@@ -1,0 +1,63 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+# This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-gradle
+
+name: Java CI with Gradle
+
+# main or devleop 브랜치로 push할 경우 ci
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - feature/6-add-ci-cd
+  # main or develop 브랜치로 PR이 될 경우 ci
+  pull_request:
+    branches:
+      - main
+      - develop
+
+# 작업 워크플로우에서 특정 파일 또는 디렉토리에 대한 권한을 설정할 때 사용
+permissions:
+  contents: read
+
+# 워크플로가 실행할 작업 (각 작업들은 독립적)
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Get Repository
+      - uses: actions/checkout@v3
+
+      - name: Create application-secret.yml
+      - uses: actions/checkout@v3
+      - run: touch ./src/main/resources/application-secret.yml
+      # GitHub Actions에서 환경 변수를 참조할 때는 ${{ 변수명 }}와 같이 사용하며, 변수명 앞뒤에 띄어쓰기를 넣어서 변수를 구분
+      - run: echo "${{ secrets.APPLICATION }}" > ./src/main/resources/application-secret.yml
+      - run: cat ./src/main/resources/application-secret.yml
+
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # chmod: 파일 권한을 변경하는 명령어입니다.
+      # +x: 실행 권한을 추가한다는 의미입니다. 즉, 파일을 실행 가능한 상태로 만듭니다.
+      # gradlew: 권한을 변경할 대상 파일의 이름입니다.
+
+      # gradlew 파일은 일반적으로 Gradle 빌드 스크립트를 실행하기 위한 스크립트 파일로 사용됩니다. 이 명령어를 통해 gradlew 파일을 실행 가능한 상태로 만들어 빌드 스크립트를 실행할 수 있게 됩니다.
+      - name: grant permission to execute gradle command
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        uses: gradle/gradle-build-action@bd5760595778326ba7f1441bcf7e88b49de61a25 # v2.6.0
+        with:
+          arguments: build --stacktrace

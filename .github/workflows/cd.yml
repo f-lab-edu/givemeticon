@@ -1,0 +1,52 @@
+name: Deploy to Ec2
+
+on:
+  push:
+    branches:
+      - main
+      - feature/6-add-ci-cd
+    type:
+      - closed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # JDK 환경
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # Gradle Permission
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Gradle build
+      - name: Build with Gradle
+        run: ./gradlew clean build -x test --stacktrace
+
+      - name: prod env docker build & push
+        run: |
+          docker build -f Dockerfile -t ${{ secrets.DOCKER_REPO }}/givemeticon .
+          docker push ${{ secrets.DOCKER_REPO }}/givemeticon
+
+      # 서버에서 Docker 이미지 실행
+      - name: Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_KEY }}
+          # 도커 작업
+          script: |
+            sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+            docker rm -f $(docker ps -qa)
+            docker pull ${{ secrets.DOCKER_REPO }}/givemeticon
+            docker run -p 8080:8080 --name givemeticon -d ${{ secrets.DOCKER_REPO }}/givemeticon
+            docker image prune -a -f
