@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feature/6-add-ci-cd
     type:
       - closed
 
