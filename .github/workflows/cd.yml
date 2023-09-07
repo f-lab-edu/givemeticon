@@ -34,8 +34,8 @@ jobs:
       - name: prod env docker build & push
         run: |
           docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{secrets.DOCKER_PASSWORD }}
-          docker build -f Dockerfile -t ${{ secrets.DOCKER_REPO }}/givemeticon .
-          docker push ${{ secrets.DOCKER_REPO }}/givemeticon
+          docker build -f Dockerfile -t ${{ secrets.DOCKER_USERNAME }}/givemeticon .
+          docker push ${{ secrets.DOCKER_USERNAME }}/givemeticon
 
       # 서버에서 Docker 이미지 실행
       - name: Deploy
@@ -48,6 +48,6 @@ jobs:
           script: |
             sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
             docker rm -f $(docker ps -qa)
-            docker pull ${{ secrets.DOCKER_REPO }}/givemeticon
-            docker run -p 8080:8080 --name givemeticon -d ${{ secrets.DOCKER_REPO }}/givemeticon
+            docker pull ${{ secrets.DOCKER_USERNAME }}/givemeticon
+            docker run -p 8080:8080 --name givemeticon -d ${{ secrets.DOCKER_USERNAME }}/givemeticon
             docker image prune -a -f

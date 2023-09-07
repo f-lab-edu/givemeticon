@@ -29,11 +29,11 @@ jobs:
     steps:
 
       - name: Get Repository
-      - uses: actions/checkout@v3
+        uses: actions/checkout@v3
 
       - name: Create application-secret.yml
-      - uses: actions/checkout@v3
-      - run: |
+        uses: actions/checkout@v3
+        run: |
           touch ./src/main/resources/application-secret.yml
           echo "${{ secrets.APPLICATION }}" > ./src/main/resources/application-secret.yml
           cat ./src/main/resources/application-secret.yml
