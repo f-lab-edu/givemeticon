@@ -1,0 +1,52 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+# This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-gradle
+
+name: givemeticon CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    # 실행될 jobs를 순서대로 명시
+    steps:
+
+      - name: Get Repository
+        uses: actions/checkout@v3
+
+      - name: Create application-secret.yml
+        run: |
+          touch ./src/main/resources/application-secret.yml
+          echo "${{ secrets.APPLICATION }}" > ./src/main/resources/application-secret.yml
+          cat ./src/main/resources/application-secret.yml
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # gradlew 파일은 일반적으로 Gradle 빌드 스크립트를 실행하기 위한 스크립트 파일로 사용됩니다. 이 명령어를 통해 gradlew 파일을 실행 가능한 상태로 만들어 빌드 스크립트를 실행할 수 있게 됩니다.
+      - name: Grant permission to execute gradle command
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        uses: gradle/gradle-build-action@bd5760595778326ba7f1441bcf7e88b49de61a25 # v2.6.0
+        with:
+          arguments: build --stacktrace
