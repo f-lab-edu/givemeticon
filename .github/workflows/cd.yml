@@ -46,7 +46,11 @@ jobs:
           # 도커 작업
           script: |
             sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-            docker rm -f $(docker ps -qa)
+            ids=$(sudo docker ps -a -q)
+            for id in $ids
+            do
+              sudo docker stop $id && docker rm $id
+            done
+            docker image prune -a -f
             docker pull ${{ secrets.DOCKER_USERNAME }}/givemeticon
             docker run -p 8080:8080 --name givemeticon -d ${{ secrets.DOCKER_USERNAME }}/givemeticon
-            docker image prune -a -f
