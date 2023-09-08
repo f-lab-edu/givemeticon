@@ -57,4 +57,4 @@ jobs:
             done
             docker image prune -a -f
             docker pull ${{ secrets.DOCKER_USERNAME }}/givemeticon
-            docker run -p 8080:8080 --name ${{ secrets.DOCKER_USERNAME }}/givemeticon -d ${{ secrets.DOCKER_USERNAME }}/givemeticon
+            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }} -d ${{ secrets.DOCKER_USERNAME }}/givemeticon
