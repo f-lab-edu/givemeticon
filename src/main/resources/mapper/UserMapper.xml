@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.givemeticon.user.infrastructure.mapper.UserMapper">
+    <insert id="save" parameterType="User" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user (id,
+                          account_id,
+                          email,
+                          password,
+                          phone,
+                          user_role,
+                          is_active,
+                          created_date,
+                          updated_date,
+                          deleted_date)
+        VALUES (#{id},
+                NULL,
+                #{email},
+                #{password},
+                #{phone},
+                #{userRole},
+                #{isActive},
+                NOW(),
+                NOW(),
+                NULL)
+    </insert>
+
+    <select id="existsByEmail" parameterType="String" resultType="boolean">
+        SELECT EXISTS
+                   (SELECT 1 FROM user where email = #{email})
+    </select>
+
+    <select id="existsByPhone" parameterType="String" resultType="boolean">
+        SELECT EXISTS
+                   (SELECT 1 FROM user where phone = #{phone})
+    </select>
+</mapper>
