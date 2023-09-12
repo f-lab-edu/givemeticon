@@ -22,7 +22,9 @@ public class UserService {
 
     public void signUp(SignUpRequest request) {
         checkUserValidity(request);
-        User user = request.toEntity(passwordEncoder);
+        String encryptedPassword = passwordEncoder.encode(request.getPassword());
+        
+        User user = request.toEntity(encryptedPassword);
         user.updateUserRole(UserRole.USER);
         userMapper.save(user);
     }

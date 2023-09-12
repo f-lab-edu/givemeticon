@@ -1,6 +1,7 @@
 package com.example.givemeticon.user.presentation.request;
 
 import com.example.givemeticon.user.domain.User;
+import com.example.givemeticon.user.domain.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -8,7 +9,6 @@ import jakarta.validation.constraints.Size;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 
@@ -32,13 +32,17 @@ public class SignUpRequest {
         this.phone = phone;
     }
 
-    public User toEntity(PasswordEncoder passwordEncoder) {
+    public User toEntity(String encryptedPassword) {
         return User.builder()
                 .email(email)
-                .password(passwordEncoder.encode(password))
+                .accountId(0)
+                .password(encryptedPassword)
                 .phone(phone)
                 .isActive(true)
+                .userRole(UserRole.USER)
                 .createdDate(LocalDateTime.now())
+                .updatedDate(null)
+                .deletedDate(null)
                 .build();
     }
 }
