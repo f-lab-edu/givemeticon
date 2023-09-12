@@ -10,7 +10,7 @@ public enum ErrorCode {
 
     // MEMBER
     DUPLICATED_EMAIL("이미 존재하는 이메일입니다."),
-    DUPLICATED_Phone("이미 존재하는 휴대폰 번호입니다."),
+    DUPLICATED_PHONE("이미 존재하는 휴대폰 번호입니다."),
     NOT_FOUND_MEMBER("존재하지 않는 회원입니다.");
 
     private final String message;
