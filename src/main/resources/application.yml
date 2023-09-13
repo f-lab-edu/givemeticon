@@ -8,6 +8,8 @@ spring:
   profiles:
     include: secret
 
-  mybatis:
-    mapper-locations: classpath:mapper/*.xml
-    type-aliases-package: com.example.givemeticon.*.domain
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.jinddung2.givemeticon.*.domain
+  configuration:
+    map-underscore-to-camel-case: true

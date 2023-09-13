@@ -5,7 +5,7 @@ plugins {
     id "jacoco"
 }
 
-group = 'com.example'
+group = 'com.jinddung2'
 version = '0.0.1-SNAPSHOT'
 
 java {
@@ -25,6 +25,7 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.security:spring-security-crypto'
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.2'
     implementation 'org.springframework.session:spring-session-data-redis'
     compileOnly 'org.projectlombok:lombok'
@@ -46,6 +47,25 @@ jacoco {
 
 jacocoTestReport {
     dependsOn test // jacocoTestReport에 test라는 종속성을 추가
+    afterEvaluate {
+        classDirectories.setFrom(
+                files(classDirectories.files.collect {
+                    fileTree(dir: it, excludes: [
+                            "**.domain.**",
+                            "**.*Application*",
+                            "**.*Config*",
+                            "**.*Dto*",
+                            "**.*Request*",
+                            "**.*Response*",
+                            "**.*Exception*",
+                            "**.*Mapper*",
+                            "**/equals",
+                            "**/hashCode",
+                            "**/toString"
+                    ])
+                })
+        )
+    }
     reports {
         xml.required = true
         csv.required = false
@@ -54,7 +74,6 @@ jacocoTestReport {
 }
 
 jacocoTestCoverageVerification {
-    // 이 커버리지 기준은 이 글의 맨 아래에서 다시 설명하겠습니다.
     violationRules {
 
         rule {
@@ -81,6 +100,9 @@ jacocoTestCoverageVerification {
                     "**.*Response*",
                     "**.*Exception*",
                     "**.*Mapper*",
+                    "**/equals",
+                    "**/hashCode",
+                    "**/toString"
             ]
         }
     }
