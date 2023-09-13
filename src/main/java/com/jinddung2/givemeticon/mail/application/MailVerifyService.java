@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.mail.application;
 
+import com.jinddung2.givemeticon.mail.exception.EmailNotFoundException;
 import com.jinddung2.givemeticon.mail.exception.InvalidCertificationNumberException;
 import com.jinddung2.givemeticon.mail.infrastructure.CertificationNumberDao;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +20,15 @@ public class MailVerifyService {
     }
 
     private boolean isVerify(String email, String certificationNumber) {
-        return (certificationNumberDao.hasKey(email) &&
-                certificationNumberDao.getCertificationNumber(email)
-                        .equals(certificationNumber));
+        boolean validatedEmail = isEmailExists(email);
+        if (!isEmailExists(email)) {
+            throw new EmailNotFoundException();
+        }
+        return (validatedEmail &&
+                certificationNumberDao.getCertificationNumber(email).equals(certificationNumber));
+    }
+
+    private boolean isEmailExists(String email) {
+        return certificationNumberDao.hasKey(email);
     }
 }
