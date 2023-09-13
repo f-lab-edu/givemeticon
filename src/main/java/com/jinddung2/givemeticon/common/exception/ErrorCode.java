@@ -7,6 +7,7 @@ public enum ErrorCode {
     // AUTH
     UNAUTHENTICATED("로그인이 필요한 기능입니다."),
     UNAUTHORIZED("해당 권한이 없습니다."),
+    INVALID_CERTIFICATED_NUMBER("인증 번호가 다릅니다."),
 
     // MEMBER
     DUPLICATED_EMAIL("이미 존재하는 이메일입니다."),
