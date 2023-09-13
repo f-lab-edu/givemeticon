@@ -2,6 +2,7 @@ package com.jinddung2.givemeticon.mail.application;
 
 import com.jinddung2.givemeticon.mail.infrastructure.CertificationGenerator;
 import com.jinddung2.givemeticon.mail.infrastructure.CertificationNumberDao;
+import com.jinddung2.givemeticon.mail.presentation.response.EmailCertificationResponse;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +23,14 @@ public class MailSendService {
     private final CertificationNumberDao certificationNumberDao;
     private final CertificationGenerator generator;
 
-    public void sendEmailForCertification(String email) throws NoSuchAlgorithmException, MessagingException {
+    public EmailCertificationResponse sendEmailForCertification(String email) throws NoSuchAlgorithmException, MessagingException {
 
         String certificationNumber = generator.createCertificationNumber();
 
         String content = String.format("%s/api/v1/users/verify?certificationNumber=%s&email=%s   링크를 3분 이내에 클릭해주세요.", DOMAIN_NAME, certificationNumber, email);
         sendMail(email, content);
         certificationNumberDao.saveCertificationNumber(email, certificationNumber);
+        return new EmailCertificationResponse(email, certificationNumber);
     }
 
     private void sendMail(String email, String content) throws MessagingException {
