@@ -24,8 +24,8 @@ public class MailController {
     @PostMapping("/send-certification")
     public ResponseEntity<ApiResponse<EmailCertificationResponse>> sendCertificationNumber(@Validated @RequestBody EmailCertificationRequest request)
             throws MessagingException, NoSuchAlgorithmException {
-        mailSendService.sendEmailForCertification(request.getEmail());
-        return ResponseEntity.ok(ApiResponse.success());
+        EmailCertificationResponse response = mailSendService.sendEmailForCertification(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/verify")
