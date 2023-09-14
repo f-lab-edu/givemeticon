@@ -13,8 +13,8 @@ spring:
     properties:
       mail:
         debug: true
-        stmp.auth: true
-        stmp.timeout: 50000
+        smtp.auth: true
+        smtp.timeout: 50000
         smtp.starttls.enable: true
 
 mybatis:
