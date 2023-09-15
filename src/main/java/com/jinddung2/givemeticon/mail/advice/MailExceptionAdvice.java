@@ -15,7 +15,7 @@ public class MailExceptionAdvice {
     @ExceptionHandler(MailException.class)
     public ResponseEntity<ErrorResult> handleMailException(MailException e) {
         ErrorResult errorResult = new ErrorResult(e.getMessage());
-        log.info("mail exception!! error msg={}", errorResult);
+        log.debug("mail exception!! error msg={}", errorResult);
         return new ResponseEntity<>(errorResult, HttpStatus.BAD_REQUEST);
     }
 }
