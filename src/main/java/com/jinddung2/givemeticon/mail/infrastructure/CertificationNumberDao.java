@@ -6,13 +6,13 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
 
-import static com.jinddung2.givemeticon.mail.constans.EmailConstants.EMAIL_VERIFICATION_LIMIT_IN_SECONDS;
 
 @Repository
 @RequiredArgsConstructor
 public class CertificationNumberDao {
 
     private final StringRedisTemplate redisTemplate;
+    public static final int EMAIL_VERIFICATION_LIMIT_IN_SECONDS = 180;
 
     public void saveCertificationNumber(String email, String certificationNumber) {
         redisTemplate.opsForValue()
