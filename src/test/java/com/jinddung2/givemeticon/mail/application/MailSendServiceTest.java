@@ -4,7 +4,6 @@ import com.jinddung2.givemeticon.mail.infrastructure.CertificationGenerator;
 import com.jinddung2.givemeticon.mail.infrastructure.CertificationNumberDao;
 import com.jinddung2.givemeticon.mail.presentation.response.EmailCertificationResponse;
 import jakarta.mail.MessagingException;
-import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,15 +11,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.test.context.TestPropertySource;
 
 import java.security.NoSuchAlgorithmException;
-import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
+@TestPropertySource(locations = "classpath:application-secret.yml")
 @ExtendWith(MockitoExtension.class)
 class MailSendServiceTest {
 
@@ -35,9 +37,19 @@ class MailSendServiceTest {
     @Mock
     CertificationGenerator generator;
 
+    @Mock
+    MimeMessage mimeMessage;
+
+    @Mock
+    MimeMessageHelper mimeMessageHelper;
+
+    @Mock
+    MailCustomProperties properties;
+
     @BeforeEach
     void setUp() {
-        mailSendService = new MailSendService(mailSender, certificationNumberDao, generator);
+        MockitoAnnotations.openMocks(this);
+        mailSendService = new MailSendService(mailSender, certificationNumberDao, generator, properties);
     }
 
     @Test
@@ -46,14 +58,17 @@ class MailSendServiceTest {
         // given
         String email = "test@example.com";
         String certificationNumber = "123456";
+        String mailTitleCertification = "givemeticon 인증번호 안내";
 
-        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
-        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
         when(generator.createCertificationNumber()).thenReturn(certificationNumber);
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
 
+        doNothing().when(mailSender).send(any(MimeMessage.class));
         // when
+        when(properties.getMailTitleCertification()).thenReturn(mailTitleCertification);
         EmailCertificationResponse response = mailSendService.sendEmailForCertification(email);
 
+        verify(generator).createCertificationNumber();
         verify(mailSender).send(any(MimeMessage.class));
         verify(certificationNumberDao).saveCertificationNumber(email, certificationNumber);
 
