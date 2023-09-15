@@ -22,3 +22,9 @@ mybatis:
   type-aliases-package: com.jinddung2.givemeticon.*.domain
   configuration:
     map-underscore-to-camel-case: true
+
+mail:
+  title:
+    certification: givemeticon 인증번호 안내
+  domain:
+    name: http://localhost:8080

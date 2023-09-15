@@ -12,9 +12,6 @@ import org.springframework.stereotype.Service;
 
 import java.security.NoSuchAlgorithmException;
 
-import static com.jinddung2.givemeticon.mail.constans.EmailConstants.DOMAIN_NAME;
-import static com.jinddung2.givemeticon.mail.constans.EmailConstants.MAIL_TITLE_CERTIFICATION;
-
 @Service
 @RequiredArgsConstructor
 public class MailSendService {
@@ -22,14 +19,14 @@ public class MailSendService {
     private final JavaMailSender mailSender;
     private final CertificationNumberDao certificationNumberDao;
     private final CertificationGenerator generator;
+    private final MailCustomProperties properties;
 
     public EmailCertificationResponse sendEmailForCertification(String email) throws NoSuchAlgorithmException, MessagingException {
 
         String certificationNumber = generator.createCertificationNumber();
-
-        String content = String.format("%s/api/v1/users/verify?certificationNumber=%s&email=%s   링크를 3분 이내에 클릭해주세요.", DOMAIN_NAME, certificationNumber, email);
-        sendMail(email, content);
+        String content = String.format("%s/api/v1/users/verify?certificationNumber=%s&email=%s   링크를 3분 이내에 클릭해주세요.", properties.getDomainName(), certificationNumber, email);
         certificationNumberDao.saveCertificationNumber(email, certificationNumber);
+        sendMail(email, content);
         return new EmailCertificationResponse(email, certificationNumber);
     }
 
@@ -37,7 +34,7 @@ public class MailSendService {
         MimeMessage mimeMessage = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage);
         helper.setTo(email);
-        helper.setSubject(MAIL_TITLE_CERTIFICATION);
+        helper.setSubject(properties.getMailTitleCertification());
         helper.setText(content);
         mailSender.send(mimeMessage);
     }
