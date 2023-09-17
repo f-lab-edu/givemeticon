@@ -1,9 +1,11 @@
 package com.jinddung2.givemeticon.user.application;
 
+import com.jinddung2.givemeticon.user.application.dto.UserDto;
 import com.jinddung2.givemeticon.user.domain.User;
 import com.jinddung2.givemeticon.user.domain.UserRole;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
+import com.jinddung2.givemeticon.user.exception.NotFoundEmailException;
 import com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +31,12 @@ public class UserService {
         userMapper.save(user);
     }
 
+    public UserDto getUser(String email) {
+        User user = userMapper.findById(email)
+                .orElseThrow(NotFoundEmailException::new);
+        return toDto(user);
+    }
+
     private void checkUserValidity(SignUpRequest request) {
         if (userMapper.existsByEmail(request.getEmail())) {
             throw new DuplicatedEmailException();
@@ -37,5 +45,19 @@ public class UserService {
         if (userMapper.existsByPhone(request.getPhone())) {
             throw new DuplicatedPhoneException();
         }
+    }
+
+    private UserDto toDto(User user) {
+        return UserDto.builder()
+                .accountId(user.getAccountId())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .password(user.getPassword())
+                .userRole(user.getUserRole())
+                .createdDate(user.getCreatedDate())
+                .updatedDate(user.getUpdatedDate())
+                .deletedDate(user.getDeletedDate())
+                .isActive(user.isActive())
+                .build();
     }
 }
