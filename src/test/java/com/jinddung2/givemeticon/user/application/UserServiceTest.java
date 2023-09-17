@@ -1,9 +1,12 @@
 package com.jinddung2.givemeticon.user.application;
 
+import com.jinddung2.givemeticon.user.application.dto.UserDto;
 import com.jinddung2.givemeticon.user.domain.User;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
+import com.jinddung2.givemeticon.user.exception.NotFoundEmailException;
 import com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper;
+import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,9 +15,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
@@ -27,16 +32,28 @@ class UserServiceTest {
     @Mock
     PasswordEncoder passwordEncoder;
     SignUpRequest signUpRequest;
+    LoginRequest loginRequest;
+    User testUser;
+
+    UserDto userDto;
 
     @BeforeEach
     void setUp() {
-        passwordEncoder = new BCryptPasswordEncoder();
-        signUpRequest = new SignUpRequest("test@naver.com", "test1234", "01012345678");
+        signUpRequest = new SignUpRequest("test@example.com", "test1234", "01012345678");
+        loginRequest = new LoginRequest("test@example.com", "test1234");
+        testUser = User.builder()
+                .email("test@example.com")
+                .password(passwordEncoder.encode("test1234"))
+                .build();
+        userDto = UserDto.builder()
+                .email("test@example.com")
+                .password(passwordEncoder.encode("test1234"))
+                .build();
     }
 
     @Test
-    @DisplayName("회원가입 성공")
-    void SignUp_Success() {
+    @DisplayName("회원가입에 성공한다")
+    void signUp_Success() {
         when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(false);
         when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(false);
 
@@ -46,19 +63,34 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("회원가입 실패 - 이메일 중복")
-    void SignUp_Fail_DuplicateEmail() {
+    @DisplayName("이메일 중복으로 회원가입에 실패한다")
+    void signUp_Fail_DuplicateEmail() {
         when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(true);
 
         assertThrows(DuplicatedEmailException.class, () -> userService.signUp(signUpRequest));
     }
 
     @Test
-    @DisplayName("회원가입 실패 - 핸드폰 번호 중복")
-    void SignUp_Fail_DuplicatePhone() {
+    @DisplayName("핸드폰 번호 중복으로 회원가입에 실패한다")
+    void signUp_Fail_DuplicatePhone() {
         when(userMapper.existsByPhone(signUpRequest.getPhone())).thenReturn(true);
 
         assertThrows(DuplicatedPhoneException.class, () -> userService.signUp(signUpRequest));
     }
 
+    @Test
+    @DisplayName("이메일을 통해 유저 정보를 갖고 오는데 성공한다.")
+    void get_User_Success() {
+        when(userMapper.findById(testUser.getEmail())).thenReturn(Optional.of(testUser));
+        UserDto user = userService.getUser(testUser.getEmail());
+        assertEquals(testUser.getEmail(), user.getEmail());
+    }
+
+    @Test
+    @DisplayName("이메일을 찾을 수 없어 유저 정보를 갖고 오는데 실패한다.")
+    void get_User_Fail_Not_Exists_Email() {
+        when(userMapper.findById(testUser.getEmail())).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundEmailException.class, () -> userService.getUser(testUser.getEmail()));
+    }
 }

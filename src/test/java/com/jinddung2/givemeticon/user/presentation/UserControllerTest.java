@@ -1,13 +1,15 @@
 package com.jinddung2.givemeticon.user.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jinddung2.givemeticon.user.application.SessionLoginService;
 import com.jinddung2.givemeticon.user.application.UserService;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
+import com.jinddung2.givemeticon.user.exception.NotFoundEmailException;
+import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -30,12 +32,15 @@ public class UserControllerTest {
     ObjectMapper objectMapper; // JSON 객체로 변환하기 위한 ObjectMapper
     @MockBean
     UserService userService; // MockBean으로 UserService 주입
-    @Mock
+    @MockBean
+    SessionLoginService loginService;
     SignUpRequest signUpRequest;
+    LoginRequest loginRequest;
 
     @BeforeEach
     void setUp() {
         signUpRequest = new SignUpRequest("test@example.com", "test1234", "01012345678");
+        loginRequest = new LoginRequest("test@example.com", "test1234");
     }
 
     @Test
@@ -75,5 +80,34 @@ public class UserControllerTest {
         resultActions
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("이미 존재하는 휴대폰 번호입니다."));
+    }
+
+    @Test
+    public void get_UserInfo_Success() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/users/info")
+                        .param("email", loginRequest.getEmail())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signUpRequest)))
+                .andExpect(status().isOk());
+
+        // Verify
+        Mockito.verify(userService).getUser(loginRequest.getEmail());
+    }
+
+    @Test
+    public void get_UserInfo_Fail_Not_Exists_Email() throws Exception {
+        doThrow(new NotFoundEmailException()).when(userService).getUser(loginRequest.getEmail());
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/users/info")
+                        .param("email", loginRequest.getEmail())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signUpRequest)))
+                .andExpect(status().isBadRequest());
+
+        // Verify
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("존재하지 않는 회원입니다."));
     }
 }
