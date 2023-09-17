@@ -16,4 +16,9 @@ public class SessionLoginService implements LoginService {
     public void login(String email) {
         session.setAttribute(LOGIN_USER, email);
     }
+
+    @Override
+    public void logout() {
+        session.removeAttribute(LOGIN_USER);
+    }
 }

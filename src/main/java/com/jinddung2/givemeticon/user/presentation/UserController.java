@@ -33,6 +33,12 @@ public class UserController {
         return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
     }
 
+    @GetMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout() {
+        loginService.logout();
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
+    }
+
     @GetMapping("/info")
     public ResponseEntity<ApiResponse<UserDto>> getUser(@RequestParam String email) {
         UserDto userDto = userService.getUser(email);
