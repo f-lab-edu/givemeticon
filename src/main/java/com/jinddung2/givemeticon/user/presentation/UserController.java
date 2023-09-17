@@ -4,6 +4,7 @@ import com.jinddung2.givemeticon.common.response.ApiResponse;
 import com.jinddung2.givemeticon.user.application.LoginService;
 import com.jinddung2.givemeticon.user.application.UserService;
 import com.jinddung2.givemeticon.user.application.dto.UserDto;
+import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,9 +21,16 @@ public class UserController {
     private final LoginService loginService;
 
     @PostMapping("/sign-up")
-    public ResponseEntity<Void> signUp(@RequestBody @Validated SignUpRequest request) {
+    public ResponseEntity<ApiResponse<Void>> signUp(@RequestBody @Validated SignUpRequest request) {
         userService.signUp(request);
-        return new ResponseEntity<>(HttpStatus.CREATED);
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.CREATED);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<Void>> login(@RequestBody @Validated LoginRequest request) {
+        UserDto userDto = userService.checkLogin(request.getEmail(), request.getPassword());
+        loginService.login(userDto.getEmail());
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
     }
 
     @GetMapping("/info")

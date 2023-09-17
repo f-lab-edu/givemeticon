@@ -5,6 +5,7 @@ import com.jinddung2.givemeticon.user.domain.User;
 import com.jinddung2.givemeticon.user.domain.UserRole;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
+import com.jinddung2.givemeticon.user.exception.MisMatchPasswordException;
 import com.jinddung2.givemeticon.user.exception.NotFoundEmailException;
 import com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
@@ -35,6 +36,16 @@ public class UserService {
         User user = userMapper.findById(email)
                 .orElseThrow(NotFoundEmailException::new);
         return toDto(user);
+    }
+
+    public UserDto checkLogin(String email, String password) {
+        UserDto user = getUser(email);
+        boolean isMatch = passwordEncoder.matches(password, user.getPassword());
+
+        if (!isMatch) {
+            throw new MisMatchPasswordException();
+        }
+        return user;
     }
 
     private void checkUserValidity(SignUpRequest request) {
