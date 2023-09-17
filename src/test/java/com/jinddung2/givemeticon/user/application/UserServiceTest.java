@@ -4,6 +4,7 @@ import com.jinddung2.givemeticon.user.application.dto.UserDto;
 import com.jinddung2.givemeticon.user.domain.User;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
+import com.jinddung2.givemeticon.user.exception.MisMatchPasswordException;
 import com.jinddung2.givemeticon.user.exception.NotFoundEmailException;
 import com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper;
 import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
@@ -19,8 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -92,5 +92,26 @@ class UserServiceTest {
         when(userMapper.findById(testUser.getEmail())).thenReturn(Optional.empty());
 
         assertThrows(NotFoundEmailException.class, () -> userService.getUser(testUser.getEmail()));
+    }
+
+    @Test
+    @DisplayName("이메일에 맞는 패스워드인지 확인한다.")
+    void check_Login_Password_Match_Success() {
+        when(userMapper.findById(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPassword())).thenReturn(true);
+
+        UserDto result = userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword());
+
+        assertNotNull(result);
+        assertEquals(loginRequest.getEmail(), userDto.getEmail());
+    }
+
+    @Test
+    @DisplayName("이메일에 맞는 패스워드가 아니어서 실패한다.")
+    void check_Login_Password_Not_Match_Success() {
+        when(userMapper.findById(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPassword())).thenReturn(false);
+
+        assertThrows(MisMatchPasswordException.class, () -> userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword()));
     }
 }

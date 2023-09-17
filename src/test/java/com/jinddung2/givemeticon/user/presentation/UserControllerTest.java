@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.user.presentation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.user.application.SessionLoginService;
 import com.jinddung2.givemeticon.user.application.UserService;
+import com.jinddung2.givemeticon.user.application.dto.UserDto;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.user.exception.NotFoundEmailException;
@@ -19,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,11 +38,16 @@ public class UserControllerTest {
     SessionLoginService loginService;
     SignUpRequest signUpRequest;
     LoginRequest loginRequest;
+    UserDto userDto;
 
     @BeforeEach
     void setUp() {
         signUpRequest = new SignUpRequest("test@example.com", "test1234", "01012345678");
         loginRequest = new LoginRequest("test@example.com", "test1234");
+        userDto = UserDto.builder()
+                .email("test@example.com")
+                .password("test1234")
+                .build();
     }
 
     @Test
@@ -109,5 +116,18 @@ public class UserControllerTest {
         resultActions
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("존재하지 않는 회원입니다."));
+    }
+
+    @Test
+    public void login_Success() throws Exception {
+        given(userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword())).willReturn(userDto);
+        mockMvc.perform(MockMvcRequestBuilders
+                        .post("/api/v1/users/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signUpRequest)))
+                .andExpect(status().isOk());
+
+        // Verify
+        Mockito.verify(loginService).login(loginRequest.getEmail());
     }
 }
