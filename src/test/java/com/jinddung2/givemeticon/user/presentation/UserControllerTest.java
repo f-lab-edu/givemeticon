@@ -2,38 +2,40 @@ package com.jinddung2.givemeticon.user.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.user.application.UserService;
+import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
+import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
+
+import static org.mockito.Mockito.doThrow;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
 public class UserControllerTest {
 
     @Autowired
     MockMvc mockMvc;
-
     @Autowired
     ObjectMapper objectMapper; // JSON 객체로 변환하기 위한 ObjectMapper
-
     @MockBean
     UserService userService; // MockBean으로 UserService 주입
+    @Mock
     SignUpRequest signUpRequest;
-    PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
-        passwordEncoder = new BCryptPasswordEncoder();
-        signUpRequest = new SignUpRequest("test@naver.com", "test1234", "01012345678");
+        signUpRequest = new SignUpRequest("test@example.com", "test1234", "01012345678");
     }
 
     @Test
@@ -42,9 +44,36 @@ public class UserControllerTest {
                         .post("/api/v1/users/sign-up")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(signUpRequest)))
-                .andExpect(MockMvcResultMatchers.status().isCreated());
+                .andExpect(status().isCreated());
 
         // Verify
-        Mockito.verify(userService, Mockito.times(1)).signUp(signUpRequest); // signUp 메서드가 한 번 호출되었는지 확인
+        Mockito.verify(userService).signUp(signUpRequest);
+    }
+
+    @Test
+    public void signUp_Fail_Duplicate_Email() throws Exception {
+        doThrow(new DuplicatedEmailException()).when(userService).signUp(signUpRequest);
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                .post("/api/v1/users/sign-up")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(signUpRequest)));
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("이미 존재하는 이메일입니다."));
+    }
+
+    @Test
+    public void signUp_Fail_Duplicate_Phone() throws Exception {
+        doThrow(new DuplicatedPhoneException()).when(userService).signUp(signUpRequest);
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .post("/api/v1/users/sign-up")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signUpRequest)))
+                .andExpect(status().isBadRequest());
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("이미 존재하는 휴대폰 번호입니다."));
     }
 }
