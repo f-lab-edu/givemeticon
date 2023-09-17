@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -129,5 +130,18 @@ public class UserControllerTest {
 
         // Verify
         Mockito.verify(loginService).login(loginRequest.getEmail());
+    }
+
+    @Test
+    public void logout_Success() throws Exception {
+        willDoNothing().given(loginService).logout();
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/users/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signUpRequest)))
+                .andExpect(status().isOk());
+
+        // Verify
+        Mockito.verify(loginService).logout();
     }
 }

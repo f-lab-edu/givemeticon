@@ -44,7 +44,7 @@ class SessionLoginServiceTest {
     }
 
     @Test
-    @DisplayName("로그인 성공한다")
+    @DisplayName("로그인에 성공한다")
     void login_Success() {
         willDoNothing().given(session).setAttribute(LOGIN_USER, testUser.getEmail());
         when(session.getAttribute(LOGIN_USER)).thenReturn(testUser.getEmail());
@@ -54,5 +54,17 @@ class SessionLoginServiceTest {
         then(session).should().setAttribute(LOGIN_USER, testUser.getEmail());
         Assertions.assertEquals(session.getAttribute(LOGIN_USER), testUser.getEmail());
     }
-    
+
+    @Test
+    @DisplayName("로그아웃에 성공한다")
+    void logout_Success() {
+        willDoNothing().given(session).removeAttribute(LOGIN_USER);
+        session.setAttribute(LOGIN_USER, loginRequest.getEmail());
+
+        loginService.logout();
+
+        then(session).should().removeAttribute(LOGIN_USER);
+        Assertions.assertNull(session.getAttribute(LOGIN_USER));
+    }
+
 }
