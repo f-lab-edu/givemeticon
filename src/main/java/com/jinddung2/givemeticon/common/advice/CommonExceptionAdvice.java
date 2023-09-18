@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.common.advice;
 
+import com.jinddung2.givemeticon.common.exception.UnauthorizedUserException;
 import com.jinddung2.givemeticon.common.response.ErrorResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,13 @@ public class CommonExceptionAdvice {
         ErrorResult errorResult = new ErrorResult(defaultMessage);
         log.debug("Exception Occurred in {}.{}(). Error message: {}", className, methodName, defaultMessage);
         return new ResponseEntity<>(errorResult, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(UnauthorizedUserException.class)
+    public ResponseEntity<ErrorResult> handleUnauthorizedUserException(UnauthorizedUserException e) {
+        ErrorResult errorResult = new ErrorResult(e.getMessage());
+        log.debug("UnauthorizedUserException Occurred. error msg={}", errorResult);
+        return new ResponseEntity<>(errorResult, HttpStatus.UNAUTHORIZED);
     }
 
 }
