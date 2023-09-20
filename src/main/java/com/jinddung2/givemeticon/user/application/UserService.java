@@ -23,13 +23,15 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public void signUp(SignUpRequest request) {
+    public Integer signUp(SignUpRequest request) {
         checkUserValidity(request);
         String encryptedPassword = passwordEncoder.encode(request.getPassword());
 
         User user = request.toEntity(encryptedPassword);
         user.updateUserRole(UserRole.USER);
         userMapper.save(user);
+
+        return user.getId();
     }
 
     public UserDto getUser(String email) {
@@ -60,11 +62,13 @@ public class UserService {
 
     private UserDto toDto(User user) {
         return UserDto.builder()
+                .id(user.getId())
                 .accountId(user.getAccountId())
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .password(user.getPassword())
                 .userRole(user.getUserRole())
+                .provider(user.getProvider())
                 .createdDate(user.getCreatedDate())
                 .updatedDate(user.getUpdatedDate())
                 .deletedDate(user.getDeletedDate())

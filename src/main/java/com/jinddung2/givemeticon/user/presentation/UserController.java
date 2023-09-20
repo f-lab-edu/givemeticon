@@ -21,9 +21,9 @@ public class UserController {
     private final LoginService loginService;
 
     @PostMapping("/sign-up")
-    public ResponseEntity<ApiResponse<Void>> signUp(@RequestBody @Validated SignUpRequest request) {
-        userService.signUp(request);
-        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.CREATED);
+    public ResponseEntity<ApiResponse<Integer>> signUp(@RequestBody @Validated SignUpRequest request) {
+        Integer userId = userService.signUp(request);
+        return new ResponseEntity<>(ApiResponse.success(userId), HttpStatus.CREATED);
     }
 
     @PostMapping("/login")
