@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.user.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jinddung2.givemeticon.user.application.SessionLoginService;
+import com.jinddung2.givemeticon.user.application.LoginService;
 import com.jinddung2.givemeticon.user.application.UserService;
 import com.jinddung2.givemeticon.user.application.dto.UserDto;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
@@ -16,12 +16,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import java.util.Optional;
+
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,7 +41,9 @@ public class UserControllerTest {
     @MockBean
     UserService userService; // MockBean으로 UserService 주입
     @MockBean
-    SessionLoginService loginService;
+    LoginService loginService;
+    @MockBean
+    MockHttpSession mockHttpSession;
     SignUpRequest signUpRequest;
     LoginRequest loginRequest;
     UserDto userDto;
@@ -48,6 +56,8 @@ public class UserControllerTest {
                 .email("test@example.com")
                 .password("test1234")
                 .build();
+        mockHttpSession = new MockHttpSession();
+        when(loginService.getLoginUser()).thenReturn(Optional.of(userDto.getEmail()));
     }
 
     @Test
@@ -94,8 +104,10 @@ public class UserControllerTest {
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/info")
                         .param("email", loginRequest.getEmail())
+                        .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(signUpRequest)))
+                .andDo(print())
                 .andExpect(status().isOk());
 
         // Verify
@@ -108,6 +120,7 @@ public class UserControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/info")
                         .param("email", loginRequest.getEmail())
+                        .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(signUpRequest)))
                 .andExpect(status().isBadRequest());
@@ -129,5 +142,19 @@ public class UserControllerTest {
 
         // Verify
         Mockito.verify(loginService).login(loginRequest.getEmail());
+    }
+
+    @Test
+    public void logout_Success() throws Exception {
+        willDoNothing().given(loginService).logout();
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/users/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(signUpRequest)))
+                .andExpect(status().isOk());
+
+        // Verify
+        Mockito.verify(loginService).logout();
     }
 }
