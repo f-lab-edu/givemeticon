@@ -7,6 +7,10 @@ spring:
 
   profiles:
     include: secret
+
+  session:
+    store-type: redis
+  
   mail:
     host: smtp.gmail.com
     port: 587

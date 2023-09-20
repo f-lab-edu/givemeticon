@@ -15,6 +15,7 @@ public class UserExceptionAdvice {
     @ExceptionHandler(UserException.class)
     public ResponseEntity<ErrorResult> handleUserException(UserException e) {
         ErrorResult errorResult = new ErrorResult(e.getMessage());
+        log.error("user exception!! error msg={}", errorResult);
         return new ResponseEntity<>(errorResult, HttpStatus.BAD_REQUEST);
     }
 }

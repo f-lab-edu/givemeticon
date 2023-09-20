@@ -26,6 +26,12 @@
                 NULL)
     </insert>
 
+    <select id="findById" parameterType="String" resultType="User">
+        SELECT *
+        FROM user
+        where email = #{email}
+    </select>
+
     <select id="existsByEmail" parameterType="String" resultType="boolean">
         SELECT EXISTS
                    (SELECT 1 FROM user where email = #{email})
