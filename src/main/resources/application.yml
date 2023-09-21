@@ -6,11 +6,11 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   profiles:
-    include: secret
+    include: secret, oauth
 
   session:
     store-type: redis
-  
+
   mail:
     host: smtp.gmail.com
     port: 587
