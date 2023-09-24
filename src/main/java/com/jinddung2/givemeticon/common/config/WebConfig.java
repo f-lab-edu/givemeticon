@@ -17,7 +17,7 @@ public class WebConfig implements WebMvcConfigurer {
             "/api/v1/users/login",
             "/api/v1/mails/send-certification",
             "/api/v1/mails/verify",
-            "/auth/naver/callback",
+            "/auth/*/callback",
             "/api/v1/auth/**",
             "/error",
             "/favicon.ico"
