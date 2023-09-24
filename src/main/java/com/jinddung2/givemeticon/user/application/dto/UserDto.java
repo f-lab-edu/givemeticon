@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.user.application.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.jinddung2.givemeticon.oauth.provider.OAuthProvider;
+import com.jinddung2.givemeticon.oauth.domain.oauth.OAuthProvider;
 import com.jinddung2.givemeticon.user.domain.UserRole;
 import lombok.Builder;
 import lombok.Getter;

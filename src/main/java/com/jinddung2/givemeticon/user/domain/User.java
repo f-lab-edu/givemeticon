@@ -1,6 +1,6 @@
 package com.jinddung2.givemeticon.user.domain;
 
-import com.jinddung2.givemeticon.oauth.provider.OAuthProvider;
+import com.jinddung2.givemeticon.oauth.domain.oauth.OAuthProvider;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
