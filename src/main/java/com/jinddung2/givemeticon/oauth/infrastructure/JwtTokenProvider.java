@@ -1,11 +1,9 @@
 package com.jinddung2.givemeticon.oauth.infrastructure;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +11,7 @@ import java.security.Key;
 import java.util.Date;
 
 @Component
+@Slf4j
 public class JwtTokenProvider {
     private final Key key;
 
@@ -32,6 +31,22 @@ public class JwtTokenProvider {
     public String extractSubject(String accessToken) {
         Claims claims = parseClaims(accessToken);
         return claims.getSubject();
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+            return true;
+        } catch (io.jsonwebtoken.security.SecurityException | MalformedJwtException e) {
+            log.warn("Invalid JWT Token", e);
+        } catch (ExpiredJwtException e) {
+            log.warn("Expired JWT Token", e);
+        } catch (UnsupportedJwtException e) {
+            log.warn("Unsupported JWT Token", e);
+        } catch (IllegalArgumentException e) {
+            log.warn("JWT claims string is empty.", e);
+        }
+        return false;
     }
 
     private Claims parseClaims(String accessToken) {
