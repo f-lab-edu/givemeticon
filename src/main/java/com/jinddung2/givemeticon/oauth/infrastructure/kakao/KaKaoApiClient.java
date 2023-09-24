@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.oauth.infrastructure.naver;
+package com.jinddung2.givemeticon.oauth.infrastructure.kakao;
 
 import com.jinddung2.givemeticon.oauth.constants.OAuthConstant;
 import com.jinddung2.givemeticon.oauth.domain.oauth.OAuthClient;
@@ -21,40 +21,35 @@ import java.util.Objects;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class NaverApiClient implements OAuthClient {
+public class KaKaoApiClient implements OAuthClient {
 
-    @Value("${oauth.naver.url.auth}")
+    @Value("${oauth.kakao.url.auth}")
     private String authUrl;
-    @Value("${oauth.naver.url.api}")
+    @Value("${oauth.kakao.url.api}")
     private String apiUrl;
-    @Value("${oauth.naver.client-id}")
+    @Value("${oauth.kakao.client-id}")
     private String clientId;
-    @Value("${oauth.naver.client-secret}")
-    private String clientSecret;
 
     private final RestTemplate restTemplate;
 
     @Override
     public OAuthProvider oauthProvider() {
-        return OAuthProvider.NAVER;
+        return OAuthProvider.KAKAO;
     }
 
     @Override
     public String requestAccessToken(OAuthLoginParams params) {
-        String url = authUrl + "/oauth2.0/token";
+        String url = authUrl + "/oauth/token";
         HttpEntity<MultiValueMap<String, String>> request = generateHttpRequest(params);
 
-        NaverToken naverToken = restTemplate.postForObject(url, request, NaverToken.class);
-
-        log.info("url={}", url);
-        log.info("request={}", request);
-        Objects.requireNonNull(naverToken);
-        return naverToken.accessToken();
+        KaKaoToken kaKaoToken = restTemplate.postForObject(url, request, KaKaoToken.class);
+        Objects.requireNonNull(kaKaoToken);
+        return kaKaoToken.accessToken();
     }
 
     @Override
     public OAuthUserInfo requestOAuthInfo(String accessToken) {
-        String url = apiUrl + "/v1/nid/me";
+        String url = apiUrl + "/v2/user/me";
 
         HttpHeaders httpHeaders = new HttpHeaders();
         httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -62,30 +57,20 @@ public class NaverApiClient implements OAuthClient {
         httpHeaders.set("Authorization", requestToken);
 
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("property_keys", "[\"kakao_account.email\"]");
 
         HttpEntity<?> request = new HttpEntity<>(body, httpHeaders);
-        log.info("request hearer={}, body={}", request.getHeaders(), request.getBody());
-        return restTemplate.postForObject(url, request, NaverUserInfo.class);
+        return restTemplate.postForObject(url, request, KaKaoUserInfo.class);
     }
 
-    /**
-     * "https://nid.naver.com/oauth2.0/token?
-     * grant_type=authorization_code (추가할 param)
-     * &client_id=jyvqXeaVOVmV (추가할 param)
-     * &client_secret=527300A0_COq1_XV33cf (추가할 param)
-     * &code=EIc5bFrl4RibFls (NaverLoginParams에 포함되어 있음)
-     * 1&state=9kgsGTfH4j7IyAkg" (NaverLoginParams에 포함되어 있음)
-     */
     private HttpEntity<MultiValueMap<String, String>> generateHttpRequest(OAuthLoginParams params) {
         HttpHeaders httpHeaders = new HttpHeaders();
-        // 접근 토큰 갱신 / 삭제 요청시 access_token 값은 URL 인코딩하셔야 합니다.
         httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         MultiValueMap<String, String> body = params.makeBody();
         log.info("age body={}", body);
         body.add("grant_type", OAuthConstant.GRANT_TYPE);
         body.add("client_id", clientId);
-        body.add("client_secret", clientSecret);
         return new HttpEntity<>(body, httpHeaders);
     }
 }
