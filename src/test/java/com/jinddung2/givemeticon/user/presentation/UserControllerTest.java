@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.user.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jinddung2.givemeticon.oauth.infrastructure.JwtTokenProvider;
 import com.jinddung2.givemeticon.user.application.LoginService;
 import com.jinddung2.givemeticon.user.application.UserService;
 import com.jinddung2.givemeticon.user.application.dto.UserDto;
@@ -42,6 +43,8 @@ public class UserControllerTest {
     UserService userService; // MockBean으로 UserService 주입
     @MockBean
     LoginService loginService;
+    @MockBean
+    JwtTokenProvider jwtTokenProvider;
     @MockBean
     MockHttpSession mockHttpSession;
     SignUpRequest signUpRequest;
