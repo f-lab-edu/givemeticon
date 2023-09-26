@@ -39,9 +39,9 @@ public class UserController {
         return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
     }
 
-    @GetMapping("/info")
-    public ResponseEntity<ApiResponse<UserDto>> getUser(@RequestParam String email) {
-        UserDto userDto = userService.getUser(email);
+    @GetMapping("/{userId}/info")
+    public ResponseEntity<ApiResponse<UserDto>> getUser(@PathVariable(name = "userId") int userId) {
+        UserDto userDto = userService.getUserInfo(userId);
         return new ResponseEntity<>(ApiResponse.success(userDto), HttpStatus.OK);
     }
 }

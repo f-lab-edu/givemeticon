@@ -26,7 +26,13 @@
                 NULL)
     </insert>
 
-    <select id="findById" parameterType="String" resultType="User">
+    <select id="findById" parameterType="int" resultType="User">
+        SELECT *
+        FROM user
+        where id = #{id}
+    </select>
+
+    <select id="findByEmail" parameterType="String" resultType="User">
         SELECT *
         FROM user
         where email = #{email}

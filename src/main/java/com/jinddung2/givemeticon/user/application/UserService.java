@@ -3,10 +3,7 @@ package com.jinddung2.givemeticon.user.application;
 import com.jinddung2.givemeticon.user.application.dto.UserDto;
 import com.jinddung2.givemeticon.user.domain.User;
 import com.jinddung2.givemeticon.user.domain.UserRole;
-import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
-import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
-import com.jinddung2.givemeticon.user.exception.MisMatchPasswordException;
-import com.jinddung2.givemeticon.user.exception.NotFoundEmailException;
+import com.jinddung2.givemeticon.user.exception.*;
 import com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,20 +29,21 @@ public class UserService {
         userMapper.save(user);
     }
 
-    public UserDto getUser(String email) {
-        User user = userMapper.findById(email)
-                .orElseThrow(NotFoundEmailException::new);
+    public UserDto getUserInfo(int userId) {
+        User user = userMapper.findById(userId)
+                .orElseThrow(NotFoundUserException::new);
         return toDto(user);
     }
 
     public UserDto checkLogin(String email, String password) {
-        UserDto user = getUser(email);
+        User user = userMapper.findByEmail(email)
+                .orElseThrow(NotFoundEmailException::new);
         boolean isMatch = passwordEncoder.matches(password, user.getPassword());
 
         if (!isMatch) {
             throw new MisMatchPasswordException();
         }
-        return user;
+        return toDto(user);
     }
 
     private void checkUserValidity(SignUpRequest request) {
@@ -60,10 +58,10 @@ public class UserService {
 
     private UserDto toDto(User user) {
         return UserDto.builder()
+                .id(user.getId())
                 .accountId(user.getAccountId())
                 .email(user.getEmail())
                 .phone(user.getPhone())
-                .password(user.getPassword())
                 .userRole(user.getUserRole())
                 .createdDate(user.getCreatedDate())
                 .updatedDate(user.getUpdatedDate())

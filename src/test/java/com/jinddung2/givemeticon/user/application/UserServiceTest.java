@@ -42,12 +42,14 @@ class UserServiceTest {
         signUpRequest = new SignUpRequest("test@example.com", "test1234", "01012345678");
         loginRequest = new LoginRequest("test@example.com", "test1234");
         testUser = User.builder()
+                .id(100)
                 .email("test@example.com")
                 .password(passwordEncoder.encode("test1234"))
                 .build();
         userDto = UserDto.builder()
-                .email("test@example.com")
-                .password(passwordEncoder.encode("test1234"))
+                .id(testUser.getId())
+                .email(testUser.getEmail())
+                .password(passwordEncoder.encode(testUser.getPassword()))
                 .build();
     }
 
@@ -81,23 +83,23 @@ class UserServiceTest {
     @Test
     @DisplayName("이메일을 통해 유저 정보를 갖고 오는데 성공한다.")
     void get_User_Success() {
-        when(userMapper.findById(testUser.getEmail())).thenReturn(Optional.of(testUser));
-        UserDto user = userService.getUser(testUser.getEmail());
+        when(userMapper.findById(testUser.getId())).thenReturn(Optional.of(testUser));
+        UserDto user = userService.getUserInfo(testUser.getId());
         assertEquals(testUser.getEmail(), user.getEmail());
     }
 
     @Test
     @DisplayName("이메일을 찾을 수 없어 유저 정보를 갖고 오는데 실패한다.")
     void get_User_Fail_Not_Exists_Email() {
-        when(userMapper.findById(testUser.getEmail())).thenReturn(Optional.empty());
+        when(userMapper.findById(testUser.getId())).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundEmailException.class, () -> userService.getUser(testUser.getEmail()));
+        assertThrows(NotFoundEmailException.class, () -> userService.getUserInfo(testUser.getId()));
     }
 
     @Test
     @DisplayName("이메일에 맞는 패스워드인지 확인한다.")
     void check_Login_Password_Match_Success() {
-        when(userMapper.findById(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
+        when(userMapper.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPassword())).thenReturn(true);
 
         UserDto result = userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword());
@@ -109,7 +111,7 @@ class UserServiceTest {
     @Test
     @DisplayName("이메일에 맞는 패스워드가 아니어서 실패한다.")
     void check_Login_Password_Not_Match_Success() {
-        when(userMapper.findById(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
+        when(userMapper.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPassword())).thenReturn(false);
 
         assertThrows(MisMatchPasswordException.class, () -> userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword()));

@@ -22,6 +22,7 @@ public class User {
 
     @Builder
     public User(
+            int id,
             int accountId,
             String email,
             String password,
@@ -32,6 +33,7 @@ public class User {
             LocalDateTime updatedDate,
             LocalDateTime deletedDate
     ) {
+        this.id = id;
         this.accountId = accountId;
         this.email = email;
         this.password = password;

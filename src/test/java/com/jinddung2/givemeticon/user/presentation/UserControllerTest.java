@@ -6,7 +6,7 @@ import com.jinddung2.givemeticon.user.application.UserService;
 import com.jinddung2.givemeticon.user.application.dto.UserDto;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
-import com.jinddung2.givemeticon.user.exception.NotFoundEmailException;
+import com.jinddung2.givemeticon.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,7 +102,7 @@ public class UserControllerTest {
     @Test
     public void get_UserInfo_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
-                        .get("/api/v1/users/info")
+                        .get("/api/v1/users/1/info")
                         .param("email", loginRequest.getEmail())
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -111,18 +111,18 @@ public class UserControllerTest {
                 .andExpect(status().isOk());
 
         // Verify
-        Mockito.verify(userService).getUser(loginRequest.getEmail());
+        Mockito.verify(userService).getUserInfo(1);
     }
 
     @Test
-    public void get_UserInfo_Fail_Not_Exists_Email() throws Exception {
-        doThrow(new NotFoundEmailException()).when(userService).getUser(loginRequest.getEmail());
+    public void get_UserInfo_Fail_Not_Exists() throws Exception {
+        doThrow(new NotFoundUserException()).when(userService).getUserInfo(1);
+
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .get("/api/v1/users/info")
+                        .get("/api/v1/users/1/info")
                         .param("email", loginRequest.getEmail())
                         .session(mockHttpSession)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(signUpRequest)))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
 
         // Verify
