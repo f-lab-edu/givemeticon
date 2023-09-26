@@ -5,7 +5,7 @@ import com.jinddung2.givemeticon.user.domain.User;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.user.exception.MisMatchPasswordException;
-import com.jinddung2.givemeticon.user.exception.NotFoundEmailException;
+import com.jinddung2.givemeticon.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper;
 import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
@@ -81,7 +81,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("이메일을 통해 유저 정보를 갖고 오는데 성공한다.")
+    @DisplayName("id를 통해 유저 정보를 갖고 오는데 성공한다.")
     void get_User_Success() {
         when(userMapper.findById(testUser.getId())).thenReturn(Optional.of(testUser));
         UserDto user = userService.getUserInfo(testUser.getId());
@@ -89,11 +89,11 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("이메일을 찾을 수 없어 유저 정보를 갖고 오는데 실패한다.")
+    @DisplayName("id를 찾을 수 없어 유저 정보를 갖고 오는데 실패한다.")
     void get_User_Fail_Not_Exists_Email() {
         when(userMapper.findById(testUser.getId())).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundEmailException.class, () -> userService.getUserInfo(testUser.getId()));
+        assertThrows(NotFoundUserException.class, () -> userService.getUserInfo(testUser.getId()));
     }
 
     @Test
