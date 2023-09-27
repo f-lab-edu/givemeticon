@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.user.domain;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 
@@ -22,6 +23,7 @@ public class User {
 
     @Builder
     public User(
+            int id,
             int accountId,
             String email,
             String password,
@@ -32,6 +34,7 @@ public class User {
             LocalDateTime updatedDate,
             LocalDateTime deletedDate
     ) {
+        this.id = id;
         this.accountId = accountId;
         this.email = email;
         this.password = password;
@@ -45,5 +48,13 @@ public class User {
 
     public void updateUserRole(UserRole userRole) {
         this.userRole = userRole;
+    }
+
+    public void updatePassword(String encryptedPassword) {
+        this.password = encryptedPassword;
+    }
+
+    public boolean isPasswordMatch(PasswordEncoder passwordEncoder, String inputPassword) {
+        return passwordEncoder.matches(inputPassword, this.password);
     }
 }

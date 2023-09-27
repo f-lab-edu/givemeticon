@@ -5,10 +5,12 @@ import com.jinddung2.givemeticon.user.domain.User;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.user.exception.MisMatchPasswordException;
-import com.jinddung2.givemeticon.user.exception.NotFoundEmailException;
+import com.jinddung2.givemeticon.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper;
 import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
+import com.jinddung2.givemeticon.user.presentation.request.PasswordUpdateRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,7 @@ class UserServiceTest {
     PasswordEncoder passwordEncoder;
     SignUpRequest signUpRequest;
     LoginRequest loginRequest;
+    PasswordUpdateRequest passwordUpdateRequest;
     User testUser;
 
     UserDto userDto;
@@ -42,13 +45,16 @@ class UserServiceTest {
         signUpRequest = new SignUpRequest("test@example.com", "test1234", "01012345678");
         loginRequest = new LoginRequest("test@example.com", "test1234");
         testUser = User.builder()
+                .id(100)
                 .email("test@example.com")
                 .password(passwordEncoder.encode("test1234"))
                 .build();
         userDto = UserDto.builder()
-                .email("test@example.com")
+                .id(testUser.getId())
+                .email(testUser.getEmail())
                 .password(passwordEncoder.encode("test1234"))
                 .build();
+        passwordUpdateRequest = new PasswordUpdateRequest("test1234", "newtest1234");
     }
 
     @Test
@@ -79,25 +85,25 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("이메일을 통해 유저 정보를 갖고 오는데 성공한다.")
+    @DisplayName("id를 통해 유저 정보를 갖고 오는데 성공한다.")
     void get_User_Success() {
-        when(userMapper.findById(testUser.getEmail())).thenReturn(Optional.of(testUser));
-        UserDto user = userService.getUser(testUser.getEmail());
+        when(userMapper.findById(testUser.getId())).thenReturn(Optional.of(testUser));
+        UserDto user = userService.getUserInfo(testUser.getId());
         assertEquals(testUser.getEmail(), user.getEmail());
     }
 
     @Test
-    @DisplayName("이메일을 찾을 수 없어 유저 정보를 갖고 오는데 실패한다.")
+    @DisplayName("id를 찾을 수 없어 유저 정보를 갖고 오는데 실패한다.")
     void get_User_Fail_Not_Exists_Email() {
-        when(userMapper.findById(testUser.getEmail())).thenReturn(Optional.empty());
+        when(userMapper.findById(testUser.getId())).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundEmailException.class, () -> userService.getUser(testUser.getEmail()));
+        assertThrows(NotFoundUserException.class, () -> userService.getUserInfo(testUser.getId()));
     }
 
     @Test
     @DisplayName("이메일에 맞는 패스워드인지 확인한다.")
     void check_Login_Password_Match_Success() {
-        when(userMapper.findById(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
+        when(userMapper.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPassword())).thenReturn(true);
 
         UserDto result = userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword());
@@ -109,9 +115,35 @@ class UserServiceTest {
     @Test
     @DisplayName("이메일에 맞는 패스워드가 아니어서 실패한다.")
     void check_Login_Password_Not_Match_Success() {
-        when(userMapper.findById(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
+        when(userMapper.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPassword())).thenReturn(false);
 
         assertThrows(MisMatchPasswordException.class, () -> userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword()));
+    }
+
+    @Test
+    @DisplayName("비밀번호 변경에 성공한다.")
+    void update_Password_Success() {
+        // given
+        when(userMapper.findById(1)).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(passwordUpdateRequest.oldPassword(), testUser.getPassword())).thenReturn(true);
+        when(passwordEncoder.encode(passwordUpdateRequest.newPassword())).thenReturn(passwordUpdateRequest.newPassword());
+        // when
+        userService.updatePassword(1, passwordUpdateRequest);
+        // then
+        verify(userMapper).findById(1);
+        verify(userMapper).updatePassword(1, passwordUpdateRequest.newPassword());
+
+        Assertions.assertEquals(passwordUpdateRequest.newPassword(), testUser.getPassword());
+    }
+
+    @Test
+    @DisplayName("이전 비밀번호 불일치로 인해 비밀번호 변경에 실패한다.")
+    void update_Password_Fail_MisMatch_Old_password() {
+        when(userMapper.findById(1)).thenReturn(Optional.of(testUser));
+        when(testUser.isPasswordMatch(passwordEncoder, passwordUpdateRequest.oldPassword())).thenReturn(false);
+
+        Assertions.assertThrows(MisMatchPasswordException.class,
+                () -> userService.updatePassword(1, passwordUpdateRequest));
     }
 }

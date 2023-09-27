@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor
 public class UserDto {
+    private int id;
     private int accountId;
     private String email;
     private String password;
@@ -24,7 +25,8 @@ public class UserDto {
     private LocalDateTime deletedDate;
 
     @Builder
-    public UserDto(int accountId, String email, String password, String phone, UserRole userRole, boolean isActive, LocalDateTime createdDate, LocalDateTime updatedDate, LocalDateTime deletedDate) {
+    public UserDto(int id, int accountId, String email, String password, String phone, UserRole userRole, boolean isActive, LocalDateTime createdDate, LocalDateTime updatedDate, LocalDateTime deletedDate) {
+        this.id = id;
         this.accountId = accountId;
         this.email = email;
         this.password = password;
