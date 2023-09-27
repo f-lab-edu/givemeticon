@@ -6,8 +6,10 @@ import com.jinddung2.givemeticon.user.application.UserService;
 import com.jinddung2.givemeticon.user.application.dto.UserDto;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
+import com.jinddung2.givemeticon.user.exception.MisMatchPasswordException;
 import com.jinddung2.givemeticon.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
+import com.jinddung2.givemeticon.user.presentation.request.PasswordUpdateRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,8 +27,7 @@ import java.util.Optional;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -47,6 +48,7 @@ public class UserControllerTest {
     SignUpRequest signUpRequest;
     LoginRequest loginRequest;
     UserDto userDto;
+    PasswordUpdateRequest passwordUpdateRequest;
 
     @BeforeEach
     void setUp() {
@@ -57,6 +59,7 @@ public class UserControllerTest {
                 .password("test1234")
                 .build();
         mockHttpSession = new MockHttpSession();
+        passwordUpdateRequest = new PasswordUpdateRequest("test1234", "newtest1234");
         when(loginService.getLoginUser()).thenReturn(Optional.of(userDto.getEmail()));
     }
 
@@ -120,7 +123,6 @@ public class UserControllerTest {
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/1/info")
-                        .param("email", loginRequest.getEmail())
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
@@ -156,5 +158,52 @@ public class UserControllerTest {
 
         // Verify
         Mockito.verify(loginService).logout();
+    }
+
+    @Test
+    public void update_Password_Success() throws Exception {
+        doNothing().when(userService).updatePassword(1, passwordUpdateRequest);
+        mockMvc.perform(MockMvcRequestBuilders
+                        .patch("/api/v1/users/1/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
+                .andExpect(status().isOk());
+
+        // Verify
+        Mockito.verify(userService).updatePassword(1, passwordUpdateRequest);
+    }
+
+    @Test
+    public void update_Password_Fail_Not_Exists_User() throws Exception {
+        doThrow(new NotFoundUserException()).when(userService).updatePassword(1, passwordUpdateRequest);
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .patch("/api/v1/users/1/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
+                .andExpect(status().isBadRequest());
+
+        // Verify
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("존재하지 않는 회원입니다."));
+    }
+
+    @Test
+    public void update_Password_MisMatch_Password() throws Exception {
+        doThrow(new MisMatchPasswordException()).when(userService).updatePassword(1, passwordUpdateRequest);
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .patch("/api/v1/users/1/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
+                .andExpect(status().isBadRequest());
+
+        // Verify
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("패스워드가 일치하지 않습니다."));
+
     }
 }

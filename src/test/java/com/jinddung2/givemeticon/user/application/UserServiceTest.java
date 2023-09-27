@@ -8,7 +8,9 @@ import com.jinddung2.givemeticon.user.exception.MisMatchPasswordException;
 import com.jinddung2.givemeticon.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper;
 import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
+import com.jinddung2.givemeticon.user.presentation.request.PasswordUpdateRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,7 @@ class UserServiceTest {
     PasswordEncoder passwordEncoder;
     SignUpRequest signUpRequest;
     LoginRequest loginRequest;
+    PasswordUpdateRequest passwordUpdateRequest;
     User testUser;
 
     UserDto userDto;
@@ -49,8 +52,9 @@ class UserServiceTest {
         userDto = UserDto.builder()
                 .id(testUser.getId())
                 .email(testUser.getEmail())
-                .password(passwordEncoder.encode(testUser.getPassword()))
+                .password(passwordEncoder.encode("test1234"))
                 .build();
+        passwordUpdateRequest = new PasswordUpdateRequest("test1234", "newtest1234");
     }
 
     @Test
@@ -115,5 +119,31 @@ class UserServiceTest {
         when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPassword())).thenReturn(false);
 
         assertThrows(MisMatchPasswordException.class, () -> userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword()));
+    }
+
+    @Test
+    @DisplayName("비밀번호 변경에 성공한다.")
+    void update_Password_Success() {
+        // given
+        when(userMapper.findById(1)).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(passwordUpdateRequest.oldPassword(), testUser.getPassword())).thenReturn(true);
+        when(passwordEncoder.encode(passwordUpdateRequest.newPassword())).thenReturn(passwordUpdateRequest.newPassword());
+        // when
+        userService.updatePassword(1, passwordUpdateRequest);
+        // then
+        verify(userMapper).findById(1);
+        verify(userMapper).updatePassword(1, passwordUpdateRequest.newPassword());
+
+        Assertions.assertEquals(passwordUpdateRequest.newPassword(), testUser.getPassword());
+    }
+
+    @Test
+    @DisplayName("이전 비밀번호 불일치로 인해 비밀번호 변경에 실패한다.")
+    void update_Password_Fail_MisMatch_Old_password() {
+        when(userMapper.findById(1)).thenReturn(Optional.of(testUser));
+        when(testUser.isPasswordMatch(passwordEncoder, passwordUpdateRequest.oldPassword())).thenReturn(false);
+
+        Assertions.assertThrows(MisMatchPasswordException.class,
+                () -> userService.updatePassword(1, passwordUpdateRequest));
     }
 }
