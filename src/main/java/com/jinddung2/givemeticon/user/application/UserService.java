@@ -58,6 +58,13 @@ public class UserService {
         userMapper.updatePassword(userId, encryptedPassword);
     }
 
+    public void resetPassword(String email, String tempPassword) {
+        User user = getUser(email);
+        String encryptedPassword = passwordEncoder.encode(tempPassword);
+        user.updatePassword(encryptedPassword);
+        userMapper.updatePassword(user.getId(), encryptedPassword);
+    }
+
     private void checkUserValidity(SignUpRequest request) {
         if (userMapper.existsByEmail(request.getEmail())) {
             throw new DuplicatedEmailException();
@@ -71,6 +78,11 @@ public class UserService {
     private User getUser(int userId) {
         return userMapper.findById(userId)
                 .orElseThrow(NotFoundUserException::new);
+    }
+
+    private User getUser(String email) {
+        return userMapper.findByEmail(email)
+                .orElseThrow(NotFoundEmailException::new);
     }
 
     private UserDto toDto(User user) {

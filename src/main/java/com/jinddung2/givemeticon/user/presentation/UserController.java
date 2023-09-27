@@ -2,11 +2,14 @@ package com.jinddung2.givemeticon.user.presentation;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
 import com.jinddung2.givemeticon.user.application.LoginService;
+import com.jinddung2.givemeticon.user.application.PasswordResetAdapter;
 import com.jinddung2.givemeticon.user.application.UserService;
 import com.jinddung2.givemeticon.user.application.dto.UserDto;
 import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
+import com.jinddung2.givemeticon.user.presentation.request.PasswordResetRequest;
 import com.jinddung2.givemeticon.user.presentation.request.PasswordUpdateRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
+import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +23,7 @@ public class UserController {
 
     private final UserService userService;
     private final LoginService loginService;
+    private final PasswordResetAdapter passwordResetAdapter;
 
     @PostMapping("/sign-up")
     public ResponseEntity<ApiResponse<Void>> signUp(@RequestBody @Validated SignUpRequest request) {
@@ -51,5 +55,11 @@ public class UserController {
                                                             @RequestBody PasswordUpdateRequest request) {
         userService.updatePassword(userId, request);
         return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
+    }
+
+    @PutMapping("/reset-password")
+    public ResponseEntity<ApiResponse<String>> resetPassword(@RequestBody PasswordResetRequest request) throws MessagingException {
+        String tempPassword = passwordResetAdapter.resetPasswordAndSendEmail(request.email());
+        return new ResponseEntity<>(ApiResponse.success(tempPassword), HttpStatus.OK);
     }
 }
