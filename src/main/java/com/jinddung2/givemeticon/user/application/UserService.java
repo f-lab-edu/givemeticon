@@ -5,6 +5,7 @@ import com.jinddung2.givemeticon.user.domain.User;
 import com.jinddung2.givemeticon.user.domain.UserRole;
 import com.jinddung2.givemeticon.user.exception.*;
 import com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper;
+import com.jinddung2.givemeticon.user.presentation.request.PasswordUpdateRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,8 +31,7 @@ public class UserService {
     }
 
     public UserDto getUserInfo(int userId) {
-        User user = userMapper.findById(userId)
-                .orElseThrow(NotFoundUserException::new);
+        User user = getUser(userId);
         return toDto(user);
     }
 
@@ -46,6 +46,18 @@ public class UserService {
         return toDto(user);
     }
 
+    public void updatePassword(int userId, PasswordUpdateRequest request) {
+        User user = getUser(userId);
+
+        if (!user.isPasswordMatch(passwordEncoder, request.oldPassword())) {
+            throw new MisMatchPasswordException();
+        }
+
+        String encryptedPassword = passwordEncoder.encode(request.newPassword());
+        user.updatePassword(encryptedPassword);
+        userMapper.updatePassword(userId, encryptedPassword);
+    }
+
     private void checkUserValidity(SignUpRequest request) {
         if (userMapper.existsByEmail(request.getEmail())) {
             throw new DuplicatedEmailException();
@@ -54,6 +66,11 @@ public class UserService {
         if (userMapper.existsByPhone(request.getPhone())) {
             throw new DuplicatedPhoneException();
         }
+    }
+
+    private User getUser(int userId) {
+        return userMapper.findById(userId)
+                .orElseThrow(NotFoundUserException::new);
     }
 
     private UserDto toDto(User user) {

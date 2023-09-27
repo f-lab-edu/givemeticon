@@ -26,6 +26,12 @@
                 NULL)
     </insert>
 
+    <update id="updatePassword">
+        UPDATE user
+        SET password = #{newPassword}
+        WHERE id = #{id}
+    </update>
+
     <select id="findById" parameterType="int" resultType="User">
         SELECT *
         FROM user
