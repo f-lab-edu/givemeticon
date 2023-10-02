@@ -1,7 +1,9 @@
 package com.jinddung2.givemeticon.user.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jinddung2.givemeticon.mail.application.MailSendService;
 import com.jinddung2.givemeticon.user.application.LoginService;
+import com.jinddung2.givemeticon.user.application.PasswordResetAdapter;
 import com.jinddung2.givemeticon.user.application.UserService;
 import com.jinddung2.givemeticon.user.application.dto.UserDto;
 import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
@@ -9,6 +11,7 @@ import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.user.exception.MisMatchPasswordException;
 import com.jinddung2.givemeticon.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
+import com.jinddung2.givemeticon.user.presentation.request.PasswordResetRequest;
 import com.jinddung2.givemeticon.user.presentation.request.PasswordUpdateRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,22 +47,28 @@ public class UserControllerTest {
     @MockBean
     LoginService loginService;
     @MockBean
+    MailSendService mailSendService;
+    @MockBean
+    PasswordResetAdapter passwordResetAdapter;
+    @MockBean
     MockHttpSession mockHttpSession;
     SignUpRequest signUpRequest;
     LoginRequest loginRequest;
     UserDto userDto;
     PasswordUpdateRequest passwordUpdateRequest;
+    PasswordResetRequest passwordResetRequest;
 
     @BeforeEach
     void setUp() {
-        signUpRequest = new SignUpRequest("test@example.com", "test1234", "01012345678");
-        loginRequest = new LoginRequest("test@example.com", "test1234");
+        signUpRequest = new SignUpRequest("test1234@example.com", "test1234", "01012345678");
+        loginRequest = new LoginRequest("test1234@example.com", "test1234");
         userDto = UserDto.builder()
-                .email("test@example.com")
+                .email("test1234@example.com")
                 .password("test1234")
                 .build();
         mockHttpSession = new MockHttpSession();
         passwordUpdateRequest = new PasswordUpdateRequest("test1234", "newtest1234");
+        passwordResetRequest = new PasswordResetRequest("test1234@example.com");
         when(loginService.getLoginUser()).thenReturn(Optional.of(userDto.getEmail()));
     }
 
@@ -205,5 +214,18 @@ public class UserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("패스워드가 일치하지 않습니다."));
 
+    }
+
+    @Test
+    public void send_Temporary_Password() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .put("/api/v1/users/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(passwordResetRequest)))
+                .andExpect(status().isOk());
+
+        // Verify
+        Mockito.verify(passwordResetAdapter).resetPasswordAndSendEmail(passwordResetRequest.email());
     }
 }

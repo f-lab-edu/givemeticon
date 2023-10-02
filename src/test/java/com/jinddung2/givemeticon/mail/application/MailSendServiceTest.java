@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.mail.application;
 
-import com.jinddung2.givemeticon.mail.infrastructure.CertificationGenerator;
+import com.jinddung2.givemeticon.common.utils.CertificationGenerator;
+import com.jinddung2.givemeticon.common.utils.PasswordGenerator;
 import com.jinddung2.givemeticon.mail.infrastructure.CertificationNumberDao;
 import com.jinddung2.givemeticon.mail.presentation.response.EmailCertificationResponse;
 import jakarta.mail.MessagingException;
@@ -14,15 +15,12 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.test.context.TestPropertySource;
 
 import java.security.NoSuchAlgorithmException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
-@TestPropertySource(locations = "classpath:application-secret.yml")
 @ExtendWith(MockitoExtension.class)
 class MailSendServiceTest {
 
@@ -35,13 +33,13 @@ class MailSendServiceTest {
     CertificationNumberDao certificationNumberDao;
 
     @Mock
-    CertificationGenerator generator;
+    CertificationGenerator certificationGenerator;
+
+    @Mock
+    PasswordGenerator passwordGenerator;
 
     @Mock
     MimeMessage mimeMessage;
-
-    @Mock
-    MimeMessageHelper mimeMessageHelper;
 
     @Mock
     MailCustomProperties properties;
@@ -49,18 +47,18 @@ class MailSendServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        mailSendService = new MailSendService(mailSender, certificationNumberDao, generator, properties);
+        mailSendService = new MailSendService(mailSender, certificationNumberDao, passwordGenerator, certificationGenerator, properties);
     }
 
     @Test
-    @DisplayName("이메일 보내기")
-    void sendEmailForCertification() throws NoSuchAlgorithmException, MessagingException {
+    @DisplayName("회원가입 시 해당 이메일로 인증코드 6자리 숫자 보내기")
+    void send_Email_Certification() throws NoSuchAlgorithmException, MessagingException {
         // given
         String email = "test@example.com";
         String certificationNumber = "123456";
         String mailTitleCertification = "givemeticon 인증번호 안내";
 
-        when(generator.createCertificationNumber()).thenReturn(certificationNumber);
+        when(certificationGenerator.createCertificationNumber()).thenReturn(certificationNumber);
         when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
 
         doNothing().when(mailSender).send(any(MimeMessage.class));
@@ -68,12 +66,34 @@ class MailSendServiceTest {
         when(properties.getMailTitleCertification()).thenReturn(mailTitleCertification);
         EmailCertificationResponse response = mailSendService.sendEmailForCertification(email);
 
-        verify(generator).createCertificationNumber();
+        verify(certificationGenerator).createCertificationNumber();
         verify(mailSender).send(any(MimeMessage.class));
         verify(certificationNumberDao).saveCertificationNumber(email, certificationNumber);
 
         assertEquals(email, response.getEmail());
         assertEquals(certificationNumber, response.getCertificationNumber());
+    }
+
+    @Test
+    @DisplayName("회원가입 시 해당 이메일로 임시 비밀번호 12자리 숫자 보내기")
+    void send_Email_Temp_Password() throws MessagingException {
+        // given
+        String email = "test@example.com";
+        String tempPassword = "0123456789ab";
+        String mailTitleCertification = "givemeticon 인증번호 안내";
+
+        when(passwordGenerator.createTemporaryPassword()).thenReturn(tempPassword);
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+
+        doNothing().when(mailSender).send(any(MimeMessage.class));
+        // when
+        when(properties.getMailTitleCertification()).thenReturn(mailTitleCertification);
+        String response = mailSendService.sendEmailForTemporaryPassword(email);
+
+        verify(passwordGenerator).createTemporaryPassword();
+        verify(mailSender).send(any(MimeMessage.class));
+
+        assertEquals(tempPassword, response);
     }
 
 }

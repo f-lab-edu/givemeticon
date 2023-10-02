@@ -146,4 +146,21 @@ class UserServiceTest {
         Assertions.assertThrows(MisMatchPasswordException.class,
                 () -> userService.updatePassword(1, passwordUpdateRequest));
     }
+
+    @Test
+    @DisplayName("유저 비밀번호를 임시 비밀번호로 바꾼다.")
+    public void reset_Password_Success() {
+        String tempPassword = "01234567890ab";
+
+        when(userMapper.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.encode(tempPassword)).thenReturn(tempPassword);
+        doNothing().when(userMapper).updatePassword(testUser.getId(), tempPassword);
+
+        userService.resetPassword(testUser.getEmail(), tempPassword);
+
+        verify(userMapper).findByEmail(testUser.getEmail());
+        verify(userMapper).updatePassword(testUser.getId(), tempPassword);
+
+        Assertions.assertEquals(tempPassword, testUser.getPassword());
+    }
 }
