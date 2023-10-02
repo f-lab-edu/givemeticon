@@ -4,7 +4,6 @@ import com.jinddung2.givemeticon.common.response.ApiResponse;
 import com.jinddung2.givemeticon.mail.application.MailSendService;
 import com.jinddung2.givemeticon.mail.application.MailVerifyService;
 import com.jinddung2.givemeticon.mail.presentation.request.EmailCertificationRequest;
-import com.jinddung2.givemeticon.mail.presentation.response.EmailCertificationResponse;
 import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,10 +21,10 @@ public class MailController {
     private final MailVerifyService mailVerifyService;
 
     @PostMapping("/send-certification")
-    public ResponseEntity<ApiResponse<EmailCertificationResponse>> sendCertificationNumber(@Validated @RequestBody EmailCertificationRequest request)
+    public ResponseEntity<ApiResponse<Void>> sendCertificationNumber(@Validated @RequestBody EmailCertificationRequest request)
             throws MessagingException, NoSuchAlgorithmException {
-        EmailCertificationResponse response = mailSendService.sendEmailForCertification(request.getEmail());
-        return ResponseEntity.ok(ApiResponse.success(response));
+        mailSendService.sendEmailForCertification(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success());
     }
 
     @GetMapping("/verify")

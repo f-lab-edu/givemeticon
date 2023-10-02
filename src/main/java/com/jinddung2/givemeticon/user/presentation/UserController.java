@@ -58,8 +58,8 @@ public class UserController {
     }
 
     @PutMapping("/reset-password")
-    public ResponseEntity<ApiResponse<String>> resetPassword(@RequestBody PasswordResetRequest request) throws MessagingException {
-        String tempPassword = passwordResetAdapter.resetPasswordAndSendEmail(request.email());
-        return new ResponseEntity<>(ApiResponse.success(tempPassword), HttpStatus.OK);
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@RequestBody PasswordResetRequest request) throws MessagingException {
+        passwordResetAdapter.resetPasswordAndSendEmail(request.email());
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
     }
 }
