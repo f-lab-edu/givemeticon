@@ -96,4 +96,29 @@ class BrandControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("존재하지 않는 브랜드입니다."));
     }
+
+    @Test
+    void brand_Delete_Success() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .delete("/api/v1/brands/100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(brandUpdateNameRequest)))
+                .andExpect(status().isNoContent());
+
+        Mockito.verify(brandService).delete(100);
+    }
+
+    @Test
+    void brand_Delete_Fail_Not_Found_Brand() throws Exception {
+        Mockito.doThrow(new NotFoundBrandException()).when(brandService).delete(100);
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .delete("/api/v1/brands/100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(brandUpdateNameRequest)))
+                .andExpect(status().isBadRequest());
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("존재하지 않는 브랜드입니다."));
+    }
 }

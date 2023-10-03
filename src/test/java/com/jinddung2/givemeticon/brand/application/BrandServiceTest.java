@@ -76,12 +76,32 @@ class BrandServiceTest {
     }
 
     @Test
-    @DisplayName("브랜드를 찾을 수 없어 브랜드명을 바꾸는데 성공한다.")
+    @DisplayName("브랜드를 찾을 수 없어 브랜드명을 바꾸는데 실패한다.")
     void update_Name_Fail_Not_Found_Brand() {
         Mockito.when(brandMapper.findById(any(Integer.class))).thenReturn(Optional.empty());
 
         assertThrows(NotFoundBrandException.class, () -> {
             brandService.updateName(brand.getId(), brandUpdateNameRequest.name());
+        });
+    }
+
+    @Test
+    @DisplayName("브랜드를 삭제에 성공한다")
+    void delete_Brand_Success() {
+        Mockito.when(brandMapper.findById(any(Integer.class))).thenReturn(Optional.of(brand));
+
+        brandService.delete(brand.getId());
+
+        Mockito.verify(brandMapper).deleteById(brand.getId());
+    }
+
+    @Test
+    @DisplayName("브랜드를 찾을 수 없어 브랜드 제거에 실패한다.")
+    void delete_Brand_Fail_Not_Found_Brand() {
+        Mockito.when(brandMapper.findById(any(Integer.class))).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundBrandException.class, () -> {
+            brandService.delete(brand.getId());
         });
     }
 }
