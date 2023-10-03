@@ -17,7 +17,8 @@ public enum ErrorCode {
     INCORRECT_PASSWORD("패스워드가 일치하지 않습니다."),
 
     // BRAND
-    DUPLICATED_BRAND_NAME("이미 존재하는 브랜드입니다.");
+    DUPLICATED_BRAND_NAME("이미 존재하는 브랜드입니다."),
+    NOT_FOUND_BRAND("존재하지 않는 브랜드입니다.");
     private final String message;
 
     ErrorCode(String message) {
