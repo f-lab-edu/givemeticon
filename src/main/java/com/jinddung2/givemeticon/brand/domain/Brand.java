@@ -28,4 +28,8 @@ public class Brand {
         this.createdDate = createdDate;
         this.updatedDate = updatedDate;
     }
+
+    public void updateName(String newName) {
+        this.name = newName;
+    }
 }

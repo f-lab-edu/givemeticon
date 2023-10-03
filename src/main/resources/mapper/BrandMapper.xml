@@ -16,6 +16,18 @@
                 NOW())
     </insert>
 
+    <select id="findById" parameterType="int" resultType="Brand">
+        SELECT *
+        FROM brand
+        where id = #{id}
+    </select>
+
+    <update id="updateName">
+        UPDATE brand
+        SET name = #{newName}
+        WHERE id = #{id}
+    </update>
+
     <select id="existsByName" parameterType="String" resultType="boolean">
         SELECT EXISTS
                    (SELECT 1 FROM brand where name = #{name})
