@@ -22,14 +22,21 @@
         where id = #{id}
     </select>
 
+
+    <select id="existsByName" parameterType="String" resultType="boolean">
+        SELECT EXISTS
+                   (SELECT 1 FROM brand where name = #{name})
+    </select>
+
     <update id="updateName">
         UPDATE brand
         SET name = #{newName}
         WHERE id = #{id}
     </update>
 
-    <select id="existsByName" parameterType="String" resultType="boolean">
-        SELECT EXISTS
-                   (SELECT 1 FROM brand where name = #{name})
-    </select>
+    <delete id="deleteById" parameterType="int">
+        DELETE
+        FROM brand
+        WHERE id = #{id}
+    </delete>
 </mapper>

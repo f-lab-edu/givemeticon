@@ -29,4 +29,10 @@ public class BrandController {
         String updatedName = brandService.updateName(brandId, request.name());
         return new ResponseEntity<>(ApiResponse.success(updatedName), HttpStatus.OK);
     }
+
+    @DeleteMapping("/{brandId}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable int brandId) {
+        brandService.delete(brandId);
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.NO_CONTENT);
+    }
 }

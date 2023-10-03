@@ -30,6 +30,11 @@ public class BrandService {
         return newName;
     }
 
+    public void delete(int id) {
+        validateBrand(id);
+        brandMapper.deleteById(id);
+    }
+
     private Brand validateBrand(int id) {
         return brandMapper.findById(id).orElseThrow(NotFoundBrandException::new);
     }
