@@ -3,7 +3,6 @@ package com.jinddung2.givemeticon.mail.application;
 import com.jinddung2.givemeticon.common.utils.CertificationGenerator;
 import com.jinddung2.givemeticon.common.utils.PasswordGenerator;
 import com.jinddung2.givemeticon.mail.infrastructure.CertificationNumberDao;
-import com.jinddung2.givemeticon.mail.presentation.response.EmailCertificationResponse;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,14 +63,11 @@ class MailSendServiceTest {
         doNothing().when(mailSender).send(any(MimeMessage.class));
         // when
         when(properties.getMailTitleCertification()).thenReturn(mailTitleCertification);
-        EmailCertificationResponse response = mailSendService.sendEmailForCertification(email);
+        mailSendService.sendEmailForCertification(email);
 
         verify(certificationGenerator).createCertificationNumber();
         verify(mailSender).send(any(MimeMessage.class));
         verify(certificationNumberDao).saveCertificationNumber(email, certificationNumber);
-
-        assertEquals(email, response.getEmail());
-        assertEquals(certificationNumber, response.getCertificationNumber());
     }
 
     @Test
