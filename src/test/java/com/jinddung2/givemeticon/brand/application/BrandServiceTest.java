@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.brand.application;
 
+import com.jinddung2.givemeticon.brand.application.dto.BrandDto;
 import com.jinddung2.givemeticon.brand.domain.Brand;
 import com.jinddung2.givemeticon.brand.exception.DuplicatedBrandNameException;
 import com.jinddung2.givemeticon.brand.exception.NotFoundBrandException;
@@ -54,6 +55,26 @@ class BrandServiceTest {
         brandService.save(brandCreateRequest);
 
         Mockito.verify(brandMapper).save(any(Brand.class));
+    }
+
+    @Test
+    @DisplayName("브랜드 단건조회에 성공한다.")
+    void get_Brand_Success() {
+        Mockito.when(brandMapper.findById(brand.getId())).thenReturn(Optional.of(brand));
+
+        BrandDto brandDto = brandService.getBrand(brand.getId());
+
+        assertEquals(brand.getId(), brandDto.getId());
+        assertEquals(brand.getCategoryId(), brandDto.getCategoryId());
+        assertEquals(brand.getName(), brandDto.getName());
+    }
+
+    @Test
+    @DisplayName("브랜드가 없어 단건조회에 실패한다.")
+    void get_Brand_Fail_Not_Found_Brand() {
+        Mockito.when(brandMapper.findById(any(Integer.class))).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundBrandException.class, () -> brandService.getBrand(brand.getId()));
     }
 
     @Test

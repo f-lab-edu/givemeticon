@@ -2,6 +2,8 @@ package com.jinddung2.givemeticon.brand.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.brand.application.BrandService;
+import com.jinddung2.givemeticon.brand.application.dto.BrandDto;
+import com.jinddung2.givemeticon.brand.domain.Brand;
 import com.jinddung2.givemeticon.brand.exception.DuplicatedBrandNameException;
 import com.jinddung2.givemeticon.brand.exception.NotFoundBrandException;
 import com.jinddung2.givemeticon.brand.presentation.request.BrandCreateRequest;
@@ -40,12 +42,16 @@ class BrandControllerTest {
     @MockBean
     BrandService brandService;
 
+    Brand brand;
+    BrandDto brandDto;
     BrandCreateRequest brandCreateRequest;
     BrandUpdateNameRequest brandUpdateNameRequest;
 
     @BeforeEach
     void setUp() {
-        brandCreateRequest = new BrandCreateRequest(100, "testBrand");
+        brand = Brand.builder().id(100).categoryId(101).name("testBrand").build();
+        brandDto = BrandDto.builder().id(brand.getId()).categoryId(brand.getCategoryId()).name(brand.getName()).build();
+        brandCreateRequest = new BrandCreateRequest(brand.getId(), "testBrand");
         brandUpdateNameRequest = new BrandUpdateNameRequest("updateNameTest");
     }
 
@@ -56,6 +62,16 @@ class BrandControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(brandCreateRequest)))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void brand_findById_Success() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/brands/100")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        Mockito.verify(brandService).getBrand(brand.getId());
     }
 
     @Test
@@ -80,7 +96,7 @@ class BrandControllerTest {
                         .content(objectMapper.writeValueAsString(brandUpdateNameRequest)))
                 .andExpect(status().isOk());
 
-        Mockito.verify(brandService).updateName(100, brandUpdateNameRequest.name());
+        Mockito.verify(brandService).updateName(brand.getId(), brandUpdateNameRequest.name());
     }
 
     @Test
@@ -105,12 +121,12 @@ class BrandControllerTest {
                         .content(objectMapper.writeValueAsString(brandUpdateNameRequest)))
                 .andExpect(status().isNoContent());
 
-        Mockito.verify(brandService).delete(100);
+        Mockito.verify(brandService).delete(brand.getId());
     }
 
     @Test
     void brand_Delete_Fail_Not_Found_Brand() throws Exception {
-        Mockito.doThrow(new NotFoundBrandException()).when(brandService).delete(100);
+        Mockito.doThrow(new NotFoundBrandException()).when(brandService).delete(brand.getId());
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .delete("/api/v1/brands/100")
                         .contentType(MediaType.APPLICATION_JSON)
