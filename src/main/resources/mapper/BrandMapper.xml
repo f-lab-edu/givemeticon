@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.brand.infrastructure.mapper.BrandMapper">
+    <insert id="save" parameterType="Brand" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO brand (id,
+                           category_id,
+                           name,
+                           created_date,
+                           updated_date)
+        VALUES (#{id},
+                #{categoryId},
+                #{name},
+                NOW(),
+                NOW())
+    </insert>
+
+    <select id="existsByName" parameterType="String" resultType="boolean">
+        SELECT EXISTS
+                   (SELECT 1 FROM brand where name = #{name})
+    </select>
+</mapper>
