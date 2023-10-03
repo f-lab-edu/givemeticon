@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.brand.application;
 
+import com.jinddung2.givemeticon.brand.application.dto.BrandDto;
 import com.jinddung2.givemeticon.brand.domain.Brand;
 import com.jinddung2.givemeticon.brand.exception.DuplicatedBrandNameException;
 import com.jinddung2.givemeticon.brand.exception.NotFoundBrandException;
@@ -23,6 +24,11 @@ public class BrandService {
         return brandMapper.save(brand);
     }
 
+    public BrandDto getBrand(int id) {
+        Brand brand = validateBrand(id);
+        return toDto(brand);
+    }
+
     public String updateName(int id, String newName) {
         Brand brand = validateBrand(id);
         brand.updateName(newName);
@@ -41,5 +47,15 @@ public class BrandService {
 
     private boolean isNameExists(String name) {
         return brandMapper.existsByName(name);
+    }
+
+    private BrandDto toDto(Brand brand) {
+        return BrandDto.builder()
+                .id(brand.getId())
+                .categoryId(brand.getCategoryId())
+                .name(brand.getName())
+                .createdDate(brand.getCreatedDate())
+                .updatedDate(brand.getUpdatedDate())
+                .build();
     }
 }

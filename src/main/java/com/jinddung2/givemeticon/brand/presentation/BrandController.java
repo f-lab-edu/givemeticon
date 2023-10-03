@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.brand.presentation;
 
 import com.jinddung2.givemeticon.brand.application.BrandService;
+import com.jinddung2.givemeticon.brand.application.dto.BrandDto;
 import com.jinddung2.givemeticon.brand.presentation.request.BrandCreateRequest;
 import com.jinddung2.givemeticon.brand.presentation.request.BrandUpdateNameRequest;
 import com.jinddung2.givemeticon.common.response.ApiResponse;
@@ -20,6 +21,12 @@ public class BrandController {
     public ResponseEntity<ApiResponse<Integer>> create(@RequestBody BrandCreateRequest request) {
         int id = brandService.save(request);
         return new ResponseEntity<>(ApiResponse.success(id), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{brandId}")
+    public ResponseEntity<ApiResponse<BrandDto>> getBrand(@PathVariable int brandId) {
+        BrandDto brandDto = brandService.getBrand(brandId);
+        return new ResponseEntity<>(ApiResponse.success(brandDto), HttpStatus.OK);
     }
 
     @PutMapping("/{brandId}")
