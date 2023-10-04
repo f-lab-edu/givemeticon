@@ -4,6 +4,8 @@ import com.jinddung2.givemeticon.brand.domain.Brand;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Mapper
@@ -18,4 +20,8 @@ public interface BrandMapper {
                     @Param("newName") String newName);
 
     void deleteById(int id);
+
+    List<Brand> findAllByCategory(Map<String, Object> paramMap);
+
+    int countBrandByCategoryId(@Param("categoryId") int categoryId);
 }

@@ -3,6 +3,13 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.jinddung2.givemeticon.brand.infrastructure.mapper.BrandMapper">
+
+    <!-- 객체 필드명과 db 칼럼명이 다른 경우에만 일치시키기 위해 작성-->
+    <resultMap id="brandResultMap" type="Brand">
+        <result property="createdDate" column="created_date"/>
+        <result property="updatedDate" column="updated_date"/>
+    </resultMap>
+
     <insert id="save" parameterType="Brand" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO brand (id,
                            category_id,
@@ -20,6 +27,23 @@
         SELECT *
         FROM brand
         where id = #{id}
+    </select>
+
+    <select id="findAllByCategory" parameterType="map" resultMap="brandResultMap">
+        SELECT *
+        FROM brand
+        WHERE category_id = #{id}
+        ORDER BY created_date DESC
+        <if test="pageSize != null and offset != null">
+            LIMIT #{pageSize}
+            OFFSET #{offset}
+        </if>
+    </select>
+
+    <select id="countBrandByCategoryId" parameterType="int" resultType="int">
+        SELECT COUNT(id)
+        FROM brand
+        WHERE category_id = #{categoryId}
     </select>
 
 
