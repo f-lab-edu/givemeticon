@@ -18,7 +18,8 @@ public enum ErrorCode {
 
     // BRAND
     DUPLICATED_BRAND_NAME("이미 존재하는 브랜드입니다."),
-    NOT_FOUND_BRAND("존재하지 않는 브랜드입니다.");
+    NOT_FOUND_BRAND("존재하지 않는 브랜드입니다."),
+    PAGE_NUMBER_HAS_EMPTY_BRAND("해당 페이지에 해당하는 브랜드가 없습니다.");
     private final String message;
 
     ErrorCode(String message) {
