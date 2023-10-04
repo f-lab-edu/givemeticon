@@ -5,6 +5,7 @@ import com.jinddung2.givemeticon.brand.application.BrandService;
 import com.jinddung2.givemeticon.brand.application.dto.BrandDto;
 import com.jinddung2.givemeticon.brand.domain.Brand;
 import com.jinddung2.givemeticon.brand.exception.DuplicatedBrandNameException;
+import com.jinddung2.givemeticon.brand.exception.EmptyBrandListException;
 import com.jinddung2.givemeticon.brand.exception.NotFoundBrandException;
 import com.jinddung2.givemeticon.brand.presentation.request.BrandCreateRequest;
 import com.jinddung2.givemeticon.brand.presentation.request.BrandUpdateNameRequest;
@@ -72,6 +73,37 @@ class BrandControllerTest {
                 .andExpect(status().isOk());
 
         Mockito.verify(brandService).getBrand(brand.getId());
+    }
+
+    @Test
+    void brand_Get_By_CategoryId_Success() throws Exception {
+        int categoryId = 101;
+        int page = 0;
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/brands/category/" + categoryId)
+                        .param("page", String.valueOf(page))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("SUCCESS"))
+                .andExpect(status().isOk());
+
+        Mockito.verify(brandService).getBrands(categoryId, page);
+    }
+
+    @Test
+    void brand_Get_By_CategoryId_Fail_No_Data() throws Exception {
+        int categoryId = 101;
+        int page = 0;
+        Mockito.doThrow(new EmptyBrandListException()).when(brandService).getBrands(categoryId, page);
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/brands/category/" + categoryId)
+                        .param("page", String.valueOf(page))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("해당 페이지에 해당하는 브랜드가 없습니다."));
+
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.brand.application;
 import com.jinddung2.givemeticon.brand.application.dto.BrandDto;
 import com.jinddung2.givemeticon.brand.domain.Brand;
 import com.jinddung2.givemeticon.brand.exception.DuplicatedBrandNameException;
+import com.jinddung2.givemeticon.brand.exception.EmptyBrandListException;
 import com.jinddung2.givemeticon.brand.exception.NotFoundBrandException;
 import com.jinddung2.givemeticon.brand.infrastructure.mapper.BrandMapper;
 import com.jinddung2.givemeticon.brand.presentation.request.BrandCreateRequest;
@@ -15,13 +16,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 
-import java.util.Optional;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class BrandServiceTest {
@@ -35,6 +38,11 @@ class BrandServiceTest {
     Brand brand;
     BrandCreateRequest brandCreateRequest;
     BrandUpdateNameRequest brandUpdateNameRequest;
+    private Map<String, Object> params;
+    private List<Brand> brandList;
+    int categoryId;
+    int page;
+    int pageSize;
 
     @BeforeEach
     void setUp() {
@@ -45,6 +53,20 @@ class BrandServiceTest {
                 .build();
         brandCreateRequest = new BrandCreateRequest(100, "testBrand");
         brandUpdateNameRequest = new BrandUpdateNameRequest("updateNameTest");
+
+        categoryId = 101;
+        page = 0;
+        pageSize = 10;
+
+        params = Map.ofEntries(
+                Map.entry("id", categoryId),
+                Map.entry("pageSize", pageSize),
+                Map.entry("offset", PageRequest.of(page, pageSize).getOffset()));
+
+        brandList = Arrays.asList(
+                Brand.builder().name("스타벅스").build(),
+                Brand.builder().name("투썸플레이스").build(),
+                Brand.builder().name("메머드").build());
     }
 
     @Test
@@ -75,6 +97,29 @@ class BrandServiceTest {
         Mockito.when(brandMapper.findById(any(Integer.class))).thenReturn(Optional.empty());
 
         assertThrows(NotFoundBrandException.class, () -> brandService.getBrand(brand.getId()));
+    }
+
+    @Test
+    @DisplayName("카테고리에 해당하는 브랜드들 조회에 성공한다.")
+    void get_Brands_By_CategoryId() {
+
+        when(brandMapper.countBrandByCategoryId(categoryId)).thenReturn(pageSize);
+        Mockito.when(brandMapper.findAllByCategory(params)).thenReturn(brandList);
+
+        List<BrandDto> brands = brandService.getBrands(categoryId, page);
+
+        assertEquals(brands.size(), brandList.size());
+    }
+
+    @Test
+    @DisplayName("페이지에 해당하는 브랜드 데이터가 없어 브랜드 다건조회에 실패한다.")
+    void get_Brands_By_CategoryId_Fail_No_Data() {
+
+        when(brandMapper.countBrandByCategoryId(categoryId)).thenReturn(pageSize);
+        Mockito.when(brandMapper.findAllByCategory(params)).thenReturn(Collections.emptyList());
+
+        assertThrows(EmptyBrandListException.class, () -> brandService.getBrands(categoryId, page));
+
     }
 
     @Test
