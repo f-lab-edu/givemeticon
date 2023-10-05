@@ -15,4 +15,8 @@ public class Category {
         this.id = id;
         this.name = name;
     }
+
+    public void updateName(String newName) {
+        this.name = newName;
+    }
 }

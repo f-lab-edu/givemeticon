@@ -1,0 +1,25 @@
+package com.jinddung2.givemeticon.category.presentation;
+
+import com.jinddung2.givemeticon.category.application.CategoryService;
+import com.jinddung2.givemeticon.category.presentation.request.CategoryUpdateNameRequest;
+import com.jinddung2.givemeticon.common.response.ApiResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/v1/categories")
+public class CategoryController {
+
+    private final CategoryService categoryService;
+
+    @PutMapping("/{categoryId}")
+    public ResponseEntity<ApiResponse<Void>> updateName(@PathVariable("categoryId") int categoryId,
+                                                        @RequestBody CategoryUpdateNameRequest request) {
+        categoryService.updateName(categoryId, request.name());
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
+    }
+
+}
