@@ -16,7 +16,8 @@ public class WebConfig implements WebMvcConfigurer {
             "/api/v1/users/sign-up",
             "/api/v1/users/login",
             "/api/v1/mails/send-certification",
-            "/api/v1/mails/verify"
+            "/api/v1/mails/verify",
+            "/api/v1/categories"
     };
 
     @Override
