@@ -10,6 +10,7 @@ import com.jinddung2.givemeticon.oauth.infrastructure.JwtTokenProvider;
 import com.jinddung2.givemeticon.user.application.LoginService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -19,7 +20,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -55,14 +56,12 @@ class MailControllerTest {
 
     @Test
     public void send_CertificationNumber_Success() throws Exception {
-        EmailCertificationResponse response = new EmailCertificationResponse(email, certificationNumber);
-        when(mailSendService.sendEmailForCertification(anyString()))
-                .thenReturn(response);
-
         mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/mails/send-certification")
                         .content("{\"email\":\"test@example.com\"}")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
+
+        Mockito.verify(mailSendService).sendEmailForCertification(email);
     }
 
     @Test
@@ -71,6 +70,8 @@ class MailControllerTest {
                         .param("email", email)
                         .param("certificationNumber", certificationNumber))
                 .andExpect(status().isOk());
+
+        Mockito.verify(mailVerifyService).verifyEmail(email, certificationNumber);
     }
 
     @Test

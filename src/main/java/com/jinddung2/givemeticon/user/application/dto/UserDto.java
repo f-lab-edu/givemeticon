@@ -27,7 +27,7 @@ public class UserDto {
     private LocalDateTime deletedDate;
 
     @Builder
-    public UserDto(int id, int accountId, String email, String password, String phone, UserRole userRole, boolean isActive, OAuthProvider provider, LocalDateTime createdDate, LocalDateTime updatedDate, LocalDateTime deletedDate) {
+    public UserDto(int id, int accountId, String email, String password, String phone, UserRole userRole, boolean isActive, OAuthProvider provider, LocalDateTime createdDate, LocalDateTime updatedDate, LocalDateTime deletedDate) {{
         this.id = id;
         this.accountId = accountId;
         this.email = email;

@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.mail.infrastructure;
+package com.jinddung2.givemeticon.common.utils;
 
 import org.springframework.stereotype.Component;
 
