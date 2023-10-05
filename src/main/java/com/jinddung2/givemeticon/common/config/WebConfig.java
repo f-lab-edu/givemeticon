@@ -17,6 +17,10 @@ public class WebConfig implements WebMvcConfigurer {
             "/api/v1/users/login",
             "/api/v1/mails/send-certification",
             "/api/v1/mails/verify",
+            "/auth/*/callback",
+            "/api/v1/auth/**",
+            "/error",
+            "/favicon.ico"
             "/api/v1/categories"
     };
 

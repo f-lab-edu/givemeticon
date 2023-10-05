@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.user.domain;
 
+import com.jinddung2.givemeticon.oauth.domain.oauth.OAuthProvider;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,6 +18,7 @@ public class User {
     private String phone;
     private UserRole userRole;
     private boolean isActive;
+    private OAuthProvider provider;
     private LocalDateTime createdDate;
     private LocalDateTime updatedDate;
     private LocalDateTime deletedDate;
@@ -30,6 +32,7 @@ public class User {
             String phone,
             UserRole userRole,
             boolean isActive,
+            OAuthProvider provider,
             LocalDateTime createdDate,
             LocalDateTime updatedDate,
             LocalDateTime deletedDate
@@ -41,6 +44,7 @@ public class User {
         this.phone = phone;
         this.userRole = userRole;
         this.isActive = isActive;
+        this.provider = provider;
         this.createdDate = createdDate;
         this.updatedDate = updatedDate;
         this.deletedDate = deletedDate;

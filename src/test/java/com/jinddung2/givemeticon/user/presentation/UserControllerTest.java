@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.user.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jinddung2.givemeticon.oauth.infrastructure.JwtTokenProvider;
 import com.jinddung2.givemeticon.mail.application.MailSendService;
 import com.jinddung2.givemeticon.user.application.LoginService;
 import com.jinddung2.givemeticon.user.application.PasswordResetAdapter;
@@ -47,9 +48,12 @@ public class UserControllerTest {
     @MockBean
     LoginService loginService;
     @MockBean
+    JwtTokenProvider jwtTokenProvider;
+    @MockBean
     MailSendService mailSendService;
     @MockBean
     PasswordResetAdapter passwordResetAdapter;
+
     @MockBean
     MockHttpSession mockHttpSession;
     SignUpRequest signUpRequest;

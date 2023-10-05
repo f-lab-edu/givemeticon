@@ -21,13 +21,15 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public void signUp(SignUpRequest request) {
+    public Integer signUp(SignUpRequest request) {
         checkUserValidity(request);
         String encryptedPassword = passwordEncoder.encode(request.getPassword());
 
         User user = request.toEntity(encryptedPassword);
         user.updateUserRole(UserRole.USER);
         userMapper.save(user);
+
+        return user.getId();
     }
 
     public UserDto getUserInfo(int userId) {
@@ -92,6 +94,7 @@ public class UserService {
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .userRole(user.getUserRole())
+                .provider(user.getProvider())
                 .createdDate(user.getCreatedDate())
                 .updatedDate(user.getUpdatedDate())
                 .deletedDate(user.getDeletedDate())

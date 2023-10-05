@@ -5,6 +5,8 @@ import com.jinddung2.givemeticon.mail.application.MailSendService;
 import com.jinddung2.givemeticon.mail.application.MailVerifyService;
 import com.jinddung2.givemeticon.mail.exception.EmailNotFoundException;
 import com.jinddung2.givemeticon.mail.exception.InvalidCertificationNumberException;
+import com.jinddung2.givemeticon.mail.presentation.response.EmailCertificationResponse;
+import com.jinddung2.givemeticon.oauth.infrastructure.JwtTokenProvider;
 import com.jinddung2.givemeticon.user.application.LoginService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +41,9 @@ class MailControllerTest {
 
     @MockBean
     LoginService loginService;
+
+    @MockBean
+    JwtTokenProvider jwtTokenProvider;
 
     String email;
     String certificationNumber;
