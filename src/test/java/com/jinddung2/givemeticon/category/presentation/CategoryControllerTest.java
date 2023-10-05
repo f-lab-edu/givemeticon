@@ -76,4 +76,29 @@ class CategoryControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("존재하지 않는 카테고리입니다."));
     }
+
+    @Test
+    void category_deleteById_Success() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .delete("/api/v1/categories/" + category.getId())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNoContent());
+
+        Mockito.verify(categoryService).deleteById(category.getId());
+    }
+
+    @Test
+    void category_deleteById_Fail_Not_Found_Category() throws Exception {
+        Mockito.doThrow(new NotFoundCategoryException())
+                .when(categoryService).deleteById(category.getId());
+
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .delete("/api/v1/categories/" + category.getId())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+
+
+        resultActions.andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("존재하지 않는 카테고리입니다."));
+    }
 }

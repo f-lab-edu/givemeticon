@@ -58,4 +58,24 @@ class CategoryServiceTest {
             categoryService.updateName(category.getId(), categoryUpdateNameRequest.name());
         });
     }
+
+    @Test
+    @DisplayName("카테고리 삭제에 성공한다")
+    void delete_Brand_Success() {
+        Mockito.when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.of(category));
+
+        categoryService.deleteById(category.getId());
+
+        Mockito.verify(categoryMapper).deleteById(category.getId());
+    }
+
+    @Test
+    @DisplayName("카테고리를 찾을 수 없어 브랜드 제거에 실패한다.")
+    void delete_Brand_Fail_Not_Found_Brand() {
+        Mockito.when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundCategoryException.class, () -> {
+            categoryService.deleteById(category.getId());
+        });
+    }
 }
