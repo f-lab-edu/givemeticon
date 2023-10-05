@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.category.application.CategoryService;
 import com.jinddung2.givemeticon.category.domain.Category;
 import com.jinddung2.givemeticon.category.exception.NotFoundCategoryException;
+import com.jinddung2.givemeticon.category.exception.NotFoundCategoryListException;
 import com.jinddung2.givemeticon.category.presentation.request.CategoryUpdateNameRequest;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.interceptor.AuthInterceptor;
@@ -48,6 +49,31 @@ class CategoryControllerTest {
     void setUp() {
         category = new Category(1, "testCategory");
         categoryUpdateNameRequest = new CategoryUpdateNameRequest("testUpdateName");
+    }
+
+    @Test
+    void category_Get_All_Name_Success() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/categories")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        Mockito.verify(categoryService).getAllCategories();
+    }
+
+    @Test
+    void category_Get_All_Name_Fail_Empty_List() throws Exception {
+        Mockito.doThrow(new NotFoundCategoryListException())
+                .when(categoryService).getAllCategories();
+
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/categories")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("카테고리 목록을 찾을 수 없습니다."));
     }
 
     @Test

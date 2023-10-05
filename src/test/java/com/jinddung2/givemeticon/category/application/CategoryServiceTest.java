@@ -2,8 +2,10 @@ package com.jinddung2.givemeticon.category.application;
 
 import com.jinddung2.givemeticon.category.domain.Category;
 import com.jinddung2.givemeticon.category.exception.NotFoundCategoryException;
+import com.jinddung2.givemeticon.category.exception.NotFoundCategoryListException;
 import com.jinddung2.givemeticon.category.infrastructure.mapper.CategoryMapper;
 import com.jinddung2.givemeticon.category.presentation.request.CategoryUpdateNameRequest;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,9 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,16 +36,42 @@ class CategoryServiceTest {
 
     Category category;
     CategoryUpdateNameRequest categoryUpdateNameRequest;
+    List<String> categoryList;
 
     @BeforeEach
     void setUp() {
         category = new Category(1, "testCategory");
         categoryUpdateNameRequest = new CategoryUpdateNameRequest("updateName");
+
+        categoryList = Arrays.asList(
+                "category1",
+                "category2",
+                "category3");
+    }
+
+    @Test
+    @DisplayName("카테고리 전체 조회에 성공한다.")
+    void get_All_Categories_Success() {
+        Mockito.when(categoryMapper.findAll()).thenReturn(categoryList);
+
+        List<String> allCategories = categoryService.getAllCategories();
+
+        Assertions.assertEquals(categoryList.size(), allCategories.size());
+    }
+
+    @Test
+    @DisplayName("카테고리 목록이 비어있어 조회에 성공한다.")
+    void get_All_Categories_Fail_Empty_List() {
+        Mockito.when(categoryMapper.findAll()).thenReturn(Collections.EMPTY_LIST);
+
+        assertThrows(NotFoundCategoryListException.class, () -> {
+            categoryService.getAllCategories();
+        });
     }
 
     @Test
     @DisplayName("카테고리명을 바꾸는데 성공한다.")
-    void updateName() {
+    void update_Name_Success() {
         Mockito.when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.of(category));
         doNothing().when(categoryMapper).updateName(category.getId(), categoryUpdateNameRequest.name());
 
