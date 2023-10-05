@@ -12,4 +12,6 @@ public interface CategoryMapper {
 
     void updateName(@Param("id") int id,
                     @Param("newName") String newName);
+
+    void deleteById(int id);
 }

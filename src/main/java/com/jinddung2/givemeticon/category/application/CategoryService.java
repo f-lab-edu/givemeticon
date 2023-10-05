@@ -18,6 +18,11 @@ public class CategoryService {
         categoryMapper.updateName(categoryId, newName);
     }
 
+    public void deleteById(int id) {
+        validateCategory(id);
+        categoryMapper.deleteById(id);
+    }
+
     private Category validateCategory(int categoryId) {
         return categoryMapper.findById(categoryId).orElseThrow(NotFoundCategoryException::new);
     }

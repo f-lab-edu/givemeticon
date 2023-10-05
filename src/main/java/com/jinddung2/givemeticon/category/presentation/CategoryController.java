@@ -22,4 +22,10 @@ public class CategoryController {
         return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
     }
 
+    @DeleteMapping("/{categoryId}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable("categoryId") int categoryId) {
+        categoryService.deleteById(categoryId);
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.NO_CONTENT);
+    }
+
 }

@@ -4,7 +4,7 @@
 
 <mapper namespace="com.jinddung2.givemeticon.category.infrastructure.mapper.CategoryMapper">
 
-    <select id="findById" parameterType="int" resultType="Brand">
+    <select id="findById" parameterType="int" resultType="Category">
         SELECT *
         FROM category
         where id = #{id}
@@ -15,4 +15,10 @@
         SET name = #{newName}
         WHERE id = #{id}
     </update>
+
+    <delete id="deleteById" parameterType="int">
+        DELETE
+        FROM category
+        WHERE id = #{id}
+    </delete>
 </mapper>
