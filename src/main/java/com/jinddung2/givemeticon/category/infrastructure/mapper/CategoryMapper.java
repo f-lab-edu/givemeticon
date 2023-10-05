@@ -4,6 +4,7 @@ import com.jinddung2.givemeticon.category.domain.Category;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 @Mapper
@@ -14,4 +15,6 @@ public interface CategoryMapper {
                     @Param("newName") String newName);
 
     void deleteById(int id);
+
+    List<String> findAll();
 }
