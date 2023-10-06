@@ -35,4 +35,8 @@ public class Item {
         this.createdDate = createdDate;
         this.updatedDate = updatedDate;
     }
+
+    public void updateBrandId(int brandId) {
+        this.brandId = brandId;
+    }
 }

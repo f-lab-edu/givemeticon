@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.item.infrasturcture.mapper.ItemMapper">
+    <insert id="save" parameterType="Item" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO item (id,
+                          brand_id,
+                          name,
+                          price,
+                          view_count,
+                          created_date,
+                          updated_date)
+        VALUES (#{id},
+                #{brandId},
+                #{name},
+                #{price},
+                #{view_count},
+                NOW(),
+                NOW())
+    </insert>
+</mapper>
