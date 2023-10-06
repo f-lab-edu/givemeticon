@@ -27,17 +27,19 @@ public class UserDto {
     private LocalDateTime deletedDate;
 
     @Builder
-    public UserDto(int id, int accountId, String email, String password, String phone, UserRole userRole, boolean isActive, OAuthProvider provider, LocalDateTime createdDate, LocalDateTime updatedDate, LocalDateTime deletedDate) {{
-        this.id = id;
-        this.accountId = accountId;
-        this.email = email;
-        this.password = password;
-        this.phone = phone;
-        this.userRole = userRole;
-        this.isActive = isActive;
-        this.provider = provider;
-        this.createdDate = createdDate;
-        this.updatedDate = updatedDate;
-        this.deletedDate = deletedDate;
+    public UserDto(int id, int accountId, String email, String password, String phone, UserRole userRole, boolean isActive, OAuthProvider provider, LocalDateTime createdDate, LocalDateTime updatedDate, LocalDateTime deletedDate) {
+        {
+            this.id = id;
+            this.accountId = accountId;
+            this.email = email;
+            this.password = password;
+            this.phone = phone;
+            this.userRole = userRole;
+            this.isActive = isActive;
+            this.provider = provider;
+            this.createdDate = createdDate;
+            this.updatedDate = updatedDate;
+            this.deletedDate = deletedDate;
+        }
     }
 }

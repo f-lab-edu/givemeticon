@@ -25,7 +25,7 @@ public class OAuthLoginService {
     }
 
     private Integer findOrCreateUser(OAuthUserInfo oAuthUserInfo) {
-        return userMapper.findById(oAuthUserInfo.getEmail())
+        return userMapper.findByEmail(oAuthUserInfo.getEmail())
                 .map(User::getId)
                 .orElseGet(() -> newUser(oAuthUserInfo));
     }
