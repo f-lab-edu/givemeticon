@@ -20,7 +20,7 @@ public class WebConfig implements WebMvcConfigurer {
             "/auth/*/callback",
             "/api/v1/auth/**",
             "/error",
-            "/favicon.ico"
+            "/favicon.ico",
             "/api/v1/categories"
     };
 
