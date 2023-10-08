@@ -1,0 +1,3 @@
+[submodule "givemeticon-config"]
+	path = givemeticon-config
+	url = https://github.com/JinDDung2/givemeticon-config.git

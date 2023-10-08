@@ -18,6 +18,14 @@ configurations {
     }
 }
 
+task copyFiles(type: Copy) {
+    copy {
+        from './givemeticon-config'
+        include "*.yml"
+        into 'src/main/resources'
+    }
+}
+
 repositories {
     mavenCentral()
 }
