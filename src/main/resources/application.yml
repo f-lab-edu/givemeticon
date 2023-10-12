@@ -6,7 +6,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   profiles:
-    include: secret, oauth
+    include: secret, oauth, openapi
 
   session:
     store-type: redis
