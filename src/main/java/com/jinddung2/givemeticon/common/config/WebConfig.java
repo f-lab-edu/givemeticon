@@ -1,10 +1,8 @@
 package com.jinddung2.givemeticon.common.config;
 
-import com.jinddung2.givemeticon.account.infrastructure.StringToBankCodeConverter;
 import com.jinddung2.givemeticon.common.interceptor.AuthInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.format.FormatterRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -31,10 +29,5 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/**")
                 .excludePathPatterns(excludePaths);
-    }
-
-    @Override
-    public void addFormatters(FormatterRegistry registry) {
-        registry.addConverter(new StringToBankCodeConverter());
     }
 }
