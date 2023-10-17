@@ -23,7 +23,14 @@ public enum ErrorCode {
 
     // CATEGORY
     NOT_FOUND_CATEGORY("존재하지 않는 카테고리입니다."),
-    EMPTY_CATEGORY_LIST("카테고리 목록을 찾을 수 없습니다.");
+    EMPTY_CATEGORY_LIST("카테고리 목록을 찾을 수 없습니다."),
+
+    // ACCOUNT
+    OPENAPI_TOKEN_REQUEST_FAIL("openapi에 대한 토큰 요청이 실패했습니다."),
+    OPENAPI_REAL_NAME_REQUEST_FAIL("openapi에 대한 실명계좌인증 요청이 실패했습니다."),
+    MISMATCH_BANK_CODE("은행 코드가 일치하지 않습니다."),
+    MISMATCH_REAL_NAME("예금주가 일치하지 않습니다."),
+    MISMATCH_BIRTHDAY("생년월일이 일치하지 않습니다.");
     private final String message;
 
     ErrorCode(String message) {
