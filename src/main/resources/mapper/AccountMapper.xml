@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.user.infrastructure.mapper.AccountMapper">
+    <insert id="save" parameterType="Account" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO account (id,
+                             transactionId,
+                             accountHolder,
+                             accountNumber,
+                             bankCode,
+                             bankName,
+                             birth,
+                             createdDate,
+                             deletedDate)
+        VALUES (#{id},
+                #{transactionId},
+                #{accountHolder},
+                #{accountNumber},
+                #{bankCode},
+                #{bankName},
+                #{birth},
+                NOW(),
+                NULL)
+    </insert>
+
+    <select id="findByTransactionId" parameterType="String" resultType="Account">
+        SELECT *
+        FROM account
+        WHERE transaction_id = #{transactionId}
+    </select>
+</mapper>
