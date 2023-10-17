@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Random;
 
 @Component
 public class CertificationGenerator {
@@ -16,5 +17,10 @@ public class CertificationGenerator {
         } while (result.length() != 6);
 
         return result;
+    }
+
+    public int createRandomNumber(int bound) {
+        Random random = new Random();
+        return random.nextInt(bound);
     }
 }
