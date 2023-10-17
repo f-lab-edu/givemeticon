@@ -30,6 +30,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -90,7 +91,6 @@ public class OpenBankingService {
     public int requestMatchRealName(String accessToken, String transactionId, String bankCode, String accountNum,
                                     String realName, String birthday) throws JSONException, NoSuchAlgorithmException {
         URI uri = URI.create(OPENAPI_DEFAULT_URI + "/v2.0/inquiry/real_name");
-        log.info("OpenBankingService.requestMatchRealName() 실행");
         HttpEntity<String> request =
                 generateRealNameHttpRequest(accessToken, transactionId, bankCode, accountNum, birthday);
 
@@ -110,17 +110,17 @@ public class OpenBankingService {
             throw new ApiRequestFailedException();
         }
 
-        if (!realNameDto.bank_code_std().equals(bankCode)) {
+        if (!Objects.equals(realNameDto.bank_code_std(), bankCode)) {
             log.error("transactionId={}, bankCode={}", realNameDto.bank_tran_id(), realNameDto.bank_code_std());
             throw new MisMatchBank();
         }
 
-        if (!realNameDto.account_holder_name().equals(realName)) {
+        if (!Objects.equals(realNameDto.account_holder_name(), realName)) {
             log.error("transactionId={}, realName={}", realNameDto.bank_tran_id(), realNameDto.account_holder_name());
             throw new MisMatchRealName();
         }
 
-        if (!realNameDto.account_holder_info().equals(birthday)) {
+        if (!Objects.equals(realNameDto.account_holder_info(), birthday)) {
             log.error("transactionId={}, birthday={}", realNameDto.bank_tran_id(), realNameDto.account_holder_info());
         }
 
@@ -136,7 +136,6 @@ public class OpenBankingService {
                     .birth(realNameDto.account_holder_info())
                     .build());
         }
-        log.info("OpenBankingService.requestMatchRealName() 실행 종료");
         return accountId;
     }
 
@@ -161,7 +160,6 @@ public class OpenBankingService {
     private HttpEntity<String> generateRealNameHttpRequest(String accessToken, String transactionId, String bankCode,
                                                            String accountNum, String birthday)
             throws JSONException, NoSuchAlgorithmException {
-        log.info("OpenBankingService.requestMatchRealName().generateRealNameHttpRequest() 실행");
         String accessTok = accessToken.substring(7);
         String token = (String) redisTemplate.opsForValue().get(transactionId);
 
@@ -185,7 +183,6 @@ public class OpenBankingService {
         params.put("account_holder_info", birthday);
         params.put("bank_tran_id", transactionId + "U" + randomNum);
         params.put("tran_dtime", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
-        log.info("OpenBankingService.requestMatchRealName().generateRealNameHttpRequest() 실행 종료");
         return new HttpEntity<>(params.toString(), httpHeaders);
     }
 }
