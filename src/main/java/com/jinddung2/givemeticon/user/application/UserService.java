@@ -7,10 +7,12 @@ import com.jinddung2.givemeticon.user.exception.*;
 import com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper;
 import com.jinddung2.givemeticon.user.presentation.request.PasswordUpdateRequest;
 import com.jinddung2.givemeticon.user.presentation.request.SignUpRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class UserService {
 
     private final UserMapper userMapper;
@@ -60,11 +62,23 @@ public class UserService {
         userMapper.updatePassword(userId, encryptedPassword);
     }
 
+    public void updateAccount(int userId, int accountId) {
+        User user = getUser(userId);
+        user.createAccount(accountId);
+        log.info("user={}", user);
+        userMapper.updateAccount(userId, accountId);
+    }
+
     public void resetPassword(String email, String tempPassword) {
         User user = getUser(email);
         String encryptedPassword = passwordEncoder.encode(tempPassword);
         user.updatePassword(encryptedPassword);
         userMapper.updatePassword(user.getId(), encryptedPassword);
+    }
+
+    private User getUser(int userId) {
+        return userMapper.findById(userId)
+                .orElseThrow(NotFoundUserException::new);
     }
 
     private void checkUserValidity(SignUpRequest request) {
@@ -75,11 +89,6 @@ public class UserService {
         if (userMapper.existsByPhone(request.getPhone())) {
             throw new DuplicatedPhoneException();
         }
-    }
-
-    private User getUser(int userId) {
-        return userMapper.findById(userId)
-                .orElseThrow(NotFoundUserException::new);
     }
 
     private User getUser(String email) {
