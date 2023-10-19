@@ -36,15 +36,19 @@ class AccountServiceTest {
                 .bankName(createAccountRequest.bankName())
                 .birth(createAccountRequest.birth())
                 .build();
+
     }
 
     @Test
     @DisplayName("계좌 등록에 성공한다.")
     void create_Account_Success() {
-        Mockito.when(accountMapper.save(Mockito.any(Account.class))).thenReturn(account.getId());
-        int id = accountService.create(createAccountRequest);
+        Mockito.when(accountMapper.existsByAccountNumber(createAccountRequest.accountNumber())).thenReturn(false);
 
-        Assertions.assertEquals(account.getId(), id);
+        accountService.create(createAccountRequest);
+
+        // Verfiy
+        Mockito.verify(accountMapper).save(Mockito.any(Account.class));
+
     }
 
     @Test
