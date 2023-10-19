@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.mail.advice;
 
+import com.jinddung2.givemeticon.common.response.ApiResponse;
 import com.jinddung2.givemeticon.common.response.ErrorResult;
 import com.jinddung2.givemeticon.domain.mail.exception.EmailNotFoundException;
 import com.jinddung2.givemeticon.domain.mail.exception.InvalidCertificationNumberException;
@@ -14,16 +15,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class MailExceptionAdvice {
 
     @ExceptionHandler(EmailNotFoundException.class)
-    public ResponseEntity<ErrorResult> handleEmailNotFoundException(EmailNotFoundException e) {
+    public ResponseEntity<ApiResponse<ErrorResult>> handleEmailNotFoundException(EmailNotFoundException e) {
         ErrorResult errorResult = new ErrorResult(e.getMessage());
         log.error("mail exception!! error msg={}", errorResult);
-        return new ResponseEntity<>(errorResult, HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(ApiResponse.fail(errorResult), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(InvalidCertificationNumberException.class)
-    public ResponseEntity<ErrorResult> handleInvalidCertificationNumberException(InvalidCertificationNumberException e) {
+    public ResponseEntity<ApiResponse<ErrorResult>> handleInvalidCertificationNumberException(InvalidCertificationNumberException e) {
         ErrorResult errorResult = new ErrorResult(e.getMessage());
         log.error("mail exception!! error msg={}", errorResult);
-        return new ResponseEntity<>(errorResult, HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(ApiResponse.fail(errorResult), HttpStatus.BAD_REQUEST);
     }
 }
