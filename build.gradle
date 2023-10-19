@@ -79,8 +79,7 @@ jacocoTestReport {
                             "**/*Dao*",
                             "**/*Generator*",
                             "**/constants/*Constants*",
-                            "**/oauth/**",
-                            "**/account/**"
+                            "**/oauth/**"
                     ])
                 })
         )
