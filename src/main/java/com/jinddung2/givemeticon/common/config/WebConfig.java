@@ -1,6 +1,6 @@
 package com.jinddung2.givemeticon.common.config;
 
-import com.jinddung2.givemeticon.common.interceptor.AuthInterceptor;
+import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
