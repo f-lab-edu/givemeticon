@@ -57,7 +57,7 @@ class MailSendServiceTest {
         String certificationNumber = "123456";
         String mailTitleCertification = "givemeticon 인증번호 안내";
 
-        when(certificationGenerator.createCertificationNumber(999999)).thenReturn(certificationNumber);
+        when(certificationGenerator.createCertificationNumber()).thenReturn(certificationNumber);
         when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
 
         doNothing().when(mailSender).send(any(MimeMessage.class));
@@ -65,7 +65,7 @@ class MailSendServiceTest {
         when(properties.getMailTitleCertification()).thenReturn(mailTitleCertification);
         mailSendService.sendEmailForCertification(email);
 
-        verify(certificationGenerator).createCertificationNumber(999999);
+        verify(certificationGenerator).createCertificationNumber();
         verify(mailSender).send(any(MimeMessage.class));
         verify(certificationNumberDao).saveCertificationNumber(email, certificationNumber);
     }

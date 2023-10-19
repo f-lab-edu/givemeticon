@@ -1,10 +1,12 @@
 package com.jinddung2.givemeticon.user.presentation;
 
+import com.jinddung2.givemeticon.account.dto.request.CreateAccountRequest;
 import com.jinddung2.givemeticon.common.response.ApiResponse;
 import com.jinddung2.givemeticon.user.application.LoginService;
 import com.jinddung2.givemeticon.user.application.PasswordResetAdapter;
 import com.jinddung2.givemeticon.user.application.UserService;
 import com.jinddung2.givemeticon.user.application.dto.UserDto;
+import com.jinddung2.givemeticon.user.presentation.facade.CreateAccountFacade;
 import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
 import com.jinddung2.givemeticon.user.presentation.request.PasswordResetRequest;
 import com.jinddung2.givemeticon.user.presentation.request.PasswordUpdateRequest;
@@ -24,6 +26,7 @@ public class UserController {
     private final UserService userService;
     private final LoginService loginService;
     private final PasswordResetAdapter passwordResetAdapter;
+    private final CreateAccountFacade createAccountFacade;
 
     @PostMapping("/sign-up")
     public ResponseEntity<ApiResponse<Integer>> signUp(@RequestBody @Validated SignUpRequest request) {
@@ -61,5 +64,12 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> resetPassword(@RequestBody PasswordResetRequest request) throws MessagingException {
         passwordResetAdapter.resetPasswordAndSendEmail(request.email());
         return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
+    }
+
+    @PostMapping("{userId}/account")
+    public ResponseEntity<ApiResponse<Integer>> createAccount(@PathVariable(name = "userId") int userId,
+                                                              @RequestBody @Validated CreateAccountRequest request) {
+        int accountId = createAccountFacade.createAccount(userId, request);
+        return new ResponseEntity<>(ApiResponse.success(accountId), HttpStatus.OK);
     }
 }

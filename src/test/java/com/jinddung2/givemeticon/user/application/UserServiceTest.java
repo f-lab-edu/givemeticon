@@ -45,7 +45,7 @@ class UserServiceTest {
         signUpRequest = new SignUpRequest("test@example.com", "test1234", "01012345678");
         loginRequest = new LoginRequest("test@example.com", "test1234");
         testUser = User.builder()
-                .id(100)
+                .id(1)
                 .email("test@example.com")
                 .password(passwordEncoder.encode("test1234"))
                 .build();
@@ -162,5 +162,17 @@ class UserServiceTest {
         verify(userMapper).updatePassword(testUser.getId(), tempPassword);
 
         Assertions.assertEquals(tempPassword, testUser.getPassword());
+    }
+
+    @Test
+    @DisplayName("해당 유저의 등록된 계좌로 일치시킨다.")
+    void update_Account_Id_Success() {
+        int accountId = 100;
+        when(userMapper.findById(1)).thenReturn(Optional.of(testUser));
+        userService.updateAccount(testUser.getId(), accountId);
+
+        verify(userMapper).updateAccount(testUser.getId(), accountId);
+
+        Assertions.assertEquals(100, testUser.getAccountId());
     }
 }

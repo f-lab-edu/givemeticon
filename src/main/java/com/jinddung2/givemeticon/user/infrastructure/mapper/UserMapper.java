@@ -21,4 +21,7 @@ public interface UserMapper {
 
     void updatePassword(@Param("id") int id,
                         @Param("newPassword") String newPassword);
+
+    void updateAccount(@Param("userId") int userId,
+                       @Param("accountId") int accountId);
 }

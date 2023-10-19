@@ -25,7 +25,7 @@ public class MailSendService {
 
     @Async(value = "mailExecutor")
     public void sendEmailForCertification(String email) throws NoSuchAlgorithmException, MessagingException {
-        String certificationNumber = certificationGenerator.createCertificationNumber(999999);
+        String certificationNumber = certificationGenerator.createCertificationNumber();
         String content = String.format("%s/api/v1/users/verify?certificationNumber=%s&email=%s   링크를 3분 이내에 클릭해주세요.", properties.getDomainName(), certificationNumber, email);
         certificationNumberDao.saveCertificationNumber(email, certificationNumber);
         sendMail(email, content);
