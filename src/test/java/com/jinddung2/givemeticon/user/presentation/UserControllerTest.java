@@ -1,8 +1,10 @@
 package com.jinddung2.givemeticon.user.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jinddung2.givemeticon.oauth.infrastructure.JwtTokenProvider;
+import com.jinddung2.givemeticon.account.dto.request.CreateAccountRequest;
+import com.jinddung2.givemeticon.account.exception.DuplicatedAccountNumberException;
 import com.jinddung2.givemeticon.mail.application.MailSendService;
+import com.jinddung2.givemeticon.oauth.infrastructure.JwtTokenProvider;
 import com.jinddung2.givemeticon.user.application.LoginService;
 import com.jinddung2.givemeticon.user.application.PasswordResetAdapter;
 import com.jinddung2.givemeticon.user.application.UserService;
@@ -11,6 +13,7 @@ import com.jinddung2.givemeticon.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.user.exception.MisMatchPasswordException;
 import com.jinddung2.givemeticon.user.exception.NotFoundUserException;
+import com.jinddung2.givemeticon.user.presentation.facade.CreateAccountFacade;
 import com.jinddung2.givemeticon.user.presentation.request.LoginRequest;
 import com.jinddung2.givemeticon.user.presentation.request.PasswordResetRequest;
 import com.jinddung2.givemeticon.user.presentation.request.PasswordUpdateRequest;
@@ -53,6 +56,8 @@ public class UserControllerTest {
     MailSendService mailSendService;
     @MockBean
     PasswordResetAdapter passwordResetAdapter;
+    @MockBean
+    CreateAccountFacade createAccountFacade;
 
     @MockBean
     MockHttpSession mockHttpSession;
@@ -61,6 +66,7 @@ public class UserControllerTest {
     UserDto userDto;
     PasswordUpdateRequest passwordUpdateRequest;
     PasswordResetRequest passwordResetRequest;
+    CreateAccountRequest createAccountRequest;
 
     @BeforeEach
     void setUp() {
@@ -73,11 +79,12 @@ public class UserControllerTest {
         mockHttpSession = new MockHttpSession();
         passwordUpdateRequest = new PasswordUpdateRequest("test1234", "newtest1234");
         passwordResetRequest = new PasswordResetRequest("test1234@example.com");
+        createAccountRequest = new CreateAccountRequest("testHolder", "0000", "testBank", "000101");
         when(loginService.getLoginUser()).thenReturn(Optional.of(userDto.getEmail()));
     }
 
     @Test
-    public void signUp_Success() throws Exception {
+    void signUp_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/sign-up")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -89,7 +96,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void signUp_Fail_Duplicate_Email() throws Exception {
+    void signUp_Fail_Duplicate_Email() throws Exception {
         doThrow(new DuplicatedEmailException()).when(userService).signUp(signUpRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                 .post("/api/v1/users/sign-up")
@@ -102,7 +109,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void signUp_Fail_Duplicate_Phone() throws Exception {
+    void signUp_Fail_Duplicate_Phone() throws Exception {
         doThrow(new DuplicatedPhoneException()).when(userService).signUp(signUpRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/sign-up")
@@ -116,7 +123,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void get_UserInfo_Success() throws Exception {
+    void get_UserInfo_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/1/info")
                         .param("email", loginRequest.getEmail())
@@ -131,7 +138,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void get_UserInfo_Fail_Not_Exists() throws Exception {
+    void get_UserInfo_Fail_Not_Exists() throws Exception {
         doThrow(new NotFoundUserException()).when(userService).getUserInfo(1);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -147,7 +154,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void login_Success() throws Exception {
+    void login_Success() throws Exception {
         given(userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword())).willReturn(userDto);
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/login")
@@ -160,7 +167,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void logout_Success() throws Exception {
+    void logout_Success() throws Exception {
         willDoNothing().given(loginService).logout();
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/logout")
@@ -174,7 +181,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void update_Password_Success() throws Exception {
+    void update_Password_Success() throws Exception {
         doNothing().when(userService).updatePassword(1, passwordUpdateRequest);
         mockMvc.perform(MockMvcRequestBuilders
                         .patch("/api/v1/users/1/password")
@@ -188,7 +195,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void update_Password_Fail_Not_Exists_User() throws Exception {
+    void update_Password_Fail_Not_Exists_User() throws Exception {
         doThrow(new NotFoundUserException()).when(userService).updatePassword(1, passwordUpdateRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .patch("/api/v1/users/1/password")
@@ -204,7 +211,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void update_Password_MisMatch_Password() throws Exception {
+    void update_Password_MisMatch_Password() throws Exception {
         doThrow(new MisMatchPasswordException()).when(userService).updatePassword(1, passwordUpdateRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .patch("/api/v1/users/1/password")
@@ -221,7 +228,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void send_Temporary_Password() throws Exception {
+    void send_Temporary_Password() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .put("/api/v1/users/reset-password")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -231,5 +238,34 @@ public class UserControllerTest {
 
         // Verify
         Mockito.verify(passwordResetAdapter).resetPasswordAndSendEmail(passwordResetRequest.email());
+    }
+
+    @Test
+    void create_Account_Link_User_Account_Id_Fail() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .post("/api/v1/users/" + userDto.getId() + "/account")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(createAccountRequest)))
+                .andExpect(status().isOk());
+
+        // Verify
+        Mockito.verify(createAccountFacade).createAccount(userDto.getId(), createAccountRequest);
+    }
+
+    @Test
+    void create_Account_Fail_Duplicated_Account_Number() throws Exception {
+        doThrow(new DuplicatedAccountNumberException())
+                .when(createAccountFacade).createAccount(userDto.getId(), createAccountRequest);
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .post("/api/v1/users/" + userDto.getId() + "/account")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(createAccountRequest)))
+                .andExpect(status().isBadRequest());
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("이미 등록된 계좌번호 입니다."));
     }
 }

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.account.mapper.AccountMapper">
+    <insert id="save" parameterType="Account" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO account (id,
+                             account_holder,
+                             account_number,
+                             bank_name,
+                             birth,
+                             created_date,
+                             deleted_date)
+        VALUES (#{id},
+                #{accountHolder},
+                #{accountNumber},
+                #{bankName},
+                #{birth},
+                NOW(),
+                NULL)
+    </insert>
+
+    <select id="existsByAccountNumber" parameterType="String" resultType="boolean">
+        SELECT EXISTS
+                   (SELECT 1 FROM account where account_number = #{accountNumber})
+    </select>
+</mapper>

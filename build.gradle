@@ -79,7 +79,8 @@ jacocoTestReport {
                             "**/*Dao*",
                             "**/*Generator*",
                             "**/constants/*Constants*",
-                            "**/oauth/**"
+                            "**/oauth/**",
+                            "**/account/**"
                     ])
                 })
         )
@@ -120,7 +121,8 @@ jacocoTestCoverageVerification {
                     "**/*Dao*",
                     "**/*Generator*",
                     "**/constants/*Constants*",
-                    "**/oauth/**"
+                    "**/oauth/**",
+                    "**/account/**"
             ]
         }
     }

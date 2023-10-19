@@ -34,6 +34,12 @@
         WHERE id = #{id}
     </update>
 
+    <update id="updateAccount">
+        UPDATE user
+        SET account_id = #{accountId}
+        WHERE id = #{userId}
+    </update>
+
     <select id="findById" parameterType="int" resultType="User">
         SELECT *
         FROM user
