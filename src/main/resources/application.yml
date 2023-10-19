@@ -23,6 +23,6 @@ spring:
 
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
-  type-aliases-package: com.jinddung2.givemeticon.*.domain
+  type-aliases-package: com.jinddung2.givemeticon.domain.*
   configuration:
     map-underscore-to-camel-case: true
