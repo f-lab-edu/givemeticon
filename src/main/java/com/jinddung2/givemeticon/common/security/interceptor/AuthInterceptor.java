@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
@@ -25,14 +26,35 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final LoginService loginService;
     private final JwtTokenProvider jwtTokenProvider;
 
+    private final String[] ALLOW_GET_PATH = {
+            "/api/v1/brands/category/**",
+            "/api/v1/brands/*",
+            "/api/v1/brands/category",
+            "/api/v1/categories"
+    };
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         log.debug("Login Interceptor preHandler");
+
+        if (checkAllowGetUrl(request)) return true;
 
         TokenLoginValidate(request);
         SessionLoginValidate();
 
         return true;
+    }
+
+    private boolean checkAllowGetUrl(HttpServletRequest request) {
+        if (request.getMethod().equals(HttpMethod.GET.name())) {
+            String requestURI = request.getRequestURI();
+            for (String allowPath : ALLOW_GET_PATH) {
+                if (requestURI.equals(allowPath)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean SessionLoginValidate() {
