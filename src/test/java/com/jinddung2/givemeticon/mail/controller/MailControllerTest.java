@@ -84,7 +84,8 @@ class MailControllerTest {
         resultActions
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("이메일이 존재하지 않습니다."));
+                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("FAIL"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.message").value("이메일이 존재하지 않습니다."));
     }
 
     @Test
@@ -97,6 +98,7 @@ class MailControllerTest {
         resultActions
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("인증 번호가 다릅니다."));
+                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("FAIL"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.message").value("인증 번호가 다릅니다."));
     }
 }

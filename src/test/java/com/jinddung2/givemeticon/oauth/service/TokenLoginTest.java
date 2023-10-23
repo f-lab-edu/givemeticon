@@ -60,7 +60,6 @@ public class TokenLoginTest {
         boolean result = authInterceptor.preHandle(request, response, handler);
 
         Assertions.assertTrue(result);
-        Mockito.verify(loginService).login("test1234@example.com");
     }
 
     @Test

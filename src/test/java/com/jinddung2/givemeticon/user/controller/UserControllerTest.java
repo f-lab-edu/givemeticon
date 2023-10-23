@@ -106,7 +106,8 @@ public class UserControllerTest {
 
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("이미 존재하는 이메일입니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("이미 존재하는 이메일입니다."));
     }
 
     @Test
@@ -120,7 +121,8 @@ public class UserControllerTest {
 
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("이미 존재하는 휴대폰 번호입니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("이미 존재하는 휴대폰 번호입니다."));
     }
 
     @Test
@@ -151,7 +153,8 @@ public class UserControllerTest {
         // Verify
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("존재하지 않는 회원입니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("존재하지 않는 회원입니다."));
     }
 
     @Test
@@ -208,7 +211,8 @@ public class UserControllerTest {
         // Verify
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("존재하지 않는 회원입니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("존재하지 않는 회원입니다."));
     }
 
     @Test
@@ -224,7 +228,8 @@ public class UserControllerTest {
         // Verify
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("패스워드가 일치하지 않습니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("패스워드가 일치하지 않습니다."));
 
     }
 
@@ -267,6 +272,7 @@ public class UserControllerTest {
 
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("이미 등록된 계좌번호 입니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("이미 등록된 계좌번호 입니다."));
     }
 }

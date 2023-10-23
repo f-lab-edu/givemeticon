@@ -74,7 +74,8 @@ class CategoryControllerTest {
 
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("카테고리 목록을 찾을 수 없습니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("카테고리 목록을 찾을 수 없습니다."));
     }
 
     @Test
@@ -101,7 +102,8 @@ class CategoryControllerTest {
 
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("존재하지 않는 카테고리입니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("존재하지 않는 카테고리입니다."));
     }
 
     @Test
@@ -126,6 +128,7 @@ class CategoryControllerTest {
 
 
         resultActions.andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("존재하지 않는 카테고리입니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("존재하지 않는 카테고리입니다."));
     }
 }

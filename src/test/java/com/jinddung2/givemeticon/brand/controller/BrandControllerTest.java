@@ -103,7 +103,8 @@ class BrandControllerTest {
 
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("해당 페이지에 해당하는 브랜드가 없습니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("해당 페이지에 해당하는 브랜드가 없습니다."));
 
     }
 
@@ -118,7 +119,8 @@ class BrandControllerTest {
 
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("이미 존재하는 브랜드입니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("이미 존재하는 브랜드입니다."));
     }
 
     @Test
@@ -143,7 +145,8 @@ class BrandControllerTest {
 
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("존재하지 않는 브랜드입니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("존재하지 않는 브랜드입니다."));
     }
 
     @Test
@@ -168,6 +171,7 @@ class BrandControllerTest {
 
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("존재하지 않는 브랜드입니다."));
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("존재하지 않는 브랜드입니다."));
     }
 }
