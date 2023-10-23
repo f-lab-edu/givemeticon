@@ -8,8 +8,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -26,17 +29,27 @@ public class AuthInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         log.debug("Login Interceptor preHandler");
 
-        String authToken = resolveToken(request);
-
-        if (authToken != null && jwtTokenProvider.validateToken(authToken)) {
-            String email = getUserIdFromToken(authToken);
-            loginService.login(email);
-        }
-
-        loginService.getLoginUser()
-                .orElseThrow(UnauthorizedUserException::new);
+        TokenLoginValidate(request);
+        SessionLoginValidate();
 
         return true;
+    }
+
+    private boolean SessionLoginValidate() {
+        String email = loginService.getLoginUser()
+                .orElseThrow(UnauthorizedUserException::new);
+
+        return !ObjectUtils.isEmpty(email);
+    }
+
+    private boolean TokenLoginValidate(HttpServletRequest request) {
+        String authToken = resolveToken(request);
+        String email = null;
+
+        if (authToken != null && jwtTokenProvider.validateToken(authToken)) {
+            email = getUserIdFromToken(authToken);
+        }
+        return !Objects.isNull(email);
     }
 
     private String resolveToken(HttpServletRequest request) {
