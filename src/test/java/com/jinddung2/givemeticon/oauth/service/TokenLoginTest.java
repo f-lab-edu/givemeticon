@@ -28,7 +28,7 @@ public class TokenLoginTest {
     @Mock
     AuthInterceptor authInterceptor;
     @Mock
-    HttpServletRequest request;
+    HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
     @Mock
     HttpServletResponse response;
 
@@ -40,8 +40,6 @@ public class TokenLoginTest {
         authInterceptor = new AuthInterceptor(loginService, jwtTokenProvider);
         email = "test1234@example.com";
         authToken = "testToken";
-//        request = Mockito.mock(HttpServletRequest.class);
-//        response = Mockito.mock(HttpServletResponse.class);
     }
 
     @Test
@@ -52,6 +50,7 @@ public class TokenLoginTest {
         Mockito.when(request.getHeader("Authorization")).thenReturn("Bearer " + authToken);
         Mockito.when(jwtTokenProvider.validateToken(authToken)).thenReturn(true);
         Mockito.when(jwtTokenProvider.extractSubject(authToken)).thenReturn(email);
+        Mockito.when(request.getMethod()).thenReturn("POST");
 
         User loginUser = User.builder()
                 .email(email)
