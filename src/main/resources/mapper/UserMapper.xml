@@ -41,13 +41,29 @@
     </update>
 
     <select id="findById" parameterType="int" resultType="User">
-        SELECT *
+        SELECT id,
+               account_id,
+               email,
+               password,
+               phone,
+               user_role,
+               is_active,
+               provider,
+               created_date,
+               updated_date
         FROM user
         where id = #{id}
     </select>
 
     <select id="findByEmail" parameterType="String" resultType="User">
-        SELECT *
+        SELECT id,
+               account_id,
+               email,
+               password,
+               phone,
+               user_role,
+               is_active,
+               provider
         FROM user
         where email = #{email}
     </select>

@@ -5,7 +5,7 @@
 <mapper namespace="com.jinddung2.givemeticon.domain.category.mapper.CategoryMapper">
 
     <select id="findById" parameterType="int" resultType="Category">
-        SELECT *
+        SELECT id, name
         FROM category
         where id = #{id}
     </select>

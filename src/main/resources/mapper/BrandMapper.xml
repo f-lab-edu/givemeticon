@@ -24,13 +24,13 @@
     </insert>
 
     <select id="findById" parameterType="int" resultType="Brand">
-        SELECT *
+        SELECT id, category_id, name, created_date, updated_date
         FROM brand
         where id = #{id}
     </select>
 
     <select id="findAllByCategory" parameterType="map" resultMap="brandResultMap">
-        SELECT *
+        SELECT id, category_id, name, created_date, updated_date
         FROM brand
         WHERE category_id = #{id}
         ORDER BY created_date DESC
