@@ -35,7 +35,7 @@ public class BrandService {
 
     public BrandDto getBrand(int id) {
         Brand brand = validateBrand(id);
-        return toDto(brand);
+        return BrandDto.of(brand);
     }
 
     public List<BrandDto> getBrands(int categoryId, int page) {
@@ -47,7 +47,7 @@ public class BrandService {
         }
 
         return brands.stream()
-                .map(this::toDto)
+                .map(BrandDto::of)
                 .collect(Collectors.toList());
     }
 

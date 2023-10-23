@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.domain.brand.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.jinddung2.givemeticon.domain.brand.domain.Brand;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,5 +32,15 @@ public class BrandDto {
         this.name = name;
         this.createdDate = createdDate;
         this.updatedDate = updatedDate;
+    }
+
+    public static BrandDto of(Brand brand) {
+        return BrandDto.builder()
+                .id(brand.getId())
+                .categoryId(brand.getCategoryId())
+                .name(brand.getName())
+                .createdDate(brand.getCreatedDate())
+                .updatedDate(brand.getUpdatedDate())
+                .build();
     }
 }
