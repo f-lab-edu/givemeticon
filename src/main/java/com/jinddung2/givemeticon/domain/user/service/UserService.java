@@ -23,7 +23,7 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public Integer signUp(SignUpRequest request) {
+    public int signUp(SignUpRequest request) {
         checkUserValidity(request);
         String encryptedPassword = passwordEncoder.encode(request.getPassword());
 
