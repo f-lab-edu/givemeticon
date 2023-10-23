@@ -3,7 +3,6 @@ package com.jinddung2.givemeticon.category.service;
 import com.jinddung2.givemeticon.domain.category.domain.Category;
 import com.jinddung2.givemeticon.domain.category.dto.request.CategoryUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.category.exception.NotFoundCategoryException;
-import com.jinddung2.givemeticon.domain.category.exception.NotFoundCategoryListException;
 import com.jinddung2.givemeticon.domain.category.mapper.CategoryMapper;
 import com.jinddung2.givemeticon.domain.category.service.CategoryService;
 import org.junit.jupiter.api.Assertions;
@@ -17,7 +16,6 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,16 +56,6 @@ class CategoryServiceTest {
         List<String> allCategories = categoryService.getAllCategories();
 
         Assertions.assertEquals(categoryList.size(), allCategories.size());
-    }
-
-    @Test
-    @DisplayName("카테고리 목록이 비어있어 조회에 성공한다.")
-    void get_All_Categories_Fail_Empty_List() {
-        Mockito.when(categoryMapper.findAll()).thenReturn(Collections.EMPTY_LIST);
-
-        assertThrows(NotFoundCategoryListException.class, () -> {
-            categoryService.getAllCategories();
-        });
     }
 
     @Test

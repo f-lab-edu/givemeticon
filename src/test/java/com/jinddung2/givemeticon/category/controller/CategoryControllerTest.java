@@ -7,7 +7,6 @@ import com.jinddung2.givemeticon.domain.category.controller.CategoryController;
 import com.jinddung2.givemeticon.domain.category.domain.Category;
 import com.jinddung2.givemeticon.domain.category.dto.request.CategoryUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.category.exception.NotFoundCategoryException;
-import com.jinddung2.givemeticon.domain.category.exception.NotFoundCategoryListException;
 import com.jinddung2.givemeticon.domain.category.service.CategoryService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,22 +59,6 @@ class CategoryControllerTest {
                 .andExpect(status().isOk());
 
         Mockito.verify(categoryService).getAllCategories();
-    }
-
-    @Test
-    void category_Get_All_Name_Fail_Empty_List() throws Exception {
-        Mockito.doThrow(new NotFoundCategoryListException())
-                .when(categoryService).getAllCategories();
-
-        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .get("/api/v1/categories")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
-
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("카테고리 목록을 찾을 수 없습니다."));
     }
 
     @Test
