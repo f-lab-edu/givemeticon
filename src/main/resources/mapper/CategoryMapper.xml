@@ -2,10 +2,10 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.jinddung2.givemeticon.category.infrastructure.mapper.CategoryMapper">
+<mapper namespace="com.jinddung2.givemeticon.domain.category.mapper.CategoryMapper">
 
     <select id="findById" parameterType="int" resultType="Category">
-        SELECT *
+        SELECT id, name
         FROM category
         where id = #{id}
     </select>
