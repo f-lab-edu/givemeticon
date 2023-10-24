@@ -2,6 +2,7 @@ package com.jinddung2.givemeticon.domain.user.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthProvider;
+import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.domain.UserRole;
 import lombok.Builder;
 import lombok.Getter;
@@ -41,5 +42,20 @@ public class UserDto {
             this.updatedDate = updatedDate;
             this.deletedDate = deletedDate;
         }
+    }
+
+    public static UserDto of(User user) {
+        return UserDto.builder()
+                .id(user.getId())
+                .accountId(user.getAccountId())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .userRole(user.getUserRole())
+                .provider(user.getProvider())
+                .createdDate(user.getCreatedDate())
+                .updatedDate(user.getUpdatedDate())
+                .deletedDate(user.getDeletedDate())
+                .isActive(user.isActive())
+                .build();
     }
 }

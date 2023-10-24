@@ -36,7 +36,7 @@ public class UserService {
 
     public UserDto getUserInfo(int userId) {
         User user = getUser(userId);
-        return toDto(user);
+        return UserDto.of(user);
     }
 
     public UserDto checkLogin(String email, String password) {
@@ -47,7 +47,7 @@ public class UserService {
         if (!isMatch) {
             throw new MisMatchPasswordException();
         }
-        return toDto(user);
+        return UserDto.of(user);
     }
 
     public void updatePassword(int userId, PasswordUpdateRequest request) {
@@ -94,20 +94,5 @@ public class UserService {
     private User getUser(String email) {
         return userMapper.findByEmail(email)
                 .orElseThrow(NotFoundEmailException::new);
-    }
-
-    private UserDto toDto(User user) {
-        return UserDto.builder()
-                .id(user.getId())
-                .accountId(user.getAccountId())
-                .email(user.getEmail())
-                .phone(user.getPhone())
-                .userRole(user.getUserRole())
-                .provider(user.getProvider())
-                .createdDate(user.getCreatedDate())
-                .updatedDate(user.getUpdatedDate())
-                .deletedDate(user.getDeletedDate())
-                .isActive(user.isActive())
-                .build();
     }
 }
