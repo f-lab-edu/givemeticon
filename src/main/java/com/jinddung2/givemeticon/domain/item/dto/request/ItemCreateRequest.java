@@ -1,6 +1,6 @@
-package com.jinddung2.givemeticon.item.presentation.request;
+package com.jinddung2.givemeticon.domain.item.dto.request;
 
-import com.jinddung2.givemeticon.item.domain.Item;
+import com.jinddung2.givemeticon.domain.item.domain.Item;
 
 public record ItemCreateRequest(
         String name,

@@ -1,7 +1,8 @@
 package com.jinddung2.givemeticon.item.application;
 
-import com.jinddung2.givemeticon.item.domain.Item;
-import com.jinddung2.givemeticon.item.infrasturcture.mapper.ItemMapper;
+import com.jinddung2.givemeticon.domain.item.domain.Item;
+import com.jinddung2.givemeticon.domain.item.mapper.ItemMapper;
+import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

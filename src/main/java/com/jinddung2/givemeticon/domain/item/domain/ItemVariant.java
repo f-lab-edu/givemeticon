@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.item.domain;
+package com.jinddung2.givemeticon.domain.item.domain;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
-public class ItemDetail {
+public class ItemVariant {
     private int id;
     private int itemId;
     private int sellerId;
@@ -21,15 +21,15 @@ public class ItemDetail {
     private LocalDateTime deletedDate;
 
     @Builder
-    public ItemDetail(int id,
-                      int itemId,
-                      int sellerId,
-                      LocalDate expirationDate,
-                      boolean isUsed,
-                      LocalDate isUsedDate,
-                      LocalDateTime createdDate,
-                      LocalDateTime updatedDate,
-                      LocalDateTime deletedDate
+    public ItemVariant(int id,
+                       int itemId,
+                       int sellerId,
+                       LocalDate expirationDate,
+                       boolean isUsed,
+                       LocalDate isUsedDate,
+                       LocalDateTime createdDate,
+                       LocalDateTime updatedDate,
+                       LocalDateTime deletedDate
     ) {
         this.id = id;
         this.itemId = itemId;

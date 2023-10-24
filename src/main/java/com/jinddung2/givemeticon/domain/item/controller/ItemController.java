@@ -1,8 +1,8 @@
-package com.jinddung2.givemeticon.item.presentation;
+package com.jinddung2.givemeticon.domain.item.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.item.facade.ItemCreationFacade;
-import com.jinddung2.givemeticon.item.presentation.request.ItemCreateRequest;
+import com.jinddung2.givemeticon.domain.item.dto.request.ItemCreateRequest;
+import com.jinddung2.givemeticon.domain.item.facade.ItemCreationFacade;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

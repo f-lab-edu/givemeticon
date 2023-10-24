@@ -1,6 +1,6 @@
-package com.jinddung2.givemeticon.item.infrasturcture.mapper;
+package com.jinddung2.givemeticon.domain.item.mapper;
 
-import com.jinddung2.givemeticon.item.domain.Item;
+import com.jinddung2.givemeticon.domain.item.domain.Item;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper

@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.item.domain;
+package com.jinddung2.givemeticon.domain.item.domain;
 
 import lombok.Builder;
 import lombok.Getter;
