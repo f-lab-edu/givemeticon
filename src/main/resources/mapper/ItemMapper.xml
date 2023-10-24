@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.item.mapper.ItemMapper">
+    <insert id="save" parameterType="Item" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO item (id,
+                          brand_id,
+                          name,
+                          price,
+                          view_count,
+                          created_date,
+                          updated_date)
+        VALUES (#{id},
+                #{brandId},
+                #{name},
+                #{price},
+                #{view_count},
+                NOW(),
+                NOW())
+    </insert>
+
+    <select id="findById" parameterType="int" resultType="Item">
+        SELECT id, brand_id, name, price, view_count, created_date, updated_date
+        FROM item
+        WHERE id = #{itemId}
+    </select>
+
+    <update id="increaseViewCount" parameterType="int">
+        UPDATE item
+        SET view_count = view_count + 1
+        WHERE id = #{itemId}
+    </update>
+</mapper>
