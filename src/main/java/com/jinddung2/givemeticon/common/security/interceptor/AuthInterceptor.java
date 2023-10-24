@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -28,9 +29,10 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     private final String[] ALLOW_GET_PATH = {
             "/api/v1/brands/category/**",
-            "/api/v1/brands/*",
+            "/api/v1/brands/**",
             "/api/v1/brands/category",
-            "/api/v1/categories"
+            "/api/v1/categories",
+            "/api/v1/items/**"
     };
 
     @Override
@@ -49,12 +51,17 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (request.getMethod().equals(HttpMethod.GET.name())) {
             String requestURI = request.getRequestURI();
             for (String allowPath : ALLOW_GET_PATH) {
-                if (requestURI.equals(allowPath)) {
+                if (isPathMatch(allowPath, requestURI)) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    private boolean isPathMatch(String patten, String path) {
+        AntPathMatcher antPathMatcher = new AntPathMatcher();
+        return antPathMatcher.match(patten, path);
     }
 
     private boolean SessionLoginValidate() {
