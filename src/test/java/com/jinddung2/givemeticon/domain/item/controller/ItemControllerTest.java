@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
 import com.jinddung2.givemeticon.domain.item.dto.request.ItemCreateRequest;
+import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.facade.ItemCreationFacade;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
@@ -17,8 +18,11 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import static org.mockito.Mockito.doThrow;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(value = ItemController.class,
@@ -50,7 +54,7 @@ class ItemControllerTest {
     }
 
     @Test
-    void createItem() throws Exception {
+    void createItem_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/items/brand/" + id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -61,12 +65,26 @@ class ItemControllerTest {
     }
 
     @Test
-    void getItem() throws Exception {
+    void getItem_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/items/" + id)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
         Mockito.verify(itemService).getItem(id);
+    }
+
+    @Test
+    void getItem_Fail_Not_Found_Item() throws Exception {
+        doThrow(new NotFoundItemException()).when(itemService).getItem(id);
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/items/" + id)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("존재하지 않는 아이템입니다."));
     }
 }
