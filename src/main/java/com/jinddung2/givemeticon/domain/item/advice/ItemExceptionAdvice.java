@@ -17,6 +17,6 @@ public class ItemExceptionAdvice {
     public ResponseEntity<ApiResponse<ErrorResult>> handleItemException(ItemException e) {
         ErrorResult errorResult = new ErrorResult(e.getMessage());
         log.debug("item exception!! error msg={}", errorResult);
-        return new ResponseEntity<>(ApiResponse.success(errorResult), HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(ApiResponse.fail(errorResult), HttpStatus.BAD_REQUEST);
     }
 }
