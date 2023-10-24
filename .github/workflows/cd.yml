@@ -36,6 +36,7 @@ jobs:
 
       # Docker build & Push
       - name: Build and Push docker image to Amazon ECR
+        sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
         env:
           REGISTRY: ${{ secrets.DOCKER_USERNAME }}
           REPOSITORY: ${{ secrets.DOCKER_REPO }}
