@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.jinddung2.givemeticon.user.infrastructure.mapper.UserMapper">
+<mapper namespace="com.jinddung2.givemeticon.domain.user.mapper.UserMapper">
     <insert id="save" parameterType="User" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO user (id,
                           account_id,
@@ -34,14 +34,36 @@
         WHERE id = #{id}
     </update>
 
+    <update id="updateAccount">
+        UPDATE user
+        SET account_id = #{accountId}
+        WHERE id = #{userId}
+    </update>
+
     <select id="findById" parameterType="int" resultType="User">
-        SELECT *
+        SELECT id,
+               account_id,
+               email,
+               password,
+               phone,
+               user_role,
+               is_active,
+               provider,
+               created_date,
+               updated_date
         FROM user
         where id = #{id}
     </select>
 
     <select id="findByEmail" parameterType="String" resultType="User">
-        SELECT *
+        SELECT id,
+               account_id,
+               email,
+               password,
+               phone,
+               user_role,
+               is_active,
+               provider
         FROM user
         where email = #{email}
     </select>
