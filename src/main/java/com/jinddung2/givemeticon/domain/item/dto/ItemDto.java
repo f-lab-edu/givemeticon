@@ -16,19 +16,19 @@ public class ItemDto {
     private int brandId;
     private String name;
     private int price;
-    private int view_count;
+    private int viewCount;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Seoul")
     private LocalDateTime createdDate;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Seoul")
     private LocalDateTime updatedDate;
 
     @Builder
-    public ItemDto(int id, int brandId, String name, int price, int view_count, LocalDateTime createdDate, LocalDateTime updatedDate) {
+    public ItemDto(int id, int brandId, String name, int price, int viewCount, LocalDateTime createdDate, LocalDateTime updatedDate) {
         this.id = id;
         this.brandId = brandId;
         this.name = name;
         this.price = price;
-        this.view_count = view_count;
+        this.viewCount = viewCount;
         this.createdDate = createdDate;
         this.updatedDate = updatedDate;
     }
@@ -39,7 +39,7 @@ public class ItemDto {
                 .brandId(item.getBrandId())
                 .name(item.getName())
                 .price(item.getPrice())
-                .view_count(item.getViewCount())
+                .viewCount(item.getViewCount())
                 .createdDate(item.getCreatedDate())
                 .updatedDate(item.getUpdatedDate())
                 .build();
