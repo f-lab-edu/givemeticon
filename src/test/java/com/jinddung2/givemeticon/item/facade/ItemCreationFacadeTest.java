@@ -1,8 +1,8 @@
 package com.jinddung2.givemeticon.item.facade;
 
-import com.jinddung2.givemeticon.brand.application.BrandService;
-import com.jinddung2.givemeticon.brand.application.dto.BrandDto;
-import com.jinddung2.givemeticon.brand.domain.Brand;
+import com.jinddung2.givemeticon.domain.brand.domain.Brand;
+import com.jinddung2.givemeticon.domain.brand.dto.BrandDto;
+import com.jinddung2.givemeticon.domain.brand.service.BrandService;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.dto.request.ItemCreateRequest;
 import com.jinddung2.givemeticon.domain.item.facade.ItemCreationFacade;
