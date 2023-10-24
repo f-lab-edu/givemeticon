@@ -23,9 +23,13 @@ public enum ErrorCode {
 
     // CATEGORY
     NOT_FOUND_CATEGORY("존재하지 않는 카테고리입니다."),
+    EMPTY_CATEGORY_LIST("카테고리 목록을 찾을 수 없습니다."),
 
     // ACCOUNT
-    DUPLICATED_ACCOUNT_NUMBER("이미 등록된 계좌번호 입니다.");
+    DUPLICATED_ACCOUNT_NUMBER("이미 등록된 계좌번호 입니다."),
+
+    // Item
+    NOT_FOUND_ITEM("존재하지 않는 아이템입니다.");
 
     private final String message;
 

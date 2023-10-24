@@ -19,4 +19,16 @@
                 NOW(),
                 NOW())
     </insert>
+
+    <select id="findById" parameterType="int" resultType="Item">
+        SELECT id, brand_id, name, price, view_count, created_date, updated_date
+        FROM item
+        WHERE id = #{itemId}
+    </select>
+
+    <update id="increaseViewCount" parameterType="int">
+        UPDATE item
+        SET view_count = view_count + 1
+        WHERE id = #{itemId}
+    </update>
 </mapper>

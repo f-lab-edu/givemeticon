@@ -10,7 +10,7 @@ public record ItemCreateRequest(
         return Item.builder()
                 .name(name)
                 .price(price)
-                .view_count(0)
+                .viewCount(0)
                 .build();
     }
 }
