@@ -35,15 +35,14 @@ jobs:
         run: ./gradlew clean build -x test --stacktrace
 
       # Docker build & Push
-      - name: Build and Push docker image to Amazon ECR
-        sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build and Push docker image to Docker Hub
         env:
-          REGISTRY: ${{ secrets.DOCKER_USERNAME }}
-          REPOSITORY: ${{ secrets.DOCKER_REPO }}
-          IMAGE_TAG: latest
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
-          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG      
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          docker build -t $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG .
+          docker push $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG
 
       # 서버에서 Docker 이미지 실행
       - name: Deploy
