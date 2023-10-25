@@ -39,8 +39,10 @@ jobs:
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          REPOSITORY: givemeticon-api-server
+          IMAGE_TAG: latest
         run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          docker login -u $DOCKER_USERNAME -p --password-stdin
           docker build -t $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG .
           docker push $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG
 
@@ -53,12 +55,12 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           # 도커 작업
           script: |
-            sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-            ids=$(sudo docker ps -a -q --filter "name=${{ secrets.DOCKER_REPO }}/givemeticon")
+            sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p --password-stdin
+            ids=$(sudo docker ps -a -q --filter "name=$DOCKER_USERNAME/$REPOSITORY")
             for id in $ids
             do
               sudo docker stop $id && docker rm $id
             done
             docker image prune -a -f
-            docker pull ${{ secrets.DOCKER_USERNAME }}/givemeticon
-            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }} -d ${{ secrets.DOCKER_USERNAME }}/givemeticon
+            docker pull $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG
+            docker run -p 8080:8080 --name $DOCKER_USERNAME/$REPOSITORY -d $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG
