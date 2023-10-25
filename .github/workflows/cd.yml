@@ -42,7 +42,7 @@ jobs:
           REPOSITORY: givemeticon-api-server
           IMAGE_TAG: latest
         run: |
-          docker login -u $DOCKER_USERNAME -p --password-stdin
+          docker login -u $DOCKER_USERNAME -p --password-stdin < $DOCKER_PASSWORD
           docker build -t $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG .
           docker push $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG
 
@@ -55,7 +55,7 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           # 도커 작업
           script: |
-            sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p --password-stdin
+            sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p --password-stdin < $DOCKER_PASSWORD
             ids=$(sudo docker ps -a -q --filter "name=$DOCKER_USERNAME/$REPOSITORY")
             for id in $ids
             do
