@@ -40,6 +40,7 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
           REPOSITORY: givemeticon-api-server
+          REGISTRY: ${{ secrets.DOCKER_REPO }}
           IMAGE_TAG: latest
         run: |
           docker login -u $DOCKER_USERNAME -p --password-stdin < $DOCKER_PASSWORD
