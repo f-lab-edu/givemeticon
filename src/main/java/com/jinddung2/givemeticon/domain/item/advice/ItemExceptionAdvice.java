@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.item.advice;
 import com.jinddung2.givemeticon.common.response.ApiResponse;
 import com.jinddung2.givemeticon.common.response.ErrorResult;
 import com.jinddung2.givemeticon.domain.item.exception.ItemException;
+import com.jinddung2.givemeticon.domain.item.exception.ItemVariantException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,13 @@ public class ItemExceptionAdvice {
     public ResponseEntity<ApiResponse<ErrorResult>> handleItemException(ItemException e) {
         ErrorResult errorResult = new ErrorResult(e.getMessage());
         log.debug("item exception!! error msg={}", errorResult);
+        return new ResponseEntity<>(ApiResponse.fail(errorResult), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(ItemVariantException.class)
+    public ResponseEntity<ApiResponse<ErrorResult>> handleItemException(ItemVariantException e) {
+        ErrorResult errorResult = new ErrorResult(e.getMessage());
+        log.debug("itemVariant exception!! error msg={}", errorResult);
         return new ResponseEntity<>(ApiResponse.fail(errorResult), HttpStatus.BAD_REQUEST);
     }
 }

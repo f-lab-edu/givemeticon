@@ -29,7 +29,10 @@ public enum ErrorCode {
     DUPLICATED_ACCOUNT_NUMBER("이미 등록된 계좌번호 입니다."),
 
     // Item
-    NOT_FOUND_ITEM("존재하지 않는 아이템입니다.");
+    NOT_FOUND_ITEM("존재하지 않는 아이템입니다."),
+    NOT_REGISTER_ACCOUNT("판매자 등록이 되어 있지 않습니다."),
+    EXPIRED_DATE("유효기간이 이미 지났습니다."),
+    DUPLICATED_BARCODE_NUMBER("이미 등록된 바코드 입니다.");
 
     private final String message;
 
