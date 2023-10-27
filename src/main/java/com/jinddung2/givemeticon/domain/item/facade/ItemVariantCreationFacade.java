@@ -32,6 +32,7 @@ public class ItemVariantCreationFacade {
         }
 
         itemVariantCreateValidator.validate(request);
+        itemVariantService.validateDuplicateBarcode(request.barcode());
         return itemVariantService.save(itemId, sellerId, request);
     }
 }
