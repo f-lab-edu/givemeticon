@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.domain.item.facade;
 
 import com.jinddung2.givemeticon.domain.item.domain.ItemVariant;
+import com.jinddung2.givemeticon.domain.item.domain.validator.ItemVariantCreateValidator;
 import com.jinddung2.givemeticon.domain.item.dto.request.ItemVariantCreateRequest;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.exception.NotRegistrSellerException;
@@ -32,6 +33,8 @@ class ItemVariantCreationFacadeTest {
     UserService userService;
     @Mock
     ItemVariantService itemVariantService;
+    @Mock
+    ItemVariantCreateValidator itemVariantCreateValidator;
     UserDto userDto;
 
     ItemVariantCreateRequest itemVariantCreateRequest;
@@ -65,6 +68,9 @@ class ItemVariantCreationFacadeTest {
 
         itemVariantCreationFacade.createItemVariant(itemId, sellerId, itemVariantCreateRequest);
 
+        Mockito.verify(itemVariantCreateValidator).validate(itemVariantCreateRequest);
+        Mockito.verify(itemVariantService).validateDuplicateBarcode(itemVariantCreateRequest.barcode());
+
         Mockito.verify(itemVariantService).save(itemId, sellerId, itemVariantCreateRequest);
     }
 
@@ -90,6 +96,6 @@ class ItemVariantCreationFacadeTest {
 
         Assertions.assertThrows(NotRegistrSellerException.class,
                 () -> itemVariantCreationFacade.createItemVariant(itemId, sellerId, itemVariantCreateRequest));
-        
+
     }
 }
