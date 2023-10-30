@@ -1,10 +1,10 @@
-package com.jinddung2.givemeticon.domain.sale.controller;
+package com.jinddung2.givemeticon.domain.sale.facade;
 
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
+import com.jinddung2.givemeticon.domain.sale.controller.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
-import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.sale.validator.SaleCreateValidator;
 import com.jinddung2.givemeticon.domain.user.dto.UserDto;

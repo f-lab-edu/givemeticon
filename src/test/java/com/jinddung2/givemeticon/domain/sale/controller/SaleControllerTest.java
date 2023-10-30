@@ -1,11 +1,9 @@
-package com.jinddung2.givemeticon.domain.item.controller;
+package com.jinddung2.givemeticon.domain.sale.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
-import com.jinddung2.givemeticon.domain.sale.controller.SaleController;
-import com.jinddung2.givemeticon.domain.sale.controller.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.exception.DuplicatedBarcodeException;
 import com.jinddung2.givemeticon.domain.sale.exception.ExpiredSaleException;
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
@@ -50,6 +48,7 @@ class SaleControllerTest {
 
     int itemId;
     int sellerId;
+    String defaultUrl = "/api/v1/sales";
 
     @BeforeEach
     void setUp() {
@@ -60,8 +59,8 @@ class SaleControllerTest {
     }
 
     @Test
-    void create_ItemVariate_Success() throws Exception {
-        String url = String.format("/api/v1/item-variants/items/%d/sellers/%d", itemId, sellerId);
+    void create_Sale_Success() throws Exception {
+        String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
         mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -72,11 +71,11 @@ class SaleControllerTest {
     }
 
     @Test
-    void create_ItemVariate_Fail_NOT_FOUND_ITEM() throws Exception {
+    void create_Sale_Fail_NOT_FOUND_ITEM() throws Exception {
         Mockito.doThrow(new NotFoundItemException()).when(saleCreationFacade)
                 .createItemVariant(itemId, sellerId, saleCreateRequest);
 
-        String url = String.format("/api/v1/item-variants/items/%d/sellers/%d", itemId, sellerId);
+        String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
@@ -91,11 +90,11 @@ class SaleControllerTest {
     }
 
     @Test
-    void create_ItemVariate_FAIL_NOT_REGISTER_ACCOUNT() throws Exception {
+    void create_Sale_FAIL_NOT_REGISTER_ACCOUNT() throws Exception {
         Mockito.doThrow(new NotRegistrSellerException()).when(saleCreationFacade)
                 .createItemVariant(itemId, sellerId, saleCreateRequest);
 
-        String url = String.format("/api/v1/item-variants/items/%d/sellers/%d", itemId, sellerId);
+        String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
@@ -110,11 +109,11 @@ class SaleControllerTest {
     }
 
     @Test
-    void create_ItemVariate_Fail_EXPIRED_DATE() throws Exception {
+    void create_Sale_Fail_EXPIRED_DATE() throws Exception {
         Mockito.doThrow(new ExpiredSaleException()).when(saleCreationFacade)
                 .createItemVariant(itemId, sellerId, saleCreateRequest);
 
-        String url = String.format("/api/v1/item-variants/items/%d/sellers/%d", itemId, sellerId);
+        String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
@@ -129,11 +128,11 @@ class SaleControllerTest {
     }
 
     @Test
-    void create_ItemVariate_Fail_DUPLICATED_BARCODE_NUMBER() throws Exception {
+    void create_Sale_Fail_DUPLICATED_BARCODE_NUMBER() throws Exception {
         Mockito.doThrow(new DuplicatedBarcodeException()).when(saleCreationFacade)
                 .createItemVariant(itemId, sellerId, saleCreateRequest);
 
-        String url = String.format("/api/v1/item-variants/items/%d/sellers/%d", itemId, sellerId);
+        String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
