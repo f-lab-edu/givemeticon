@@ -1,6 +1,7 @@
-package com.jinddung2.givemeticon.domain.item.domain;
+package com.jinddung2.givemeticon.domain.sale.domain;
 
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -9,10 +10,12 @@ import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
-public class ItemVariant {
+@EqualsAndHashCode
+public class Sale {
     private int id;
     private int itemId;
     private int sellerId;
+    private String barcode;
     private LocalDate expirationDate;
     private boolean isUsed;
     private LocalDate isUsedDate;
@@ -21,24 +24,34 @@ public class ItemVariant {
     private LocalDateTime deletedDate;
 
     @Builder
-    public ItemVariant(int id,
-                       int itemId,
-                       int sellerId,
-                       LocalDate expirationDate,
-                       boolean isUsed,
-                       LocalDate isUsedDate,
-                       LocalDateTime createdDate,
-                       LocalDateTime updatedDate,
-                       LocalDateTime deletedDate
+    public Sale(int id,
+                int itemId,
+                int sellerId,
+                String barcode,
+                LocalDate expirationDate,
+                boolean isUsed,
+                LocalDate isUsedDate,
+                LocalDateTime createdDate,
+                LocalDateTime updatedDate,
+                LocalDateTime deletedDate
     ) {
         this.id = id;
         this.itemId = itemId;
         this.sellerId = sellerId;
+        this.barcode = barcode;
         this.expirationDate = expirationDate;
         this.isUsed = isUsed;
         this.isUsedDate = isUsedDate;
         this.createdDate = createdDate;
         this.updatedDate = updatedDate;
         this.deletedDate = deletedDate;
+    }
+
+    public void updateItemId(int itemId) {
+        this.itemId = itemId;
+    }
+
+    public void updateSellerId(int sellerId) {
+        this.sellerId = sellerId;
     }
 }
