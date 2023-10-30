@@ -30,4 +30,17 @@
         SELECT EXISTS
                    (SELECT 1 FROM sale WHERE barcode = #{barcode})
     </select>
+
+    <select id="findById" parameterType="int" resultType="Sale">
+        SELECT id,
+               item_id,
+               seller_id,
+               barcode,
+               expiration_date,
+               is_used,
+               is_used_date,
+               created_date
+        FROM sale
+        WHERE id = #{saleId}
+    </select>
 </mapper>
