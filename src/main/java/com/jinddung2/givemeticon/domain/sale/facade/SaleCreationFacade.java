@@ -20,7 +20,7 @@ public class SaleCreationFacade {
     private final SaleService itemVariantService;
     private final SaleCreateValidator saleCreateValidator;
 
-    public int createItemVariant(int itemId, int sellerId, SaleCreateRequest request) {
+    public int createSale(int itemId, int sellerId, SaleCreateRequest request) {
         if (!itemService.isExists(itemId)) {
             throw new NotFoundItemException();
         }

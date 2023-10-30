@@ -68,13 +68,13 @@ class SaleControllerTest {
                         .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isCreated());
 
-        Mockito.verify(saleCreationFacade).createItemVariant(itemId, sellerId, saleCreateRequest);
+        Mockito.verify(saleCreationFacade).createSale(itemId, sellerId, saleCreateRequest);
     }
 
     @Test
     void create_Sale_Fail_NOT_FOUND_ITEM() throws Exception {
         Mockito.doThrow(new NotFoundItemException()).when(saleCreationFacade)
-                .createItemVariant(itemId, sellerId, saleCreateRequest);
+                .createSale(itemId, sellerId, saleCreateRequest);
 
         String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
 
@@ -93,7 +93,7 @@ class SaleControllerTest {
     @Test
     void create_Sale_FAIL_NOT_REGISTER_ACCOUNT() throws Exception {
         Mockito.doThrow(new NotRegistrSellerException()).when(saleCreationFacade)
-                .createItemVariant(itemId, sellerId, saleCreateRequest);
+                .createSale(itemId, sellerId, saleCreateRequest);
 
         String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
 
@@ -112,7 +112,7 @@ class SaleControllerTest {
     @Test
     void create_Sale_Fail_EXPIRED_DATE() throws Exception {
         Mockito.doThrow(new ExpiredSaleException()).when(saleCreationFacade)
-                .createItemVariant(itemId, sellerId, saleCreateRequest);
+                .createSale(itemId, sellerId, saleCreateRequest);
 
         String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
 
@@ -131,7 +131,7 @@ class SaleControllerTest {
     @Test
     void create_Sale_Fail_DUPLICATED_BARCODE_NUMBER() throws Exception {
         Mockito.doThrow(new DuplicatedBarcodeException()).when(saleCreationFacade)
-                .createItemVariant(itemId, sellerId, saleCreateRequest);
+                .createSale(itemId, sellerId, saleCreateRequest);
 
         String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
 

@@ -17,10 +17,12 @@ public class SaleController {
     private final SaleCreationFacade saleCreationFacade;
 
     @PostMapping("/items/{itemId}/sellers/{sellerId}")
-    public ResponseEntity<ApiResponse<Integer>> createItemVariate(@PathVariable("itemId") int itemId,
-                                                                  @PathVariable("sellerId") int sellerId,
-                                                                  @RequestBody @Validated SaleCreateRequest request) {
-        int id = saleCreationFacade.createItemVariant(itemId, sellerId, request);
+    public ResponseEntity<ApiResponse<Integer>> createSale(@PathVariable("itemId") int itemId,
+                                                           @PathVariable("sellerId") int sellerId,
+                                                           @RequestBody @Validated SaleCreateRequest request) {
+        int id = saleCreationFacade.createSale(itemId, sellerId, request);
         return new ResponseEntity<>(ApiResponse.success(id), HttpStatus.CREATED);
     }
+
+
 }
