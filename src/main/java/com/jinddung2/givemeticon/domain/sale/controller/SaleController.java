@@ -1,8 +1,7 @@
-package com.jinddung2.givemeticon.domain.item.controller;
+package com.jinddung2.givemeticon.domain.sale.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.domain.item.dto.request.ItemVariantCreateRequest;
-import com.jinddung2.givemeticon.domain.item.facade.ItemVariantCreationFacade;
+import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,16 +10,16 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/item-variants")
-public class ItemVariantController {
+@RequestMapping("/api/v1/sales")
+public class SaleController {
 
-    private final ItemVariantCreationFacade itemVariantCreationFacade;
+    private final SaleCreationFacade saleCreationFacade;
 
     @PostMapping("/items/{itemId}/sellers/{sellerId}")
     public ResponseEntity<ApiResponse<Integer>> createItemVariate(@PathVariable("itemId") int itemId,
                                                                   @PathVariable("sellerId") int sellerId,
-                                                                  @RequestBody @Validated ItemVariantCreateRequest request) {
-        int id = itemVariantCreationFacade.createItemVariant(itemId, sellerId, request);
+                                                                  @RequestBody @Validated SaleCreateRequest request) {
+        int id = saleCreationFacade.createItemVariant(itemId, sellerId, request);
         return new ResponseEntity<>(ApiResponse.success(id), HttpStatus.CREATED);
     }
 }
