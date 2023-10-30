@@ -1,6 +1,6 @@
 package com.jinddung2.givemeticon.domain.sale.validator;
 
-import com.jinddung2.givemeticon.domain.sale.controller.SaleCreateRequest;
+import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.exception.ExpiredSaleException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

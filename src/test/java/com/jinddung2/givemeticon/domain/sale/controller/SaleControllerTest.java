@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
+import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.exception.DuplicatedBarcodeException;
 import com.jinddung2.givemeticon.domain.sale.exception.ExpiredSaleException;
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;

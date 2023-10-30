@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.domain.sale.controller;
+package com.jinddung2.givemeticon.domain.sale.controller.request;
 
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import jakarta.validation.constraints.NotNull;

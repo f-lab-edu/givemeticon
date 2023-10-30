@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.domain.sale.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
+import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

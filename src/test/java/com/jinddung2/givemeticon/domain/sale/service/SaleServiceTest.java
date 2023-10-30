@@ -1,6 +1,6 @@
 package com.jinddung2.givemeticon.domain.sale.service;
 
-import com.jinddung2.givemeticon.domain.sale.controller.SaleCreateRequest;
+import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.exception.DuplicatedBarcodeException;
 import com.jinddung2.givemeticon.domain.sale.mapper.SaleMapper;
