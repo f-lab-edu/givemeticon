@@ -1,12 +1,12 @@
-package com.jinddung2.givemeticon.domain.item.facade;
+package com.jinddung2.givemeticon.domain.sale.controller;
 
-import com.jinddung2.givemeticon.domain.item.domain.ItemVariant;
-import com.jinddung2.givemeticon.domain.item.domain.validator.ItemVariantCreateValidator;
-import com.jinddung2.givemeticon.domain.item.dto.request.ItemVariantCreateRequest;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
-import com.jinddung2.givemeticon.domain.item.exception.NotRegistrSellerException;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
-import com.jinddung2.givemeticon.domain.item.service.ItemVariantService;
+import com.jinddung2.givemeticon.domain.sale.domain.Sale;
+import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
+import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
+import com.jinddung2.givemeticon.domain.sale.service.SaleService;
+import com.jinddung2.givemeticon.domain.sale.validator.SaleCreateValidator;
 import com.jinddung2.givemeticon.domain.user.dto.UserDto;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import org.junit.jupiter.api.Assertions;
@@ -22,37 +22,37 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 
 @ExtendWith(MockitoExtension.class)
-class ItemVariantCreationFacadeTest {
+class SaleCreationFacadeTest {
 
     @InjectMocks
-    ItemVariantCreationFacade itemVariantCreationFacade;
+    SaleCreationFacade saleCreationFacade;
 
     @Mock
     ItemService itemService;
     @Mock
     UserService userService;
     @Mock
-    ItemVariantService itemVariantService;
+    SaleService itemVariantService;
     @Mock
-    ItemVariantCreateValidator itemVariantCreateValidator;
+    SaleCreateValidator saleCreateValidator;
     UserDto userDto;
 
-    ItemVariantCreateRequest itemVariantCreateRequest;
-    ItemVariant itemVariant;
+    SaleCreateRequest saleCreateRequest;
+    Sale itemVariant;
     int itemId;
     int sellerId;
 
     @BeforeEach
     void setUp() {
-        itemVariantCreateRequest = new ItemVariantCreateRequest("123412341234",
+        saleCreateRequest = new SaleCreateRequest("123412341234",
                 LocalDate.of(2099, 12, 31));
 
         itemId = 1;
         sellerId = 1;
 
-        itemVariant = ItemVariant.builder()
-                .barcode(itemVariantCreateRequest.barcode())
-                .expirationDate(itemVariantCreateRequest.expirationDate())
+        itemVariant = Sale.builder()
+                .barcode(saleCreateRequest.barcode())
+                .expirationDate(saleCreateRequest.expirationDate())
                 .build();
     }
 
@@ -66,12 +66,12 @@ class ItemVariantCreationFacadeTest {
         Mockito.when(itemService.isExists(itemId)).thenReturn(true);
         Mockito.when(userService.getUserInfo(sellerId)).thenReturn(userDto);
 
-        itemVariantCreationFacade.createItemVariant(itemId, sellerId, itemVariantCreateRequest);
+        saleCreationFacade.createItemVariant(itemId, sellerId, saleCreateRequest);
 
-        Mockito.verify(itemVariantCreateValidator).validate(itemVariantCreateRequest);
-        Mockito.verify(itemVariantService).validateDuplicateBarcode(itemVariantCreateRequest.barcode());
+        Mockito.verify(saleCreateValidator).validate(saleCreateRequest);
+        Mockito.verify(itemVariantService).validateDuplicateBarcode(saleCreateRequest.barcode());
 
-        Mockito.verify(itemVariantService).save(itemId, sellerId, itemVariantCreateRequest);
+        Mockito.verify(itemVariantService).save(itemId, sellerId, saleCreateRequest);
     }
 
     @Test
@@ -80,7 +80,7 @@ class ItemVariantCreationFacadeTest {
         Mockito.when(itemService.isExists(itemId)).thenReturn(false);
 
         Assertions.assertThrows(NotFoundItemException.class,
-                () -> itemVariantCreationFacade.createItemVariant(itemId, sellerId, itemVariantCreateRequest));
+                () -> saleCreationFacade.createItemVariant(itemId, sellerId, saleCreateRequest));
     }
 
     @Test
@@ -95,7 +95,7 @@ class ItemVariantCreationFacadeTest {
         Mockito.when(userService.getUserInfo(sellerId)).thenReturn(userDto);
 
         Assertions.assertThrows(NotRegistrSellerException.class,
-                () -> itemVariantCreationFacade.createItemVariant(itemId, sellerId, itemVariantCreateRequest));
+                () -> saleCreationFacade.createItemVariant(itemId, sellerId, saleCreateRequest));
 
     }
 }

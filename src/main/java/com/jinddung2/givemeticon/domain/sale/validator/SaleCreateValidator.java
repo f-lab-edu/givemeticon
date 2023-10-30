@@ -1,7 +1,7 @@
-package com.jinddung2.givemeticon.domain.item.domain.validator;
+package com.jinddung2.givemeticon.domain.sale.validator;
 
-import com.jinddung2.givemeticon.domain.item.dto.request.ItemVariantCreateRequest;
-import com.jinddung2.givemeticon.domain.item.exception.ExpiredItemVariantException;
+import com.jinddung2.givemeticon.domain.sale.controller.SaleCreateRequest;
+import com.jinddung2.givemeticon.domain.sale.exception.ExpiredSaleException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -9,16 +9,16 @@ import java.time.LocalDate;
 
 @Component
 @RequiredArgsConstructor
-public class ItemVariantCreateValidator {
+public class SaleCreateValidator {
 
-    public void validate(ItemVariantCreateRequest request) {
+    public void validate(SaleCreateRequest request) {
         validateExpirationDate(request.expirationDate());
     }
 
     private void validateExpirationDate(LocalDate expirationDate) {
         LocalDate currentDate = LocalDate.now();
         if (expirationDate.isBefore(currentDate)) {
-            throw new ExpiredItemVariantException();
+            throw new ExpiredSaleException();
         }
     }
 }

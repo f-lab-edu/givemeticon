@@ -3,12 +3,13 @@ package com.jinddung2.givemeticon.domain.item.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
-import com.jinddung2.givemeticon.domain.item.dto.request.ItemVariantCreateRequest;
-import com.jinddung2.givemeticon.domain.item.exception.DuplicatedBarcodeException;
-import com.jinddung2.givemeticon.domain.item.exception.ExpiredItemVariantException;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
-import com.jinddung2.givemeticon.domain.item.exception.NotRegistrSellerException;
-import com.jinddung2.givemeticon.domain.item.facade.ItemVariantCreationFacade;
+import com.jinddung2.givemeticon.domain.sale.controller.SaleController;
+import com.jinddung2.givemeticon.domain.sale.controller.SaleCreateRequest;
+import com.jinddung2.givemeticon.domain.sale.exception.DuplicatedBarcodeException;
+import com.jinddung2.givemeticon.domain.sale.exception.ExpiredSaleException;
+import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
+import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,13 +29,13 @@ import java.time.LocalDate;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(value = ItemVariantController.class,
+@WebMvcTest(value = SaleController.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
                 WebConfig.class,
                 AuthInterceptor.class,
                 LoginService.class
         }))
-class ItemVariantControllerTest {
+class SaleControllerTest {
 
     @Autowired
     MockMvc mockMvc;
@@ -43,16 +44,16 @@ class ItemVariantControllerTest {
     ObjectMapper objectMapper;
 
     @MockBean
-    ItemVariantCreationFacade itemVariantCreationFacade;
+    SaleCreationFacade saleCreationFacade;
 
-    ItemVariantCreateRequest itemVariantCreateRequest;
+    SaleCreateRequest saleCreateRequest;
 
     int itemId;
     int sellerId;
 
     @BeforeEach
     void setUp() {
-        itemVariantCreateRequest = new ItemVariantCreateRequest("123412341234",
+        saleCreateRequest = new SaleCreateRequest("123412341234",
                 LocalDate.of(2099, 12, 31));
         itemId = 1;
         sellerId = 1;
@@ -64,23 +65,23 @@ class ItemVariantControllerTest {
         mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(itemVariantCreateRequest)))
+                        .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isCreated());
 
-        Mockito.verify(itemVariantCreationFacade).createItemVariant(itemId, sellerId, itemVariantCreateRequest);
+        Mockito.verify(saleCreationFacade).createItemVariant(itemId, sellerId, saleCreateRequest);
     }
 
     @Test
     void create_ItemVariate_Fail_NOT_FOUND_ITEM() throws Exception {
-        Mockito.doThrow(new NotFoundItemException()).when(itemVariantCreationFacade)
-                .createItemVariant(itemId, sellerId, itemVariantCreateRequest);
+        Mockito.doThrow(new NotFoundItemException()).when(saleCreationFacade)
+                .createItemVariant(itemId, sellerId, saleCreateRequest);
 
         String url = String.format("/api/v1/item-variants/items/%d/sellers/%d", itemId, sellerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(itemVariantCreateRequest)))
+                        .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isBadRequest());
 
         resultActions
@@ -91,15 +92,15 @@ class ItemVariantControllerTest {
 
     @Test
     void create_ItemVariate_FAIL_NOT_REGISTER_ACCOUNT() throws Exception {
-        Mockito.doThrow(new NotRegistrSellerException()).when(itemVariantCreationFacade)
-                .createItemVariant(itemId, sellerId, itemVariantCreateRequest);
+        Mockito.doThrow(new NotRegistrSellerException()).when(saleCreationFacade)
+                .createItemVariant(itemId, sellerId, saleCreateRequest);
 
         String url = String.format("/api/v1/item-variants/items/%d/sellers/%d", itemId, sellerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(itemVariantCreateRequest)))
+                        .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isBadRequest());
 
         resultActions
@@ -110,15 +111,15 @@ class ItemVariantControllerTest {
 
     @Test
     void create_ItemVariate_Fail_EXPIRED_DATE() throws Exception {
-        Mockito.doThrow(new ExpiredItemVariantException()).when(itemVariantCreationFacade)
-                .createItemVariant(itemId, sellerId, itemVariantCreateRequest);
+        Mockito.doThrow(new ExpiredSaleException()).when(saleCreationFacade)
+                .createItemVariant(itemId, sellerId, saleCreateRequest);
 
         String url = String.format("/api/v1/item-variants/items/%d/sellers/%d", itemId, sellerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(itemVariantCreateRequest)))
+                        .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isBadRequest());
 
         resultActions
@@ -129,15 +130,15 @@ class ItemVariantControllerTest {
 
     @Test
     void create_ItemVariate_Fail_DUPLICATED_BARCODE_NUMBER() throws Exception {
-        Mockito.doThrow(new DuplicatedBarcodeException()).when(itemVariantCreationFacade)
-                .createItemVariant(itemId, sellerId, itemVariantCreateRequest);
+        Mockito.doThrow(new DuplicatedBarcodeException()).when(saleCreationFacade)
+                .createItemVariant(itemId, sellerId, saleCreateRequest);
 
         String url = String.format("/api/v1/item-variants/items/%d/sellers/%d", itemId, sellerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(itemVariantCreateRequest)))
+                        .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isBadRequest());
 
         resultActions
