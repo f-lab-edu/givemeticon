@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -42,5 +44,13 @@ public class SaleService {
         }
 
         return SaleDto.of(sale);
+    }
+
+    public List<SaleDto> getSalesByItemId(int itemId) {
+        List<Sale> sales = saleMapper.findSalesByItemId(itemId);
+        return sales.stream()
+                .filter(sale -> !sale.getExpirationDate().isBefore(LocalDate.now()))
+                .map(SaleDto::of)
+                .collect(Collectors.toList());
     }
 }

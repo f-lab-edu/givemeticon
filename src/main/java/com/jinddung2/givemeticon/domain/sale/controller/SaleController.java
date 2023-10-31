@@ -4,12 +4,15 @@ import com.jinddung2.givemeticon.common.response.ApiResponse;
 import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
+import com.jinddung2.givemeticon.domain.sale.facade.SaleItemFacade;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -18,6 +21,7 @@ public class SaleController {
 
     private final SaleCreationFacade saleCreationFacade;
     private final SaleService saleService;
+    private final SaleItemFacade saleItemFacade;
 
     @PostMapping("/items/{itemId}/sellers/{sellerId}")
     public ResponseEntity<ApiResponse<Integer>> createSale(@PathVariable("itemId") int itemId,
@@ -31,5 +35,11 @@ public class SaleController {
     public ResponseEntity<ApiResponse<SaleDto>> getSale(@PathVariable("saleId") int saleId) {
         SaleDto saleDto = saleService.getSale(saleId);
         return new ResponseEntity<>(ApiResponse.success(saleDto), HttpStatus.OK);
+    }
+
+    @GetMapping("/items/{itemId}")
+    public ResponseEntity<ApiResponse<List<SaleDto>>> getSalesByItemId(@PathVariable("itemId") int itemId) {
+        List<SaleDto> sales = saleItemFacade.getSalesByItemId(itemId);
+        return new ResponseEntity<>(ApiResponse.success(sales), HttpStatus.OK);
     }
 }
