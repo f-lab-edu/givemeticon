@@ -2,6 +2,7 @@ package com.jinddung2.givemeticon.domain.sale.service;
 
 import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
+import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.exception.DuplicatedBarcodeException;
 import com.jinddung2.givemeticon.domain.sale.exception.ExpiredSaleException;
 import com.jinddung2.givemeticon.domain.sale.exception.NotFoundSaleException;
@@ -17,6 +18,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -98,5 +100,21 @@ class SaleServiceTest {
 
         Assertions.assertThrows(ExpiredSaleException.class,
                 () -> saleService.getSale(fakeSale.getId()));
+    }
+
+    @Test
+    @DisplayName("상품 재고조회에 성공한다.")
+    void get_Sales_By_ItemId_Success() {
+
+        List<Sale> sales = List.of(
+                Sale.builder().expirationDate(LocalDate.now().plusDays(1)).build(),
+                Sale.builder().expirationDate(LocalDate.now().plusDays(1)).build(),
+                Sale.builder().expirationDate(LocalDate.now().plusDays(1)).build());
+        Mockito.when(saleMapper.findSalesByItemId(itemId)).thenReturn(sales);
+
+        List<SaleDto> result = saleService.getSalesByItemId(itemId);
+
+        Assertions.assertEquals(3, result.size());
+
     }
 }

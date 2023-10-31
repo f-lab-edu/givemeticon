@@ -5,17 +5,16 @@ import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
-import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.exception.DuplicatedBarcodeException;
 import com.jinddung2.givemeticon.domain.sale.exception.ExpiredSaleException;
 import com.jinddung2.givemeticon.domain.sale.exception.NotFoundSaleException;
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
+import com.jinddung2.givemeticon.domain.sale.facade.SaleItemFacade;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -52,9 +51,10 @@ class SaleControllerTest {
     @MockBean
     SaleService saleService;
 
+    @MockBean
+    SaleItemFacade saleItemFacade;
+
     SaleCreateRequest saleCreateRequest;
-    @Mock
-    SaleDto saleDto;
 
     int itemId;
     int sellerId;
@@ -186,5 +186,34 @@ class SaleControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("FAIL"))
                 .andExpect(jsonPath("$.data.message").value("존재하지 않는 판매 상품입니다."));
+    }
+
+    @Test
+    void get_Sales_By_ItemId_Success() throws Exception {
+        String url = defaultUrl + "/items/" + itemId;
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get(url)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        Mockito.verify(saleItemFacade).getSalesByItemId(itemId);
+    }
+
+    @Test
+    void get_Sales_By_ItemId_Fail_Not_Found_ItemId() throws Exception {
+        String url = defaultUrl + "/items/" + itemId;
+
+        Mockito.doThrow(new NotFoundItemException())
+                .when(saleItemFacade).getSalesByItemId(itemId);
+
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .get(url)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value("존재하지 않는 아이템입니다."));
     }
 }
