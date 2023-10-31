@@ -17,8 +17,8 @@ public class Sale {
     private int sellerId;
     private String barcode;
     private LocalDate expirationDate;
-    private boolean isUsed;
-    private LocalDate isUsedDate;
+    private boolean isBought;
+    private LocalDate isBoughtDate;
     private LocalDateTime createdDate;
     private LocalDateTime updatedDate;
     private LocalDateTime deletedDate;
@@ -29,8 +29,8 @@ public class Sale {
                 int sellerId,
                 String barcode,
                 LocalDate expirationDate,
-                boolean isUsed,
-                LocalDate isUsedDate,
+                boolean isBought,
+                LocalDate isBoughtDate,
                 LocalDateTime createdDate,
                 LocalDateTime updatedDate,
                 LocalDateTime deletedDate
@@ -40,8 +40,8 @@ public class Sale {
         this.sellerId = sellerId;
         this.barcode = barcode;
         this.expirationDate = expirationDate;
-        this.isUsed = isUsed;
-        this.isUsedDate = isUsedDate;
+        this.isBought = isBought;
+        this.isBoughtDate = isBoughtDate;
         this.createdDate = createdDate;
         this.updatedDate = updatedDate;
         this.deletedDate = deletedDate;

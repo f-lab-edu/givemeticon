@@ -17,19 +17,19 @@ public class SaleDto {
     private int sellerId;
     private String barcode;
     private LocalDate expirationDate;
-    private boolean isUsed;
-    private LocalDate isUsedDate;
+    private boolean isBought;
+    private LocalDate isBoughtDate;
     private LocalDateTime createdDate;
 
     @Builder
-    public SaleDto(int id, int itemId, int sellerId, String barcode, LocalDate expirationDate, boolean isUsed, LocalDate isUsedDate, LocalDateTime createdDate, LocalDateTime updatedDate) {
+    public SaleDto(int id, int itemId, int sellerId, String barcode, LocalDate expirationDate, boolean isBought, LocalDate isBoughtDate, LocalDateTime createdDate, LocalDateTime updatedDate) {
         this.id = id;
         this.itemId = itemId;
         this.sellerId = sellerId;
         this.barcode = barcode;
         this.expirationDate = expirationDate;
-        this.isUsed = isUsed;
-        this.isUsedDate = isUsedDate;
+        this.isBought = isBought;
+        this.isBoughtDate = isBoughtDate;
         this.createdDate = createdDate;
     }
 
@@ -40,8 +40,8 @@ public class SaleDto {
                 .sellerId(sale.getSellerId())
                 .barcode(sale.getBarcode())
                 .expirationDate(sale.getExpirationDate())
-                .isUsed(sale.isUsed())
-                .isUsedDate(sale.getIsUsedDate())
+                .isBought(sale.isBought())
+                .isBoughtDate(sale.getIsBoughtDate())
                 .build();
     }
 }

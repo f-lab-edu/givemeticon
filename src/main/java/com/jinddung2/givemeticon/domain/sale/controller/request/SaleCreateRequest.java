@@ -19,7 +19,7 @@ public record SaleCreateRequest(
         return Sale.builder()
                 .barcode(barcode)
                 .expirationDate(expirationDate)
-                .isUsed(false)
+                .isBought(false)
                 .build();
     }
 }
