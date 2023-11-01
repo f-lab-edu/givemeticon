@@ -89,7 +89,7 @@ class SaleServiceTest {
         Mockito.when(saleMapper.findById(sale.getId())).thenReturn(Optional.empty());
 
         Assertions.assertThrows(NotFoundSaleException.class,
-                () -> saleService.getSale(sale.getId()));
+                () -> saleService.validateSale(sale.getId()));
     }
 
     @Test

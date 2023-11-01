@@ -20,10 +20,14 @@ public class ItemService {
     }
 
     public ItemDto getItem(int itemId) {
-        Item item = itemMapper.findById(itemId).orElseThrow(NotFoundItemException::new);
+        Item item = validateItem(itemId);
         item.increaseViewCount();
         itemMapper.increaseViewCount(itemId);
         return ItemDto.of(item);
+    }
+
+    public Item validateItem(int itemId) {
+        return itemMapper.findById(itemId).orElseThrow(NotFoundItemException::new);
     }
 
     public boolean isExists(int itemId) {

@@ -50,7 +50,7 @@ class ItemServiceTest {
         Mockito.when(itemMapper.findById(item.getId())).thenReturn(Optional.empty());
 
         Assertions.assertThrows(NotFoundItemException.class,
-                () -> itemService.getItem(item.getId()));
+                () -> itemService.validateItem(item.getId()));
 
     }
 }

@@ -37,13 +37,17 @@ public class SaleService {
     }
 
     public SaleDto getSale(int saleId) {
-        Sale sale = saleMapper.findById(saleId).orElseThrow(NotFoundSaleException::new);
+        Sale sale = validateSale(saleId);
 
         if (sale.getExpirationDate().isBefore(LocalDate.now())) {
             throw new ExpiredSaleException();
         }
 
         return SaleDto.of(sale);
+    }
+
+    public Sale validateSale(int saleId) {
+        return saleMapper.findById(saleId).orElseThrow(NotFoundSaleException::new);
     }
 
     public List<SaleDto> getSalesByItemId(int itemId) {

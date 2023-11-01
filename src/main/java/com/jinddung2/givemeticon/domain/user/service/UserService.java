@@ -35,7 +35,7 @@ public class UserService {
     }
 
     public UserDto getUserInfo(int userId) {
-        User user = getUser(userId);
+        User user = validateUser(userId);
         return UserDto.of(user);
     }
 
@@ -51,7 +51,7 @@ public class UserService {
     }
 
     public void updatePassword(int userId, PasswordUpdateRequest request) {
-        User user = getUser(userId);
+        User user = validateUser(userId);
 
         if (!user.isPasswordMatch(passwordEncoder, request.oldPassword())) {
             throw new MisMatchPasswordException();
@@ -63,20 +63,20 @@ public class UserService {
     }
 
     public void updateAccount(int userId, int accountId) {
-        User user = getUser(userId);
+        User user = validateUser(userId);
         user.createAccount(accountId);
         log.info("user={}", user);
         userMapper.updateAccount(userId, accountId);
     }
 
     public void resetPassword(String email, String tempPassword) {
-        User user = getUser(email);
+        User user = validateUser(email);
         String encryptedPassword = passwordEncoder.encode(tempPassword);
         user.updatePassword(encryptedPassword);
         userMapper.updatePassword(user.getId(), encryptedPassword);
     }
 
-    private User getUser(int userId) {
+    public User validateUser(int userId) {
         return userMapper.findById(userId)
                 .orElseThrow(NotFoundUserException::new);
     }
@@ -91,7 +91,7 @@ public class UserService {
         }
     }
 
-    private User getUser(String email) {
+    private User validateUser(String email) {
         return userMapper.findByEmail(email)
                 .orElseThrow(NotFoundEmailException::new);
     }
