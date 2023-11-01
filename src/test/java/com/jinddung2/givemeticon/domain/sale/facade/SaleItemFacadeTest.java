@@ -7,6 +7,7 @@ import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,6 +38,7 @@ class SaleItemFacadeTest {
     }
 
     @Test
+    @DisplayName("전시용 상품에 해당하는 판매 상품 조회에 성공한다.")
     void get_Sales_By_ItemId_Success() {
         Mockito.when(itemService.getItem(itemId)).thenReturn(itemDto);
         List<SaleDto> sales = List.of(
@@ -51,6 +53,7 @@ class SaleItemFacadeTest {
     }
 
     @Test
+    @DisplayName("전시용 상품이 존재하지 않아 판매용 상품들 다건 조회에 실패한다.")
     void get_Sales_By_ItemId_Fail_Not_Found_ItemId() {
         Mockito.doThrow(new NotFoundItemException())
                 .when(itemService).getItem(itemId);

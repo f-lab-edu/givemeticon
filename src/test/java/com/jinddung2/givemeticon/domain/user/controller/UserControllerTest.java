@@ -20,6 +20,7 @@ import com.jinddung2.givemeticon.domain.user.presentation.facade.PasswordResetFa
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,6 +86,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("회원 가입에 성공한다.")
     void signUp_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/sign-up")
@@ -97,6 +99,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("이메일 중븍으로 회원가입에 실패한다.")
     void signUp_Fail_Duplicate_Email() throws Exception {
         doThrow(new DuplicatedEmailException()).when(userService).signUp(signUpRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -111,6 +114,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("핸드폰 번호 중복으로 회원가입에 실패한다.")
     void signUp_Fail_Duplicate_Phone() throws Exception {
         doThrow(new DuplicatedPhoneException()).when(userService).signUp(signUpRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -126,6 +130,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("유저 상세 정보 조회에 성공한다.")
     void get_UserInfo_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/1/info")
@@ -141,6 +146,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("유저가 존재하지 않아 상세 정보 조회에 실패한다.")
     void get_UserInfo_Fail_Not_Exists() throws Exception {
         doThrow(new NotFoundUserException()).when(userService).getUserInfo(1);
 
@@ -158,6 +164,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("로그인에 성공한다.")
     void login_Success() throws Exception {
         given(userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword())).willReturn(userDto);
         mockMvc.perform(MockMvcRequestBuilders
@@ -171,6 +178,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("로그아웃에 성공한다.")
     void logout_Success() throws Exception {
         willDoNothing().given(loginService).logout();
         mockMvc.perform(MockMvcRequestBuilders
@@ -185,6 +193,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("비밀번호 변경에 성공한다.")
     void update_Password_Success() throws Exception {
         doNothing().when(userService).updatePassword(1, passwordUpdateRequest);
         mockMvc.perform(MockMvcRequestBuilders
@@ -199,6 +208,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("유저가 존재하지 않아 비밀번호 변경에 실패한다.")
     void update_Password_Fail_Not_Exists_User() throws Exception {
         doThrow(new NotFoundUserException()).when(userService).updatePassword(1, passwordUpdateRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -216,6 +226,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("이전 비밀번호가 맞지 않아 비밀번호 변경에 실패한다.")
     void update_Password_MisMatch_Password() throws Exception {
         doThrow(new MisMatchPasswordException()).when(userService).updatePassword(1, passwordUpdateRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -234,6 +245,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("비밀번호 변경을 위한 임시 비밀번호 발급에 성공한다.")
     void send_Temporary_Password() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .put("/api/v1/users/reset-password")
@@ -247,6 +259,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("계좌 등록에 성공하여 판매자 등록에 성공한다.")
     void create_Account_Link_User_Account_Id_Fail() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/" + userDto.getId() + "/account")
@@ -260,6 +273,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("중복된 계좌번호로 인해 판매자 등록에 실패한다.")
     void create_Account_Fail_Duplicated_Account_Number() throws Exception {
         doThrow(new DuplicatedAccountNumberException())
                 .when(createAccountFacade).createAccount(userDto.getId(), createAccountRequest);

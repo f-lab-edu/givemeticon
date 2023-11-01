@@ -9,6 +9,7 @@ import com.jinddung2.givemeticon.domain.item.facade.ItemCreationFacade;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +55,7 @@ class ItemControllerTest {
     }
 
     @Test
+    @DisplayName("해당 브랜드의 전시용 아이템 생성에 성공한다.")
     void createItem_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/items/brand/" + id)
@@ -65,6 +67,7 @@ class ItemControllerTest {
     }
 
     @Test
+    @DisplayName("전시용 아이템 단건 조회에 성공한다.")
     void getItem_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/items/" + id)
@@ -75,6 +78,7 @@ class ItemControllerTest {
     }
 
     @Test
+    @DisplayName("전시용 아이템이 존재하지 않아 단건 조회에 실패한다.")
     void getItem_Fail_Not_Found_Item() throws Exception {
         doThrow(new NotFoundItemException()).when(itemService).getItem(id);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
