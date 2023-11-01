@@ -5,6 +5,7 @@ import com.jinddung2.givemeticon.domain.brand.dto.BrandDto;
 import com.jinddung2.givemeticon.domain.brand.dto.request.BrandCreateRequest;
 import com.jinddung2.givemeticon.domain.brand.exception.DuplicatedBrandNameException;
 import com.jinddung2.givemeticon.domain.brand.exception.EmptyBrandListException;
+import com.jinddung2.givemeticon.domain.brand.exception.NoBrandForCategoryException;
 import com.jinddung2.givemeticon.domain.brand.exception.NotFoundBrandException;
 import com.jinddung2.givemeticon.domain.brand.mapper.BrandMapper;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +53,13 @@ public class BrandService {
     }
 
     private int countBrandByCategoryId(int categoryId) {
-        return brandMapper.countBrandByCategoryId(categoryId);
+        int brands = brandMapper.countBrandByCategoryId(categoryId);
+
+        if (brands == 0) {
+            throw new NoBrandForCategoryException();
+        }
+        
+        return brands;
     }
 
     public String updateName(int id, String newName) {
@@ -75,13 +82,4 @@ public class BrandService {
         return brandMapper.existsByName(name);
     }
 
-    private BrandDto toDto(Brand brand) {
-        return BrandDto.builder()
-                .id(brand.getId())
-                .categoryId(brand.getCategoryId())
-                .name(brand.getName())
-                .createdDate(brand.getCreatedDate())
-                .updatedDate(brand.getUpdatedDate())
-                .build();
-    }
 }
