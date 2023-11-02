@@ -30,6 +30,11 @@ public class SaleService {
         return itemVariant.getId();
     }
 
+    public int update(Sale sale) {
+        saleMapper.update(sale);
+        return sale.getId();
+    }
+
     public void validateDuplicateBarcode(String barcode) {
         if (saleMapper.existsByBarcode(barcode)) {
             throw new DuplicatedBarcodeException();
