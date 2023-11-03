@@ -9,6 +9,8 @@ import com.jinddung2.givemeticon.domain.sale.exception.NotFoundSaleException;
 import com.jinddung2.givemeticon.domain.sale.mapper.SaleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -30,6 +32,7 @@ public class SaleService {
         return itemVariant.getId();
     }
 
+    @Transactional(propagation = Propagation.REQUIRED)
     public int update(Sale sale) {
         saleMapper.update(sale);
         return sale.getId();
