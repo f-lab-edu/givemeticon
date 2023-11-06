@@ -97,7 +97,7 @@ class UserServiceTest {
     void get_User_Fail_Not_Exists_Email() {
         when(userMapper.findById(testUser.getId())).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundUserException.class, () -> userService.getUserInfo(testUser.getId()));
+        assertThrows(NotFoundUserException.class, () -> userService.validateUser(testUser.getId()));
     }
 
     @Test

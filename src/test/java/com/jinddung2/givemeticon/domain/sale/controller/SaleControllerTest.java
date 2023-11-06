@@ -173,14 +173,14 @@ class SaleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        Mockito.verify(saleService).getSale(saleId);
+        Mockito.verify(saleService).getAvailableSaleForItem(saleId);
     }
 
     @Test
     @DisplayName("판매용 상품이 존재하지 않아 단건 조회에 실패한다.")
     void get_Sale_Fail_Not_Found_Sale() throws Exception {
         Mockito.doThrow(new NotFoundSaleException())
-                .when(saleService).getSale(saleId);
+                .when(saleService).getAvailableSaleForItem(saleId);
 
         String url = defaultUrl + "/" + saleId;
 
@@ -205,7 +205,7 @@ class SaleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        Mockito.verify(saleItemFacade).getSalesByItemId(itemId);
+        Mockito.verify(saleItemFacade).getSalesForItem(itemId);
     }
 
     @Test
@@ -214,7 +214,7 @@ class SaleControllerTest {
         String url = defaultUrl + "/items/" + itemId;
 
         Mockito.doThrow(new NotFoundItemException())
-                .when(saleItemFacade).getSalesByItemId(itemId);
+                .when(saleItemFacade).getSalesForItem(itemId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get(url)
