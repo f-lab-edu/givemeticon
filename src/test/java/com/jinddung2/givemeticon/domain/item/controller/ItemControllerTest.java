@@ -71,12 +71,12 @@ class ItemControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        Mockito.verify(itemService).getItem(id);
+        Mockito.verify(itemService).getItemAndIncreaseViewCount(id);
     }
 
     @Test
     void getItem_Fail_Not_Found_Item() throws Exception {
-        doThrow(new NotFoundItemException()).when(itemService).getItem(id);
+        doThrow(new NotFoundItemException()).when(itemService).getItemAndIncreaseViewCount(id);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/items/" + id)
                         .contentType(MediaType.APPLICATION_JSON))

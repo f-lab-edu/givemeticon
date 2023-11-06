@@ -1,6 +1,6 @@
 package com.jinddung2.givemeticon.domain.sale.facade;
 
-import com.jinddung2.givemeticon.domain.item.dto.ItemDto;
+import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
@@ -28,17 +28,17 @@ class SaleItemFacadeTest {
     SaleService saleService;
 
     int itemId;
-    ItemDto itemDto;
+    Item item;
 
     @BeforeEach
     void setUp() {
         itemId = 10;
-        itemDto = ItemDto.builder().id(itemId).build();
+        item = Item.builder().id(itemId).build();
     }
 
     @Test
     void get_Sales_By_ItemId_Success() {
-        Mockito.when(itemService.getItem(itemId)).thenReturn(itemDto);
+        Mockito.when(itemService.getItem(itemId)).thenReturn(item);
         List<SaleDto> sales = List.of(
                 SaleDto.builder().expirationDate(LocalDate.now().plusDays(1)).build(),
                 SaleDto.builder().expirationDate(LocalDate.now().plusDays(1)).build(),

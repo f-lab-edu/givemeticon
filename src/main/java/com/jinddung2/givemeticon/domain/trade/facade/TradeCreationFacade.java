@@ -34,7 +34,7 @@ public class TradeCreationFacade {
             throw new AlreadyBoughtSaleException();
         }
 
-        Item item = itemService.validateItem(sale.getItemId());
+        Item item = itemService.getItem(sale.getItemId());
 
         long daysUntilExpiration = ChronoUnit.DAYS.between(LocalDate.now(), sale.getExpirationDate());
 

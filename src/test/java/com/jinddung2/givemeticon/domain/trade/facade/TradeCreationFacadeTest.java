@@ -61,7 +61,7 @@ class TradeCreationFacadeTest {
     void transact() {
         Mockito.when(userService.validateUser(buyerId)).thenReturn(user);
         Mockito.when(saleService.validateSale(saleId)).thenReturn(sale);
-        Mockito.when(itemService.validateItem(itemId)).thenReturn(item);
+        Mockito.when(itemService.getItem(itemId)).thenReturn(item);
 
         Mockito.when(tradeService.save(Mockito.any(Trade.class), Mockito.any(Long.class))).thenReturn(1);
 
