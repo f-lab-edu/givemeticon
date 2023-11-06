@@ -74,13 +74,13 @@ class ItemControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        Mockito.verify(itemService).getItemAndIncreaseViewCount(id);
+        Mockito.verify(itemService).getItem(id);
     }
 
     @Test
     @DisplayName("전시용 아이템이 존재하지 않아 단건 조회에 실패한다.")
     void getItem_Fail_Not_Found_Item() throws Exception {
-        doThrow(new NotFoundItemException()).when(itemService).getItemAndIncreaseViewCount(id);
+        doThrow(new NotFoundItemException()).when(itemService).getItem(id);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/items/" + id)
                         .contentType(MediaType.APPLICATION_JSON))

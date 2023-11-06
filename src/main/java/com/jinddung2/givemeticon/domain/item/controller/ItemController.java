@@ -26,8 +26,8 @@ public class ItemController {
     }
 
     @GetMapping("/{itemId}")
-    public ResponseEntity<ApiResponse<ItemDto>> getItemAndIncreaseViewCount(@PathVariable("itemId") int itemId) {
-        ItemDto itemDto = itemService.getItemAndIncreaseViewCount(itemId);
+    public ResponseEntity<ApiResponse<ItemDto>> getItem(@PathVariable("itemId") int itemId) {
+        ItemDto itemDto = itemService.getItem(itemId);
         return new ResponseEntity<>(ApiResponse.success(itemDto), HttpStatus.OK);
     }
 }

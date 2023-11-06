@@ -26,25 +26,6 @@
                 null)
     </insert>
 
-    <update id="update" parameterType="Sale">
-        UPDATE sale
-        SET item_id = #{itemId},
-        seller_id = #{sellerId},
-        barcode = #{barcode},
-        expiration_date = #{expirationDate},
-        is_bought = #{isBought},
-        is_bought_date = #{isBoughtDate},
-        created_date = #{createdDate},
-        updated_date = #{updatedDate},
-        <if test="deletedDate == null">
-            deleted_date = null
-        </if>
-        <if test="deletedDate != null">
-            deleted_date = deleted_date
-        </if>
-        WHERE id = #{id}
-    </update>
-
     <select id="existsByBarcode" parameterType="String" resultType="boolean">
         SELECT EXISTS
                    (SELECT 1 FROM sale WHERE barcode = #{barcode})
@@ -61,9 +42,11 @@
                created_date
         FROM sale
         WHERE id = #{saleId}
+          AND is_bought = 0
+          AND is_bought_date IS NULL
     </select>
 
-    <select id="findNotBoughtSalesByItemId" parameterType="int" resultType="Sale">
+    <select id="findSalesByItemId" parameterType="int" resultType="Sale">
         SELECT id,
                item_id,
                seller_id,

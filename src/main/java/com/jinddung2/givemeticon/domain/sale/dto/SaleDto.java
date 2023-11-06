@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -19,11 +18,11 @@ public class SaleDto {
     private String barcode;
     private LocalDate expirationDate;
     private boolean isBought;
-    private Date isBoughtDate;
+    private LocalDate isBoughtDate;
     private LocalDateTime createdDate;
 
     @Builder
-    public SaleDto(int id, int itemId, int sellerId, String barcode, LocalDate expirationDate, boolean isBought, Date isBoughtDate, LocalDateTime createdDate) {
+    public SaleDto(int id, int itemId, int sellerId, String barcode, LocalDate expirationDate, boolean isBought, LocalDate isBoughtDate, LocalDateTime createdDate, LocalDateTime updatedDate) {
         this.id = id;
         this.itemId = itemId;
         this.sellerId = sellerId;

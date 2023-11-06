@@ -1,6 +1,5 @@
 package com.jinddung2.givemeticon.domain.sale.service;
 
-import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
@@ -8,7 +7,6 @@ import com.jinddung2.givemeticon.domain.sale.exception.DuplicatedBarcodeExceptio
 import com.jinddung2.givemeticon.domain.sale.exception.ExpiredSaleException;
 import com.jinddung2.givemeticon.domain.sale.exception.NotFoundSaleException;
 import com.jinddung2.givemeticon.domain.sale.mapper.SaleMapper;
-import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,7 +17,6 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.sql.Date;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -39,7 +36,6 @@ class SaleServiceTest {
     int sellerId;
     int saleId;
     Sale sale;
-    Item item;
 
     @BeforeEach
     void setUp() {
@@ -49,7 +45,6 @@ class SaleServiceTest {
         saleId = 10;
         sale = Sale.builder().id(saleId).expirationDate(LocalDate.of(2099, 12, 31)).build();
         itemId = 1;
-        item = Item.builder().id(itemId).build();
         sellerId = 1;
     }
 
@@ -83,7 +78,7 @@ class SaleServiceTest {
     @DisplayName("판매 상품 단건 조회에 성공한다.")
     void get_Sale_Success() {
         Mockito.when(saleMapper.findById(sale.getId())).thenReturn(Optional.of(sale));
-        saleService.getAvailableSaleForItem(sale.getId());
+        saleService.getSale(sale.getId());
 
         Mockito.verify(saleMapper).findById(saleId);
     }
@@ -104,22 +99,7 @@ class SaleServiceTest {
         Mockito.when(saleMapper.findById(fakeSale.getId())).thenReturn(Optional.of(fakeSale));
 
         Assertions.assertThrows(ExpiredSaleException.class,
-                () -> saleService.getAvailableSaleForItem(fakeSale.getId()));
-    }
-
-    @Test
-    @DisplayName("판매 상품이 이미 구매되어 단건 조회에 실패한다.")
-    void get_Sale_Fail_Already_Bought() {
-        Sale fakeSale = Sale.builder()
-                .id(20)
-                .expirationDate(LocalDate.now().plusDays(1))
-                .isBought(true)
-                .isBoughtDate(new Date(20220101))
-                .build();
-        Mockito.when(saleMapper.findById(fakeSale.getId())).thenReturn(Optional.of(fakeSale));
-
-        Assertions.assertThrows(AlreadyBoughtSaleException.class,
-                () -> saleService.getAvailableSaleForItem(fakeSale.getId()));
+                () -> saleService.getSale(fakeSale.getId()));
     }
 
     @Test
@@ -130,9 +110,9 @@ class SaleServiceTest {
                 Sale.builder().expirationDate(LocalDate.now().plusDays(1)).build(),
                 Sale.builder().expirationDate(LocalDate.now().plusDays(1)).build(),
                 Sale.builder().expirationDate(LocalDate.now().plusDays(1)).build());
-        Mockito.when(saleMapper.findNotBoughtSalesByItemId(itemId)).thenReturn(sales);
+        Mockito.when(saleMapper.findSalesByItemId(itemId)).thenReturn(sales);
 
-        List<SaleDto> result = saleService.getAvailableSalesForItem(item);
+        List<SaleDto> result = saleService.getSalesByItemId(itemId);
 
         Assertions.assertEquals(3, result.size());
 

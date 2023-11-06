@@ -34,22 +34,13 @@ class ItemServiceTest {
     }
 
     @Test
-    @DisplayName("아이템 도메인 조회에 성공한다.")
+    @DisplayName("전시용 아이템 조회에 성공한다.")
     void get_Item_Success() {
         Mockito.when(itemMapper.findById(item.getId())).thenReturn(Optional.of(item));
 
         itemService.getItem(item.getId());
 
-        Mockito.verify(itemMapper).findById(item.getId());
-    }
-
-    @Test
-    @DisplayName("전시용 아이템 조회에 성공하여 조회수가 증가한다.")
-    void get_Item_Increase_View_Count_Success() {
-        Mockito.when(itemMapper.findById(item.getId())).thenReturn(Optional.of(item));
-
-        itemService.getItemAndIncreaseViewCount(item.getId());
-
+        Mockito.verify(item).increaseViewCount();
         Mockito.verify(itemMapper).increaseViewCount(item.getId());
     }
 
