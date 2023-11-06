@@ -32,14 +32,14 @@ public class SaleController {
     }
 
     @GetMapping("/{saleId}")
-    public ResponseEntity<ApiResponse<SaleDto>> getAvailableSaleForItem(@PathVariable("saleId") int saleId) {
-        SaleDto saleDto = saleService.getAvailableSaleForItem(saleId);
+    public ResponseEntity<ApiResponse<SaleDto>> getSale(@PathVariable("saleId") int saleId) {
+        SaleDto saleDto = saleService.getSale(saleId);
         return new ResponseEntity<>(ApiResponse.success(saleDto), HttpStatus.OK);
     }
 
     @GetMapping("/items/{itemId}")
-    public ResponseEntity<ApiResponse<List<SaleDto>>> getSalesForItem(@PathVariable("itemId") int itemId) {
-        List<SaleDto> sales = saleItemFacade.getSalesForItem(itemId);
+    public ResponseEntity<ApiResponse<List<SaleDto>>> getSalesByItemId(@PathVariable("itemId") int itemId) {
+        List<SaleDto> sales = saleItemFacade.getSalesByItemId(itemId);
         return new ResponseEntity<>(ApiResponse.success(sales), HttpStatus.OK);
     }
 }

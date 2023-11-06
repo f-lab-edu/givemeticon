@@ -19,12 +19,8 @@ public class ItemService {
         return itemMapper.save(item);
     }
 
-    public Item getItem(int itemId) {
-        return itemMapper.findById(itemId).orElseThrow(NotFoundItemException::new);
-    }
-
-    public ItemDto getItemAndIncreaseViewCount(int itemId) {
-        Item item = getItem(itemId);
+    public ItemDto getItem(int itemId) {
+        Item item = itemMapper.findById(itemId).orElseThrow(NotFoundItemException::new);
         item.increaseViewCount();
         itemMapper.increaseViewCount(itemId);
         return ItemDto.of(item);
