@@ -1,11 +1,18 @@
 package com.jinddung2.givemeticon.domain.sale.service;
 
-import com.jinddung2.givemeticon.domain.sale.controller.SaleCreateRequest;
+import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
+import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.exception.DuplicatedBarcodeException;
+import com.jinddung2.givemeticon.domain.sale.exception.ExpiredSaleException;
+import com.jinddung2.givemeticon.domain.sale.exception.NotFoundSaleException;
 import com.jinddung2.givemeticon.domain.sale.mapper.SaleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,5 +34,23 @@ public class SaleService {
         if (saleMapper.existsByBarcode(barcode)) {
             throw new DuplicatedBarcodeException();
         }
+    }
+
+    public SaleDto getSale(int saleId) {
+        Sale sale = saleMapper.findById(saleId).orElseThrow(NotFoundSaleException::new);
+
+        if (sale.getExpirationDate().isBefore(LocalDate.now())) {
+            throw new ExpiredSaleException();
+        }
+
+        return SaleDto.of(sale);
+    }
+
+    public List<SaleDto> getSalesByItemId(int itemId) {
+        List<Sale> sales = saleMapper.findSalesByItemId(itemId);
+        return sales.stream()
+                .filter(sale -> !sale.getExpirationDate().isBefore(LocalDate.now()))
+                .map(SaleDto::of)
+                .collect(Collectors.toList());
     }
 }

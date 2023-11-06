@@ -32,7 +32,9 @@ public class AuthInterceptor implements HandlerInterceptor {
             "/api/v1/brands/**",
             "/api/v1/brands/category",
             "/api/v1/categories",
-            "/api/v1/items/**"
+            "/api/v1/items/**",
+            "/api/v1/sales/**",
+            "/api/v1/sales/items/**"
     };
 
     @Override

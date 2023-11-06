@@ -1,12 +1,18 @@
 package com.jinddung2.givemeticon.domain.sale.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
+import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
+import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
+import com.jinddung2.givemeticon.domain.sale.facade.SaleItemFacade;
+import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -14,12 +20,26 @@ import org.springframework.web.bind.annotation.*;
 public class SaleController {
 
     private final SaleCreationFacade saleCreationFacade;
+    private final SaleService saleService;
+    private final SaleItemFacade saleItemFacade;
 
     @PostMapping("/items/{itemId}/sellers/{sellerId}")
-    public ResponseEntity<ApiResponse<Integer>> createItemVariate(@PathVariable("itemId") int itemId,
-                                                                  @PathVariable("sellerId") int sellerId,
-                                                                  @RequestBody @Validated SaleCreateRequest request) {
-        int id = saleCreationFacade.createItemVariant(itemId, sellerId, request);
+    public ResponseEntity<ApiResponse<Integer>> createSale(@PathVariable("itemId") int itemId,
+                                                           @PathVariable("sellerId") int sellerId,
+                                                           @RequestBody @Validated SaleCreateRequest request) {
+        int id = saleCreationFacade.createSale(itemId, sellerId, request);
         return new ResponseEntity<>(ApiResponse.success(id), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{saleId}")
+    public ResponseEntity<ApiResponse<SaleDto>> getSale(@PathVariable("saleId") int saleId) {
+        SaleDto saleDto = saleService.getSale(saleId);
+        return new ResponseEntity<>(ApiResponse.success(saleDto), HttpStatus.OK);
+    }
+
+    @GetMapping("/items/{itemId}")
+    public ResponseEntity<ApiResponse<List<SaleDto>>> getSalesByItemId(@PathVariable("itemId") int itemId) {
+        List<SaleDto> sales = saleItemFacade.getSalesByItemId(itemId);
+        return new ResponseEntity<>(ApiResponse.success(sales), HttpStatus.OK);
     }
 }

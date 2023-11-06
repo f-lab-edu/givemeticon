@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.common.security.provider;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -27,6 +28,7 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    @DisplayName("토큰 생성에 성공한다.")
     void generate_Token() {
         Date expiredTime = new Date(System.currentTimeMillis() + (60 * 60 * 1000));
 

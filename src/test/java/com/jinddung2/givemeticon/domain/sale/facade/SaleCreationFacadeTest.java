@@ -2,7 +2,7 @@ package com.jinddung2.givemeticon.domain.sale.facade;
 
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
-import com.jinddung2.givemeticon.domain.sale.controller.SaleCreateRequest;
+import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
@@ -66,7 +66,7 @@ class SaleCreationFacadeTest {
         Mockito.when(itemService.isExists(itemId)).thenReturn(true);
         Mockito.when(userService.getUserInfo(sellerId)).thenReturn(userDto);
 
-        saleCreationFacade.createItemVariant(itemId, sellerId, saleCreateRequest);
+        saleCreationFacade.createSale(itemId, sellerId, saleCreateRequest);
 
         Mockito.verify(saleCreateValidator).validate(saleCreateRequest);
         Mockito.verify(itemVariantService).validateDuplicateBarcode(saleCreateRequest.barcode());
@@ -80,7 +80,7 @@ class SaleCreationFacadeTest {
         Mockito.when(itemService.isExists(itemId)).thenReturn(false);
 
         Assertions.assertThrows(NotFoundItemException.class,
-                () -> saleCreationFacade.createItemVariant(itemId, sellerId, saleCreateRequest));
+                () -> saleCreationFacade.createSale(itemId, sellerId, saleCreateRequest));
     }
 
     @Test
@@ -95,7 +95,7 @@ class SaleCreationFacadeTest {
         Mockito.when(userService.getUserInfo(sellerId)).thenReturn(userDto);
 
         Assertions.assertThrows(NotRegistrSellerException.class,
-                () -> saleCreationFacade.createItemVariant(itemId, sellerId, saleCreateRequest));
+                () -> saleCreationFacade.createSale(itemId, sellerId, saleCreateRequest));
 
     }
 }

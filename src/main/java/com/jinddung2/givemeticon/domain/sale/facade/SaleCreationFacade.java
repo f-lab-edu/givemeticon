@@ -2,7 +2,7 @@ package com.jinddung2.givemeticon.domain.sale.facade;
 
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
-import com.jinddung2.givemeticon.domain.sale.controller.SaleCreateRequest;
+import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.sale.validator.SaleCreateValidator;
@@ -20,7 +20,7 @@ public class SaleCreationFacade {
     private final SaleService itemVariantService;
     private final SaleCreateValidator saleCreateValidator;
 
-    public int createItemVariant(int itemId, int sellerId, SaleCreateRequest request) {
+    public int createSale(int itemId, int sellerId, SaleCreateRequest request) {
         if (!itemService.isExists(itemId)) {
             throw new NotFoundItemException();
         }

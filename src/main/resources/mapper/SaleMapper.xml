@@ -9,8 +9,8 @@
                           seller_id,
                           barcode,
                           expiration_date,
-                          is_used,
-                          is_used_date,
+                          is_bought,
+                          is_bought_date,
                           created_date,
                           updated_date,
                           deleted_date)
@@ -19,7 +19,7 @@
                 #{sellerId},
                 #{barcode},
                 #{expirationDate},
-                #{isUsed},
+                #{isBought},
                 null,
                 NOW(),
                 NOW(),
@@ -29,5 +29,36 @@
     <select id="existsByBarcode" parameterType="String" resultType="boolean">
         SELECT EXISTS
                    (SELECT 1 FROM sale WHERE barcode = #{barcode})
+    </select>
+
+    <select id="findById" parameterType="int" resultType="Sale">
+        SELECT id,
+               item_id,
+               seller_id,
+               barcode,
+               expiration_date,
+               is_bought,
+               is_bought_date,
+               created_date
+        FROM sale
+        WHERE id = #{saleId}
+          AND is_bought = 0
+          AND is_bought_date IS NULL
+    </select>
+
+    <select id="findSalesByItemId" parameterType="int" resultType="Sale">
+        SELECT id,
+               item_id,
+               seller_id,
+               barcode,
+               expiration_date,
+               is_bought,
+               is_bought_date,
+               created_date
+        FROM sale
+        WHERE item_id = #{itemId}
+          AND is_bought = 0
+          AND is_bought_date IS NULL
+        ORDER BY expiration_date ASC
     </select>
 </mapper>

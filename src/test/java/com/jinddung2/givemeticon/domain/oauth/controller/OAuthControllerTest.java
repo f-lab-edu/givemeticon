@@ -10,6 +10,7 @@ import com.jinddung2.givemeticon.domain.oauth.infrastructure.naver.NaverLoginPar
 import com.jinddung2.givemeticon.domain.oauth.service.OAuthLoginService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -57,6 +58,7 @@ class OAuthControllerTest {
     }
 
     @Test
+    @DisplayName("네이버 로그인에 성공한다.")
     void naverLogin_Success() throws Exception {
         when(oAuthLoginService.login(any(NaverLoginParam.class))).thenReturn(authToken);
 
@@ -73,6 +75,7 @@ class OAuthControllerTest {
     }
 
     @Test
+    @DisplayName("카카오 로그인에 성공한다.")
     void kakaoLogin_Success() throws Exception {
         when(oAuthLoginService.login(any(KakaoLoginParam.class))).thenReturn(authToken);
 

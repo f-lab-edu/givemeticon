@@ -5,6 +5,7 @@ import com.jinddung2.givemeticon.domain.user.presentation.facade.PasswordResetFa
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import jakarta.mail.MessagingException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -35,6 +36,7 @@ class PasswordResetFacadeTest {
     }
 
     @Test
+    @DisplayName("현재 비밀번호를 임시비밀번호로 바꾸고 유저 메일에 임시비밀번호 발급에 성공한다.")
     void resetPasswordAndSendEmail() throws MessagingException {
         when(mailSendService.sendEmailForTemporaryPassword(email)).thenReturn(tempPassword);
         doNothing().when(userService).resetPassword(email, tempPassword);
