@@ -28,7 +28,7 @@ public class TradeCreationFacade {
     @Transactional
     public int transact(int saleId, int buyerId) {
         userService.validateUser(buyerId);
-        Sale sale = saleService.validateSale(saleId);
+        Sale sale = saleService.getSale(saleId);
 
         if (sale.isBought()) {
             throw new AlreadyBoughtSaleException();

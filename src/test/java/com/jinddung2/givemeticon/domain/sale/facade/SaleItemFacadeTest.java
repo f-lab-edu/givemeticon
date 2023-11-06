@@ -43,9 +43,9 @@ class SaleItemFacadeTest {
                 SaleDto.builder().expirationDate(LocalDate.now().plusDays(1)).build(),
                 SaleDto.builder().expirationDate(LocalDate.now().plusDays(1)).build(),
                 SaleDto.builder().expirationDate(LocalDate.now().plusDays(1)).build());
-        Mockito.when(saleService.getSalesByItemId(itemId)).thenReturn(sales);
+        Mockito.when(saleService.getAvailableSalesForItem(item)).thenReturn(sales);
 
-        List<SaleDto> result = saleItemFacade.getSalesByItemId(itemId);
+        List<SaleDto> result = saleItemFacade.getSalesForItem(itemId);
 
         Assertions.assertEquals(sales, result);
     }
@@ -56,7 +56,7 @@ class SaleItemFacadeTest {
                 .when(itemService).getItem(itemId);
 
         Assertions.assertThrows(NotFoundItemException.class,
-                () -> saleItemFacade.getSalesByItemId(itemId));
+                () -> saleItemFacade.getSalesForItem(itemId));
 
     }
 }
