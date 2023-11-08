@@ -38,10 +38,11 @@ jobs:
       - name: Build and Push docker image to Docker Hub
         env:
           REGISTRY: ${{ secrets.DOCKER_REPO }}
+          REPOSITORY: back-api
           IMAGE_TAG: latest
         run: |
           docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/$REGISTRY:$IMAGE_TAG .
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
 
       # 서버에서 Docker 이미지 실행
@@ -54,11 +55,11 @@ jobs:
           # 도커 작업
           script: |
             docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-            ids=$(sudo docker ps -a -q --filter "name=${{ secrets.DOCKER_REPO }}/$REPOSITORY")
+            ids=$(sudo docker ps -a -q --filter "${{ secrets.DOCKER_REPO }}/back-api")
             for id in $ids
             do
               sudo docker stop $id && docker rm $id
             done
             docker image prune -a -f
-            docker pull $REGISTRY/$REPOSITORY:$IMAGE_TAG
-            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }}/$REPOSITORY -d ${{ secrets.DOCKER_REPO }}/$REPOSITORY:$IMAGE_TAG
+            docker pull ${{ secrets.DOCKER_REPO }}/back-api:$IMAGE_TAG
+            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }}/back-api -d ${{ secrets.DOCKER_REPO }}/back-api:$IMAGE_TAG
