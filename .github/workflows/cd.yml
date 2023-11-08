@@ -53,7 +53,7 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           # 도커 작업
           script: |
-            docker login -u ${{ secrets.DOCKER_USERNAME }} -p --password-stdin < ${{ secrets.DOCKER_PASSWORD }}
+            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
             ids=$(sudo docker ps -a -q --filter "name=${{ secrets.DOCKER_REPO }}/$REPOSITORY")
             for id in $ids
             do
