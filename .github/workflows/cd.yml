@@ -41,7 +41,7 @@ jobs:
           IMAGE_TAG: latest
         run: |
           docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/$REPOSITORY:$IMAGE_TAG .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/$REGISTRY:$IMAGE_TAG .
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
 
       # 서버에서 Docker 이미지 실행
