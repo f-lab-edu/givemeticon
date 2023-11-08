@@ -17,7 +17,7 @@ public class SaleCreationFacade {
 
     private final ItemService itemService;
     private final UserService userService;
-    private final SaleService itemVariantService;
+    private final SaleService saleService;
     private final SaleCreateValidator saleCreateValidator;
 
     public int createSale(int itemId, int sellerId, SaleCreateRequest request) {
@@ -32,7 +32,7 @@ public class SaleCreationFacade {
         }
 
         saleCreateValidator.validate(request);
-        itemVariantService.validateDuplicateBarcode(request.barcode());
-        return itemVariantService.save(itemId, sellerId, request);
+        saleService.validateDuplicateBarcode(request.barcode());
+        return saleService.save(itemId, sellerId, request);
     }
 }

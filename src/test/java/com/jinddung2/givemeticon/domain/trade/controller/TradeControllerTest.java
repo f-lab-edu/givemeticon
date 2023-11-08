@@ -5,6 +5,7 @@ import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import com.jinddung2.givemeticon.domain.trade.facade.TradeCreationFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -14,10 +15,12 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,16 +38,28 @@ class TradeControllerTest {
     @MockBean
     TradeCreationFacade tradeCreationFacade;
 
-    String defaultUrl = "/api/v1/trades";
-    int saleId = 10;
-    int buyerId = 20;
+    MockHttpSession mockHttpSession;
+
+    String defaultUrl;
+    int saleId;
+    int buyerId;
+
+    @BeforeEach
+    void setUp() {
+        defaultUrl = "/api/v1/trades";
+        saleId = 10;
+        buyerId = 20;
+        mockHttpSession = new MockHttpSession();
+        mockHttpSession.setAttribute(LOGIN_USER, buyerId);
+    }
 
     @Test
     @DisplayName("거래에 성공한다.")
     void create_Trade() throws Exception {
 
         mockMvc.perform(MockMvcRequestBuilders
-                        .post(defaultUrl + String.format("/sales/%d/buyer/%d", saleId, buyerId))
+                        .post(defaultUrl + String.format("/sales/%d", saleId))
+                        .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated());
 
@@ -58,7 +73,8 @@ class TradeControllerTest {
                 .when(tradeCreationFacade).transact(saleId, buyerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .post(defaultUrl + String.format("/sales/%d/buyer/%d", saleId, buyerId))
+                        .post(defaultUrl + String.format("/sales/%d", saleId))
+                        .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
 

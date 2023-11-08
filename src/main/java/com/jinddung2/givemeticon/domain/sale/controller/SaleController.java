@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/sales")
@@ -23,9 +25,9 @@ public class SaleController {
     private final SaleService saleService;
     private final SaleItemFacade saleItemFacade;
 
-    @PostMapping("/items/{itemId}/sellers/{sellerId}")
+    @PostMapping("/items/{itemId}")
     public ResponseEntity<ApiResponse<Integer>> createSale(@PathVariable("itemId") int itemId,
-                                                           @PathVariable("sellerId") int sellerId,
+                                                           @SessionAttribute(name = LOGIN_USER) int sellerId,
                                                            @RequestBody @Validated SaleCreateRequest request) {
         int id = saleCreationFacade.createSale(itemId, sellerId, request);
         return new ResponseEntity<>(ApiResponse.success(id), HttpStatus.CREATED);

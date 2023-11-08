@@ -22,12 +22,14 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.time.LocalDate;
 
+import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -53,6 +55,7 @@ class SaleControllerTest {
 
     @MockBean
     SaleItemFacade saleItemFacade;
+    MockHttpSession mockHttpSession;
 
     SaleCreateRequest saleCreateRequest;
 
@@ -63,34 +66,38 @@ class SaleControllerTest {
 
     @BeforeEach
     void setUp() {
+        int sellerId = 100;
+        mockHttpSession = new MockHttpSession();
+        mockHttpSession.setAttribute(LOGIN_USER, sellerId);
         saleCreateRequest = new SaleCreateRequest("123412341234",
                 LocalDate.of(2099, 12, 31));
         itemId = 1;
-        sellerId = 1;
         saleId = 10;
     }
 
     @Test
     void create_Sale_Success() throws Exception {
-        String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
+        String url = String.format(defaultUrl + "/items/%d", itemId);
         mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
+                        .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isCreated());
 
-        Mockito.verify(saleCreationFacade).createSale(itemId, sellerId, saleCreateRequest);
+        Mockito.verify(saleCreationFacade).createSale(itemId, (int) mockHttpSession.getAttribute(LOGIN_USER), saleCreateRequest);
     }
 
     @Test
     void create_Sale_Fail_NOT_FOUND_ITEM() throws Exception {
         Mockito.doThrow(new NotFoundItemException()).when(saleCreationFacade)
-                .createSale(itemId, sellerId, saleCreateRequest);
+                .createSale(itemId, (int) mockHttpSession.getAttribute(LOGIN_USER), saleCreateRequest);
 
-        String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
+        String url = String.format(defaultUrl + "/items/%d", itemId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
+                        .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isBadRequest());
@@ -104,12 +111,13 @@ class SaleControllerTest {
     @Test
     void create_Sale_FAIL_NOT_REGISTER_ACCOUNT() throws Exception {
         Mockito.doThrow(new NotRegistrSellerException()).when(saleCreationFacade)
-                .createSale(itemId, sellerId, saleCreateRequest);
+                .createSale(itemId, (int) mockHttpSession.getAttribute(LOGIN_USER), saleCreateRequest);
 
-        String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
+        String url = String.format(defaultUrl + "/items/%d", itemId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
+                        .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isBadRequest());
@@ -123,12 +131,13 @@ class SaleControllerTest {
     @Test
     void create_Sale_Fail_EXPIRED_DATE() throws Exception {
         Mockito.doThrow(new ExpiredSaleException()).when(saleCreationFacade)
-                .createSale(itemId, sellerId, saleCreateRequest);
+                .createSale(itemId, (int) mockHttpSession.getAttribute(LOGIN_USER), saleCreateRequest);
 
-        String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
+        String url = String.format(defaultUrl + "/items/%d", itemId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
+                        .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isBadRequest());
@@ -142,12 +151,13 @@ class SaleControllerTest {
     @Test
     void create_Sale_Fail_DUPLICATED_BARCODE_NUMBER() throws Exception {
         Mockito.doThrow(new DuplicatedBarcodeException()).when(saleCreationFacade)
-                .createSale(itemId, sellerId, saleCreateRequest);
+                .createSale(itemId, (int) mockHttpSession.getAttribute(LOGIN_USER), saleCreateRequest);
 
-        String url = String.format(defaultUrl + "/items/%d/sellers/%d", itemId, sellerId);
+        String url = String.format(defaultUrl + "/items/%d", itemId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(url)
+                        .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(saleCreateRequest)))
                 .andExpect(status().isBadRequest());
