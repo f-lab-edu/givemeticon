@@ -34,8 +34,18 @@ public class UserService {
         return user.getId();
     }
 
+    public User getUser(int userId) {
+        return userMapper.findById(userId)
+                .orElseThrow(NotFoundUserException::new);
+    }
+
+    public User getUser(String email) {
+        return userMapper.findByEmail(email)
+                .orElseThrow(NotFoundEmailException::new);
+    }
+
     public UserDto getUserInfo(int userId) {
-        User user = validateUser(userId);
+        User user = getUser(userId);
         return UserDto.of(user);
     }
 
@@ -51,7 +61,7 @@ public class UserService {
     }
 
     public void updatePassword(int userId, PasswordUpdateRequest request) {
-        User user = validateUser(userId);
+        User user = getUser(userId);
 
         if (!user.isPasswordMatch(passwordEncoder, request.oldPassword())) {
             throw new MisMatchPasswordException();
@@ -63,22 +73,17 @@ public class UserService {
     }
 
     public void updateAccount(int userId, int accountId) {
-        User user = validateUser(userId);
+        User user = getUser(userId);
         user.createAccount(accountId);
         log.info("user={}", user);
         userMapper.updateAccount(userId, accountId);
     }
 
     public void resetPassword(String email, String tempPassword) {
-        User user = validateUser(email);
+        User user = getUser(email);
         String encryptedPassword = passwordEncoder.encode(tempPassword);
         user.updatePassword(encryptedPassword);
         userMapper.updatePassword(user.getId(), encryptedPassword);
-    }
-
-    public User validateUser(int userId) {
-        return userMapper.findById(userId)
-                .orElseThrow(NotFoundUserException::new);
     }
 
     private void checkUserValidity(SignUpRequest request) {
@@ -89,10 +94,5 @@ public class UserService {
         if (userMapper.existsByPhone(request.getPhone())) {
             throw new DuplicatedPhoneException();
         }
-    }
-
-    private User validateUser(String email) {
-        return userMapper.findByEmail(email)
-                .orElseThrow(NotFoundEmailException::new);
     }
 }

@@ -27,7 +27,7 @@ public class TradeCreationFacade {
 
     @Transactional
     public int transact(int saleId, int buyerId) {
-        userService.validateUser(buyerId);
+        userService.getUser(buyerId);
         Sale sale = saleService.getSale(saleId);
 
         if (sale.isBought()) {

@@ -59,7 +59,7 @@ class TradeCreationFacadeTest {
     @Test
     @DisplayName("거래에 성공한다.")
     void transact() {
-        Mockito.when(userService.validateUser(buyerId)).thenReturn(user);
+        Mockito.when(userService.getUser(buyerId)).thenReturn(user);
         Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
         Mockito.when(itemService.getItem(itemId)).thenReturn(item);
 

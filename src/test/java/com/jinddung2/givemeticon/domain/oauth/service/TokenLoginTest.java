@@ -16,8 +16,6 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.util.StringUtils;
 
-import java.util.Optional;
-
 @ExtendWith(MockitoExtension.class)
 public class TokenLoginTest {
 
@@ -55,7 +53,7 @@ public class TokenLoginTest {
         User loginUser = User.builder()
                 .email(email)
                 .build();
-        Mockito.when(loginService.getLoginUser()).thenReturn(Optional.of(loginUser.getEmail()));
+        Mockito.when(loginService.getLoginUser()).thenReturn(loginUser.getId());
         boolean result = authInterceptor.preHandle(request, response, handler);
 
         Assertions.assertTrue(result);
