@@ -12,10 +12,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Optional;
-
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.Mockito.when;
@@ -38,6 +37,7 @@ class SessionLoginServiceTest {
     @BeforeEach
     void setUp() {
         testUser = User.builder()
+                .id(1)
                 .email("test@example.com")
                 .password(passwordEncoder.encode("test1234"))
                 .build();
@@ -49,13 +49,13 @@ class SessionLoginServiceTest {
     @Test
     @DisplayName("로그인에 성공한다")
     void login_Success() {
-        willDoNothing().given(mockHttpSession).setAttribute(LOGIN_USER, testUser.getEmail());
-        when(mockHttpSession.getAttribute(LOGIN_USER)).thenReturn(testUser.getEmail());
+        willDoNothing().given(mockHttpSession).setAttribute(LOGIN_USER, testUser.getId());
+        when(mockHttpSession.getAttribute(LOGIN_USER)).thenReturn(testUser.getId());
 
-        loginService.login(testUser.getEmail());
+        loginService.login(testUser.getId());
 
-        then(mockHttpSession).should().setAttribute(LOGIN_USER, testUser.getEmail());
-        assertEquals(mockHttpSession.getAttribute(LOGIN_USER), testUser.getEmail());
+        then(mockHttpSession).should().setAttribute(LOGIN_USER, testUser.getId());
+        assertEquals(mockHttpSession.getAttribute(LOGIN_USER), testUser.getId());
     }
 
     @Test
@@ -73,11 +73,10 @@ class SessionLoginServiceTest {
     @Test
     @DisplayName("로그인 유저 세션 정보를 가져오는데 성공한다")
     void get_Session_Id_Success() {
-        when(mockHttpSession.getAttribute(LOGIN_USER)).thenReturn(testUser.getEmail());
+        when(mockHttpSession.getAttribute(LOGIN_USER)).thenReturn(testUser.getId());
 
-        Optional<String> loginUser = loginService.getLoginUser();
+        int loginUserId = loginService.getLoginUser();
 
-        assertTrue(loginUser.isPresent());
-        assertEquals(testUser.getEmail(), loginUser.get());
+        assertEquals(testUser.getId(), loginUserId);
     }
 }
