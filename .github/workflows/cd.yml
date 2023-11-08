@@ -55,11 +55,11 @@ jobs:
           # 도커 작업
           script: |
             docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-            ids=$(sudo docker ps -a -q --filter "name=${{ secrets.DOCKER_REPO }}/back-api")
+            ids=$(sudo docker ps -a -q --filter "name=${{ secrets.DOCKER_REPO }}/back")
             for id in $ids
             do
               sudo docker stop $id && docker rm $id
             done
             docker image prune -a -f
             docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
-            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }}/back-api -d ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
+            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }}/back -d ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
