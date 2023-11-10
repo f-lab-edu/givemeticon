@@ -3,7 +3,7 @@ package com.jinddung2.givemeticon.domain.sale.facade;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
-import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
+import com.jinddung2.givemeticon.domain.sale.controller.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;

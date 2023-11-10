@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.domain.user.dto;
+package com.jinddung2.givemeticon.domain.user.controller.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthProvider;

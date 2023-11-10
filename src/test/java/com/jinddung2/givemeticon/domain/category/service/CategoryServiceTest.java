@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.category.service;
 
+import com.jinddung2.givemeticon.domain.category.controller.request.CategoryUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.category.domain.Category;
-import com.jinddung2.givemeticon.domain.category.dto.request.CategoryUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.category.exception.NotFoundCategoryException;
 import com.jinddung2.givemeticon.domain.category.mapper.CategoryMapper;
 import org.junit.jupiter.api.Assertions;

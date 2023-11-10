@@ -1,9 +1,9 @@
 package com.jinddung2.givemeticon.domain.sale.service;
 
 import com.jinddung2.givemeticon.domain.item.domain.Item;
+import com.jinddung2.givemeticon.domain.sale.controller.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
-import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.exception.DuplicatedBarcodeException;
 import com.jinddung2.givemeticon.domain.sale.exception.ExpiredSaleException;
 import com.jinddung2.givemeticon.domain.sale.exception.NotFoundSaleException;

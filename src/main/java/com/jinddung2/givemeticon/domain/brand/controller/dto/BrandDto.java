@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.domain.brand.dto;
+package com.jinddung2.givemeticon.domain.brand.controller.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.jinddung2.givemeticon.domain.brand.domain.Brand;

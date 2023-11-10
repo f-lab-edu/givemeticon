@@ -3,7 +3,7 @@ package com.jinddung2.givemeticon.domain.item.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
-import com.jinddung2.givemeticon.domain.item.dto.request.ItemCreateRequest;
+import com.jinddung2.givemeticon.domain.item.controller.dto.request.ItemCreateRequest;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.facade.ItemCreationFacade;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;

@@ -2,7 +2,7 @@ package com.jinddung2.givemeticon.domain.sale.facade;
 
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
-import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
+import com.jinddung2.givemeticon.domain.sale.controller.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

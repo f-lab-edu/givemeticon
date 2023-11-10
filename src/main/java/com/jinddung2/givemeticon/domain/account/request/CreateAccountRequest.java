@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.domain.account.dto.request;
+package com.jinddung2.givemeticon.domain.account.request;
 
 import com.jinddung2.givemeticon.domain.account.domain.Account;
 import jakarta.validation.constraints.NotBlank;

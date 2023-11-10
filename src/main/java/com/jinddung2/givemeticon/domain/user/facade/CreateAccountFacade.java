@@ -1,6 +1,6 @@
-package com.jinddung2.givemeticon.domain.user.presentation.facade;
+package com.jinddung2.givemeticon.domain.user.facade;
 
-import com.jinddung2.givemeticon.domain.account.dto.request.CreateAccountRequest;
+import com.jinddung2.givemeticon.domain.account.request.CreateAccountRequest;
 import com.jinddung2.givemeticon.domain.account.service.AccountService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;

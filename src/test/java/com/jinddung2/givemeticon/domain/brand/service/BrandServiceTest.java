@@ -1,9 +1,9 @@
 package com.jinddung2.givemeticon.domain.brand.service;
 
+import com.jinddung2.givemeticon.domain.brand.controller.dto.BrandDto;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.request.BrandCreateRequest;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.request.BrandUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.brand.domain.Brand;
-import com.jinddung2.givemeticon.domain.brand.dto.BrandDto;
-import com.jinddung2.givemeticon.domain.brand.dto.request.BrandCreateRequest;
-import com.jinddung2.givemeticon.domain.brand.dto.request.BrandUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.brand.exception.DuplicatedBrandNameException;
 import com.jinddung2.givemeticon.domain.brand.exception.EmptyBrandListException;
 import com.jinddung2.givemeticon.domain.brand.exception.NotFoundBrandException;

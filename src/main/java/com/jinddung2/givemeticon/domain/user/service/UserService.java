@@ -1,10 +1,10 @@
 package com.jinddung2.givemeticon.domain.user.service;
 
+import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordUpdateRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.domain.UserRole;
-import com.jinddung2.givemeticon.domain.user.dto.UserDto;
-import com.jinddung2.givemeticon.domain.user.dto.request.PasswordUpdateRequest;
-import com.jinddung2.givemeticon.domain.user.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.exception.*;
 import com.jinddung2.givemeticon.domain.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;

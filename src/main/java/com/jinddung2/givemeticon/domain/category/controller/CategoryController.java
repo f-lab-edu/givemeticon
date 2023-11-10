@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.category.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.domain.category.dto.request.CategoryUpdateNameRequest;
+import com.jinddung2.givemeticon.domain.category.controller.request.CategoryUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.category.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

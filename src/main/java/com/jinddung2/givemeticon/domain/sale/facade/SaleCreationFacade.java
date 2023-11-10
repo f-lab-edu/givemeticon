@@ -6,7 +6,7 @@ import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateReques
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.sale.validator.SaleCreateValidator;
-import com.jinddung2.givemeticon.domain.user.dto.UserDto;
+import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

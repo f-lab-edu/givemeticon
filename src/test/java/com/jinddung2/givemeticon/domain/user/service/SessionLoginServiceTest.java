@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.user.service;
 
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.LoginRequest;
 import com.jinddung2.givemeticon.domain.user.domain.User;
-import com.jinddung2.givemeticon.domain.user.dto.request.LoginRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

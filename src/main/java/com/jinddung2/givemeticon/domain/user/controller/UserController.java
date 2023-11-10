@@ -1,14 +1,14 @@
-package com.jinddung2.givemeticon.domain.user.presentation;
+package com.jinddung2.givemeticon.domain.user.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.domain.account.dto.request.CreateAccountRequest;
-import com.jinddung2.givemeticon.domain.user.dto.UserDto;
-import com.jinddung2.givemeticon.domain.user.dto.request.LoginRequest;
-import com.jinddung2.givemeticon.domain.user.dto.request.PasswordResetRequest;
-import com.jinddung2.givemeticon.domain.user.dto.request.PasswordUpdateRequest;
-import com.jinddung2.givemeticon.domain.user.dto.request.SignUpRequest;
-import com.jinddung2.givemeticon.domain.user.presentation.facade.CreateAccountFacade;
-import com.jinddung2.givemeticon.domain.user.presentation.facade.PasswordResetFacade;
+import com.jinddung2.givemeticon.domain.account.request.CreateAccountRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.LoginRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordResetRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordUpdateRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.SignUpRequest;
+import com.jinddung2.givemeticon.domain.user.facade.CreateAccountFacade;
+import com.jinddung2.givemeticon.domain.user.facade.PasswordResetFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import jakarta.mail.MessagingException;

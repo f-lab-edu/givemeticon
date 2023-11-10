@@ -1,8 +1,8 @@
 package com.jinddung2.givemeticon.domain.sale.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
+import com.jinddung2.givemeticon.domain.sale.controller.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateRequest;
-import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleItemFacade;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;

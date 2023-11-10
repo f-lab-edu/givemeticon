@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.domain.item.dto.request;
+package com.jinddung2.givemeticon.domain.item.controller.dto.request;
 
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 

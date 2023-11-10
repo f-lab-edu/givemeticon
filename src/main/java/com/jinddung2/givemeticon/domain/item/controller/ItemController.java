@@ -1,8 +1,8 @@
 package com.jinddung2.givemeticon.domain.item.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.domain.item.dto.ItemDto;
-import com.jinddung2.givemeticon.domain.item.dto.request.ItemCreateRequest;
+import com.jinddung2.givemeticon.domain.item.controller.dto.ItemDto;
+import com.jinddung2.givemeticon.domain.item.controller.dto.request.ItemCreateRequest;
 import com.jinddung2.givemeticon.domain.item.facade.ItemCreationFacade;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import lombok.RequiredArgsConstructor;

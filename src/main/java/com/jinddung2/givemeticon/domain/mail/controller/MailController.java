@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.mail.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.domain.mail.dto.request.EmailCertificationRequest;
+import com.jinddung2.givemeticon.domain.mail.controller.request.EmailCertificationRequest;
 import com.jinddung2.givemeticon.domain.mail.service.MailSendService;
 import com.jinddung2.givemeticon.domain.mail.service.MailVerifyService;
 import jakarta.mail.MessagingException;

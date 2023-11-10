@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.domain.user.dto.request;
+package com.jinddung2.givemeticon.domain.user.controller.dto.request;
 
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.domain.UserRole;

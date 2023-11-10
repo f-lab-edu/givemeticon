@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.item.service;
 
+import com.jinddung2.givemeticon.domain.item.controller.dto.ItemDto;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
-import com.jinddung2.givemeticon.domain.item.dto.ItemDto;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.mapper.ItemMapper;
 import lombok.RequiredArgsConstructor;
