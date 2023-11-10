@@ -25,6 +25,7 @@ public class SaleService {
     private final SaleMapper saleMapper;
 
     public int save(int itemId, int sellerId, SaleCreateRequest request) {
+        validateDuplicateBarcode(request.barcode());
 
         Sale itemVariant = request.toEntity();
         itemVariant.updateItemId(itemId);

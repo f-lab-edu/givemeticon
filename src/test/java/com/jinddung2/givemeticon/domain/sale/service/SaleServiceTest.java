@@ -56,17 +56,18 @@ class SaleServiceTest {
     @Test
     @DisplayName("판매할 아이템 생성에 성공한다.")
     void save_Success() {
-        Sale itemVariant = saleCreateRequest.toEntity();
-        itemVariant.updateItemId(itemId);
-        itemVariant.updateSellerId(sellerId);
+        Sale fakeSale = saleCreateRequest.toEntity();
+        fakeSale.updateItemId(itemId);
+        fakeSale.updateSellerId(sellerId);
 
+        Mockito.when(saleMapper.existsByBarcode(fakeSale.getBarcode())).thenReturn(false);
         Mockito.when(saleMapper.save(any(Sale.class))).thenReturn(10);
 
         int resultId = saleService.save(itemId, sellerId, saleCreateRequest);
 
-        Mockito.verify(saleMapper).save(itemVariant);
+        Mockito.verify(saleMapper).save(fakeSale);
 
-        Assertions.assertEquals(itemVariant.getId(), resultId);
+        Assertions.assertEquals(fakeSale.getId(), resultId);
     }
 
     @Test

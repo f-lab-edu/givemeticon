@@ -32,7 +32,6 @@ public class SaleCreationFacade {
         }
 
         saleCreateValidator.validate(request);
-        saleService.validateDuplicateBarcode(request.barcode());
         return saleService.save(itemId, sellerId, request);
     }
 }
