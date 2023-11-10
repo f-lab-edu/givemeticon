@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.trade.controller;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
+import com.jinddung2.givemeticon.domain.trade.facade.GetItemUsageConfirmationFacade;
 import com.jinddung2.givemeticon.domain.trade.facade.TradeSaleItemUserFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,9 @@ class TradeControllerTest {
 
     @MockBean
     TradeSaleItemUserFacade tradeSaleItemUserFacade;
+
+    @MockBean
+    GetItemUsageConfirmationFacade getItemUsageConfirmationFacade;
 
     MockHttpSession mockHttpSession;
 
@@ -75,7 +79,7 @@ class TradeControllerTest {
                 .when(tradeSaleItemUserFacade).transact(saleId, buyerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .post(defaultUrl + String.format("/sales/%d", saleId))
+                        .post(String.format("%s/sales/%d", defaultUrl, saleId))
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
@@ -88,14 +92,27 @@ class TradeControllerTest {
 
     @Test
     @DisplayName("구매 상세페이지 가져오는데 성공한다.")
-    void get_Trade() throws Exception {
+    void get_Trade_Detail() throws Exception {
 
         mockMvc.perform(MockMvcRequestBuilders
-                        .get(defaultUrl + "/" + tradeId)
+                        .get(String.format("%s/%d", defaultUrl, tradeId))
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
         Mockito.verify(tradeSaleItemUserFacade).getTradeDetail(tradeId, buyerId);
+    }
+
+    @Test
+    @DisplayName("사용 상세페이지 가져오는데 성공한다.")
+    void get_TradeFor_Confirm_Usage() throws Exception {
+
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get(String.format("%s/%d/confirm-usage", defaultUrl, tradeId))
+                        .session(mockHttpSession)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        Mockito.verify(getItemUsageConfirmationFacade).getTradeForConfirmUsage(tradeId, buyerId);
     }
 }
