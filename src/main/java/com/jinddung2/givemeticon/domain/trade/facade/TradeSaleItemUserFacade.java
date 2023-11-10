@@ -4,6 +4,7 @@ import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
+import com.jinddung2.givemeticon.domain.trade.controller.dto.TradeDto;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import com.jinddung2.givemeticon.domain.trade.service.TradeService;
@@ -19,7 +20,7 @@ import java.time.temporal.ChronoUnit;
 
 @Service
 @RequiredArgsConstructor
-public class TradeCreationFacade {
+public class TradeSaleItemUserFacade {
 
     private final UserService userService;
     private final SaleService saleService;
@@ -28,9 +29,7 @@ public class TradeCreationFacade {
 
     @Transactional
     public int transact(int saleId, int buyerId) {
-        if (!userService.isExists(buyerId)) {
-            throw new NotFoundUserException();
-        }
+        checkUserExists(buyerId);
 
         Sale sale = saleService.getSale(saleId);
 
@@ -52,5 +51,29 @@ public class TradeCreationFacade {
         sale.updateBoughtState();
         saleService.update(sale);
         return tradeService.save(trade, daysUntilExpiration);
+    }
+
+
+    public TradeDto getTradeDetail(int tradeId, int buyerId) {
+        checkUserExists(buyerId);
+
+        Trade trade = tradeService.getTrade(tradeId);
+        Sale sale = saleService.getSale(trade.getSaleId());
+        Item item = itemService.getItem(sale.getItemId());
+
+        TradeDto tradeDto = TradeDto.of(trade);
+        long restDay = ChronoUnit.DAYS.between(LocalDate.now(), sale.getExpirationDate());
+        tradeDto.addRestDay(restDay);
+        tradeDto.addItemPrice(item.getPrice());
+        tradeDto.addExpiredDate(sale.getExpirationDate());
+        tradeDto.addDiscountRate();
+
+        return tradeDto;
+    }
+
+    private void checkUserExists(int userId) {
+        if (!userService.isExists(userId)) {
+            throw new NotFoundUserException();
+        }
     }
 }
