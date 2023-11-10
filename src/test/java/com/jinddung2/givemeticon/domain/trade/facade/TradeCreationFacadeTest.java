@@ -59,7 +59,7 @@ class TradeCreationFacadeTest {
     @Test
     @DisplayName("거래에 성공한다.")
     void transact() {
-        Mockito.when(userService.getUser(buyerId)).thenReturn(user);
+        Mockito.when(userService.isExists(buyerId)).thenReturn(true);
         Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
         Mockito.when(itemService.getItem(itemId)).thenReturn(item);
 
@@ -78,6 +78,7 @@ class TradeCreationFacadeTest {
     @Test
     @DisplayName("이미 구매한 상품이라 거래에 실패한다.")
     void transact_Fail_Already_Bought() {
+        Mockito.when(userService.isExists(user.getId())).thenReturn(true);
         sale = Mockito.mock(Sale.class);
         Mockito.when(sale.isBought()).thenReturn(true);
 

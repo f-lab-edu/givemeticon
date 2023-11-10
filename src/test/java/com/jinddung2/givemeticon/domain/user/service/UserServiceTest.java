@@ -69,6 +69,24 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("해당 유저의 id가 존재하는지 확인한다.")
+    void exists_By_Id_True() {
+        when(userMapper.existsById(userDto.getId())).thenReturn(true);
+
+        boolean exists = userService.isExists(userDto.getId());
+        Assertions.assertTrue(exists);
+    }
+
+    @Test
+    @DisplayName("해당 유저의 id가 존재하지 않는다.")
+    void exists_By_Id_False() {
+        when(userMapper.existsById(userDto.getId())).thenReturn(false);
+
+        boolean exists = userService.isExists(userDto.getId());
+        Assertions.assertFalse(exists);
+    }
+
+    @Test
     @DisplayName("이메일 중복으로 회원가입에 실패한다")
     void signUp_Fail_DuplicateEmail() {
         when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(true);

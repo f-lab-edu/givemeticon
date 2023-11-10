@@ -7,6 +7,7 @@ import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import com.jinddung2.givemeticon.domain.trade.service.TradeService;
+import com.jinddung2.givemeticon.domain.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,10 @@ public class TradeCreationFacade {
 
     @Transactional
     public int transact(int saleId, int buyerId) {
-        userService.getUser(buyerId);
+        if (!userService.isExists(buyerId)) {
+            throw new NotFoundUserException();
+        }
+
         Sale sale = saleService.getSale(saleId);
 
         if (sale.isBought()) {

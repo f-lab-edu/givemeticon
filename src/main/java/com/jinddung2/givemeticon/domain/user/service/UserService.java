@@ -49,6 +49,10 @@ public class UserService {
         return UserDto.of(user);
     }
 
+    public boolean isExists(int userId) {
+        return userMapper.existsById(userId);
+    }
+
     public UserDto checkLogin(String email, String password) {
         User user = userMapper.findByEmail(email)
                 .orElseThrow(NotFoundEmailException::new);
