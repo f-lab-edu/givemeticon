@@ -14,6 +14,7 @@ import com.jinddung2.givemeticon.domain.sale.facade.SaleItemFacade;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,6 +77,7 @@ class SaleControllerTest {
     }
 
     @Test
+    @DisplayName("판매용 상품 생성에 성공한다.")
     void create_Sale_Success() throws Exception {
         String url = String.format(defaultUrl + "/items/%d", itemId);
         mockMvc.perform(MockMvcRequestBuilders
@@ -89,6 +91,7 @@ class SaleControllerTest {
     }
 
     @Test
+    @DisplayName("전시용 아이템이 존재하지 않아 판매용 상품 생성에 실패한다.")
     void create_Sale_Fail_NOT_FOUND_ITEM() throws Exception {
         Mockito.doThrow(new NotFoundItemException()).when(saleCreationFacade)
                 .createSale(itemId, (int) mockHttpSession.getAttribute(LOGIN_USER), saleCreateRequest);
@@ -109,6 +112,7 @@ class SaleControllerTest {
     }
 
     @Test
+    @DisplayName("판매자로 등록되어 있지 않아 판매 상품 생성에 실패한다.")
     void create_Sale_FAIL_NOT_REGISTER_ACCOUNT() throws Exception {
         Mockito.doThrow(new NotRegistrSellerException()).when(saleCreationFacade)
                 .createSale(itemId, (int) mockHttpSession.getAttribute(LOGIN_USER), saleCreateRequest);
@@ -129,7 +133,8 @@ class SaleControllerTest {
     }
 
     @Test
-    void create_Sale_Fail_EXPIRED_DATE() throws Exception {
+    @DisplayName("유효기간이 만료되어 판매용 상품 생성에 실패한다.")
+    void create_Sale_Fail_Expired_Date() throws Exception {
         Mockito.doThrow(new ExpiredSaleException()).when(saleCreationFacade)
                 .createSale(itemId, (int) mockHttpSession.getAttribute(LOGIN_USER), saleCreateRequest);
 
@@ -149,7 +154,8 @@ class SaleControllerTest {
     }
 
     @Test
-    void create_Sale_Fail_DUPLICATED_BARCODE_NUMBER() throws Exception {
+    @DisplayName("바코드 번호가 이미 등록되어 판매용 상품 생성에 실패한다.")
+    void create_Sale_Fail_Duplicated_Barcode_Number() throws Exception {
         Mockito.doThrow(new DuplicatedBarcodeException()).when(saleCreationFacade)
                 .createSale(itemId, (int) mockHttpSession.getAttribute(LOGIN_USER), saleCreateRequest);
 
@@ -169,6 +175,7 @@ class SaleControllerTest {
     }
 
     @Test
+    @DisplayName("판매용 상품 단건 조회에 성공한다.")
     void get_Sale_Success() throws Exception {
         String url = defaultUrl + "/" + saleId;
         mockMvc.perform(MockMvcRequestBuilders
@@ -180,6 +187,7 @@ class SaleControllerTest {
     }
 
     @Test
+    @DisplayName("판매용 상품이 존재하지 않아 단건 조회에 실패한다.")
     void get_Sale_Fail_Not_Found_Sale() throws Exception {
         Mockito.doThrow(new NotFoundSaleException())
                 .when(saleService).getAvailableSaleForItem(saleId);
@@ -199,6 +207,7 @@ class SaleControllerTest {
     }
 
     @Test
+    @DisplayName("전시용 아이템에 해당하는 판매용 상품들 다건 조회에 성공한다.")
     void get_Sales_By_ItemId_Success() throws Exception {
         String url = defaultUrl + "/items/" + itemId;
         mockMvc.perform(MockMvcRequestBuilders
@@ -210,6 +219,7 @@ class SaleControllerTest {
     }
 
     @Test
+    @DisplayName("전시용 상품이 존재하지 않아 판매용 상품들 다건 조회에 실패한다.")
     void get_Sales_By_ItemId_Fail_Not_Found_ItemId() throws Exception {
         String url = defaultUrl + "/items/" + itemId;
 
