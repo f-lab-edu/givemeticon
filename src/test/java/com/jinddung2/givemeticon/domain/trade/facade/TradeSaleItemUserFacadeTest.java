@@ -4,6 +4,8 @@ import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
+import com.jinddung2.givemeticon.domain.trade.controller.dto.TradeDto;
+import com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import com.jinddung2.givemeticon.domain.trade.service.TradeService;
@@ -19,13 +21,14 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @ExtendWith(MockitoExtension.class)
-class TradeCreationFacadeTest {
+class TradeSaleItemUserFacadeTest {
 
     @InjectMocks
-    TradeCreationFacade tradeCreationFacade;
+    TradeSaleItemUserFacade tradeSaleItemUserFacade;
 
     @Mock
     UserService userService;
@@ -39,21 +42,28 @@ class TradeCreationFacadeTest {
     int buyerId;
     int saleId;
     int itemId;
+    int tradeId;
 
     User user;
 
     Sale sale;
 
     Item item;
+    int itemPrice;
+    Trade trade;
 
     @BeforeEach
     void setUp() {
         buyerId = 1;
         saleId = 2;
         itemId = 3;
+        tradeId = 4;
+        itemPrice = 10000;
         user = User.builder().id(buyerId).build();
         sale = Sale.builder().id(saleId).itemId(itemId).isBought(false).expirationDate(LocalDate.now().plusDays(30)).build();
-        item = Item.builder().id(itemId).price(10000).build();
+        item = Item.builder().id(itemId).price(itemPrice).build();
+        trade = Trade.builder().id(tradeId).saleId(saleId).buyerId(buyerId).salePrice(BigDecimal.valueOf(itemPrice)).build();
+        trade.discountItemPrice(DiscountRatePolicy.STANDARD.getDiscountRate());
     }
 
     @Test
@@ -63,12 +73,12 @@ class TradeCreationFacadeTest {
         Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
         Mockito.when(itemService.getItem(itemId)).thenReturn(item);
 
-        Mockito.when(tradeService.save(Mockito.any(Trade.class), Mockito.any(Long.class))).thenReturn(1);
+        Mockito.when(tradeService.save(Mockito.any(Trade.class), Mockito.any(Long.class))).thenReturn(tradeId);
 
 
-        int transactId = tradeCreationFacade.transact(saleId, buyerId);
+        int transactId = tradeSaleItemUserFacade.transact(saleId, buyerId);
 
-        Assertions.assertEquals(1, transactId);
+        Assertions.assertEquals(tradeId, transactId);
         Assertions.assertTrue(sale.isBought());
 
         Mockito.verify(saleService).update(sale);
@@ -87,7 +97,24 @@ class TradeCreationFacadeTest {
         Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
 
         Assertions.assertThrows(AlreadyBoughtSaleException.class, () -> {
-            tradeCreationFacade.transact(saleId, buyerId);
+            tradeSaleItemUserFacade.transact(saleId, buyerId);
         });
+    }
+
+    @Test
+    @DisplayName("거래 상세 페이지 가져오는데 성공한다.")
+    void get_Trade_Detail() {
+        Mockito.when(userService.isExists(buyerId)).thenReturn(true);
+        Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
+        Mockito.when(itemService.getItem(itemId)).thenReturn(item);
+        Mockito.when(tradeService.getTrade(tradeId)).thenReturn(trade);
+
+        TradeDto result = tradeSaleItemUserFacade.getTradeDetail(tradeId, buyerId);
+
+        Assertions.assertEquals(trade.getSalePrice(), result.getTradePrice());
+
+        Mockito.verify(tradeService).getTrade(trade.getId());
+        Mockito.verify(saleService).getSale(trade.getSaleId());
+        Mockito.verify(itemService).getItem(sale.getItemId());
     }
 }

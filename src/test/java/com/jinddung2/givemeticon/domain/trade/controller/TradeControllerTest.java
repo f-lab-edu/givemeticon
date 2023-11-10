@@ -3,7 +3,7 @@ package com.jinddung2.givemeticon.domain.trade.controller;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
-import com.jinddung2.givemeticon.domain.trade.facade.TradeCreationFacade;
+import com.jinddung2.givemeticon.domain.trade.facade.TradeSaleItemUserFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,19 +36,21 @@ class TradeControllerTest {
     MockMvc mockMvc;
 
     @MockBean
-    TradeCreationFacade tradeCreationFacade;
+    TradeSaleItemUserFacade tradeSaleItemUserFacade;
 
     MockHttpSession mockHttpSession;
 
     String defaultUrl;
     int saleId;
     int buyerId;
+    int tradeId;
 
     @BeforeEach
     void setUp() {
         defaultUrl = "/api/v1/trades";
         saleId = 10;
         buyerId = 20;
+        tradeId = 5;
         mockHttpSession = new MockHttpSession();
         mockHttpSession.setAttribute(LOGIN_USER, buyerId);
     }
@@ -63,14 +65,14 @@ class TradeControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated());
 
-        Mockito.verify(tradeCreationFacade).transact(saleId, buyerId);
+        Mockito.verify(tradeSaleItemUserFacade).transact(saleId, buyerId);
     }
 
     @Test
     @DisplayName("구매된 상품이라 거래에 실패한다.")
     void create_Trade_Fail_Already_Bought() throws Exception {
         Mockito.doThrow(new AlreadyBoughtSaleException())
-                .when(tradeCreationFacade).transact(saleId, buyerId);
+                .when(tradeSaleItemUserFacade).transact(saleId, buyerId);
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(defaultUrl + String.format("/sales/%d", saleId))
@@ -82,5 +84,18 @@ class TradeControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("FAIL"))
                 .andExpect(jsonPath("$.data.message").value("이미 구매된 상품 입니다."));
+    }
+
+    @Test
+    @DisplayName("구매 상세페이지 가져오는데 성공한다.")
+    void get_Trade() throws Exception {
+
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get(defaultUrl + "/" + tradeId)
+                        .session(mockHttpSession)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        Mockito.verify(tradeSaleItemUserFacade).getTradeDetail(tradeId, buyerId);
     }
 }

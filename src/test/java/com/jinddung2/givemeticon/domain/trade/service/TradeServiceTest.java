@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.domain.trade.service;
 
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
+import com.jinddung2.givemeticon.domain.trade.exception.NotFoundTradeException;
 import com.jinddung2.givemeticon.domain.trade.mapper.TradeMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Optional;
 
 import static com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy.STANDARD;
 import static com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy.WEEKLY_DISCOUNT;
@@ -38,7 +40,7 @@ class TradeServiceTest {
         trade = Trade.builder()
                 .saleId(saleId)
                 .buyerId(buyerId)
-                .salePrice(new BigDecimal(price))
+                .salePrice(BigDecimal.valueOf(price))
                 .build();
     }
 
@@ -72,5 +74,25 @@ class TradeServiceTest {
 
         Assertions.assertEquals(result, trade.getSalePrice());
         Mockito.verify(tradeMapper).save(trade);
+    }
+
+    @Test
+    @DisplayName("거래 단건조회에 성공한다.")
+    void get_Trade_ById() {
+        Mockito.when(tradeMapper.findById(trade.getId())).thenReturn(Optional.of(trade));
+
+        Trade result = tradeService.getTrade(trade.getId());
+
+        Assertions.assertEquals(trade.getId(), result.getId());
+        Assertions.assertEquals(trade.getSalePrice(), result.getSalePrice());
+    }
+
+    @Test
+    @DisplayName("거래번호가 없어 단건조회에 실패한다한다.")
+    void get_Trade_ById_Fail_Not_Found_Trade() {
+        Mockito.when(tradeMapper.findById(trade.getId())).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(NotFoundTradeException.class,
+                () -> tradeService.getTrade(trade.getId()));
     }
 }
