@@ -8,5 +8,5 @@ public interface LoginService {
 
     void logout();
 
-    int getLoginUser();
+    int getLoginUserId();
 }

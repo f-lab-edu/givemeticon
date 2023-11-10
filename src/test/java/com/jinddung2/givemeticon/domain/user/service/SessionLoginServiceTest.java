@@ -75,7 +75,7 @@ class SessionLoginServiceTest {
     void get_Session_Id_Success() {
         when(mockHttpSession.getAttribute(LOGIN_USER)).thenReturn(testUser.getId());
 
-        int loginUserId = loginService.getLoginUser();
+        int loginUserId = loginService.getLoginUserId();
 
         assertEquals(testUser.getId(), loginUserId);
     }

@@ -23,7 +23,7 @@ public class SessionLoginService implements LoginService {
     }
 
     @Override
-    public int getLoginUser() {
+    public int getLoginUserId() {
         return (int) session.getAttribute(LOGIN_USER);
     }
 }

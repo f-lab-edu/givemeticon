@@ -53,7 +53,7 @@ public class TokenLoginTest {
         User loginUser = User.builder()
                 .email(email)
                 .build();
-        Mockito.when(loginService.getLoginUser()).thenReturn(loginUser.getId());
+        Mockito.when(loginService.getLoginUserId()).thenReturn(loginUser.getId());
         boolean result = authInterceptor.preHandle(request, response, handler);
 
         Assertions.assertTrue(result);

@@ -65,7 +65,7 @@ public class AuthInterceptor implements HandlerInterceptor {
     }
 
     private boolean sessionLoginValidate() {
-        int id = loginService.getLoginUser();
+        int id = loginService.getLoginUserId();
 
         return id != 0;
     }
