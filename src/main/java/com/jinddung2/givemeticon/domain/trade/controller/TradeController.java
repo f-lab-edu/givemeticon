@@ -1,7 +1,9 @@
 package com.jinddung2.givemeticon.domain.trade.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
+import com.jinddung2.givemeticon.domain.trade.controller.dto.ItemUsageConfirmationDTO;
 import com.jinddung2.givemeticon.domain.trade.controller.dto.TradeDto;
+import com.jinddung2.givemeticon.domain.trade.facade.GetItemUsageConfirmationFacade;
 import com.jinddung2.givemeticon.domain.trade.facade.TradeSaleItemUserFacade;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,7 @@ import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.L
 public class TradeController {
 
     private final TradeSaleItemUserFacade tradeSaleItemUserFacade;
+    private final GetItemUsageConfirmationFacade itemUsageConfirmationFacade;
 
     @PostMapping("/sales/{saleId}")
     public ResponseEntity<ApiResponse<Integer>> createTrade(@PathVariable("saleId") int saleId,
@@ -29,6 +32,14 @@ public class TradeController {
                                                                 @SessionAttribute(name = LOGIN_USER) int buyerId) {
         TradeDto tradeDto = tradeSaleItemUserFacade.getTradeDetail(tradeId, buyerId);
         return new ResponseEntity<>(ApiResponse.success(tradeDto), HttpStatus.OK);
+    }
+
+    @GetMapping("{id}/confirm-usage")
+    public ResponseEntity<ApiResponse<ItemUsageConfirmationDTO>> getTradeForConfirmUsage(@PathVariable("id") int tradeId,
+                                                                                         @SessionAttribute(name = LOGIN_USER) int buyerId) {
+        ItemUsageConfirmationDTO itemUsageConfirmationDTO =
+                itemUsageConfirmationFacade.getTradeForConfirmUsage(tradeId, buyerId);
+        return new ResponseEntity<>(ApiResponse.success(itemUsageConfirmationDTO), HttpStatus.OK);
     }
 
 }
