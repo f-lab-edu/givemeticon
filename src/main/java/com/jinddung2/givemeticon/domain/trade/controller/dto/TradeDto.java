@@ -15,17 +15,17 @@ public class TradeDto {
     private boolean isUsed;
     private LocalDate expiredDate;
     private long restDay;
-    private LocalDate createdDate;
+    private LocalDate boughtDate;
     private BigDecimal tradePrice;
     private int itemPrice;
     private double discountRate;
 
     @Builder
-    public TradeDto(boolean isUsed, LocalDate expiredDate, long restDay, LocalDate createdDate, BigDecimal tradePrice, int itemPrice) {
+    public TradeDto(boolean isUsed, LocalDate expiredDate, long restDay, LocalDate boughtDate, BigDecimal tradePrice, int itemPrice) {
         this.isUsed = isUsed;
         this.expiredDate = expiredDate;
         this.restDay = restDay;
-        this.createdDate = createdDate;
+        this.boughtDate = boughtDate;
         this.tradePrice = tradePrice;
         this.itemPrice = itemPrice;
     }
@@ -33,8 +33,8 @@ public class TradeDto {
     public static TradeDto of(Trade trade) {
         return TradeDto.builder()
                 .isUsed(trade.isUsed())
-                .createdDate(trade.getCreatedDate())
-                .tradePrice(trade.getSalePrice())
+                .boughtDate(trade.getCreatedDate())
+                .tradePrice(trade.getTradePrice())
                 .build();
     }
 

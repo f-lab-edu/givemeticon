@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -39,18 +40,18 @@ public class TradeSaleItemUserFacade {
 
         Item item = itemService.getItem(sale.getItemId());
 
-        long daysUntilExpiration = ChronoUnit.DAYS.between(LocalDate.now(), sale.getExpirationDate());
+        long restDay = getRestDay(sale.getExpirationDate());
 
         Trade trade = Trade.builder()
                 .buyerId(buyerId)
                 .saleId(saleId)
-                .salePrice(BigDecimal.valueOf(item.getPrice()))
+                .tradePrice(BigDecimal.valueOf(item.getPrice()))
                 .isUsed(false)
                 .build();
 
         sale.updateBoughtState();
         saleService.update(sale);
-        return tradeService.save(trade, daysUntilExpiration);
+        return tradeService.save(trade, restDay);
     }
 
 
@@ -62,13 +63,41 @@ public class TradeSaleItemUserFacade {
         Item item = itemService.getItem(sale.getItemId());
 
         TradeDto tradeDto = TradeDto.of(trade);
-        long restDay = ChronoUnit.DAYS.between(LocalDate.now(), sale.getExpirationDate());
+        long restDay = getRestDay(sale.getExpirationDate());
         tradeDto.addRestDay(restDay);
         tradeDto.addItemPrice(item.getPrice());
         tradeDto.addExpiredDate(sale.getExpirationDate());
         tradeDto.addDiscountRate();
 
         return tradeDto;
+    }
+
+    public List<TradeDto> getUnusedTradeHistory(int buyerId, boolean orderByBoughtDate,
+                                                boolean orderByExpiredDate, int page) {
+        checkUserExists(buyerId);
+
+        List<Trade> myUnusedItemHistory = tradeService.getMyUnusedItemHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
+
+        return myUnusedItemHistory.stream()
+                .map(trade -> {
+                    TradeDto tradeDto = TradeDto.of(trade);
+
+                    Sale sale = saleService.getSale(trade.getSaleId());
+                    Item item = itemService.getItem(sale.getItemId());
+
+                    long restDay = getRestDay(sale.getExpirationDate());
+                    tradeDto.addRestDay(restDay);
+                    tradeDto.addItemPrice(item.getPrice());
+                    tradeDto.addExpiredDate(sale.getExpirationDate());
+                    tradeDto.addDiscountRate();
+
+                    return tradeDto;
+                })
+                .toList();
+    }
+
+    private long getRestDay(LocalDate expiredDate) {
+        return ChronoUnit.DAYS.between(LocalDate.now(), expiredDate);
     }
 
     private void checkUserExists(int userId) {
