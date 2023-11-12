@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.user.service;
 
+import com.jinddung2.givemeticon.common.exception.UnauthorizedUserException;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,10 @@ public class SessionLoginService implements LoginService {
 
     @Override
     public int getLoginUserId() {
-        return (int) session.getAttribute(LOGIN_USER);
+        Object sessionId = session.getAttribute(LOGIN_USER);
+        if (sessionId == null) {
+            throw new UnauthorizedUserException();
+        }
+        return (int) sessionId;
     }
 }
