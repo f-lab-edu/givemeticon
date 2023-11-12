@@ -15,8 +15,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import static com.jinddung2.givemeticon.common.utils.PaginationUtil.makePagingParamMap;
+import static com.jinddung2.givemeticon.common.utils.constants.PageSize.TRADE;
 import static com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy.STANDARD;
 import static com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy.WEEKLY_DISCOUNT;
 
@@ -40,7 +45,7 @@ class TradeServiceTest {
         trade = Trade.builder()
                 .saleId(saleId)
                 .buyerId(buyerId)
-                .salePrice(BigDecimal.valueOf(price))
+                .tradePrice(BigDecimal.valueOf(price))
                 .build();
     }
 
@@ -56,7 +61,7 @@ class TradeServiceTest {
                 .setScale(0, RoundingMode.HALF_UP);
         BigDecimal result = salePrice.subtract(discount);
 
-        Assertions.assertEquals(result, trade.getSalePrice());
+        Assertions.assertEquals(result, trade.getTradePrice());
         Mockito.verify(tradeMapper).save(trade);
     }
 
@@ -72,7 +77,7 @@ class TradeServiceTest {
                 .setScale(0, RoundingMode.HALF_UP);
         BigDecimal result = salePrice.subtract(discount);
 
-        Assertions.assertEquals(result, trade.getSalePrice());
+        Assertions.assertEquals(result, trade.getTradePrice());
         Mockito.verify(tradeMapper).save(trade);
     }
 
@@ -84,7 +89,7 @@ class TradeServiceTest {
         Trade result = tradeService.getTrade(trade.getId());
 
         Assertions.assertEquals(trade.getId(), result.getId());
-        Assertions.assertEquals(trade.getSalePrice(), result.getSalePrice());
+        Assertions.assertEquals(trade.getTradePrice(), result.getTradePrice());
     }
 
     @Test
@@ -94,5 +99,23 @@ class TradeServiceTest {
 
         Assertions.assertThrows(NotFoundTradeException.class,
                 () -> tradeService.getTrade(trade.getId()));
+    }
+
+    @Test
+    @DisplayName("미사용된 아이템을 조회한다.")
+    void getMyUnusedItemHistory() {
+        int page = 0;
+        Map<String, Object> pageInfo = makePagingParamMap(buyerId, page, TRADE.getSize());
+        boolean orderByBoughtDate = false;
+        boolean orderByExpiredDate = false;
+
+        List<Trade> tradeList = new ArrayList<>();
+        tradeList.add(trade);
+        Mockito.when(tradeMapper.findMyBoughtGifticon(pageInfo, orderByBoughtDate, orderByExpiredDate)).thenReturn(tradeList);
+
+        List<Trade> result = tradeService.getMyUnusedItemHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
+
+        Assertions.assertEquals(result.size(), tradeList.size());
+
     }
 }

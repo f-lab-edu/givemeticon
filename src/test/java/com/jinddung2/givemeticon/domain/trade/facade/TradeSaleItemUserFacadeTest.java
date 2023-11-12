@@ -23,6 +23,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
 class TradeSaleItemUserFacadeTest {
@@ -62,7 +64,7 @@ class TradeSaleItemUserFacadeTest {
         user = User.builder().id(buyerId).build();
         sale = Sale.builder().id(saleId).itemId(itemId).isBought(false).expirationDate(LocalDate.now().plusDays(30)).build();
         item = Item.builder().id(itemId).price(itemPrice).build();
-        trade = Trade.builder().id(tradeId).saleId(saleId).buyerId(buyerId).salePrice(BigDecimal.valueOf(itemPrice)).build();
+        trade = Trade.builder().id(tradeId).saleId(saleId).buyerId(buyerId).tradePrice(BigDecimal.valueOf(itemPrice)).build();
         trade.discountItemPrice(DiscountRatePolicy.STANDARD.getDiscountRate());
     }
 
@@ -111,10 +113,44 @@ class TradeSaleItemUserFacadeTest {
 
         TradeDto result = tradeSaleItemUserFacade.getTradeDetail(tradeId, buyerId);
 
-        Assertions.assertEquals(trade.getSalePrice(), result.getTradePrice());
+        Assertions.assertEquals(trade.getTradePrice(), result.getTradePrice());
 
         Mockito.verify(tradeService).getTrade(trade.getId());
         Mockito.verify(saleService).getSale(trade.getSaleId());
         Mockito.verify(itemService).getItem(sale.getItemId());
+    }
+
+    @Test
+    @DisplayName("구매 목록 중 사용하지 않은 아이템을 조회한다.")
+    void get_My_Unused_Trade_History() {
+        boolean orderByBoughtDate = true;
+        boolean orderByExpiredDate = false;
+        int page = 0;
+
+        Mockito.when(userService.isExists(user.getId())).thenReturn(true);
+
+        Trade trade2 = Trade.builder().id(tradeId).saleId(saleId).buyerId(buyerId).tradePrice(BigDecimal.valueOf(itemPrice)).build();
+        Trade trade3 = Trade.builder().id(tradeId).saleId(saleId).buyerId(buyerId).tradePrice(BigDecimal.valueOf(itemPrice)).build();
+
+        Mockito.when(tradeService.getMyUnusedItemHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page))
+                .thenReturn(Arrays.asList(trade, trade2, trade3));
+
+        Sale sale2 = sale = Sale.builder().id(saleId).itemId(itemId).isBought(false).expirationDate(LocalDate.now().plusDays(30)).build();
+        Sale sale3 = sale = Sale.builder().id(saleId).itemId(itemId).isBought(false).expirationDate(LocalDate.now().plusDays(30)).build();
+
+        Mockito.when(saleService.getSale(Mockito.anyInt())).thenReturn(sale, sale2, sale3);
+
+        Item item2 = Item.builder().id(itemId).price(itemPrice).build();
+        Item item3 = Item.builder().id(itemId).price(itemPrice).build();
+
+        Mockito.when(itemService.getItem(Mockito.anyInt())).thenReturn(item, item2, item3);
+        
+        List<TradeDto> result = tradeSaleItemUserFacade.getUnusedTradeHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
+
+        Assertions.assertEquals(3, result.size());
+
+        Mockito.verify(tradeService, Mockito.times(1)).getMyUnusedItemHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
+        Mockito.verify(saleService, Mockito.times(3)).getSale(Mockito.anyInt());
+        Mockito.verify(itemService, Mockito.times(3)).getItem(Mockito.anyInt());
     }
 }

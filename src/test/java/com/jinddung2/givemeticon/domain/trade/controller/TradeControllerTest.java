@@ -20,6 +20,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -114,5 +115,22 @@ class TradeControllerTest {
                 .andExpect(status().isOk());
 
         Mockito.verify(getItemUsageConfirmationFacade).getTradeForConfirmUsage(tradeId, buyerId);
+    }
+
+    @Test
+    @DisplayName("미사용된 구매 아이템 가져오는데 성공한다.")
+    void get_Unused_Trade_History() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get(String.format("%s/my", defaultUrl))
+                        .session(mockHttpSession)
+                        .param("orderByBoughtDate", "false")
+                        .param("orderByExpiredDate", "false")
+                        .param("page", "0")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("SUCCESS"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data").isArray())
+                .andExpect(status().isOk());
+
+        Mockito.verify(tradeSaleItemUserFacade).getUnusedTradeHistory(buyerId, false, false, 0);
     }
 }
