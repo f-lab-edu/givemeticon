@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.domain.user.presentation.facade;
+package com.jinddung2.givemeticon.domain.user.facade;
 
 import com.jinddung2.givemeticon.domain.mail.service.MailSendService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;

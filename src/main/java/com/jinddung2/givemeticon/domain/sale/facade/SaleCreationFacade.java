@@ -6,7 +6,7 @@ import com.jinddung2.givemeticon.domain.sale.controller.request.SaleCreateReques
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.sale.validator.SaleCreateValidator;
-import com.jinddung2.givemeticon.domain.user.dto.UserDto;
+import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,7 +17,7 @@ public class SaleCreationFacade {
 
     private final ItemService itemService;
     private final UserService userService;
-    private final SaleService itemVariantService;
+    private final SaleService saleService;
     private final SaleCreateValidator saleCreateValidator;
 
     public int createSale(int itemId, int sellerId, SaleCreateRequest request) {
@@ -32,7 +32,6 @@ public class SaleCreationFacade {
         }
 
         saleCreateValidator.validate(request);
-        itemVariantService.validateDuplicateBarcode(request.barcode());
-        return itemVariantService.save(itemId, sellerId, request);
+        return saleService.save(itemId, sellerId, request);
     }
 }

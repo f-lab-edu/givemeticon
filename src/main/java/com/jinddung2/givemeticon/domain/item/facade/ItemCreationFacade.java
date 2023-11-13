@@ -1,8 +1,8 @@
 package com.jinddung2.givemeticon.domain.item.facade;
 
 import com.jinddung2.givemeticon.domain.brand.service.BrandService;
+import com.jinddung2.givemeticon.domain.item.controller.dto.request.ItemCreateRequest;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
-import com.jinddung2.givemeticon.domain.item.dto.request.ItemCreateRequest;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

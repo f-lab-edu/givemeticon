@@ -61,11 +61,9 @@
                created_date
         FROM sale
         WHERE id = #{saleId}
-          AND is_bought = 0
-          AND is_bought_date IS NULL
     </select>
 
-    <select id="findSalesByItemId" parameterType="int" resultType="Sale">
+    <select id="findNotBoughtSalesByItemId" parameterType="int" resultType="Sale">
         SELECT id,
                item_id,
                seller_id,

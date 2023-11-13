@@ -1,8 +1,8 @@
 package com.jinddung2.givemeticon.domain.item.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.domain.item.dto.ItemDto;
-import com.jinddung2.givemeticon.domain.item.dto.request.ItemCreateRequest;
+import com.jinddung2.givemeticon.domain.item.controller.dto.ItemDto;
+import com.jinddung2.givemeticon.domain.item.controller.dto.request.ItemCreateRequest;
 import com.jinddung2.givemeticon.domain.item.facade.ItemCreationFacade;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +26,8 @@ public class ItemController {
     }
 
     @GetMapping("/{itemId}")
-    public ResponseEntity<ApiResponse<ItemDto>> getItem(@PathVariable("itemId") int itemId) {
-        ItemDto itemDto = itemService.getItem(itemId);
+    public ResponseEntity<ApiResponse<ItemDto>> getItemAndIncreaseViewCount(@PathVariable("itemId") int itemId) {
+        ItemDto itemDto = itemService.getItemAndIncreaseViewCount(itemId);
         return new ResponseEntity<>(ApiResponse.success(itemDto), HttpStatus.OK);
     }
 }

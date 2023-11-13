@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.domain.sale.dto;
+package com.jinddung2.givemeticon.domain.sale.controller.dto;
 
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import lombok.Builder;

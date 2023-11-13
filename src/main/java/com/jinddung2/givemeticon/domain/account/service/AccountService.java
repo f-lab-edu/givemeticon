@@ -1,9 +1,9 @@
 package com.jinddung2.givemeticon.domain.account.service;
 
 import com.jinddung2.givemeticon.domain.account.domain.Account;
-import com.jinddung2.givemeticon.domain.account.dto.request.CreateAccountRequest;
 import com.jinddung2.givemeticon.domain.account.exception.DuplicatedAccountNumberException;
 import com.jinddung2.givemeticon.domain.account.mapper.AccountMapper;
+import com.jinddung2.givemeticon.domain.account.request.CreateAccountRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

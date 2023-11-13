@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.domain.mail.dto.request;
+package com.jinddung2.givemeticon.domain.mail.controller.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

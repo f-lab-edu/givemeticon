@@ -1,6 +1,5 @@
 package com.jinddung2.givemeticon.common.security.interceptor;
 
-import com.jinddung2.givemeticon.common.exception.UnauthorizedUserException;
 import com.jinddung2.givemeticon.common.security.provider.JwtTokenProvider;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
-import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -43,8 +41,8 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         if (checkAllowGetUrl(request)) return true;
 
-        TokenLoginValidate(request);
-        SessionLoginValidate();
+        tokenLoginValidate(request);
+        sessionLoginValidate();
 
         return true;
     }
@@ -66,14 +64,13 @@ public class AuthInterceptor implements HandlerInterceptor {
         return antPathMatcher.match(patten, path);
     }
 
-    private boolean SessionLoginValidate() {
-        String email = loginService.getLoginUser()
-                .orElseThrow(UnauthorizedUserException::new);
+    private boolean sessionLoginValidate() {
+        int id = loginService.getLoginUserId();
 
-        return !ObjectUtils.isEmpty(email);
+        return id != 0;
     }
 
-    private boolean TokenLoginValidate(HttpServletRequest request) {
+    private boolean tokenLoginValidate(HttpServletRequest request) {
         String authToken = resolveToken(request);
         String email = null;
 

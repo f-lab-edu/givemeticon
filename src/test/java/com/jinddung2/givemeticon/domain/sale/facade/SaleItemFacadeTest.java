@@ -1,9 +1,9 @@
 package com.jinddung2.givemeticon.domain.sale.facade;
 
-import com.jinddung2.givemeticon.domain.item.dto.ItemDto;
+import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
-import com.jinddung2.givemeticon.domain.sale.dto.SaleDto;
+import com.jinddung2.givemeticon.domain.sale.controller.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,24 +28,24 @@ class SaleItemFacadeTest {
     SaleService saleService;
 
     int itemId;
-    ItemDto itemDto;
+    Item item;
 
     @BeforeEach
     void setUp() {
         itemId = 10;
-        itemDto = ItemDto.builder().id(itemId).build();
+        item = Item.builder().id(itemId).build();
     }
 
     @Test
     void get_Sales_By_ItemId_Success() {
-        Mockito.when(itemService.getItem(itemId)).thenReturn(itemDto);
+        Mockito.when(itemService.getItem(itemId)).thenReturn(item);
         List<SaleDto> sales = List.of(
                 SaleDto.builder().expirationDate(LocalDate.now().plusDays(1)).build(),
                 SaleDto.builder().expirationDate(LocalDate.now().plusDays(1)).build(),
                 SaleDto.builder().expirationDate(LocalDate.now().plusDays(1)).build());
-        Mockito.when(saleService.getSalesByItemId(itemId)).thenReturn(sales);
+        Mockito.when(saleService.getAvailableSalesForItem(item)).thenReturn(sales);
 
-        List<SaleDto> result = saleItemFacade.getSalesByItemId(itemId);
+        List<SaleDto> result = saleItemFacade.getSalesForItem(itemId);
 
         Assertions.assertEquals(sales, result);
     }
@@ -56,7 +56,7 @@ class SaleItemFacadeTest {
                 .when(itemService).getItem(itemId);
 
         Assertions.assertThrows(NotFoundItemException.class,
-                () -> saleItemFacade.getSalesByItemId(itemId));
+                () -> saleItemFacade.getSalesForItem(itemId));
 
     }
 }

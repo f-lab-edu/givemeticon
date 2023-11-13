@@ -59,9 +59,9 @@ class TradeCreationFacadeTest {
     @Test
     @DisplayName("거래에 성공한다.")
     void transact() {
-        Mockito.when(userService.validateUser(buyerId)).thenReturn(user);
-        Mockito.when(saleService.validateSale(saleId)).thenReturn(sale);
-        Mockito.when(itemService.validateItem(itemId)).thenReturn(item);
+        Mockito.when(userService.isExists(buyerId)).thenReturn(true);
+        Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
+        Mockito.when(itemService.getItem(itemId)).thenReturn(item);
 
         Mockito.when(tradeService.save(Mockito.any(Trade.class), Mockito.any(Long.class))).thenReturn(1);
 
@@ -78,12 +78,13 @@ class TradeCreationFacadeTest {
     @Test
     @DisplayName("이미 구매한 상품이라 거래에 실패한다.")
     void transact_Fail_Already_Bought() {
+        Mockito.when(userService.isExists(user.getId())).thenReturn(true);
         sale = Mockito.mock(Sale.class);
         Mockito.when(sale.isBought()).thenReturn(true);
 
         Assertions.assertTrue(sale.isBought());
 
-        Mockito.when(saleService.validateSale(saleId)).thenReturn(sale);
+        Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
 
         Assertions.assertThrows(AlreadyBoughtSaleException.class, () -> {
             tradeCreationFacade.transact(saleId, buyerId);

@@ -3,12 +3,13 @@ package com.jinddung2.givemeticon.domain.category.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
+import com.jinddung2.givemeticon.domain.category.controller.request.CategoryUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.category.domain.Category;
-import com.jinddung2.givemeticon.domain.category.dto.request.CategoryUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.category.exception.NotFoundCategoryException;
 import com.jinddung2.givemeticon.domain.category.service.CategoryService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +52,7 @@ class CategoryControllerTest {
     }
 
     @Test
+    @DisplayName("모든 카테고리의 이름 조회에 성공한다.")
     void category_Get_All_Name_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/categories")
@@ -61,6 +63,7 @@ class CategoryControllerTest {
     }
 
     @Test
+    @DisplayName("카테고리 이름 변경에 성공한다.")
     void category_updateName_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .put("/api/v1/categories/" + category.getId())
@@ -72,6 +75,7 @@ class CategoryControllerTest {
     }
 
     @Test
+    @DisplayName("카테고리가 존재하지 않아 이름 변경에 실패한다.")
     void category_updateName_Fail_Not_Found_Category() throws Exception {
         Mockito.doThrow(new NotFoundCategoryException())
                 .when(categoryService).updateName(category.getId(), categoryUpdateNameRequest.name());
@@ -89,6 +93,7 @@ class CategoryControllerTest {
     }
 
     @Test
+    @DisplayName("카테고리 삭제에 성공한다.")
     void category_deleteById_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .delete("/api/v1/categories/" + category.getId())
@@ -99,6 +104,7 @@ class CategoryControllerTest {
     }
 
     @Test
+    @DisplayName("카테고리가 존재하지 않아 삭제에 실패한다.")
     void category_deleteById_Fail_Not_Found_Category() throws Exception {
         Mockito.doThrow(new NotFoundCategoryException())
                 .when(categoryService).deleteById(category.getId());

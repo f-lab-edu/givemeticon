@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.domain.user.dto.request;
+package com.jinddung2.givemeticon.domain.user.controller.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

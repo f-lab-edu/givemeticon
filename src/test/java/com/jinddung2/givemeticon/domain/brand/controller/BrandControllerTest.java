@@ -3,16 +3,17 @@ package com.jinddung2.givemeticon.domain.brand.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.BrandDto;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.request.BrandCreateRequest;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.request.BrandUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.brand.domain.Brand;
-import com.jinddung2.givemeticon.domain.brand.dto.BrandDto;
-import com.jinddung2.givemeticon.domain.brand.dto.request.BrandCreateRequest;
-import com.jinddung2.givemeticon.domain.brand.dto.request.BrandUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.brand.exception.DuplicatedBrandNameException;
 import com.jinddung2.givemeticon.domain.brand.exception.EmptyBrandListException;
 import com.jinddung2.givemeticon.domain.brand.exception.NotFoundBrandException;
 import com.jinddung2.givemeticon.domain.brand.service.BrandService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +58,7 @@ class BrandControllerTest {
     }
 
     @Test
+    @DisplayName("브랜드 생성에 성공한다.")
     void brand_Create_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/brands")
@@ -66,6 +68,7 @@ class BrandControllerTest {
     }
 
     @Test
+    @DisplayName("브랜드 단건 조회에 성공한다.")
     void brand_findById_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/brands/100")
@@ -76,6 +79,7 @@ class BrandControllerTest {
     }
 
     @Test
+    @DisplayName("카테고리별 브랜드 조회에 성공한다.")
     void brand_Get_By_CategoryId_Success() throws Exception {
         int categoryId = 101;
         int page = 0;
@@ -90,6 +94,7 @@ class BrandControllerTest {
     }
 
     @Test
+    @DisplayName("페이지에 해당하는 브랜드가 없어 실패한다.")
     void brand_Get_By_CategoryId_Fail_No_Data() throws Exception {
         int categoryId = 101;
         int page = 0;
@@ -108,6 +113,7 @@ class BrandControllerTest {
     }
 
     @Test
+    @DisplayName("이미 브랜드명이 존재하여 브랜드 생성에 실패한다.")
     void brand_Create_Fail_Exists_Brand_Name() throws Exception {
         Mockito.doThrow(new DuplicatedBrandNameException()).when(brandService).save(brandCreateRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -123,6 +129,7 @@ class BrandControllerTest {
     }
 
     @Test
+    @DisplayName("브랜드명 변경에 성공한다.")
     void brand_Update_Name_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .put("/api/v1/brands/100")
@@ -134,6 +141,7 @@ class BrandControllerTest {
     }
 
     @Test
+    @DisplayName("브랜드를 찾을 수 없어 브랜드명 변경에 실패한다.")
     void brand_Update_Name_Fail_Not_Found_Brand() throws Exception {
         Mockito.doThrow(new NotFoundBrandException()).when(brandService).updateName(100, brandUpdateNameRequest.name());
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -149,6 +157,7 @@ class BrandControllerTest {
     }
 
     @Test
+    @DisplayName("브랜드 삭제에 성공한다.")
     void brand_Delete_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .delete("/api/v1/brands/100")
@@ -160,6 +169,7 @@ class BrandControllerTest {
     }
 
     @Test
+    @DisplayName("브랜드를 찾을 수 없어 브랜드 삭제에 실패한다.")
     void brand_Delete_Fail_Not_Found_Brand() throws Exception {
         Mockito.doThrow(new NotFoundBrandException()).when(brandService).delete(brand.getId());
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
