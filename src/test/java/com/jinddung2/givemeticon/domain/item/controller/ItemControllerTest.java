@@ -3,7 +3,7 @@ package com.jinddung2.givemeticon.domain.item.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
-import com.jinddung2.givemeticon.domain.item.dto.request.ItemCreateRequest;
+import com.jinddung2.givemeticon.domain.item.controller.dto.request.ItemCreateRequest;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.facade.ItemCreationFacade;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
@@ -74,13 +74,13 @@ class ItemControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        Mockito.verify(itemService).getItem(id);
+        Mockito.verify(itemService).getItemAndIncreaseViewCount(id);
     }
 
     @Test
     @DisplayName("전시용 아이템이 존재하지 않아 단건 조회에 실패한다.")
     void getItem_Fail_Not_Found_Item() throws Exception {
-        doThrow(new NotFoundItemException()).when(itemService).getItem(id);
+        doThrow(new NotFoundItemException()).when(itemService).getItemAndIncreaseViewCount(id);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/items/" + id)
                         .contentType(MediaType.APPLICATION_JSON))

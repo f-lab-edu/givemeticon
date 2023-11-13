@@ -1,9 +1,9 @@
 package com.jinddung2.givemeticon.domain.brand.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.domain.brand.dto.BrandDto;
-import com.jinddung2.givemeticon.domain.brand.dto.request.BrandCreateRequest;
-import com.jinddung2.givemeticon.domain.brand.dto.request.BrandUpdateNameRequest;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.BrandDto;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.request.BrandCreateRequest;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.request.BrandUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.brand.service.BrandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

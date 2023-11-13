@@ -1,12 +1,11 @@
 package com.jinddung2.givemeticon.domain.brand.service;
 
+import com.jinddung2.givemeticon.domain.brand.controller.dto.BrandDto;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.request.BrandCreateRequest;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.request.BrandUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.brand.domain.Brand;
-import com.jinddung2.givemeticon.domain.brand.dto.BrandDto;
-import com.jinddung2.givemeticon.domain.brand.dto.request.BrandCreateRequest;
-import com.jinddung2.givemeticon.domain.brand.dto.request.BrandUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.brand.exception.DuplicatedBrandNameException;
 import com.jinddung2.givemeticon.domain.brand.exception.EmptyBrandListException;
-import com.jinddung2.givemeticon.domain.brand.exception.NoBrandForCategoryException;
 import com.jinddung2.givemeticon.domain.brand.exception.NotFoundBrandException;
 import com.jinddung2.givemeticon.domain.brand.mapper.BrandMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,6 +102,7 @@ class BrandServiceTest {
     @Test
     @DisplayName("카테고리에 해당하는 브랜드들 조회에 성공한다.")
     void get_Brands_By_CategoryId() {
+
         when(brandMapper.countBrandByCategoryId(categoryId)).thenReturn(pageSize);
         Mockito.when(brandMapper.findAllByCategory(params)).thenReturn(brandList);
 
@@ -114,18 +114,12 @@ class BrandServiceTest {
     @Test
     @DisplayName("페이지에 해당하는 브랜드 데이터가 없어 브랜드 다건조회에 실패한다.")
     void get_Brands_By_CategoryId_Fail_No_Data() {
+
         when(brandMapper.countBrandByCategoryId(categoryId)).thenReturn(pageSize);
         Mockito.when(brandMapper.findAllByCategory(params)).thenReturn(Collections.emptyList());
 
         assertThrows(EmptyBrandListException.class, () -> brandService.getBrands(categoryId, page));
-    }
 
-    @Test
-    @DisplayName("카테리고에 해당하는 브랜드가 없어 조회에 실패한다.")
-    void get_Brands_By_CategoryId_Fail_No_Brand() {
-        when(brandMapper.countBrandByCategoryId(categoryId)).thenReturn(0);
-
-        assertThrows(NoBrandForCategoryException.class, () -> brandService.getBrands(categoryId, page));
     }
 
     @Test

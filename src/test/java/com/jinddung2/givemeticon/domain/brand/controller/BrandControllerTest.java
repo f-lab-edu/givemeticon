@@ -3,13 +3,12 @@ package com.jinddung2.givemeticon.domain.brand.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.BrandDto;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.request.BrandCreateRequest;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.request.BrandUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.brand.domain.Brand;
-import com.jinddung2.givemeticon.domain.brand.dto.BrandDto;
-import com.jinddung2.givemeticon.domain.brand.dto.request.BrandCreateRequest;
-import com.jinddung2.givemeticon.domain.brand.dto.request.BrandUpdateNameRequest;
 import com.jinddung2.givemeticon.domain.brand.exception.DuplicatedBrandNameException;
 import com.jinddung2.givemeticon.domain.brand.exception.EmptyBrandListException;
-import com.jinddung2.givemeticon.domain.brand.exception.NoBrandForCategoryException;
 import com.jinddung2.givemeticon.domain.brand.exception.NotFoundBrandException;
 import com.jinddung2.givemeticon.domain.brand.service.BrandService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
@@ -95,24 +94,6 @@ class BrandControllerTest {
     }
 
     @Test
-    @DisplayName("카테고리에 해당하는 브랜드가 없어 실패한다.")
-    void brand_Get_By_CategoryId_Fail_No_Brand() throws Exception {
-        int categoryId = 101;
-        int page = 0;
-        Mockito.doThrow(new NoBrandForCategoryException()).when(brandService).getBrands(categoryId, page);
-        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .get("/api/v1/brands/category/" + categoryId)
-                        .param("page", String.valueOf(page))
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
-
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("카테고리에 해당하는 브랜드가 없습니다."));
-    }
-
-    @Test
     @DisplayName("페이지에 해당하는 브랜드가 없어 실패한다.")
     void brand_Get_By_CategoryId_Fail_No_Data() throws Exception {
         int categoryId = 101;
@@ -128,6 +109,7 @@ class BrandControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("FAIL"))
                 .andExpect(jsonPath("$.data.message").value("해당 페이지에 해당하는 브랜드가 없습니다."));
+
     }
 
     @Test

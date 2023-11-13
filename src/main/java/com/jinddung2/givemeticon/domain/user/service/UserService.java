@@ -1,10 +1,10 @@
 package com.jinddung2.givemeticon.domain.user.service;
 
+import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordUpdateRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.domain.UserRole;
-import com.jinddung2.givemeticon.domain.user.dto.UserDto;
-import com.jinddung2.givemeticon.domain.user.dto.request.PasswordUpdateRequest;
-import com.jinddung2.givemeticon.domain.user.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.exception.*;
 import com.jinddung2.givemeticon.domain.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -34,9 +34,23 @@ public class UserService {
         return user.getId();
     }
 
+    public User getUser(int userId) {
+        return userMapper.findById(userId)
+                .orElseThrow(NotFoundUserException::new);
+    }
+
+    public User getUser(String email) {
+        return userMapper.findByEmail(email)
+                .orElseThrow(NotFoundEmailException::new);
+    }
+
     public UserDto getUserInfo(int userId) {
         User user = getUser(userId);
         return UserDto.of(user);
+    }
+
+    public boolean isExists(int userId) {
+        return userMapper.existsById(userId);
     }
 
     public UserDto checkLogin(String email, String password) {
@@ -76,11 +90,6 @@ public class UserService {
         userMapper.updatePassword(user.getId(), encryptedPassword);
     }
 
-    private User getUser(int userId) {
-        return userMapper.findById(userId)
-                .orElseThrow(NotFoundUserException::new);
-    }
-
     private void checkUserValidity(SignUpRequest request) {
         if (userMapper.existsByEmail(request.getEmail())) {
             throw new DuplicatedEmailException();
@@ -89,10 +98,5 @@ public class UserService {
         if (userMapper.existsByPhone(request.getPhone())) {
             throw new DuplicatedPhoneException();
         }
-    }
-
-    private User getUser(String email) {
-        return userMapper.findByEmail(email)
-                .orElseThrow(NotFoundEmailException::new);
     }
 }

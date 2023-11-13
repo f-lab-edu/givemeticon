@@ -2,25 +2,23 @@ package com.jinddung2.givemeticon.domain.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.security.provider.JwtTokenProvider;
-import com.jinddung2.givemeticon.domain.account.dto.request.CreateAccountRequest;
 import com.jinddung2.givemeticon.domain.account.exception.DuplicatedAccountNumberException;
+import com.jinddung2.givemeticon.domain.account.request.CreateAccountRequest;
 import com.jinddung2.givemeticon.domain.mail.service.MailSendService;
-import com.jinddung2.givemeticon.domain.user.dto.UserDto;
-import com.jinddung2.givemeticon.domain.user.dto.request.LoginRequest;
-import com.jinddung2.givemeticon.domain.user.dto.request.PasswordResetRequest;
-import com.jinddung2.givemeticon.domain.user.dto.request.PasswordUpdateRequest;
-import com.jinddung2.givemeticon.domain.user.dto.request.SignUpRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.LoginRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordResetRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordUpdateRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.domain.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.domain.user.exception.MisMatchPasswordException;
 import com.jinddung2.givemeticon.domain.user.exception.NotFoundUserException;
-import com.jinddung2.givemeticon.domain.user.presentation.UserController;
-import com.jinddung2.givemeticon.domain.user.presentation.facade.CreateAccountFacade;
-import com.jinddung2.givemeticon.domain.user.presentation.facade.PasswordResetFacade;
+import com.jinddung2.givemeticon.domain.user.facade.CreateAccountFacade;
+import com.jinddung2.givemeticon.domain.user.facade.PasswordResetFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,16 +30,16 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
-import java.util.Optional;
-
+import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(UserController.class)
+@WebMvcTest(value = UserController.class)
 public class UserControllerTest {
 
     @Autowired
@@ -61,7 +59,6 @@ public class UserControllerTest {
     @MockBean
     CreateAccountFacade createAccountFacade;
 
-    @MockBean
     MockHttpSession mockHttpSession;
     SignUpRequest signUpRequest;
     LoginRequest loginRequest;
@@ -74,19 +71,20 @@ public class UserControllerTest {
     void setUp() {
         signUpRequest = new SignUpRequest("test1234@example.com", "test1234", "01012345678");
         loginRequest = new LoginRequest("test1234@example.com", "test1234");
+        int fakeUserId = 100;
         userDto = UserDto.builder()
+                .id(fakeUserId)
                 .email("test1234@example.com")
                 .password("test1234")
                 .build();
         mockHttpSession = new MockHttpSession();
+        mockHttpSession.setAttribute(LOGIN_USER, fakeUserId);
         passwordUpdateRequest = new PasswordUpdateRequest("test1234", "newtest1234");
         passwordResetRequest = new PasswordResetRequest("test1234@example.com");
         createAccountRequest = new CreateAccountRequest("testHolder", "0000", "testBank", "000101");
-        when(loginService.getLoginUser()).thenReturn(Optional.of(userDto.getEmail()));
     }
 
     @Test
-    @DisplayName("회원 가입에 성공한다.")
     void signUp_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/sign-up")
@@ -99,7 +97,6 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("이메일 중븍으로 회원가입에 실패한다.")
     void signUp_Fail_Duplicate_Email() throws Exception {
         doThrow(new DuplicatedEmailException()).when(userService).signUp(signUpRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -114,7 +111,6 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("핸드폰 번호 중복으로 회원가입에 실패한다.")
     void signUp_Fail_Duplicate_Phone() throws Exception {
         doThrow(new DuplicatedPhoneException()).when(userService).signUp(signUpRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -130,11 +126,9 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("유저 상세 정보 조회에 성공한다.")
     void get_UserInfo_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
-                        .get("/api/v1/users/1/info")
-                        .param("email", loginRequest.getEmail())
+                        .get("/api/v1/users/info")
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(signUpRequest)))
@@ -142,16 +136,15 @@ public class UserControllerTest {
                 .andExpect(status().isOk());
 
         // Verify
-        Mockito.verify(userService).getUserInfo(1);
+        Mockito.verify(userService).getUserInfo(userDto.getId());
     }
 
     @Test
-    @DisplayName("유저가 존재하지 않아 상세 정보 조회에 실패한다.")
     void get_UserInfo_Fail_Not_Exists() throws Exception {
-        doThrow(new NotFoundUserException()).when(userService).getUserInfo(1);
+        doThrow(new NotFoundUserException()).when(userService).getUserInfo(userDto.getId());
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .get("/api/v1/users/1/info")
+                        .get("/api/v1/users/info")
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
@@ -164,7 +157,6 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("로그인에 성공한다.")
     void login_Success() throws Exception {
         given(userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword())).willReturn(userDto);
         mockMvc.perform(MockMvcRequestBuilders
@@ -174,11 +166,10 @@ public class UserControllerTest {
                 .andExpect(status().isOk());
 
         // Verify
-        Mockito.verify(loginService).login(loginRequest.getEmail());
+        Mockito.verify(loginService).login(userDto.getId());
     }
 
     @Test
-    @DisplayName("로그아웃에 성공한다.")
     void logout_Success() throws Exception {
         willDoNothing().given(loginService).logout();
         mockMvc.perform(MockMvcRequestBuilders
@@ -193,26 +184,24 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("비밀번호 변경에 성공한다.")
     void update_Password_Success() throws Exception {
-        doNothing().when(userService).updatePassword(1, passwordUpdateRequest);
+        doNothing().when(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
         mockMvc.perform(MockMvcRequestBuilders
-                        .patch("/api/v1/users/1/password")
+                        .patch("/api/v1/users/password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
                 .andExpect(status().isOk());
 
         // Verify
-        Mockito.verify(userService).updatePassword(1, passwordUpdateRequest);
+        Mockito.verify(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
     }
 
     @Test
-    @DisplayName("유저가 존재하지 않아 비밀번호 변경에 실패한다.")
     void update_Password_Fail_Not_Exists_User() throws Exception {
-        doThrow(new NotFoundUserException()).when(userService).updatePassword(1, passwordUpdateRequest);
+        doThrow(new NotFoundUserException()).when(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .patch("/api/v1/users/1/password")
+                        .patch("/api/v1/users/password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
@@ -226,11 +215,10 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("이전 비밀번호가 맞지 않아 비밀번호 변경에 실패한다.")
     void update_Password_MisMatch_Password() throws Exception {
-        doThrow(new MisMatchPasswordException()).when(userService).updatePassword(1, passwordUpdateRequest);
+        doThrow(new MisMatchPasswordException()).when(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .patch("/api/v1/users/1/password")
+                        .patch("/api/v1/users/password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
@@ -245,7 +233,6 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("비밀번호 변경을 위한 임시 비밀번호 발급에 성공한다.")
     void send_Temporary_Password() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .put("/api/v1/users/reset-password")
@@ -259,10 +246,9 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("계좌 등록에 성공하여 판매자 등록에 성공한다.")
     void create_Account_Link_User_Account_Id_Fail() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
-                        .post("/api/v1/users/" + userDto.getId() + "/account")
+                        .post("/api/v1/users/account")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
@@ -273,12 +259,11 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("중복된 계좌번호로 인해 판매자 등록에 실패한다.")
     void create_Account_Fail_Duplicated_Account_Number() throws Exception {
         doThrow(new DuplicatedAccountNumberException())
                 .when(createAccountFacade).createAccount(userDto.getId(), createAccountRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .post("/api/v1/users/" + userDto.getId() + "/account")
+                        .post("/api/v1/users/account")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))

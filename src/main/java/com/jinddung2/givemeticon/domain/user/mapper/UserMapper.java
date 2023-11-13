@@ -15,6 +15,8 @@ public interface UserMapper {
 
     Optional<User> findByEmail(String email);
 
+    boolean existsById(int id);
+
     boolean existsByEmail(String email);
 
     boolean existsByPhone(String phone);

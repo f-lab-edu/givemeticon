@@ -5,6 +5,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -18,7 +19,7 @@ public class Sale {
     private String barcode;
     private LocalDate expirationDate;
     private boolean isBought;
-    private LocalDate isBoughtDate;
+    private Date isBoughtDate;
     private LocalDateTime createdDate;
     private LocalDateTime updatedDate;
     private LocalDateTime deletedDate;
@@ -30,7 +31,7 @@ public class Sale {
                 String barcode,
                 LocalDate expirationDate,
                 boolean isBought,
-                LocalDate isBoughtDate,
+                Date isBoughtDate,
                 LocalDateTime createdDate,
                 LocalDateTime updatedDate,
                 LocalDateTime deletedDate
@@ -53,5 +54,10 @@ public class Sale {
 
     public void updateSellerId(int sellerId) {
         this.sellerId = sellerId;
+    }
+
+    public void updateBoughtState() {
+        this.isBought = true;
+        this.isBoughtDate = Date.valueOf(LocalDate.now());
     }
 }

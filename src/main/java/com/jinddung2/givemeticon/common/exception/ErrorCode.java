@@ -19,7 +19,6 @@ public enum ErrorCode {
     // BRAND
     DUPLICATED_BRAND_NAME("이미 존재하는 브랜드입니다."),
     NOT_FOUND_BRAND("존재하지 않는 브랜드입니다."),
-    NO_BRANDS_FOR_CATEGORY("카테고리에 해당하는 브랜드가 없습니다."),
     PAGE_NUMBER_HAS_EMPTY_BRAND("해당 페이지에 해당하는 브랜드가 없습니다."),
 
     // CATEGORY
@@ -34,7 +33,11 @@ public enum ErrorCode {
     NOT_FOUND_SALE("존재하지 않는 판매 상품입니다."),
     NOT_REGISTER_ACCOUNT("판매자 등록이 되어 있지 않습니다."),
     EXPIRED_DATE("유효기간이 이미 지났습니다."),
-    DUPLICATED_BARCODE_NUMBER("이미 등록된 바코드 입니다.");
+    DUPLICATED_BARCODE_NUMBER("이미 등록된 바코드 입니다."),
+
+    // Trade
+    INVALID_DISCOUNT_RATE("할인율은 0 이상 1 이하여야 합니다."),
+    ALREADY_BOUGHT_SALE("이미 구매된 상품 입니다.");
 
     private final String message;
 

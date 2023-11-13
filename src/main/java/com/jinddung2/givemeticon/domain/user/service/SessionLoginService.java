@@ -4,8 +4,6 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
-
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 
 @Service
@@ -15,8 +13,8 @@ public class SessionLoginService implements LoginService {
     private final HttpSession session;
 
     @Override
-    public void login(String email) {
-        session.setAttribute(LOGIN_USER, email);
+    public void login(int id) {
+        session.setAttribute(LOGIN_USER, id);
     }
 
     @Override
@@ -25,7 +23,7 @@ public class SessionLoginService implements LoginService {
     }
 
     @Override
-    public Optional<String> getLoginUser() {
-        return Optional.ofNullable((String) session.getAttribute(LOGIN_USER));
+    public int getLoginUserId() {
+        return (int) session.getAttribute(LOGIN_USER);
     }
 }

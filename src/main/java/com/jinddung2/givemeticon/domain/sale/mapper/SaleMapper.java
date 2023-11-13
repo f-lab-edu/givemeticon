@@ -11,9 +11,11 @@ public interface SaleMapper {
 
     int save(Sale itemVariant);
 
+    void update(Sale sale);
+
     boolean existsByBarcode(String barcode);
 
     Optional<Sale> findById(int saleId);
 
-    List<Sale> findSalesByItemId(int itemId);
+    List<Sale> findNotBoughtSalesByItemId(int itemId);
 }

@@ -7,7 +7,7 @@ import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.sale.validator.SaleCreateValidator;
-import com.jinddung2.givemeticon.domain.user.dto.UserDto;
+import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,13 +32,13 @@ class SaleCreationFacadeTest {
     @Mock
     UserService userService;
     @Mock
-    SaleService itemVariantService;
+    SaleService saleService;
     @Mock
     SaleCreateValidator saleCreateValidator;
     UserDto userDto;
 
     SaleCreateRequest saleCreateRequest;
-    Sale itemVariant;
+    Sale sale;
     int itemId;
     int sellerId;
 
@@ -50,7 +50,7 @@ class SaleCreationFacadeTest {
         itemId = 1;
         sellerId = 1;
 
-        itemVariant = Sale.builder()
+        sale = Sale.builder()
                 .barcode(saleCreateRequest.barcode())
                 .expirationDate(saleCreateRequest.expirationDate())
                 .build();
@@ -58,7 +58,7 @@ class SaleCreationFacadeTest {
 
     @Test
     @DisplayName("판매할 아이템 생성에 성공한다.")
-    void create_Item_Variant_Success() {
+    void create_Sale_Success() {
         userDto = UserDto.builder()
                 .accountId(1)
                 .build();
@@ -69,14 +69,13 @@ class SaleCreationFacadeTest {
         saleCreationFacade.createSale(itemId, sellerId, saleCreateRequest);
 
         Mockito.verify(saleCreateValidator).validate(saleCreateRequest);
-        Mockito.verify(itemVariantService).validateDuplicateBarcode(saleCreateRequest.barcode());
 
-        Mockito.verify(itemVariantService).save(itemId, sellerId, saleCreateRequest);
+        Mockito.verify(saleService).save(itemId, sellerId, saleCreateRequest);
     }
 
     @Test
     @DisplayName("전시용 아이템이 존재하지 않아 판매할 아이템 생성에 실패한다.")
-    void create_Item_Variant_Fail_Not_Found_Item() {
+    void create_Sale_Fail_Not_Found_Item() {
         Mockito.when(itemService.isExists(itemId)).thenReturn(false);
 
         Assertions.assertThrows(NotFoundItemException.class,
@@ -85,7 +84,7 @@ class SaleCreationFacadeTest {
 
     @Test
     @DisplayName("계좌 등록이 되어 있지 않아서 판매할 아이템 생성에 실패한다.")
-    void create_Item_Variant_Fail_NOT_REGISTER_ACCOUNT() {
+    void create_Sale_Fail_NOT_REGISTER_ACCOUNT() {
         userDto = UserDto.builder()
                 .accountId(0)
                 .build();

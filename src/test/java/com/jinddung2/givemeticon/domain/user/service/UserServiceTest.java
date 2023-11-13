@@ -1,10 +1,10 @@
 package com.jinddung2.givemeticon.domain.user.service;
 
+import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.LoginRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordUpdateRequest;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.domain.User;
-import com.jinddung2.givemeticon.domain.user.dto.UserDto;
-import com.jinddung2.givemeticon.domain.user.dto.request.LoginRequest;
-import com.jinddung2.givemeticon.domain.user.dto.request.PasswordUpdateRequest;
-import com.jinddung2.givemeticon.domain.user.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.domain.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.domain.user.exception.MisMatchPasswordException;
@@ -69,6 +69,24 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("해당 유저의 id가 존재하는지 확인한다.")
+    void exists_By_Id_True() {
+        when(userMapper.existsById(userDto.getId())).thenReturn(true);
+
+        boolean exists = userService.isExists(userDto.getId());
+        Assertions.assertTrue(exists);
+    }
+
+    @Test
+    @DisplayName("해당 유저의 id가 존재하지 않는다.")
+    void exists_By_Id_False() {
+        when(userMapper.existsById(userDto.getId())).thenReturn(false);
+
+        boolean exists = userService.isExists(userDto.getId());
+        Assertions.assertFalse(exists);
+    }
+
+    @Test
     @DisplayName("이메일 중복으로 회원가입에 실패한다")
     void signUp_Fail_DuplicateEmail() {
         when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(true);
@@ -97,7 +115,7 @@ class UserServiceTest {
     void get_User_Fail_Not_Exists_Email() {
         when(userMapper.findById(testUser.getId())).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundUserException.class, () -> userService.getUserInfo(testUser.getId()));
+        assertThrows(NotFoundUserException.class, () -> userService.getUser(testUser.getId()));
     }
 
     @Test
