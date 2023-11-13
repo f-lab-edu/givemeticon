@@ -62,4 +62,4 @@ jobs:
             done
             docker image prune -a -f
             docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
-            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }}/back -d ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
+            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }}_back -d ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
