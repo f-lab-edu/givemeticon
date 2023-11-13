@@ -42,10 +42,6 @@ public class Trade {
     }
 
     public void buyConfirmation() {
-        this.isUsed = true;
-    }
-
-    public void cancelBuyConfirmation() {
-        this.isUsed = false;
+        this.isUsed = !isUsed;
     }
 }

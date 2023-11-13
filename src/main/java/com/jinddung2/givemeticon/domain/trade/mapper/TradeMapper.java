@@ -18,5 +18,5 @@ public interface TradeMapper {
                                      @Param("orderByBoughtDate") boolean orderByBoughtDate,
                                      @Param("orderByExpiredDate") boolean orderByExpiredDate);
 
-    void updateIsUsedTrue(int id);
+    void updateIsUsedAndIsUsedDate(int id);
 }

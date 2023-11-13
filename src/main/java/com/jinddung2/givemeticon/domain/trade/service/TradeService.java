@@ -1,7 +1,6 @@
 package com.jinddung2.givemeticon.domain.trade.service;
 
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
-import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtConfirmationException;
 import com.jinddung2.givemeticon.domain.trade.exception.NotFoundTradeException;
 import com.jinddung2.givemeticon.domain.trade.exception.NotMatchBuyOwnership;
 import com.jinddung2.givemeticon.domain.trade.mapper.TradeMapper;
@@ -47,15 +46,10 @@ public class TradeService {
 
     public void buyConfirmation(int tradeId, int buyerId) {
         Trade trade = getTrade(tradeId);
-
-        if (trade.isUsed()) {
-            throw new AlreadyBoughtConfirmationException();
-        }
-
         verifyBuyOwnership(buyerId, trade);
 
         trade.buyConfirmation();
-        tradeMapper.updateIsUsedTrue(tradeId);
+        tradeMapper.updateIsUsedAndIsUsedDate(tradeId);
     }
 
     private void verifyBuyOwnership(int buyerId, Trade trade) {

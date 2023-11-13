@@ -63,9 +63,16 @@
         OFFSET #{pageInfo.offset}
     </select>
 
-    <update id="updateIsUsedTrue" parameterType="int">
+    <update id="updateIsUsedAndIsUsedDate" parameterType="int">
         UPDATE trade
-        SET is_used = true
+        SET is_used      = CASE
+                               WHEN is_used = 0 THEN 1
+                               ELSE 0
+            END,
+            is_used_date = CASE
+                               WHEN is_used = 1 THEN NOW()
+                               ELSE NULL
+                END
         WHERE id = #{id};
     </update>
 
