@@ -1,7 +1,6 @@
 package com.jinddung2.givemeticon.domain.trade.service;
 
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
-import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtConfirmationException;
 import com.jinddung2.givemeticon.domain.trade.exception.NotFoundTradeException;
 import com.jinddung2.givemeticon.domain.trade.exception.NotMatchBuyOwnership;
 import com.jinddung2.givemeticon.domain.trade.mapper.TradeMapper;
@@ -131,18 +130,20 @@ class TradeServiceTest {
 
         tradeService.buyConfirmation(trade.getId(), buyerId);
 
-        Mockito.verify(tradeMapper).updateIsUsedTrue(trade.getId());
+        Mockito.verify(tradeMapper).updateIsUsedAndIsUsedDate(trade.getId());
         Assertions.assertTrue(trade.isUsed());
     }
 
     @Test
-    @DisplayName("이미 구매 확정인 상태라서 구매 확정에 실패한다.")
+    @DisplayName("이미 구매 확정인 상태라서 구매 확정을 취소한다.")
     void buy_Confirmation_Fail_Already_Buy_Confirmation() {
-        Trade fakeTrade = Trade.builder().isUsed(true).build();
+        Trade fakeTrade = Trade.builder().isUsed(true).buyerId(buyerId).build();
         Mockito.when(tradeMapper.findById(tradeId)).thenReturn(Optional.of(fakeTrade));
 
-        Assertions.assertThrows(AlreadyBoughtConfirmationException.class,
-                () -> tradeService.buyConfirmation(trade.getId(), buyerId));
+        tradeService.buyConfirmation(trade.getId(), buyerId);
+
+        Mockito.verify(tradeMapper).updateIsUsedAndIsUsedDate(trade.getId());
+        Assertions.assertFalse(trade.isUsed());
     }
 
     @Test
