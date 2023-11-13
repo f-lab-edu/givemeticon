@@ -62,4 +62,13 @@ public class TradeController {
         return new ResponseEntity<>(ApiResponse.success(tradeDtoPage), HttpStatus.OK);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> buyConfirmation(
+            @PathVariable("id") int tradeId,
+            @SessionAttribute(name = LOGIN_USER) int buyerId
+    ) {
+        tradeSaleItemUserFacade.buyConfirmation(tradeId, buyerId);
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
+    }
+
 }

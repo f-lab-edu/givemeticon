@@ -38,7 +38,9 @@ public enum ErrorCode {
     // Trade
     INVALID_DISCOUNT_RATE("할인율은 0 이상 1 이하여야 합니다."),
     ALREADY_BOUGHT_SALE("이미 구매된 상품 입니다."),
-    NOT_FOUND_TRADE("존재하지 않은 거래번호 입니다.");
+    ALREADY_BOUGHT_CONFIRMATION("이미 구매 확정된 상품 입니다."),
+    NOT_FOUND_TRADE("존재하지 않은 거래번호 입니다."),
+    INVALID_BUY_OWNER("구매하신 사용자가 아닙니다.");
 
     private final String message;
 

@@ -63,4 +63,10 @@
         OFFSET #{pageInfo.offset}
     </select>
 
+    <update id="updateIsUsedTrue" parameterType="int">
+        UPDATE trade
+        SET is_used = true
+        WHERE id = #{id};
+    </update>
+
 </mapper>
