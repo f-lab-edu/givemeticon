@@ -3,7 +3,7 @@ package com.jinddung2.givemeticon.domain.trade.service;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtConfirmationException;
 import com.jinddung2.givemeticon.domain.trade.exception.NotFoundTradeException;
-import com.jinddung2.givemeticon.domain.trade.exception.NotMathBuyOwnership;
+import com.jinddung2.givemeticon.domain.trade.exception.NotMatchBuyOwnership;
 import com.jinddung2.givemeticon.domain.trade.mapper.TradeMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -60,7 +60,7 @@ public class TradeService {
 
     private void verifyBuyOwnership(int buyerId, Trade trade) {
         if (trade.getBuyerId() != buyerId) {
-            throw new NotMathBuyOwnership();
+            throw new NotMatchBuyOwnership();
         }
     }
 }
