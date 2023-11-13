@@ -144,7 +144,7 @@ class TradeSaleItemUserFacadeTest {
         Item item3 = Item.builder().id(itemId).price(itemPrice).build();
 
         Mockito.when(itemService.getItem(Mockito.anyInt())).thenReturn(item, item2, item3);
-        
+
         List<TradeDto> result = tradeSaleItemUserFacade.getUnusedTradeHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
 
         Assertions.assertEquals(3, result.size());
@@ -152,5 +152,15 @@ class TradeSaleItemUserFacadeTest {
         Mockito.verify(tradeService, Mockito.times(1)).getMyUnusedItemHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
         Mockito.verify(saleService, Mockito.times(3)).getSale(Mockito.anyInt());
         Mockito.verify(itemService, Mockito.times(3)).getItem(Mockito.anyInt());
+    }
+
+    @Test
+    @DisplayName("구매 확정에 성공한다.")
+    void buy_Confirmation() {
+        Mockito.when(userService.isExists(buyerId)).thenReturn(true);
+
+        tradeSaleItemUserFacade.buyConfirmation(tradeId, buyerId);
+        
+        Mockito.verify(tradeService).buyConfirmation(tradeId, buyerId);
     }
 }
