@@ -37,15 +37,13 @@ jobs:
       # Docker build & Push
       - name: Build and Push docker image to Docker Hub
         env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-          REPOSITORY: givemeticon-api-server
-          REGISTRY: ${{ secrets.DOCKER_REPO }}
+          REGISTRY: ${{ secrets.DOCKER_USERNAME }}
+          REPOSITORY: ${{ secrets.DOCKER_REPO }}
           IMAGE_TAG: latest
         run: |
-          docker login -u $DOCKER_USERNAME -p --password-stdin < $DOCKER_PASSWORD
-          docker build -t $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG .
-          docker push $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG
+          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
 
       # 서버에서 Docker 이미지 실행
       - name: Deploy
@@ -56,12 +54,12 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           # 도커 작업
           script: |
-            sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p --password-stdin < $DOCKER_PASSWORD
-            ids=$(sudo docker ps -a -q --filter "name=$DOCKER_USERNAME/$REPOSITORY")
+            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+            ids=$(sudo docker ps -a -q --filter "name=$back")
             for id in $ids
             do
               sudo docker stop $id && docker rm $id
             done
             docker image prune -a -f
-            docker pull $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG
-            docker run -p 8080:8080 --name $DOCKER_USERNAME/$REPOSITORY -d $DOCKER_USERNAME/$REPOSITORY:$IMAGE_TAG
+            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
+            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }}_back -d ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
