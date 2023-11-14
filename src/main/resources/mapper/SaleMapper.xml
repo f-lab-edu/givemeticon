@@ -5,6 +5,7 @@
 <mapper namespace="com.jinddung2.givemeticon.domain.sale.mapper.SaleMapper">
 
     <resultMap id="saleResultMap" type="Sale">
+        <result property="id" column="id"/>
         <result property="itemId" column="item_id"/>
         <result property="sellerId" column="seller_id"/>
         <result property="expirationDate" column="expiration_date"/>
@@ -100,5 +101,21 @@
                created_date
         FROM sale
         WHERE seller_id = #{userId}
+    </select>
+
+    <select id="findMySales" resultType="java.util.List" resultMap="saleResultMap">
+        SELECT id,
+               item_id,
+               seller_id,
+               barcode,
+               expiration_date,
+               is_bought,
+               is_bought_date,
+               created_date
+        FROM sale
+        WHERE seller_id = #{pageInfo.id}
+        ORDER BY id DESC
+            LIMIT #{pageInfo.pageSize}
+        OFFSET #{pageInfo.offset}
     </select>
 </mapper>
