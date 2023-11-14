@@ -136,6 +136,20 @@ class SaleServiceTest {
         List<SaleDto> result = saleService.getAvailableSalesForItem(item);
 
         Assertions.assertEquals(3, result.size());
+    }
 
+    @Test
+    @DisplayName("내 판매목록을 조회한다.")
+    void get_My_Sales() {
+        int userId = 1;
+        List<Sale> sales = List.of(
+                Sale.builder().sellerId(userId).expirationDate(LocalDate.now().plusDays(1)).build(),
+                Sale.builder().sellerId(userId).expirationDate(LocalDate.now().plusDays(1)).build(),
+                Sale.builder().sellerId(userId).expirationDate(LocalDate.now().plusDays(1)).build());
+        Mockito.when(saleMapper.findMySalesBySellerId(userId)).thenReturn(sales);
+
+        List<Sale> result = saleService.getMySales(userId);
+
+        Assertions.assertEquals(3, result.size());
     }
 }

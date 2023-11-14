@@ -87,13 +87,34 @@ class TradeServiceTest {
 
     @Test
     @DisplayName("거래 단건조회에 성공한다.")
-    void get_Trade_ById() {
+    void get_Trade_By_Id() {
         Mockito.when(tradeMapper.findById(trade.getId())).thenReturn(Optional.of(trade));
 
         Trade result = tradeService.getTrade(trade.getId());
 
         Assertions.assertEquals(trade.getId(), result.getId());
         Assertions.assertEquals(trade.getTradePrice(), result.getTradePrice());
+    }
+
+    @Test
+    @DisplayName("판매자 id가 일치하는 거래 단건조회에 성공한다.")
+    void get_Trade_By_SaleId() {
+        Mockito.when(tradeMapper.findBySaleId(trade.getSaleId())).thenReturn(Optional.of(trade));
+
+        Optional<Trade> result = tradeService.getTradeBySaleId(trade.getSaleId());
+
+        Assertions.assertTrue(result.isPresent());
+        Assertions.assertFalse(result.get().isUsed());
+    }
+
+    @Test
+    @DisplayName("판매자 id가 일치하는 거래 단건조회 했는데 데이터가 없다.")
+    void get_Trade_By_SaleId_Not_Found_Trade() {
+        Mockito.when(tradeMapper.findBySaleId(trade.getSaleId())).thenReturn(Optional.empty());
+
+        Optional<Trade> result = tradeService.getTradeBySaleId(trade.getSaleId());
+
+        Assertions.assertTrue(result.isEmpty());
     }
 
     @Test

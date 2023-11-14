@@ -11,6 +11,7 @@ import com.jinddung2.givemeticon.domain.sale.exception.NotFoundSaleException;
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleItemFacade;
+import com.jinddung2.givemeticon.domain.sale.facade.SaleTradeFacade;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +57,9 @@ class SaleControllerTest {
 
     @MockBean
     SaleItemFacade saleItemFacade;
+
+    @MockBean
+    SaleTradeFacade saleTradeFacade;
     MockHttpSession mockHttpSession;
 
     SaleCreateRequest saleCreateRequest;
@@ -235,5 +239,17 @@ class SaleControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("FAIL"))
                 .andExpect(jsonPath("$.data.message").value("존재하지 않는 아이템입니다."));
+    }
+
+    @Test
+    @DisplayName("내 판매금액 조회에 성공한다.")
+    void get_Total_Amount_For_Sales() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get(String.format("%s/my/total-amount", defaultUrl))
+                        .session(mockHttpSession)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        Mockito.verify(saleTradeFacade).getTotalAmountForSales((int) mockHttpSession.getAttribute(LOGIN_USER));
     }
 }
