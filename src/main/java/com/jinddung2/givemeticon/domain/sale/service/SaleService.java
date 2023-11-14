@@ -72,4 +72,8 @@ public class SaleService {
                 .map(SaleDto::of)
                 .collect(Collectors.toList());
     }
+
+    public List<Sale> getMySales(int userId) {
+        return saleMapper.findMySalesBySellerId(userId);
+    }
 }

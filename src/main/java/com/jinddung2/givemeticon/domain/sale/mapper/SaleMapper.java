@@ -18,4 +18,6 @@ public interface SaleMapper {
     Optional<Sale> findById(int saleId);
 
     List<Sale> findNotBoughtSalesByItemId(int itemId);
+
+    List<Sale> findMySalesBySellerId(int userId);
 }
