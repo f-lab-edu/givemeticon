@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 class TradeTest {
 
     Trade trade = Trade.builder()
-            .salePrice(BigDecimal.valueOf(10000))
+            .tradePrice(BigDecimal.valueOf(10000))
             .build();
 
     @Test

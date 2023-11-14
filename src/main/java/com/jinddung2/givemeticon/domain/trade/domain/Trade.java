@@ -15,17 +15,17 @@ public class Trade {
     private int id;
     private int buyerId;
     private int saleId;
-    private BigDecimal salePrice;
+    private BigDecimal tradePrice;
     private boolean isUsed;
     private LocalDate isUsedDate;
     private LocalDate createdDate;
 
     @Builder
-    public Trade(int id, int buyerId, int saleId, BigDecimal salePrice, boolean isUsed, LocalDate isUsedDate, LocalDate createdDate) {
+    public Trade(int id, int buyerId, int saleId, BigDecimal tradePrice, boolean isUsed, LocalDate isUsedDate, LocalDate createdDate) {
         this.id = id;
         this.buyerId = buyerId;
         this.saleId = saleId;
-        this.salePrice = salePrice;
+        this.tradePrice = tradePrice;
         this.isUsed = isUsed;
         this.isUsedDate = isUsedDate;
         this.createdDate = createdDate;
@@ -36,8 +36,8 @@ public class Trade {
             throw new InvalidDiscountRateException();
         }
 
-        BigDecimal discountPrice = salePrice.multiply(BigDecimal.valueOf(discountRate))
+        BigDecimal discountPrice = tradePrice.multiply(BigDecimal.valueOf(discountRate))
                 .setScale(0, RoundingMode.HALF_UP);
-        this.salePrice = salePrice.subtract(discountPrice);
+        this.tradePrice = tradePrice.subtract(discountPrice);
     }
 }
