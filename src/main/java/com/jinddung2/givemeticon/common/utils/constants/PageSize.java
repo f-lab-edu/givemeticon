@@ -4,7 +4,7 @@ import lombok.Getter;
 
 @Getter
 public enum PageSize {
-    Item(9),
+    ITEM(9),
     TRADE(6);
 
     private final int size;
