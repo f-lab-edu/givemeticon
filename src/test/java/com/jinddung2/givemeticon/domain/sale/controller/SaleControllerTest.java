@@ -11,6 +11,7 @@ import com.jinddung2.givemeticon.domain.sale.exception.NotFoundSaleException;
 import com.jinddung2.givemeticon.domain.sale.exception.NotRegistrSellerException;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleCreationFacade;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleItemFacade;
+import com.jinddung2.givemeticon.domain.sale.facade.SaleItemTradeFacade;
 import com.jinddung2.givemeticon.domain.sale.facade.SaleTradeFacade;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
@@ -57,6 +58,9 @@ class SaleControllerTest {
 
     @MockBean
     SaleItemFacade saleItemFacade;
+
+    @MockBean
+    SaleItemTradeFacade saleItemTradeFacade;
 
     @MockBean
     SaleTradeFacade saleTradeFacade;
@@ -251,5 +255,18 @@ class SaleControllerTest {
                 .andExpect(status().isOk());
 
         Mockito.verify(saleTradeFacade).getTotalAmountForSales((int) mockHttpSession.getAttribute(LOGIN_USER));
+    }
+
+    @Test
+    @DisplayName("내 판매목록 중 사용된 상품들을 조회한다.")
+    void get_Confirmed_Sales_() throws Exception {
+        int page = 0;
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get(String.format("%s/my", defaultUrl))
+                        .session(mockHttpSession)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        Mockito.verify(saleItemTradeFacade).getConfirmedSalesBySellerId((int) mockHttpSession.getAttribute(LOGIN_USER), page);
     }
 }

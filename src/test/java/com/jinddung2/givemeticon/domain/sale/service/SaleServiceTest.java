@@ -22,8 +22,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import static com.jinddung2.givemeticon.common.utils.PaginationUtil.makePagingParamMap;
+import static com.jinddung2.givemeticon.common.utils.constants.PageSize.SALE;
 import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,14 +38,13 @@ class SaleServiceTest {
     SaleMapper saleMapper;
 
     SaleCreateRequest saleCreateRequest;
-    int itemId;
-    int sellerId;
-    int saleId;
+    int itemId, sellerId, saleId, page;
     Sale sale;
     Item item;
 
     @BeforeEach
     void setUp() {
+        page = 0;
         saleCreateRequest = new SaleCreateRequest("123412341234",
                 LocalDate.of(2099, 12, 31));
 
@@ -150,6 +152,22 @@ class SaleServiceTest {
 
         List<Sale> result = saleService.getMySales(userId);
 
-        Assertions.assertEquals(3, result.size());
+        Assertions.assertEquals(sales.size(), result.size());
+    }
+
+    @Test
+    @DisplayName("내 판매목록을 페이징 처리해서 조회한다.")
+    void get_My_Sales_With_page() {
+        int userId = 1;
+        List<Sale> sales = List.of(
+                Sale.builder().sellerId(userId).expirationDate(LocalDate.now().plusDays(1)).build(),
+                Sale.builder().sellerId(userId).expirationDate(LocalDate.now().plusDays(1)).build(),
+                Sale.builder().sellerId(userId).expirationDate(LocalDate.now().plusDays(1)).build());
+        Map<String, Object> pageInfo = makePagingParamMap(userId, page, SALE.getSize());
+        Mockito.when(saleMapper.findMySales(pageInfo)).thenReturn(sales);
+
+        List<Sale> result = saleService.getMySales(userId, page);
+
+        Assertions.assertEquals(sales.size(), result.size());
     }
 }
