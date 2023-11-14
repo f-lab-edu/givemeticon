@@ -31,7 +31,6 @@ public class TradeSaleItemUserFacade {
     @Transactional
     public int transact(int saleId, int buyerId) {
         checkUserExists(buyerId);
-
         Sale sale = saleService.getSale(saleId);
 
         if (sale.isBought()) {
@@ -39,9 +38,7 @@ public class TradeSaleItemUserFacade {
         }
 
         Item item = itemService.getItem(sale.getItemId());
-
         long restDay = getRestDay(sale.getExpirationDate());
-
         Trade trade = Trade.builder()
                 .buyerId(buyerId)
                 .saleId(saleId)
@@ -57,12 +54,12 @@ public class TradeSaleItemUserFacade {
 
     public TradeDto getTradeDetail(int tradeId, int buyerId) {
         checkUserExists(buyerId);
-
         Trade trade = tradeService.getTrade(tradeId);
         Sale sale = saleService.getSale(trade.getSaleId());
         Item item = itemService.getItem(sale.getItemId());
 
         TradeDto tradeDto = TradeDto.of(trade);
+
         long restDay = getRestDay(sale.getExpirationDate());
         tradeDto.addRestDay(restDay);
         tradeDto.addItemPrice(item.getPrice());
@@ -94,6 +91,11 @@ public class TradeSaleItemUserFacade {
                     return tradeDto;
                 })
                 .toList();
+    }
+
+    public void buyConfirmation(int tradeId, int buyerId) {
+        checkUserExists(buyerId);
+        tradeService.buyConfirmation(tradeId, buyerId);
     }
 
     private long getRestDay(LocalDate expiredDate) {

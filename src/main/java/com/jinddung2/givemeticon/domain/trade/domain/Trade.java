@@ -40,4 +40,8 @@ public class Trade {
                 .setScale(0, RoundingMode.HALF_UP);
         this.tradePrice = tradePrice.subtract(discountPrice);
     }
+
+    public void buyConfirmation() {
+        this.isUsed = !isUsed;
+    }
 }

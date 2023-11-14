@@ -17,4 +17,6 @@ public interface TradeMapper {
     List<Trade> findMyBoughtGifticon(@Param("pageInfo") Map<String, Object> pageInfo,
                                      @Param("orderByBoughtDate") boolean orderByBoughtDate,
                                      @Param("orderByExpiredDate") boolean orderByExpiredDate);
+
+    void updateIsUsedAndIsUsedDate(int id);
 }

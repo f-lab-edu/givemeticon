@@ -2,6 +2,7 @@ package com.jinddung2.givemeticon.domain.trade.service;
 
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.NotFoundTradeException;
+import com.jinddung2.givemeticon.domain.trade.exception.NotMatchBuyOwnership;
 import com.jinddung2.givemeticon.domain.trade.mapper.TradeMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,5 +42,19 @@ public class TradeService {
                 .stream()
                 .filter(trade -> !trade.isUsed())
                 .toList();
+    }
+
+    public void buyConfirmation(int tradeId, int buyerId) {
+        Trade trade = getTrade(tradeId);
+        verifyBuyOwnership(buyerId, trade);
+
+        trade.buyConfirmation();
+        tradeMapper.updateIsUsedAndIsUsedDate(tradeId);
+    }
+
+    private void verifyBuyOwnership(int buyerId, Trade trade) {
+        if (trade.getBuyerId() != buyerId) {
+            throw new NotMatchBuyOwnership();
+        }
     }
 }

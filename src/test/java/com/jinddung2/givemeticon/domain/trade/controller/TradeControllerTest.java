@@ -133,4 +133,16 @@ class TradeControllerTest {
 
         Mockito.verify(tradeSaleItemUserFacade).getUnusedTradeHistory(buyerId, false, false, 0);
     }
+
+    @Test
+    @DisplayName("구매 확정한다.")
+    void buy_Confirmation() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .put(String.format("%s/%d", defaultUrl, tradeId))
+                        .session(mockHttpSession)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        Mockito.verify(tradeSaleItemUserFacade).buyConfirmation(tradeId, buyerId);
+    }
 }

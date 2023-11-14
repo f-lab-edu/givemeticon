@@ -2,6 +2,7 @@ package com.jinddung2.givemeticon.domain.trade.service;
 
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.NotFoundTradeException;
+import com.jinddung2.givemeticon.domain.trade.exception.NotMatchBuyOwnership;
 import com.jinddung2.givemeticon.domain.trade.mapper.TradeMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,16 +36,19 @@ class TradeServiceTest {
     TradeMapper tradeMapper;
 
     Trade trade;
-    int saleId, buyerId, price;
+    int saleId, buyerId, price, tradeId;
 
     @BeforeEach
     void setUp() {
         saleId = 10;
         buyerId = 20;
+        tradeId = 30;
         price = 10000;
         trade = Trade.builder()
+                .id(tradeId)
                 .saleId(saleId)
                 .buyerId(buyerId)
+                .isUsed(false)
                 .tradePrice(BigDecimal.valueOf(price))
                 .build();
     }
@@ -117,5 +121,38 @@ class TradeServiceTest {
 
         Assertions.assertEquals(result.size(), tradeList.size());
 
+    }
+
+    @Test
+    @DisplayName("구매 확정에 성공한다.")
+    void buy_Confirmation_Success() {
+        Mockito.when(tradeMapper.findById(tradeId)).thenReturn(Optional.of(trade));
+
+        tradeService.buyConfirmation(trade.getId(), buyerId);
+
+        Mockito.verify(tradeMapper).updateIsUsedAndIsUsedDate(trade.getId());
+        Assertions.assertTrue(trade.isUsed());
+    }
+
+    @Test
+    @DisplayName("이미 구매 확정인 상태라서 구매 확정을 취소한다.")
+    void buy_Confirmation_Fail_Already_Buy_Confirmation() {
+        Trade fakeTrade = Trade.builder().isUsed(true).buyerId(buyerId).build();
+        Mockito.when(tradeMapper.findById(tradeId)).thenReturn(Optional.of(fakeTrade));
+
+        tradeService.buyConfirmation(trade.getId(), buyerId);
+
+        Mockito.verify(tradeMapper).updateIsUsedAndIsUsedDate(trade.getId());
+        Assertions.assertFalse(trade.isUsed());
+    }
+
+    @Test
+    @DisplayName("요청자의 userId와 구매자의 userId가 불일치하여 구매확정에 실패한다.")
+    void buy_Confirmation_Fail_Invalidate_Buy_Ownership() {
+        Trade fakeTrade = Trade.builder().isUsed(false).buyerId(buyerId + 1).build();
+        Mockito.when(tradeMapper.findById(tradeId)).thenReturn(Optional.of(fakeTrade));
+
+        Assertions.assertThrows(NotMatchBuyOwnership.class,
+                () -> tradeService.buyConfirmation(trade.getId(), buyerId));
     }
 }
