@@ -9,6 +9,7 @@ import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordUpda
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.facade.CreateAccountFacade;
 import com.jinddung2.givemeticon.domain.user.facade.PasswordResetFacade;
+import com.jinddung2.givemeticon.domain.user.facade.UserItemFavoriteFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import jakarta.mail.MessagingException;
@@ -27,6 +28,7 @@ public class UserController {
 
     private final UserService userService;
     private final LoginService loginService;
+    private final UserItemFavoriteFacade userItemFavoriteFacade;
     private final PasswordResetFacade passwordResetFacade;
     private final CreateAccountFacade createAccountFacade;
 
@@ -73,5 +75,12 @@ public class UserController {
                                                               @RequestBody @Validated CreateAccountRequest request) {
         int accountId = createAccountFacade.createAccount(userId, request);
         return new ResponseEntity<>(ApiResponse.success(accountId), HttpStatus.OK);
+    }
+
+    @PostMapping("/item/{itemId}")
+    public ResponseEntity<ApiResponse<Void>> pushFavoriteItem(@SessionAttribute(name = LOGIN_USER) int userId,
+                                                              @PathVariable(name = "itemId") int itemId) {
+        userItemFavoriteFacade.pushFavorite(userId, itemId);
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
     }
 }

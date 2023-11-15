@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMapper">
+
+    <insert id="save" parameterType="ItemFavorite">
+        INSERT INTO item_favorite(id,
+                                  user_id,
+                                  item_id,
+                                  is_favorite)
+        VALUES (#{id},
+                #{userId},
+                #{itemId},
+                TRUE) ON DUPLICATE KEY
+        UPDATE is_favorite = #{isFavorite}
+    </insert>
+
+    <select id="findByIdByUserIDAndItemId" resultType="ItemFavorite">
+        SELECT id,
+               user_id,
+               item_id,
+               is_favorite
+        FROM item_favorite
+        WHERE user_id = #{userId}
+          AND item_id = #{itemId}
+    </select>
+</mapper>
