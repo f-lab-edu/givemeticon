@@ -16,6 +16,7 @@ import com.jinddung2.givemeticon.domain.user.exception.MisMatchPasswordException
 import com.jinddung2.givemeticon.domain.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.domain.user.facade.CreateAccountFacade;
 import com.jinddung2.givemeticon.domain.user.facade.PasswordResetFacade;
+import com.jinddung2.givemeticon.domain.user.facade.UserItemFavoriteFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +59,8 @@ public class UserControllerTest {
     PasswordResetFacade passwordResetFacade;
     @MockBean
     CreateAccountFacade createAccountFacade;
+    @MockBean
+    UserItemFavoriteFacade userItemFavoriteFacade;
 
     MockHttpSession mockHttpSession;
     SignUpRequest signUpRequest;
@@ -273,5 +276,18 @@ public class UserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("FAIL"))
                 .andExpect(jsonPath("$.data.message").value("이미 등록된 계좌번호 입니다."));
+    }
+
+    @Test
+    void push_Favorite_Item() throws Exception {
+        int itemId = 1;
+        mockMvc.perform(MockMvcRequestBuilders
+                        .post("/api/v1/users/item/" + itemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(createAccountRequest)))
+                .andExpect(status().isOk());
+
+        Mockito.verify(userItemFavoriteFacade).pushFavorite(userDto.getId(), itemId);
     }
 }
