@@ -4,6 +4,13 @@
 
 <mapper namespace="com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMapper">
 
+    <resultMap id="itemFavoriteResultMap" type="ItemFavorite">
+        <result property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="itemId" column="item_ud"/>
+        <result property="isFavorite" column="is_favorite"/>
+    </resultMap>
+
     <insert id="save" parameterType="ItemFavorite">
         INSERT INTO item_favorite(id,
                                   user_id,
@@ -24,5 +31,16 @@
         FROM item_favorite
         WHERE user_id = #{userId}
           AND item_id = #{itemId}
+    </select>
+
+    <select id="findFavoritesByUserId" parameterType="int"
+            resultType="java.util.List" resultMap="itemFavoriteResultMap">
+        SELECT id,
+               user_id,
+               item_id,
+               is_favorite
+        FROM item_favorite
+        WHERE user_id = #{userId}
+          AND is_favorite = 1
     </select>
 </mapper>

@@ -5,6 +5,7 @@ import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -18,7 +19,7 @@ public class ItemFavoriteService {
             insertFavorite(userId, itemId);
             return;
         }
-        
+
         updateFavorite(itemFavoriteOptional.get());
     }
 
@@ -40,5 +41,9 @@ public class ItemFavoriteService {
 
     private Optional<ItemFavorite> getItemFavoriteByUserIDAndItemId(int userId, int itemId) {
         return itemFavoriteMapper.findByIdByUserIDAndItemId(userId, itemId);
+    }
+
+    public List<ItemFavorite> getMyFavorite(int userId) {
+        return itemFavoriteMapper.findFavoritesByUserId(userId);
     }
 }
