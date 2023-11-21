@@ -20,6 +20,7 @@ import com.jinddung2.givemeticon.domain.user.facade.UserItemFavoriteFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -279,15 +280,29 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("특정 상품에 좋아요를 누른다.")
     void push_Favorite_Item() throws Exception {
         int itemId = 1;
         mockMvc.perform(MockMvcRequestBuilders
-                        .post("/api/v1/users/item/" + itemId)
+                        .post("/api/v1/users/items/" + itemId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
                 .andExpect(status().isOk());
 
         Mockito.verify(userItemFavoriteFacade).pushFavorite(userDto.getId(), itemId);
+    }
+
+    @Test
+    @DisplayName("내가 좋아요한 상품들을 조회한다.")
+    void get_My_Favorite_Items() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/users/items/my-favorite")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(createAccountRequest)))
+                .andExpect(status().isOk());
+
+        Mockito.verify(userItemFavoriteFacade).getMyFavoriteItems(userDto.getId());
     }
 }

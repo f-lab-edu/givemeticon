@@ -4,8 +4,10 @@ import com.jinddung2.givemeticon.domain.favorite.domain.ItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.service.ItemFavoriteService;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
+import com.jinddung2.givemeticon.domain.user.controller.dto.request.ItemFavoriteDto;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
 class UserItemFavoriteFacadeTest {
@@ -54,5 +58,35 @@ class UserItemFavoriteFacadeTest {
         userItemFavoriteFacade.pushFavorite(userId, itemId);
 
         Mockito.verify(itemFavoriteService).pushFavorite(userId, itemId);
+    }
+
+    @Test
+    @DisplayName("좋아요 누른 상품들의 이름과 가격을 모두 조회한다.")
+    void getMyFavoriteItems() {
+        int fakeItemId = 10;
+        Item fakeItem1 = Item.builder().id(fakeItemId).name("test1").price(10001).build();
+        Item fakeItem2 = Item.builder().id(fakeItemId + 1).name("test1").price(10001).build();
+        Item fakeItem3 = Item.builder().id(fakeItemId + 2).name("test1").price(10001).build();
+
+        List<ItemFavorite> fakeMyItemFavorites = List.of(
+                new ItemFavorite(1, userId, fakeItem1.getId(), true),
+                new ItemFavorite(2, userId, fakeItem2.getId(), true),
+                new ItemFavorite(3, userId, fakeItem3.getId(), true)
+        );
+
+
+        Mockito.when(userService.getUser(userId)).thenReturn(Mockito.mock(User.class));
+
+        Mockito.when(itemService.getItem(fakeItem1.getId())).thenReturn(fakeItem1);
+        Mockito.when(itemService.getItem(fakeItem2.getId())).thenReturn(fakeItem2);
+        Mockito.when(itemService.getItem(fakeItem3.getId())).thenReturn(fakeItem3);
+
+        Mockito.when(itemFavoriteService.getMyFavorite(userId)).thenReturn(fakeMyItemFavorites);
+
+        List<ItemFavoriteDto> myFavoriteItems = userItemFavoriteFacade.getMyFavoriteItems(userId);
+
+        Assertions.assertEquals(fakeItem1.getName(), myFavoriteItems.get(0).getName());
+        Assertions.assertEquals(fakeItem2.getName(), myFavoriteItems.get(1).getName());
+        Assertions.assertEquals(fakeItem3.getName(), myFavoriteItems.get(2).getName());
     }
 }

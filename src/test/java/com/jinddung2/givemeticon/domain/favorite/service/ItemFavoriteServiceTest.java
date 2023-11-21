@@ -12,6 +12,8 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,5 +60,20 @@ class ItemFavoriteServiceTest {
 
         Mockito.verify(itemFavoriteMapper).save(itemFavorite);
         Assertions.assertFalse(itemFavorite.isFavorite());
+    }
+
+    @Test
+    @DisplayName("내가 좋아요한 것들을 모두 조회한다.")
+    void get_My_Favorites() {
+        List<ItemFavorite> fakeFavorites = Arrays.asList(
+                new ItemFavorite(1, 1, 101, true),
+                new ItemFavorite(2, 1, 102, true)
+        );
+
+        Mockito.when(itemFavoriteMapper.findFavoritesByUserId(Mockito.anyInt())).thenReturn(fakeFavorites);
+
+        List<ItemFavorite> result = itemFavoriteService.getMyFavorite(1);
+
+        Assertions.assertEquals(fakeFavorites.size(), result.size());
     }
 }
