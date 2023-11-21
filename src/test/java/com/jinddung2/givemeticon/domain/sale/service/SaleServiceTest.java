@@ -141,7 +141,7 @@ class SaleServiceTest {
     }
 
     @Test
-    @DisplayName("내 판매목록을 조회한다.")
+    @DisplayName("판매 목록을 가져올 때, 예상안 크기와 같은지 검증한다.")
     void get_My_Sales() {
         int userId = 1;
         List<Sale> sales = List.of(
@@ -156,7 +156,7 @@ class SaleServiceTest {
     }
 
     @Test
-    @DisplayName("내 판매목록을 페이징 처리해서 조회한다.")
+    @DisplayName("페이징 처리한 판매 목록을 가져올 때, 예상안 크기와 같은지 검증한다.")
     void get_My_Sales_With_page() {
         int userId = 1;
         List<Sale> sales = List.of(
