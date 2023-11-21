@@ -13,15 +13,15 @@ import java.util.Date;
 public class MySaleDto {
 
     private String itemName;
-    private LocalDate expirationDate;
+    private LocalDate expiredDate;
     private Date isBoughtDate;
     private String barcode;
     private BigDecimal price;
 
     @Builder
-    public MySaleDto(String itemName, LocalDate expirationDate, Date isBoughtDate, String barcode, BigDecimal price) {
+    public MySaleDto(String itemName, LocalDate expiredDate, Date isBoughtDate, String barcode, BigDecimal price) {
         this.itemName = itemName;
-        this.expirationDate = expirationDate;
+        this.expiredDate = expiredDate;
         this.isBoughtDate = isBoughtDate;
         this.barcode = barcode;
         this.price = price;
@@ -30,7 +30,7 @@ public class MySaleDto {
     public static MySaleDto of(String itemName, LocalDate expirationDate, Date isBoughtDate, String barcode, BigDecimal price) {
         return MySaleDto.builder()
                 .itemName(itemName)
-                .expirationDate(expirationDate)
+                .expiredDate(expirationDate)
                 .isBoughtDate(isBoughtDate)
                 .barcode(barcode)
                 .price(price)
