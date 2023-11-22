@@ -14,6 +14,8 @@ public interface TradeMapper {
 
     Optional<Trade> findById(int id);
 
+    Optional<Trade> findBySaleId(int sellerId);
+
     List<Trade> findMyBoughtGifticon(@Param("pageInfo") Map<String, Object> pageInfo,
                                      @Param("orderByBoughtDate") boolean orderByBoughtDate,
                                      @Param("orderByExpiredDate") boolean orderByExpiredDate);
