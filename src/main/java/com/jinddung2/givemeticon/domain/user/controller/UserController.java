@@ -76,10 +76,17 @@ public class UserController {
         return new ResponseEntity<>(ApiResponse.success(accountId), HttpStatus.OK);
     }
 
-    @PostMapping("/items/{itemId}")
+    @PostMapping("/items/{itemId}/favorite")
     public ResponseEntity<ApiResponse<Void>> pushFavoriteItem(@SessionAttribute(name = LOGIN_USER) int userId,
                                                               @PathVariable(name = "itemId") int itemId) {
-        userItemFavoriteFacade.pushFavorite(userId, itemId);
+        userItemFavoriteFacade.pushItemFavorite(userId, itemId);
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
+    }
+
+    @DeleteMapping("/items/{itemId}/cancel-favorite")
+    public ResponseEntity<ApiResponse<Void>> cancelFavoriteItem(@SessionAttribute(name = LOGIN_USER) int userId,
+                                                                @PathVariable(name = "itemId") int itemId) {
+        userItemFavoriteFacade.cancelItemFavorite(userId, itemId);
         return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
     }
 

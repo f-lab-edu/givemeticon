@@ -19,8 +19,7 @@
         VALUES (#{id},
                 #{userId},
                 #{itemId},
-                TRUE) ON DUPLICATE KEY
-        UPDATE is_favorite = #{isFavorite}
+                TRUE)
     </insert>
 
     <select id="findByIdByUserIDAndItemId" resultType="ItemFavorite">
@@ -43,4 +42,10 @@
         WHERE user_id = #{userId}
           AND is_favorite = 1
     </select>
+
+    <delete id="findById" parameterType="int">
+        DELETE
+        FROM item_favorite
+        WHERE id = {id}
+    </delete>
 </mapper>

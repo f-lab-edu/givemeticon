@@ -18,10 +18,16 @@ public class UserItemFavoriteFacade {
     private final ItemService itemService;
     private final ItemFavoriteService itemFavoriteService;
 
-    public void pushFavorite(int userId, int itemId) {
+    public void pushItemFavorite(int userId, int itemId) {
         checkUserExists(userId);
         checkItemExists(itemId);
-        itemFavoriteService.pushFavorite(userId, itemId);
+        itemFavoriteService.insertFavorite(userId, itemId);
+    }
+
+    public void cancelItemFavorite(int userId, int itemId) {
+        checkUserExists(userId);
+        checkItemExists(itemId);
+        itemFavoriteService.cancelItemFavorite(userId, itemId);
     }
 
     public List<ItemFavoriteDto> getMyFavoriteItems(int userId) {
@@ -31,7 +37,8 @@ public class UserItemFavoriteFacade {
                 .map(itemFavorite -> {
                     Item item = itemService.getItem(itemFavorite.getItemId());
                     return ItemFavoriteDto.of(item);
-                }).toList();
+                })
+                .toList();
     }
 
     private void checkUserExists(int userId) {

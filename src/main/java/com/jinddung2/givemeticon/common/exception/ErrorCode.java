@@ -39,7 +39,12 @@ public enum ErrorCode {
     INVALID_DISCOUNT_RATE("할인율은 0 이상 1 이하여야 합니다."),
     ALREADY_BOUGHT_SALE("이미 구매된 상품 입니다."),
     NOT_FOUND_TRADE("존재하지 않은 거래번호 입니다."),
-    INVALID_BUY_OWNER("구매하신 사용자가 아닙니다.");
+    INVALID_BUY_OWNER("구매하신 사용자가 아닙니다."),
+
+    // ItemFavorite
+    ALREADY_PUSH_ITEMFAVORITE("이미 좋아요를 눌렀습니다."),
+    NOT_PUSH_ITEMFAVORITE("좋아요한 적이 없는 상품이 아닙니다.."),
+    ;
 
     private final String message;
 
