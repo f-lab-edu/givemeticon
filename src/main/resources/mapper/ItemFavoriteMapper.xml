@@ -40,7 +40,6 @@
                is_favorite
         FROM item_favorite
         WHERE user_id = #{userId}
-          AND is_favorite = 1
     </select>
 
     <delete id="findById" parameterType="int">
