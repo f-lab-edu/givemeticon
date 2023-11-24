@@ -50,14 +50,25 @@ class UserItemFavoriteFacadeTest {
     }
 
     @Test
-    @DisplayName("좋아요를 누른다.")
+    @DisplayName("좋아요를 누른 것에 성공한다.")
     void push_Favorite() {
         Mockito.when(userService.getUser(userId)).thenReturn(Mockito.mock(User.class));
         Mockito.when(itemService.getItem(itemId)).thenReturn(Mockito.mock(Item.class));
 
-        userItemFavoriteFacade.pushFavorite(userId, itemId);
+        userItemFavoriteFacade.pushItemFavorite(userId, itemId);
 
-        Mockito.verify(itemFavoriteService).pushFavorite(userId, itemId);
+        Mockito.verify(itemFavoriteService).insertFavorite(userId, itemId);
+    }
+
+    @Test
+    @DisplayName("좋아요를 눌렀던 상품에 좋아요 취소하는 것에 성공한다.")
+    void cancel_Favorite() {
+        Mockito.when(userService.getUser(userId)).thenReturn(Mockito.mock(User.class));
+        Mockito.when(itemService.getItem(itemId)).thenReturn(Mockito.mock(Item.class));
+
+        userItemFavoriteFacade.cancelItemFavorite(userId, itemId);
+
+        Mockito.verify(itemFavoriteService).cancelItemFavorite(userId, itemId);
     }
 
     @Test

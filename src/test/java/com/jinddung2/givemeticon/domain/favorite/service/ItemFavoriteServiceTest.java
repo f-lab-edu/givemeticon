@@ -1,6 +1,8 @@
 package com.jinddung2.givemeticon.domain.favorite.service;
 
 import com.jinddung2.givemeticon.domain.favorite.domain.ItemFavorite;
+import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavorite;
+import com.jinddung2.givemeticon.domain.favorite.exception.NotPushItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +36,7 @@ class ItemFavoriteServiceTest {
         itemId = 2;
 
         itemFavorite = ItemFavorite.builder()
+                .id(1)
                 .itemId(itemId)
                 .userId(userId)
                 .isFavorite(true)
@@ -41,25 +44,42 @@ class ItemFavoriteServiceTest {
     }
 
     @Test
-    @DisplayName("새로운 좋아요를 누른다.")
+    @DisplayName("아이템 좋아요 누른 것을 확인한다.")
     void push_New_Favorite() {
         Mockito.when(itemFavoriteMapper.findByIdByUserIDAndItemId(userId, itemId)).thenReturn(Optional.empty());
 
-        itemFavoriteService.pushFavorite(userId, itemId);
+        itemFavoriteService.insertFavorite(userId, itemId);
 
         Mockito.verify(itemFavoriteMapper).save(Mockito.any(ItemFavorite.class));
         Assertions.assertTrue(itemFavorite.isFavorite());
     }
 
     @Test
-    @DisplayName("기존에 있던 좋아요를 업데이트 한다.")
-    void update_Favorite() {
+    @DisplayName("이미 좋아요한 아이템이라 좋아요에 실패한다.")
+    void push_New_Favorite_Fail_Already_Item_Favorite() {
         Mockito.when(itemFavoriteMapper.findByIdByUserIDAndItemId(userId, itemId)).thenReturn(Optional.of(itemFavorite));
 
-        itemFavoriteService.pushFavorite(userId, itemId);
+        Assertions.assertThrows(AlreadyPushItemFavorite.class,
+                () -> itemFavoriteService.insertFavorite(userId, itemId));
+    }
 
-        Mockito.verify(itemFavoriteMapper).save(itemFavorite);
-        Assertions.assertFalse(itemFavorite.isFavorite());
+    @Test
+    @DisplayName("눌렀던 좋아요가 취소된 것을 확인한다.")
+    void cancel_Favorite() {
+        Mockito.when(itemFavoriteMapper.findByIdByUserIDAndItemId(userId, itemId)).thenReturn(Optional.of(itemFavorite));
+
+        itemFavoriteService.cancelItemFavorite(userId, itemId);
+
+        Mockito.verify(itemFavoriteMapper).deleteById(itemFavorite.getId());
+    }
+
+    @Test
+    @DisplayName("좋아요를 하지 않은 상품이라 좋아요 취소에 실패한다.")
+    void cancel_Favorite_Fail_Not_Push_Item_Favorite() {
+        Mockito.when(itemFavoriteMapper.findByIdByUserIDAndItemId(userId, itemId)).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(NotPushItemFavorite.class,
+                () -> itemFavoriteService.cancelItemFavorite(userId, itemId));
     }
 
     @Test
