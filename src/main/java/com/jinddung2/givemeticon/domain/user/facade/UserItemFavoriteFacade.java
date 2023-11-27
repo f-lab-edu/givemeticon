@@ -3,8 +3,10 @@ package com.jinddung2.givemeticon.domain.user.facade;
 import com.jinddung2.givemeticon.domain.favorite.domain.ItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.service.ItemFavoriteService;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
+import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.ItemFavoriteDto;
+import com.jinddung2.givemeticon.domain.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,11 +44,15 @@ public class UserItemFavoriteFacade {
     }
 
     private void checkUserExists(int userId) {
-        userService.getUser(userId);
+        if (!userService.isExists(userId)) {
+            throw new NotFoundUserException();
+        }
     }
 
     private void checkItemExists(int itemId) {
-        itemService.getItem(itemId);
+        if (itemService.isExists(itemId)) {
+            throw new NotFoundItemException();
+        }
     }
 
 }
