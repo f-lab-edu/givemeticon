@@ -42,9 +42,9 @@
         WHERE user_id = #{userId}
     </select>
 
-    <delete id="findById" parameterType="int">
+    <delete id="deleteById" parameterType="int">
         DELETE
         FROM item_favorite
-        WHERE id = {id}
+        WHERE id = #{id}
     </delete>
 </mapper>
