@@ -1,7 +1,6 @@
-package com.jinddung2.givemeticon.domain.user.controller.facade;
+package com.jinddung2.givemeticon.domain.user.facade;
 
 import com.jinddung2.givemeticon.domain.mail.service.MailSendService;
-import com.jinddung2.givemeticon.domain.user.facade.PasswordResetFacade;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import jakarta.mail.MessagingException;
 import org.junit.jupiter.api.BeforeEach;

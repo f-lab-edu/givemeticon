@@ -93,6 +93,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("회원 가입을 성공한다.")
     void signUp_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/sign-up")
@@ -105,6 +106,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("중복된 이메일이라서 회원가입에 실패한다.")
     void signUp_Fail_Duplicate_Email() throws Exception {
         doThrow(new DuplicatedEmailException()).when(userService).signUp(signUpRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -119,6 +121,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("중복된 휴대폰 번호라서 회원가입에 실패한다.")
     void signUp_Fail_Duplicate_Phone() throws Exception {
         doThrow(new DuplicatedPhoneException()).when(userService).signUp(signUpRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -134,6 +137,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("사용자 회원 정보 조회에 성공한다.")
     void get_UserInfo_Success() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/info")
@@ -148,6 +152,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("해당 유저가 존재하지 않아 회원 정보 조회에 실패한다.")
     void get_UserInfo_Fail_Not_Exists() throws Exception {
         doThrow(new NotFoundUserException()).when(userService).getUserInfo(userDto.getId());
 
@@ -165,6 +170,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("로그인을 성공한다.")
     void login_Success() throws Exception {
         given(userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword())).willReturn(userDto);
         mockMvc.perform(MockMvcRequestBuilders
@@ -178,6 +184,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("로그아웃을 성공한다.")
     void logout_Success() throws Exception {
         willDoNothing().given(loginService).logout();
         mockMvc.perform(MockMvcRequestBuilders
@@ -192,6 +199,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("비밀번호 변경에 성공한다.")
     void update_Password_Success() throws Exception {
         doNothing().when(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
         mockMvc.perform(MockMvcRequestBuilders
@@ -206,6 +214,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("해당 유저가 존재하지 않아 비밀번호 변경에 실패한다.")
     void update_Password_Fail_Not_Exists_User() throws Exception {
         doThrow(new NotFoundUserException()).when(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -223,6 +232,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("이전 비밀번호가 일치하지 않아 비밀번호 변경에 실패한다.")
     void update_Password_MisMatch_Password() throws Exception {
         doThrow(new MisMatchPasswordException()).when(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
@@ -241,6 +251,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("등록된 이메일에 임시 비밀번호 발급에 성공한다.")
     void send_Temporary_Password() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .put("/api/v1/users/reset-password")
@@ -254,7 +265,8 @@ public class UserControllerTest {
     }
 
     @Test
-    void create_Account_Link_User_Account_Id_Fail() throws Exception {
+    @DisplayName("유저가 계좌 생성하는데 성공한다.")
+    void create_Account_Link_User_Account_Id() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/account")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -267,6 +279,7 @@ public class UserControllerTest {
     }
 
     @Test
+    @DisplayName("계좌번호가 이미 등록되어서 유저와 계좌 연결에 실패한다.")
     void create_Account_Fail_Duplicated_Account_Number() throws Exception {
         doThrow(new DuplicatedAccountNumberException())
                 .when(createAccountFacade).createAccount(userDto.getId(), createAccountRequest);
@@ -284,7 +297,7 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("상품에 좋아요를 누른 것을 확인한다.")
+    @DisplayName("특정 상품에 좋아요를 누르는데 성공한다.")
     void push_Favorite_Item() throws Exception {
         int itemId = 1;
         mockMvc.perform(MockMvcRequestBuilders
@@ -350,7 +363,7 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("내가 좋아요한 상품들을 조회한다.")
+    @DisplayName("내가 좋아요한 상품들을 조회하는데 성공한다.")
     void get_My_Favorite_Items() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/items/my-favorite")
