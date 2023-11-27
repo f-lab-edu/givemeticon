@@ -50,7 +50,7 @@ public class UserItemFavoriteFacade {
     }
 
     private void checkItemExists(int itemId) {
-        if (itemService.isExists(itemId)) {
+        if (!itemService.isExists(itemId)) {
             throw new NotFoundItemException();
         }
     }

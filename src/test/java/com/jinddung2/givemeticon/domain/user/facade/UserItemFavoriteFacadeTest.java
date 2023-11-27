@@ -5,7 +5,6 @@ import com.jinddung2.givemeticon.domain.favorite.service.ItemFavoriteService;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.ItemFavoriteDto;
-import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,8 +51,8 @@ class UserItemFavoriteFacadeTest {
     @Test
     @DisplayName("좋아요를 누른 것에 성공한다.")
     void push_Favorite() {
-        Mockito.when(userService.getUser(userId)).thenReturn(Mockito.mock(User.class));
-        Mockito.when(itemService.getItem(itemId)).thenReturn(Mockito.mock(Item.class));
+        Mockito.when(userService.isExists(userId)).thenReturn(true);
+        Mockito.when(itemService.isExists(itemId)).thenReturn(true);
 
         userItemFavoriteFacade.pushItemFavorite(userId, itemId);
 
@@ -63,8 +62,8 @@ class UserItemFavoriteFacadeTest {
     @Test
     @DisplayName("좋아요를 눌렀던 상품에 좋아요 취소하는 것에 성공한다.")
     void cancel_Favorite() {
-        Mockito.when(userService.getUser(userId)).thenReturn(Mockito.mock(User.class));
-        Mockito.when(itemService.getItem(itemId)).thenReturn(Mockito.mock(Item.class));
+        Mockito.when(userService.isExists(userId)).thenReturn(true);
+        Mockito.when(itemService.isExists(itemId)).thenReturn(true);
 
         userItemFavoriteFacade.cancelItemFavorite(userId, itemId);
 
@@ -86,7 +85,7 @@ class UserItemFavoriteFacadeTest {
         );
 
 
-        Mockito.when(userService.getUser(userId)).thenReturn(Mockito.mock(User.class));
+        Mockito.when(userService.isExists(userId)).thenReturn(true);
 
         Mockito.when(itemService.getItem(fakeItem1.getId())).thenReturn(fakeItem1);
         Mockito.when(itemService.getItem(fakeItem2.getId())).thenReturn(fakeItem2);
