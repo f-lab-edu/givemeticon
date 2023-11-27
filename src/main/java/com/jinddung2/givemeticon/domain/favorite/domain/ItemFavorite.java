@@ -17,8 +17,4 @@ public class ItemFavorite {
         this.itemId = itemId;
         this.isFavorite = isFavorite;
     }
-
-    public void pushFavorite() {
-        this.isFavorite = !isFavorite;
-    }
 }

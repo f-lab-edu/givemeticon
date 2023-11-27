@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.security.provider.JwtTokenProvider;
 import com.jinddung2.givemeticon.domain.account.exception.DuplicatedAccountNumberException;
 import com.jinddung2.givemeticon.domain.account.request.CreateAccountRequest;
+import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavorite;
+import com.jinddung2.givemeticon.domain.favorite.exception.NotPushItemFavorite;
 import com.jinddung2.givemeticon.domain.mail.service.MailSendService;
 import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.LoginRequest;
@@ -32,6 +34,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import static com.jinddung2.givemeticon.common.exception.ErrorCode.ALREADY_PUSH_ITEMFAVORITE;
+import static com.jinddung2.givemeticon.common.exception.ErrorCode.NOT_PUSH_ITEMFAVORITE;
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
@@ -297,13 +301,65 @@ public class UserControllerTest {
     void push_Favorite_Item() throws Exception {
         int itemId = 1;
         mockMvc.perform(MockMvcRequestBuilders
-                        .post("/api/v1/users/items/" + itemId)
+                        .post("/api/v1/users/items/" + itemId + "/favorite")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
                 .andExpect(status().isOk());
 
-        Mockito.verify(userItemFavoriteFacade).pushFavorite(userDto.getId(), itemId);
+        Mockito.verify(userItemFavoriteFacade).pushItemFavorite(userDto.getId(), itemId);
+    }
+
+    @Test
+    @DisplayName("상품에 좋아요를 눌렀지만 이미 좋아요 한 상품이라 실패한다.")
+    void push_Favorite_Item_Fail_Already_Item_Favorite() throws Exception {
+        int itemId = 1;
+        Mockito.doThrow(new AlreadyPushItemFavorite())
+                .when(userItemFavoriteFacade).pushItemFavorite(userDto.getId(), itemId);
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .post("/api/v1/users/items/" + itemId + "/favorite")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(createAccountRequest)))
+                .andExpect(status().isBadRequest());
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value(ALREADY_PUSH_ITEMFAVORITE.getMessage()));
+    }
+
+    @Test
+    @DisplayName("좋아요를 누른 상품을 취소하는 것을 확인한다.")
+    void cancel_Favorite_Item() throws Exception {
+        int itemId = 1;
+        mockMvc.perform(MockMvcRequestBuilders
+                        .delete("/api/v1/users/items/" + itemId + "/cancel-favorite")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(createAccountRequest)))
+                .andExpect(status().isOk());
+
+        Mockito.verify(userItemFavoriteFacade).cancelItemFavorite(userDto.getId(), itemId);
+    }
+
+    @Test
+    @DisplayName("좋아요 한 적이 없는 상품이라 좋아요 취소에 실패한다.")
+    void cancel_Favorite_Item_Fail_Not_Push_Item_Favorite() throws Exception {
+        int itemId = 1;
+        Mockito.doThrow(new NotPushItemFavorite())
+                .when(userItemFavoriteFacade).cancelItemFavorite(userDto.getId(), itemId);
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .delete("/api/v1/users/items/" + itemId + "/cancel-favorite")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(createAccountRequest)))
+                .andExpect(status().isBadRequest());
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value(NOT_PUSH_ITEMFAVORITE.getMessage()));
     }
 
     @Test
