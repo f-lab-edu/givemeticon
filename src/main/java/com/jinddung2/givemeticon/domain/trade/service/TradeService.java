@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.jinddung2.givemeticon.common.utils.PaginationUtil.makePagingParamMap;
 import static com.jinddung2.givemeticon.common.utils.constants.PageSize.TRADE;
@@ -33,6 +34,10 @@ public class TradeService {
 
     public Trade getTrade(int tradeId) {
         return tradeMapper.findById(tradeId).orElseThrow(NotFoundTradeException::new);
+    }
+
+    public Optional<Trade> getTradeBySaleId(int saleId) {
+        return tradeMapper.findBySaleId(saleId);
     }
 
     public List<Trade> getMyUnusedItemHistory(int buyerId, boolean orderByBoughtDate,
