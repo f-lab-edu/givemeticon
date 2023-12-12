@@ -1,16 +1,3 @@
-<head>
-  <style>
-  .boarder-image {
-    border: 2px solid lightskyblue;
-    margin: 5px;
-  }
-  .toggle-font {
-    font-size: 1.15em;
-    font-weight: bold;
-  }
-  </style>
-</head>
-
 # 🎁 givemeticon
 
 새로운 소비 트렌드를 반영하여 낭비를 최소화하는 **기프티콘 전문 중고거래 플랫폼**으로, 사용하지 않거나 만료가 임박한 기프티콘을 판매하고 저렴한 가격으로 구매할 수 있는 환경을 제공하는 서비스 플랫폼
@@ -36,52 +23,52 @@
 
 ---
 <details>
-  <summary class="toggle-font">🤳 로그인 및 회원 정보</summary>
+  <summary style="font-size: 1.15em; font-weight: bold">🤳 로그인 및 회원 정보</summary>
   <div style="overflow-x: auto; white-space: nowrap">
-      <img src="assets/login/로그인1.png" width="200" height="350" alt="로그인 화면" class="boarder-image">
-      <img src="assets/login/로그인2.png" width="200" height="350" alt="회원 가입 화면" class="boarder-image">
-      <img src="assets/login/로그인3.png" width="200" height="350" alt="비밀번호 찾기" class="boarder-image">
-      <img src="assets/login/로그인4.png" width="200" height="350" alt="비밀번호 변경하기" class="boarder-image">
+      <img src="assets/login/로그인1.png" width="200" height="350" alt="로그인 화면" style="border: 2px solid lightskyblue;">
+      <img src="assets/login/로그인2.png" width="200" height="350" alt="회원 가입 화면" style="border: 2px solid lightskyblue;">
+      <img src="assets/login/로그인3.png" width="200" height="350" alt="비밀번호 찾기" style="border: 2px solid lightskyblue;">
+      <img src="assets/login/로그인4.png" width="200" height="350" alt="비밀번호 변경하기" style="border: 2px solid lightskyblue;">
     </div>
 </details>
 
 <details>
-  <summary class="toggle-font">🤳 상품 탐색 </summary>
+  <summary style="font-size: 1.15em; font-weight: bold">🤳 상품 탐색 </summary>
     <div style="overflow-x: auto; white-space: nowrap">
-      <img src="assets/search/탐색1.png" width="200" height="350" alt="회원 가입 화면" class="boarder-image">
-      <img src="assets/search/탐색2.png" width="200" height="350" alt="비밀번호 찾기" class="boarder-image">
-      <img src="assets/search/탐색3.png" width="200" height="350" alt="비밀번호 변경하기" class="boarder-image">
+      <img src="assets/search/탐색1.png" width="200" height="350" alt="회원 가입 화면" style="border: 2px solid lightskyblue;">
+      <img src="assets/search/탐색2.png" width="200" height="350" alt="비밀번호 찾기" style="border: 2px solid lightskyblue;">
+      <img src="assets/search/탐색3.png" width="200" height="350" alt="비밀번호 변경하기" style="border: 2px solid lightskyblue;">
     </div>
 </details>
 
 <details>
-  <summary class="toggle-font">🤳 상품 구매</summary>
+  <summary style="font-size: 1.15em; font-weight: bold">🤳 상품 구매</summary>
     <div style="overflow-x: auto; white-space: nowrap">
-      <img src="assets/purchase/구매1.png" width="200" height="350" alt="상품 구매 화면" class="boarder-image">
-      <img src="assets/purchase/구매2.png" width="200" height="350" alt="유효기간 선택" class="boarder-image">
-      <img src="assets/purchase/구매3.png" width="200" height="350" alt="구매 완료" class="boarder-image">
-      <img src="assets/purchase/구매4.png" width="200" height="350" alt="구매 상세" class="boarder-image">
-      <img src="assets/purchase/구매5.png" width="200" height="350" alt="구매 확정" class="boarder-image">
-      <img src="assets/purchase/구매6.png" width="200" height="350" alt="구매콘함(보유)" class="boarder-image">
-      <img src="assets/purchase/구매7.png" width="200" height="350" alt="구매콘함(사용 및 만료)" class="boarder-image">
+      <img src="assets/purchase/구매1.png" width="200" height="350" alt="상품 구매 화면" style="border: 2px solid lightskyblue;">
+      <img src="assets/purchase/구매2.png" width="200" height="350" alt="유효기간 선택" style="border: 2px solid lightskyblue;">
+      <img src="assets/purchase/구매3.png" width="200" height="350" alt="구매 완료" style="border: 2px solid lightskyblue;">
+      <img src="assets/purchase/구매4.png" width="200" height="350" alt="구매 상세" style="border: 2px solid lightskyblue;">
+      <img src="assets/purchase/구매5.png" width="200" height="350" alt="구매 확정" style="border: 2px solid lightskyblue;">
+      <img src="assets/purchase/구매6.png" width="200" height="350" alt="구매콘함(보유)" style="border: 2px solid lightskyblue;">
+      <img src="assets/purchase/구매7.png" width="200" height="350" alt="구매콘함(사용 및 만료)" style="border: 2px solid lightskyblue;">
     </div>
 </details>
 
 <details>
-  <summary class="toggle-font">🤳 상품 판매 </summary>
+  <summary style="font-size: 1.15em; font-weight: bold">🤳 상품 판매 </summary>
     <div style="overflow-x: auto; white-space: nowrap">
-      <img src="assets/sell/판매1.png" width="200" height="350" alt="판매 제품 선택" class="boarder-image">
-      <img src="assets/sell/판매2.png" width="200" height="350" alt="바코드 및 유효기간 인증" class="boarder-image">
-      <img src="assets/sell/판매3.png" width="200" height="350" alt="총 판매 금액" class="boarder-image">
-      <img src="assets/sell/판매4.png" width="200" height="350" alt="판매 내역" class="boarder-image">
+      <img src="assets/sell/판매1.png" width="200" height="350" alt="판매 제품 선택" style="border: 2px solid lightskyblue;">
+      <img src="assets/sell/판매2.png" width="200" height="350" alt="바코드 및 유효기간 인증" style="border: 2px solid lightskyblue;">
+      <img src="assets/sell/판매3.png" width="200" height="350" alt="총 판매 금액" style="border: 2px solid lightskyblue;">
+      <img src="assets/sell/판매4.png" width="200" height="350" alt="판매 내역" style="border: 2px solid lightskyblue;">
     </div>
 </details>
 
 <details>
-  <summary class="toggle-font">🤳 부가 기능</summary>
+  <summary style="font-size: 1.15em; font-weight: bold">🤳 부가 기능</summary>
     <div style="overflow-x: auto; white-space: nowrap">
-      <img src="assets/mypage/찜목록.png" width="200" height="350" alt="찜 목록" class="boarder-image">
-      <img src="assets/mypage/알림.png" width="200" height="350" alt="알림" class="boarder-image">
+      <img src="assets/mypage/찜목록.png" width="200" height="350" alt="찜 목록" style="border: 2px solid lightskyblue;">
+      <img src="assets/mypage/알림.png" width="200" height="350" alt="알림" style="border: 2px solid lightskyblue;">
     </div>
 </details>
 
