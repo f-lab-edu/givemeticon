@@ -1,9 +1,15 @@
-<style>
-.boarder-image {
-  border: 2px solid lightskyblue;
-  margin: 5px;
-}
-</style>
+<head>
+  <style>
+  .boarder-image {
+    border: 2px solid lightskyblue;
+    margin: 5px;
+  }
+  .toggle-font {
+    font-size: 1.15em;
+    font-weight: bold;
+  }
+  </style>
+</head>
 
 # 🎁 givemeticon
 
@@ -29,51 +35,55 @@
 ## 📖 간단한 화면 구성도 (그림)
 
 ---
+<details>
+  <summary class="toggle-font">🤳 로그인 및 회원 정보</summary>
+  <div style="overflow-x: auto; white-space: nowrap">
+      <img src="assets/login/로그인1.png" width="200" height="350" alt="로그인 화면" class="boarder-image">
+      <img src="assets/login/로그인2.png" width="200" height="350" alt="회원 가입 화면" class="boarder-image">
+      <img src="assets/login/로그인3.png" width="200" height="350" alt="비밀번호 찾기" class="boarder-image">
+      <img src="assets/login/로그인4.png" width="200" height="350" alt="비밀번호 변경하기" class="boarder-image">
+    </div>
+</details>
 
-### 🤳 로그인 및 회원 정보
+<details>
+  <summary class="toggle-font">🤳 상품 탐색 </summary>
+    <div style="overflow-x: auto; white-space: nowrap">
+      <img src="assets/search/탐색1.png" width="200" height="350" alt="회원 가입 화면" class="boarder-image">
+      <img src="assets/search/탐색2.png" width="200" height="350" alt="비밀번호 찾기" class="boarder-image">
+      <img src="assets/search/탐색3.png" width="200" height="350" alt="비밀번호 변경하기" class="boarder-image">
+    </div>
+</details>
 
-<div style="overflow-x: auto; white-space: nowrap">
-  <img src="assets/login/로그인1.png" width="200" height="350" alt="로그인 화면" class="boarder-image">
-  <img src="assets/login/로그인2.png" width="200" height="350" alt="회원 가입 화면" class="boarder-image">
-  <img src="assets/login/로그인3.png" width="200" height="350" alt="비밀번호 찾기" class="boarder-image">
-  <img src="assets/login/로그인4.png" width="200" height="350" alt="비밀번호 변경하기" class="boarder-image">
-</div>
+<details>
+  <summary class="toggle-font">🤳 상품 구매</summary>
+    <div style="overflow-x: auto; white-space: nowrap">
+      <img src="assets/purchase/구매1.png" width="200" height="350" alt="상품 구매 화면" class="boarder-image">
+      <img src="assets/purchase/구매2.png" width="200" height="350" alt="유효기간 선택" class="boarder-image">
+      <img src="assets/purchase/구매3.png" width="200" height="350" alt="구매 완료" class="boarder-image">
+      <img src="assets/purchase/구매4.png" width="200" height="350" alt="구매 상세" class="boarder-image">
+      <img src="assets/purchase/구매5.png" width="200" height="350" alt="구매 확정" class="boarder-image">
+      <img src="assets/purchase/구매6.png" width="200" height="350" alt="구매콘함(보유)" class="boarder-image">
+      <img src="assets/purchase/구매7.png" width="200" height="350" alt="구매콘함(사용 및 만료)" class="boarder-image">
+    </div>
+</details>
 
-### 🤳 상품 탐색
+<details>
+  <summary class="toggle-font">🤳 상품 판매 </summary>
+    <div style="overflow-x: auto; white-space: nowrap">
+      <img src="assets/sell/판매1.png" width="200" height="350" alt="판매 제품 선택" class="boarder-image">
+      <img src="assets/sell/판매2.png" width="200" height="350" alt="바코드 및 유효기간 인증" class="boarder-image">
+      <img src="assets/sell/판매3.png" width="200" height="350" alt="총 판매 금액" class="boarder-image">
+      <img src="assets/sell/판매4.png" width="200" height="350" alt="판매 내역" class="boarder-image">
+    </div>
+</details>
 
-<div style="overflow-x: auto; white-space: nowrap">
-  <img src="assets/search/탐색1.png" width="200" height="350" alt="회원 가입 화면" class="boarder-image">
-  <img src="assets/search/탐색2.png" width="200" height="350" alt="비밀번호 찾기" class="boarder-image">
-  <img src="assets/search/탐색3.png" width="200" height="350" alt="비밀번호 변경하기" class="boarder-image">
-</div>
-
-### 🤳 상품 구매
-
-<div style="overflow-x: auto; white-space: nowrap">
-  <img src="assets/purchase/구매1.png" width="200" height="350" alt="상품 구매 화면" class="boarder-image">
-  <img src="assets/purchase/구매2.png" width="200" height="350" alt="유효기간 선택" class="boarder-image">
-  <img src="assets/purchase/구매3.png" width="200" height="350" alt="구매 완료" class="boarder-image">
-  <img src="assets/purchase/구매4.png" width="200" height="350" alt="구매 상세" class="boarder-image">
-  <img src="assets/purchase/구매5.png" width="200" height="350" alt="구매 확정" class="boarder-image">
-  <img src="assets/purchase/구매6.png" width="200" height="350" alt="구매콘함(보유)" class="boarder-image">
-  <img src="assets/purchase/구매7.png" width="200" height="350" alt="구매콘함(사용 및 만료)" class="boarder-image">
-</div>
-
-### 🤳 상품 판매
-
-<div style="overflow-x: auto; white-space: nowrap">
-  <img src="assets/sell/판매1.png" width="200" height="350" alt="판매 제품 선택" class="boarder-image">
-  <img src="assets/sell/판매2.png" width="200" height="350" alt="바코드 및 유효기간 인증" class="boarder-image">
-  <img src="assets/sell/판매3.png" width="200" height="350" alt="총 판매 금액" class="boarder-image">
-  <img src="assets/sell/판매4.png" width="200" height="350" alt="판매 내역" class="boarder-image">
-</div>
-
-### 🤳 부가 기능
-
-<div style="overflow-x: auto; white-space: nowrap">
-  <img src="assets/mypage/찜목록.png" width="200" height="350" alt="찜 목록" class="boarder-image">
-  <img src="assets/mypage/알림.png" width="200" height="350" alt="알림" class="boarder-image">
-</div>
+<details>
+  <summary class="toggle-font">🤳 부가 기능</summary>
+    <div style="overflow-x: auto; white-space: nowrap">
+      <img src="assets/mypage/찜목록.png" width="200" height="350" alt="찜 목록" class="boarder-image">
+      <img src="assets/mypage/알림.png" width="200" height="350" alt="알림" class="boarder-image">
+    </div>
+</details>
 
 전체 프로토타입 -> [카카오 오븐 UI](https://ovenapp.io/view/N8q3JurAx3UZZR5DhCzkDvlEsCRUQnJZ/cFTi7)
 
@@ -106,6 +116,7 @@
 
 - 소프트웨어 개발 과정을 자동화하여 안정적으로 코드를 통합하고 신속하게 배포할 수 있게 하기 위해 CI/CD를 적용하였습니다. **Jenkins**, **Travics CI**, **GitHub Actions**
   세 가지 방법 중 **GitHub Actions**는 **GitHub과 통합된 편리한 사용자 경험을 제공**하며, **저장소 이벤트를 트리거로 다양한 워크플로를 자동화**할 수 있습니다. 제한적이긴 하지만 무료로 사용가능 하여 **GitHub Actions**을 활용하여 CI/CD를 구축하였고, 결과적으로 비지니스 문제에만 집중할 수 있었습니다.
+- 환경 변수를 배포 시마다 스크립트로 입력하는 보안 문제를 해결하기 위해 **Git Submodule**을 도입하여 독립된 저장소를 활용하였으며, 이로써 환경 변수 관리의 유지보수성이 향상되고 보안이 강화되었습니다
 - **third-party**와 상호작용 하기 위해 스프링이 지원하는 기술 **RestTemplate**, **WebClient** 그리고 **FeignClient**를 세 가지 방식을 학습한 후 **RestTemplate**을 선택하였습니다. **스프링과 통합**되어 있으며, **간편하고 직관적인 API 호출**을 지원하는 **RestTemplate**을 통해 외부에 HTTP 요청 및 응답이 가능해졌고 결과적으로 OAuth 로그인을 구현하였습니다.
   👉 [해당 블로그](https://velog.io/@wlsgur1533/RestTemplate-WebClient-FeignClient-%EB%A5%BC-%EB%B9%84%EA%B5%90-OAuth-%EB%A1%9C%EA%B7%B8%EC%9D%B8-%EC%98%88%EC%8B%9C%EB%A1%9C#resttemplate%EC%9D%98-%EC%9E%A5%EC%A0%90)
 - **OAuth 로그인**을 직접 구현하면서 Spring Security를 사용하지 않고도 보안적으로 신뢰할 수 있는 시스템을 구축할 수 있다는 것을 깨달았습니다. 직접
