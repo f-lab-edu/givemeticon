@@ -37,8 +37,8 @@ class UserServiceTest {
     LoginRequest loginRequest;
     PasswordUpdateRequest passwordUpdateRequest;
     User testUser;
-
     UserDto userDto;
+    int pointId = 10;
 
     @BeforeEach
     void setUp() {
@@ -63,7 +63,7 @@ class UserServiceTest {
         when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(false);
         when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(false);
 
-        userService.signUp(signUpRequest);
+        userService.signUp(signUpRequest, pointId);
 
         verify(userMapper).save(any(User.class));
     }
@@ -91,7 +91,7 @@ class UserServiceTest {
     void signUp_Fail_DuplicateEmail() {
         when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(true);
 
-        assertThrows(DuplicatedEmailException.class, () -> userService.signUp(signUpRequest));
+        assertThrows(DuplicatedEmailException.class, () -> userService.signUp(signUpRequest, pointId));
     }
 
     @Test
@@ -99,7 +99,7 @@ class UserServiceTest {
     void signUp_Fail_DuplicatePhone() {
         when(userMapper.existsByPhone(signUpRequest.getPhone())).thenReturn(true);
 
-        assertThrows(DuplicatedPhoneException.class, () -> userService.signUp(signUpRequest));
+        assertThrows(DuplicatedPhoneException.class, () -> userService.signUp(signUpRequest, pointId));
     }
 
     @Test

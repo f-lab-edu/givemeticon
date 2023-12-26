@@ -18,6 +18,7 @@ import com.jinddung2.givemeticon.domain.user.exception.MisMatchPasswordException
 import com.jinddung2.givemeticon.domain.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.domain.user.facade.CreateAccountFacade;
 import com.jinddung2.givemeticon.domain.user.facade.PasswordResetFacade;
+import com.jinddung2.givemeticon.domain.user.facade.SignUpFacade;
 import com.jinddung2.givemeticon.domain.user.facade.UserItemFavoriteFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
@@ -52,6 +53,8 @@ public class UserControllerTest {
     MockMvc mockMvc;
     @Autowired
     ObjectMapper objectMapper; // JSON 객체로 변환하기 위한 ObjectMapper
+    @MockBean
+    SignUpFacade signUpFacade;
     @MockBean
     UserService userService; // MockBean으로 UserService 주입
     @MockBean
@@ -102,13 +105,13 @@ public class UserControllerTest {
                 .andExpect(status().isCreated());
 
         // Verify
-        Mockito.verify(userService).signUp(signUpRequest);
+        Mockito.verify(signUpFacade).signUp(signUpRequest);
     }
 
     @Test
     @DisplayName("중복된 이메일이라서 회원가입에 실패한다.")
     void signUp_Fail_Duplicate_Email() throws Exception {
-        doThrow(new DuplicatedEmailException()).when(userService).signUp(signUpRequest);
+        doThrow(new DuplicatedEmailException()).when(signUpFacade).signUp(signUpRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                 .post("/api/v1/users/sign-up")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -123,7 +126,7 @@ public class UserControllerTest {
     @Test
     @DisplayName("중복된 휴대폰 번호라서 회원가입에 실패한다.")
     void signUp_Fail_Duplicate_Phone() throws Exception {
-        doThrow(new DuplicatedPhoneException()).when(userService).signUp(signUpRequest);
+        doThrow(new DuplicatedPhoneException()).when(signUpFacade).signUp(signUpRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/sign-up")
                         .contentType(MediaType.APPLICATION_JSON)
