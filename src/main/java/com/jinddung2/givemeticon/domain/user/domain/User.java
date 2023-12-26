@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public class User {
     private int id;
     private int accountId;
+    private int pointId;
     private String email;
     private String password;
     private String phone;
@@ -26,21 +27,14 @@ public class User {
     private LocalDateTime deletedDate;
 
     @Builder
-    public User(
-            int id,
-            int accountId,
-            String email,
-            String password,
-            String phone,
-            UserRole userRole,
-            boolean isActive,
-            OAuthProvider provider,
-            LocalDateTime createdDate,
-            LocalDateTime updatedDate,
-            LocalDateTime deletedDate
+    public User(int id, int accountId, int pointId,
+            String email, String password, String phone, UserRole userRole,
+            boolean isActive, OAuthProvider provider,
+            LocalDateTime createdDate, LocalDateTime updatedDate, LocalDateTime deletedDate
     ) {
         this.id = id;
         this.accountId = accountId;
+        this.pointId = pointId;
         this.email = email;
         this.password = password;
         this.phone = phone;
@@ -55,6 +49,7 @@ public class User {
     public void updateUserRole(UserRole userRole) {
         this.userRole = userRole;
     }
+    public void connectPoint(int pointId) {this.pointId = pointId;}
 
     public void updatePassword(String encryptedPassword) {
         this.password = encryptedPassword;

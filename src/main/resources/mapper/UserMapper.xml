@@ -6,6 +6,7 @@
     <insert id="save" parameterType="User" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO user (id,
                           account_id,
+                          point_id,
                           email,
                           password,
                           phone,
@@ -17,6 +18,7 @@
                           deleted_date)
         VALUES (#{id},
                 NULL,
+                #{pointId},
                 #{email},
                 #{password},
                 #{phone},
