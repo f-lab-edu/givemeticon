@@ -38,7 +38,7 @@ class SignUpFacadeTest {
                 .build();
         cashPoint = CashPoint.builder()
                 .id(1)
-                .point(defaultPoint)
+                .cashPoint(defaultPoint)
                 .build();
     }
 

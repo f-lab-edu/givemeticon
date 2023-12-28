@@ -25,7 +25,7 @@ class CashCashPointServiceTest {
 
     @BeforeEach
     void setUp() {
-        cashPoint = CashPoint.builder().id(pointId).point(defaultPoint).build();
+        cashPoint = CashPoint.builder().id(pointId).cashPoint(defaultPoint).build();
     }
 
     @Test
