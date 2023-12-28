@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.user.facade;
 
-import com.jinddung2.givemeticon.domain.point.domain.Point;
-import com.jinddung2.givemeticon.domain.point.service.PointService;
+import com.jinddung2.givemeticon.domain.point.domain.CashPoint;
+import com.jinddung2.givemeticon.domain.point.service.CashPointService;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
@@ -23,11 +23,11 @@ class SignUpFacadeTest {
     @Mock
     UserService userService;
     @Mock
-    PointService pointService;
+    CashPointService cashPointService;
 
     SignUpRequest signUpRequest;
     User user;
-    Point point;
+    CashPoint cashPoint;
     int defaultPoint = 1000;
 
     @BeforeEach
@@ -36,7 +36,7 @@ class SignUpFacadeTest {
         user = User.builder()
                 .id(1)
                 .build();
-        point = Point.builder()
+        cashPoint = CashPoint.builder()
                 .id(1)
                 .point(defaultPoint)
                 .build();
@@ -45,14 +45,14 @@ class SignUpFacadeTest {
     @Test
     @DisplayName("회원가입 할 때 1000 포인트를 갖고 유저가 생성된다.")
     void signUp() {
-        Mockito.when(pointService.createPoint()).thenReturn(point.getId());
-        Mockito.when(userService.signUp(signUpRequest, point.getId())).thenReturn(user);
+        Mockito.when(cashPointService.createPoint()).thenReturn(cashPoint.getId());
+        Mockito.when(userService.signUp(signUpRequest, cashPoint.getId())).thenReturn(user);
 
         int userId = signUpFacade.signUp(signUpRequest);
 
         Assertions.assertEquals(1, userId);
-        Assertions.assertEquals(1, point.getId());
-        Assertions.assertEquals(point.getId(), user.getId());
-        Assertions.assertEquals(defaultPoint, point.getPoint());
+        Assertions.assertEquals(1, cashPoint.getId());
+        Assertions.assertEquals(cashPoint.getId(), user.getId());
+        Assertions.assertEquals(defaultPoint, cashPoint.getCashPoint());
     }
 }

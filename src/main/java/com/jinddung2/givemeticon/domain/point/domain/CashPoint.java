@@ -10,15 +10,15 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor
 @ToString
-public class Point {
+public class CashPoint {
     private int id;
-    private int point;
+    private int cashPoint;
     private LocalDateTime createdDate;
 
     @Builder
-    public Point(int id, int point, LocalDateTime createdDate) {
+    public CashPoint(int id, int cashPoint, LocalDateTime createdDate) {
         this.id = id;
-        this.point = point;
+        this.cashPoint = cashPoint;
         this.createdDate = createdDate;
     }
 

@@ -25,13 +25,13 @@ public class UserService {
     }
 
     @Transactional
-    public User signUp(SignUpRequest request, int pointId) {
+    public User signUp(SignUpRequest request, int cashPointId) {
         checkUserValidity(request);
         String encryptedPassword = passwordEncoder.encode(request.getPassword());
 
         User user = request.toEntity(encryptedPassword);
         user.updateUserRole(UserRole.USER);
-        user.connectPoint(pointId);
+        user.setUpCashPoint(cashPointId);
         userMapper.save(user);
 
         return user;

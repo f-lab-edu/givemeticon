@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.point.service;
 
-import com.jinddung2.givemeticon.domain.point.domain.Point;
-import com.jinddung2.givemeticon.domain.point.mapper.PointMapper;
+import com.jinddung2.givemeticon.domain.point.domain.CashPoint;
+import com.jinddung2.givemeticon.domain.point.mapper.CashPointMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,28 +13,28 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class PointServiceTest {
+class CashCashPointServiceTest {
     @InjectMocks
-    PointService pointService;
+    CashPointService cashPointService;
     @Mock
-    PointMapper pointMapper;
+    CashPointMapper cashPointMapper;
 
-    Point point;
+    CashPoint cashPoint;
     int pointId = 1;
     int defaultPoint = 1000;
 
     @BeforeEach
     void setUp() {
-        point = Point.builder().id(pointId).point(defaultPoint).build();
+        cashPoint = CashPoint.builder().id(pointId).point(defaultPoint).build();
     }
 
     @Test
     @DisplayName("포인트 1000점 적립에 성공한다.")
     void save_default_point(){
-        Mockito.when(pointMapper.save(point)).thenReturn(point.getId());
-        pointMapper.save(point);
-        pointService.createPoint();
-        Assertions.assertEquals(pointId, point.getId());
-        Assertions.assertEquals(defaultPoint, point.getPoint());
+        Mockito.when(cashPointMapper.save(cashPoint)).thenReturn(cashPoint.getId());
+        cashPointMapper.save(cashPoint);
+        cashPointService.createPoint();
+        Assertions.assertEquals(pointId, cashPoint.getId());
+        Assertions.assertEquals(defaultPoint, cashPoint.getCashPoint());
     }
 }
