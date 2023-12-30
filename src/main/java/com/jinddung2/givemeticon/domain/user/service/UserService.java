@@ -10,6 +10,7 @@ import com.jinddung2.givemeticon.domain.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Slf4j
@@ -23,15 +24,17 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public int signUp(SignUpRequest request) {
+    @Transactional
+    public User signUp(SignUpRequest request, int cashPointId) {
         checkUserValidity(request);
         String encryptedPassword = passwordEncoder.encode(request.getPassword());
 
         User user = request.toEntity(encryptedPassword);
         user.updateUserRole(UserRole.USER);
+        user.setUpCashPoint(cashPointId);
         userMapper.save(user);
 
-        return user.getId();
+        return user;
     }
 
     public User getUser(int userId) {

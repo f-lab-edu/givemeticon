@@ -6,6 +6,7 @@ import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.*;
 import com.jinddung2.givemeticon.domain.user.facade.CreateAccountFacade;
 import com.jinddung2.givemeticon.domain.user.facade.PasswordResetFacade;
+import com.jinddung2.givemeticon.domain.user.facade.SignUpFacade;
 import com.jinddung2.givemeticon.domain.user.facade.UserItemFavoriteFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
@@ -26,6 +27,7 @@ import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.L
 public class UserController {
 
     private final UserService userService;
+    private final SignUpFacade signUpFacade;
     private final LoginService loginService;
     private final UserItemFavoriteFacade userItemFavoriteFacade;
     private final PasswordResetFacade passwordResetFacade;
@@ -33,7 +35,7 @@ public class UserController {
 
     @PostMapping("/sign-up")
     public ResponseEntity<ApiResponse<Integer>> signUp(@RequestBody @Validated SignUpRequest request) {
-        Integer userId = userService.signUp(request);
+        Integer userId = signUpFacade.signUp(request);
         return new ResponseEntity<>(ApiResponse.success(userId), HttpStatus.CREATED);
     }
 
