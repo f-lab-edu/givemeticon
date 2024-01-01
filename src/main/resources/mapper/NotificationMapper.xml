@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.notification.mapper.NotificationMapper">
+    <insert id="save" parameterType="Notification" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO notification (id,
+                                  sale_id,
+                                  seller_id,
+                                  message,
+                                  is_read,
+                                  created_date)
+        VALUES (#{id},
+                #{saleId},
+                #{sellerId},
+                #{message},
+                #{isRead},
+                NOW())
+    </insert>
+</mapper>
