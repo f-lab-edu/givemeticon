@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper">
+
+    <insert id="save" parameterType="Coupon" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO coupon (id,
+                            user_id,
+                            name,
+                            coupon_type,
+                            coupon_number,
+                            price,
+                            is_used,
+                            created_date,
+                            expired_date)
+        VALUES (
+                #{id},
+                #{userId},
+                #{name},
+                #{couponType},
+                #{couponNumber},
+                #{price},
+                #{isUsed},
+                #{createdDate},
+                #{expiredDate}
+               )
+    </insert>
+
+</mapper>

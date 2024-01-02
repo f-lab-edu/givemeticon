@@ -19,8 +19,15 @@ public class CertificationGenerator {
         return result;
     }
 
-    public int createRandomNumber(int bound) {
+    public String createRandomNumber(int bound) {
         Random random = new Random();
-        return random.nextInt(bound);
+
+        // 16자리 숫자 생성
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < bound; i++) {
+            int digit = random.nextInt(10);
+            sb.append(digit);
+        }
+        return sb.toString();
     }
 }
