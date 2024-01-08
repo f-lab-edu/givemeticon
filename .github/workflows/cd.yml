@@ -49,13 +49,14 @@ jobs:
       - name: Deploy
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
+          host: ${{ secrets.NCP_SERVER_IP }}
+          username: ${{ secrets.NCP_SERVER_USER }}
+          password: ${{ secrets.NCP_SERVER_PASSWORD }}
+          port: ${{ secrets.NCP_SERVER_SSH_PORT }}
           # 도커 작업
           script: |
             docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-            ids=$(sudo docker ps -a -q --filter "name=$back")
+            ids=$(sudo docker ps -a -q --filter "name=${{ secrets.DOCKER_REPO }}_back")
             for id in $ids
             do
               sudo docker stop $id && docker rm $id
