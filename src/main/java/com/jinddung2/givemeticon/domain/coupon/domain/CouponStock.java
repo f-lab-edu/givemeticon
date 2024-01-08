@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.coupon.domain;
 
+import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,6 +23,9 @@ public class CouponStock {
     }
 
     public void decrease() {
+        if (remain - 1 < 0) {
+            throw new NotEnoughCouponStockException();
+        }
         this.remain--;
     }
 

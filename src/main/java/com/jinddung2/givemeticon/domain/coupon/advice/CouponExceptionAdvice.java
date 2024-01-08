@@ -19,5 +19,4 @@ public class CouponExceptionAdvice {
         log.debug("coupon exception!! error msg={}", errorResult);
         return new ResponseEntity<>(ApiResponse.fail(errorResult), HttpStatus.BAD_REQUEST);
     }
-
 }
