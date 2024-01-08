@@ -12,6 +12,7 @@ import java.util.Objects;
 public class Coupon {
     private int id;
     private int userId;
+    private int stockId;
     private String name;
     private CouponType couponType;
     private String couponNumber;
@@ -21,10 +22,12 @@ public class Coupon {
     private LocalDate expiredDate;
 
     @Builder
-    public Coupon(int userId, String name, CouponType couponType, String couponNumber, int price, boolean isUsed, LocalDate createdDate, LocalDate expiredDate) {
+    public Coupon(final int userId, final int stockId, final String name, CouponType couponType, final String couponNumber,
+                  final int price, boolean isUsed, LocalDate createdDate, LocalDate expiredDate) {
         validatePrice(price);
         validateExpiredDate(createdDate, expiredDate);
         this.userId = userId;
+        this.stockId = stockId;
         this.name = Objects.requireNonNull(name);
         this.couponType = Objects.requireNonNull(couponType);
         this.couponNumber = Objects.requireNonNull(couponNumber);

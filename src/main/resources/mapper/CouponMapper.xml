@@ -7,6 +7,7 @@
     <insert id="save" parameterType="Coupon" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO coupon (id,
                             user_id,
+                            stock_id,
                             name,
                             coupon_type,
                             coupon_number,
@@ -17,6 +18,7 @@
         VALUES (
                 #{id},
                 #{userId},
+                #{stockId},
                 #{name},
                 #{couponType},
                 #{couponNumber},

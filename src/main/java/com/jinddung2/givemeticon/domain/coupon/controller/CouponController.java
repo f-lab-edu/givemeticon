@@ -1,14 +1,11 @@
 package com.jinddung2.givemeticon.domain.coupon.controller;
 
 import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
+import com.jinddung2.givemeticon.domain.coupon.facade.CreateCouponFacade;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.SessionAttribute;
+import org.springframework.web.bind.annotation.*;
 
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 
@@ -17,12 +14,12 @@ import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.L
 @RequestMapping("/api/v1/coupons")
 public class CouponController {
 
-    private final CouponService couponService;
+    private final CreateCouponFacade createCouponFacade;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Void>> createCoupon(@SessionAttribute(name = LOGIN_USER) int userId) {
-        couponService.createCoupon(userId);
-        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.CREATED);
+    public ResponseEntity<ApiResponse<Integer>> createCoupon(@SessionAttribute(name = LOGIN_USER) int userId,
+                                                          @RequestParam("stock_id") int stockId) {
+        int couponId = createCouponFacade.createCoupon(userId, stockId);
+        return new ResponseEntity<>(ApiResponse.success(couponId), HttpStatus.CREATED);
     }
-
 }

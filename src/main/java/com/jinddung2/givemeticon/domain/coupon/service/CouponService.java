@@ -6,6 +6,7 @@ import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
@@ -16,12 +17,14 @@ public class CouponService {
     private final CouponMapper couponMapper;
     private final CertificationGenerator certificationGenerator;
 
-    public int createCoupon(int userId) {
+    @Transactional
+    public int createCoupon(int userId, int stockId) {
         Coupon coupon = Coupon.builder()
                 .userId(userId)
+                .stockId(stockId)
                 .name("선착순 100장 쿠폰")
                 .couponType(CouponType.FREE_POINT)
-                .couponNumber(certificationGenerator.createRandomNumber(16))
+                .couponNumber(certificationGenerator.createCouponNumber(16))
                 .price(10000)
                 .isUsed(false)
                 .createdDate(LocalDate.now())
