@@ -3,7 +3,7 @@ package com.jinddung2.givemeticon.domain.coupon.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
-import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
+import com.jinddung2.givemeticon.domain.coupon.facade.CreateCouponFacade;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +37,7 @@ class CouponControllerTest {
     ObjectMapper objectMapper;
 
     @MockBean
-    CouponService couponService;
+    CreateCouponFacade createCouponFacade;
 
     MockHttpSession mockHttpSession;
 
@@ -51,12 +51,14 @@ class CouponControllerTest {
     @Test
     @DisplayName("쿠폰 생성 요청이 성공한다.")
     void create_Coupon() throws Exception {
+        int stockId = 1;
+        String url = "/api/v1/coupons?stock_id=";
         mockMvc.perform(MockMvcRequestBuilders
-                        .post("/api/v1/coupons")
+                        .post(url + stockId)
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated());
 
-        Mockito.verify(couponService).createCoupon(1);
+        Mockito.verify(createCouponFacade).createCoupon(1, stockId);
     }
 }

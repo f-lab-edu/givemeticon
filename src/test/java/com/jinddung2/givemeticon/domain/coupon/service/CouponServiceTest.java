@@ -25,17 +25,19 @@ class CouponServiceTest {
     CertificationGenerator certificationGenerator;
 
     int userId = 1;
+    int stockId = 1;
+    int couponLength = 16;
     String randomNum = "1234567812345678";
 
     @Test
     @DisplayName("10000 포인트 주는 쿠폰을 생성하는데 성공한다.")
     void create_coupon() {
         when(couponMapper.save(any(Coupon.class))).thenReturn(2);
-        when(certificationGenerator.createRandomNumber(16)).thenReturn(randomNum);
+        when(certificationGenerator.createCouponNumber(couponLength)).thenReturn(randomNum);
 
-        couponService.createCoupon(userId);
+        couponService.createCoupon(userId, stockId);
 
         verify(couponMapper).save(any(Coupon.class));
-        verify(certificationGenerator).createRandomNumber(16);
+        verify(certificationGenerator).createCouponNumber(couponLength);
     }
 }
