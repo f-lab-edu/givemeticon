@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.common.config;
 import com.jinddung2.givemeticon.domain.notification.domain.dto.CreateNotificationRequestDto;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
@@ -15,6 +16,9 @@ import java.util.Map;
 
 @Configuration
 public class NotificationConsumerConfig {
+
+    @Value("${bootstrap.server}")
+    private String bootstrapServer;
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, CreateNotificationRequestDto> notificationListenerContainerFactory() {
@@ -36,7 +40,7 @@ public class NotificationConsumerConfig {
     // FIXME: bootstrap-server 변경 예정
     private Map<String, Object> notificationConsumerConfigs() {
         Map<String, Object> props = new HashMap<>();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "alarm");
         return props;
     }
