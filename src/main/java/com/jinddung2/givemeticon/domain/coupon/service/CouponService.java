@@ -18,17 +18,18 @@ public class CouponService {
     private final CertificationGenerator certificationGenerator;
 
     @Transactional
-    public int createCoupon(int userId, int stockId) {
+    public int createCoupon(int userId, int stockId, String couponName, CouponType couponType, int price) {
+        LocalDate now  = LocalDate.now();
         Coupon coupon = Coupon.builder()
                 .userId(userId)
                 .stockId(stockId)
-                .name("선착순 100장 쿠폰")
-                .couponType(CouponType.FREE_POINT)
+                .name(couponName)
+                .couponType(couponType)
                 .couponNumber(certificationGenerator.createCouponNumber(16))
-                .price(10000)
+                .price(price)
                 .isUsed(false)
-                .createdDate(LocalDate.now())
-                .expiredDate(LocalDate.now().plusMonths(1))
+                .createdDate(now)
+                .expiredDate(now.plusDays(30))
                 .build();
 
         couponMapper.save(coupon);

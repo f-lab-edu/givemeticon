@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.coupon.facade;
 
+import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponRequestDto;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
-import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponStockService;
 import lombok.RequiredArgsConstructor;
@@ -16,15 +16,12 @@ public class CreateCouponFacade {
     private final CouponStockService couponStockService;
 
     @Transactional
-    public int createCoupon(int userId, int stockId) {
-        CouponStock stock = couponStockService.getStock(stockId);
+    public int createCouponAndDecreaseStock(int userId, CreateCouponRequestDto requestDto) {
+        CouponStock stock = couponStockService.getStock(requestDto.stockId());
 
-        if (stock.getRemain() <= 0) {
-            throw new NotEnoughCouponStockException();
-        }
-
-        int couponId = couponService.createCoupon(userId, stockId);
-        couponStockService.decreaseStock(stockId);
+        int couponId = couponService.createCoupon(
+                userId, requestDto.stockId(), requestDto.couponName(), requestDto.couponType(), requestDto.price());
+        couponStockService.decreaseStock(stock);
 
         return couponId;
     }
