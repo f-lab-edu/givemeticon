@@ -2,6 +2,7 @@ package com.jinddung2.givemeticon.domain.coupon.service;
 
 import com.jinddung2.givemeticon.common.utils.CertificationGenerator;
 import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
+import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,8 +25,12 @@ class CouponServiceTest {
     @Mock
     CertificationGenerator certificationGenerator;
 
-    int userId = 1;
     int stockId = 1;
+    String couponName = "테스트 선착순 쿠폰";
+    int price = 10_000;
+
+    int userId = 1;
+
     int couponLength = 16;
     String randomNum = "1234567812345678";
 
@@ -35,7 +40,7 @@ class CouponServiceTest {
         when(couponMapper.save(any(Coupon.class))).thenReturn(2);
         when(certificationGenerator.createCouponNumber(couponLength)).thenReturn(randomNum);
 
-        couponService.createCoupon(userId, stockId);
+        couponService.createCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price);
 
         verify(couponMapper).save(any(Coupon.class));
         verify(certificationGenerator).createCouponNumber(couponLength);

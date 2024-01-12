@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.exception.ErrorCode;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
+import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponRequestDto;
+import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotFoundCouponStock;
 import com.jinddung2.givemeticon.domain.coupon.facade.CreateCouponFacade;
@@ -44,40 +46,48 @@ class CouponControllerTest {
     @MockBean
     CreateCouponFacade createCouponFacade;
 
+    @MockBean
+    CreateCouponRequestDto createCouponRequestDto;
+
     MockHttpSession mockHttpSession;
 
     int stockId = 1;
+    String couponName = "테스트 선착순 쿠폰";
+    int price = 10_000;
 
     @BeforeEach
     void setUp() {
         mockHttpSession = new MockHttpSession();
         mockHttpSession.setAttribute(LOGIN_USER, 1);
+        createCouponRequestDto = new CreateCouponRequestDto(stockId, couponName, CouponType.FREE_POINT, price);
     }
 
 
     @Test
     @DisplayName("쿠폰 생성 요청이 성공한다.")
     void create_Coupon() throws Exception {
-        String url = "/api/v1/coupons?stock_id=";
+        String url = "/api/v1/coupons";
         mockMvc.perform(MockMvcRequestBuilders
-                        .post(url + stockId)
+                        .post(url)
                         .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(createCouponRequestDto))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated());
 
-        Mockito.verify(createCouponFacade).createCoupon(1, stockId);
+        Mockito.verify(createCouponFacade).createCouponAndDecreaseStock(1, createCouponRequestDto);
     }
 
     @Test
     @DisplayName("쿠폰 재고 아이디가 존재하지 않아 쿠폰 생성 요청에 실패한다.")
     void create_Coupon_Fail_NotFoundCouponStock() throws Exception {
         Mockito.doThrow(new NotFoundCouponStock()).when(createCouponFacade)
-                .createCoupon((int) mockHttpSession.getAttribute(LOGIN_USER), stockId);
+                .createCouponAndDecreaseStock((int) mockHttpSession.getAttribute(LOGIN_USER), createCouponRequestDto);
 
-        String url = "/api/v1/coupons?stock_id=";
+        String url = "/api/v1/coupons";
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .post(url + stockId)
+                        .post(url)
                         .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(createCouponRequestDto))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
 
@@ -91,12 +101,13 @@ class CouponControllerTest {
     @DisplayName("재고가 부족하여 쿠폰 생성 요청에 실패한다.")
     void create_Coupon_Fail_NotEnoughCouponStock() throws Exception {
         Mockito.doThrow(new NotEnoughCouponStockException()).when(createCouponFacade)
-                .createCoupon((int) mockHttpSession.getAttribute(LOGIN_USER), stockId);
+                .createCouponAndDecreaseStock((int) mockHttpSession.getAttribute(LOGIN_USER), createCouponRequestDto);
 
-        String url = "/api/v1/coupons?stock_id=";
+        String url = "/api/v1/coupons";
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
-                        .post(url + stockId)
+                        .post(url)
                         .session(mockHttpSession)
+                        .content(objectMapper.writeValueAsString(createCouponRequestDto))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
 
