@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponStockMapper">
+
+    <select id="findById" parameterType="int" resultType="CouponStock">
+        SELECT id, total, remain
+        FROM coupon_stock
+        WHERE id = #{id}
+    </select>
+
+    <update id="decreaseStock" parameterType="int">
+        UPDATE coupon_stock
+        SET remain = #{remain}
+        WHERE id = #{id}
+    </update>
+</mapper>

@@ -43,7 +43,11 @@ public enum ErrorCode {
 
     // ItemFavorite
     ALREADY_PUSH_ITEMFAVORITE("이미 좋아요를 눌렀습니다."),
-    NOT_PUSH_ITEMFAVORITE("좋아요한 적이 없는 상품이 아닙니다.."),
+    NOT_PUSH_ITEMFAVORITE("좋아요한 적이 없는 상품이 아닙니다."),
+
+    // Coupon
+    NOT_FOUND_COUPON_STOCK("쿠폰 재고를 찾을 수 없습니다."),
+    NOT_ENOUGH_COUPON_STOCK("쿠폰이 소진되었습니다.")
     ;
 
     private final String message;
