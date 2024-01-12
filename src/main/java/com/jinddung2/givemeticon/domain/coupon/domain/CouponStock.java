@@ -23,15 +23,19 @@ public class CouponStock {
     }
 
     public void decrease() {
-        if (remain - 1 < 0) {
-            throw new NotEnoughCouponStockException();
-        }
+        validateEnoughStock(this.remain);
         this.remain--;
     }
 
     private static void validateStock(final int total) {
         if (total < 0) {
             throw new IllegalArgumentException("total of stock should be grater than 0");
+        }
+    }
+
+    private void validateEnoughStock(int remain) {
+        if (remain - 1 < 0) {
+            throw new NotEnoughCouponStockException();
         }
     }
 }

@@ -8,12 +8,11 @@
         SELECT id, total, remain
         FROM coupon_stock
         WHERE id = #{id}
-        FOR UPDATE
     </select>
 
     <update id="decreaseStock" parameterType="int">
         UPDATE coupon_stock
-        SET remain = remain - 1
+        SET remain = #{remain}
         WHERE id = #{id}
     </update>
 </mapper>
