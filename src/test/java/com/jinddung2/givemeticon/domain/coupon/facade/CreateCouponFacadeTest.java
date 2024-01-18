@@ -60,12 +60,12 @@ class CreateCouponFacadeTest {
         Mockito.doAnswer(invocation -> {
             mockStock.decrease();
             return null;
-        }).when(couponStockService).decreaseStock(mockStock);
+        }).when(couponStockService).lockAndGetStockForDecrease(mockStock);
 
         createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto);
 
         Assertions.assertEquals(total - 1, mockStock.getRemain());
 
-        Mockito.verify(couponStockService).decreaseStock(mockStock);
+        Mockito.verify(couponStockService).lockAndGetStockForDecrease(mockStock);
     }
 }
