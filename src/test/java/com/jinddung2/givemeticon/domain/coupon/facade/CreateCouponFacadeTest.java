@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.coupon.facade;
 import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponRequestDto;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
+import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponStockService;
 import org.junit.jupiter.api.Assertions;
@@ -67,5 +68,14 @@ class CreateCouponFacadeTest {
         Assertions.assertEquals(total - 1, mockStock.getRemain());
 
         Mockito.verify(couponStockService).decreaseStockAndGetLock(mockStock);
+    }
+
+    @Test
+    @DisplayName("재고가 0개이하면 쿠폰 생성시 불가하다.")
+    void create_Coupon_Fail_Under_Remain_0() {
+        Mockito.when(couponStockService.getStock(stockId)).thenReturn(zeroStock);
+
+        Assertions.assertThrows(NotEnoughCouponStockException.class,
+                () -> createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto));
     }
 }
