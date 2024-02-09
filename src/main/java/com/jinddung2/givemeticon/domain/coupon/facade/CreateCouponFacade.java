@@ -21,7 +21,7 @@ public class CreateCouponFacade {
 
         int couponId = couponService.createCoupon(
                 userId, requestDto.stockId(), requestDto.couponName(), requestDto.couponType(), requestDto.price());
-        couponStockService.decreaseStock(stock);
+        couponStockService.decreaseStockAndGetLock(stock);
 
         return couponId;
     }

@@ -65,7 +65,7 @@ class CouponStockServiceTest {
         Mockito.when(redissonClient.getLock(Mockito.anyString())).thenReturn(mockLock);
         Mockito.when(mockLock.tryLock(1, 3, TimeUnit.SECONDS)).thenReturn(false);
 
-        couponStockService.decreaseStock(mockStock);
+        couponStockService.decreaseStockAndGetLock(mockStock);
 
         Mockito.verify(couponStockMapper, Mockito.never()).decreaseStock(mockStock.getId(), mockStock.getRemain());
     }
@@ -78,7 +78,7 @@ class CouponStockServiceTest {
         Mockito.when(mockLock.tryLock(1, 3, TimeUnit.SECONDS)).thenReturn(true);
         Mockito.when(redissonClient.getLock(Mockito.anyString())).thenReturn(mockLock);
 
-        couponStockService.decreaseStock(mockStock);
+        couponStockService.decreaseStockAndGetLock(mockStock);
 
         Mockito.verify(mockStock).decrease();
         Mockito.verify(couponStockMapper).decreaseStock(mockStock.getId(), mockStock.getRemain());

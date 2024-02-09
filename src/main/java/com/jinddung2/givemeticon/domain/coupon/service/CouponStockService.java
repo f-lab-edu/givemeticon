@@ -26,7 +26,7 @@ public class CouponStockService {
     }
 
     @Transactional
-    public void decreaseStock(CouponStock stock) {
+    public void decreaseStockAndGetLock(CouponStock stock) {
         String lockNam = "stockLock:" + stock.getId();
         RLock lock = redissonClient.getLock(lockNam);
         String worker = Thread.currentThread().getName();
