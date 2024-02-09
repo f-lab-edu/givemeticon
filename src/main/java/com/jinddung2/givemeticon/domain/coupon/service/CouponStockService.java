@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.concurrent.TimeUnit;
@@ -27,7 +26,7 @@ public class CouponStockService {
     }
 
     @Transactional
-    public void lockAndGetStockForDecrease(CouponStock stock) {
+    public void decreaseStockAndGetLock(CouponStock stock) {
         String lockNam = "stockLock:" + stock.getId();
         RLock lock = redissonClient.getLock(lockNam);
         String worker = Thread.currentThread().getName();
@@ -41,18 +40,13 @@ public class CouponStockService {
             }
 
             log.info("working worker: {} & remain stock: {}", worker, stock.getRemain());
-            decreaseStock(stock);
+            stock.decrease();
+            couponStockMapper.decreaseStock(stock.getId(), stock.getRemain());
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
             lock.unlock();
         }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected void decreaseStock(CouponStock stock) {
-        stock.decrease();
-        couponStockMapper.decreaseStock(stock.getId(), stock.getRemain());
     }
 
 }
