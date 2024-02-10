@@ -20,7 +20,7 @@ public class CouponController {
     @PostMapping("")
     public ResponseEntity<ApiResponse<Integer>> createCoupon(@SessionAttribute(name = LOGIN_USER) int userId,
                                                           @RequestBody CreateCouponRequestDto requestDto) {
-        int couponId = createCouponFacade.createCouponAndDecreaseStock(userId, requestDto);
-        return new ResponseEntity<>(ApiResponse.success(couponId), HttpStatus.CREATED);
+        createCouponFacade.createCouponAndDecreaseStock(userId, requestDto);
+        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.CREATED);
     }
 }

@@ -11,11 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 @ExtendWith(MockitoExtension.class)
 class CouponStockServiceTest {
@@ -58,30 +56,13 @@ class CouponStockServiceTest {
     }
 
     @Test
-    @DisplayName("락 흭득에 실패한다.")
-    void getLock_Fail() throws InterruptedException {
-        RLock mockLock = Mockito.mock(RLock.class);
-
-        Mockito.when(redissonClient.getLock(Mockito.anyString())).thenReturn(mockLock);
-        Mockito.when(mockLock.tryLock(1, 3, TimeUnit.SECONDS)).thenReturn(false);
-
-        couponStockService.decreaseStockAndGetLock(mockStock);
-
-        Mockito.verify(couponStockMapper, Mockito.never()).decreaseStock(mockStock.getId(), mockStock.getRemain());
-    }
-
-    @Test
     @DisplayName("쿠폰 재고 감소에 성공한다.")
     void decrease_Stock() throws InterruptedException {
-        RLock mockLock = Mockito.mock(RLock.class);
 
-        Mockito.when(mockLock.tryLock(1, 3, TimeUnit.SECONDS)).thenReturn(true);
-        Mockito.when(redissonClient.getLock(Mockito.anyString())).thenReturn(mockLock);
-
-        couponStockService.decreaseStockAndGetLock(mockStock);
+        couponStockService.decreaseStock(mockStock);
 
         Mockito.verify(mockStock).decrease();
         Mockito.verify(couponStockMapper).decreaseStock(mockStock.getId(), mockStock.getRemain());
-        Mockito.verify(mockLock).unlock();
+
     }
 }

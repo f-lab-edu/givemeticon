@@ -18,7 +18,7 @@ public class CouponService {
     private final CertificationGenerator certificationGenerator;
 
     @Transactional
-    public int createCoupon(int userId, int stockId, String couponName, CouponType couponType, int price) {
+    public void createCoupon(int userId, int stockId, String couponName, CouponType couponType, int price) {
         LocalDate now  = LocalDate.now();
         Coupon coupon = Coupon.builder()
                 .userId(userId)
@@ -33,6 +33,5 @@ public class CouponService {
                 .build();
 
         couponMapper.save(coupon);
-        return coupon.getId();
     }
 }
