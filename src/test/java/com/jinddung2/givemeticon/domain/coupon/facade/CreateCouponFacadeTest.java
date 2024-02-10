@@ -3,7 +3,6 @@ package com.jinddung2.givemeticon.domain.coupon.facade;
 import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponRequestDto;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
-import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponStockService;
 import org.junit.jupiter.api.Assertions;
@@ -15,12 +14,19 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+
+import java.util.concurrent.TimeUnit;
 
 @ExtendWith(MockitoExtension.class)
 class CreateCouponFacadeTest {
 
     @InjectMocks
     CreateCouponFacade createCouponFacade;
+
+    @Mock
+    RedissonClient redissonClient;
 
     @Mock
     CouponService couponService;
@@ -47,35 +53,52 @@ class CreateCouponFacadeTest {
     }
 
     @Test
-    @DisplayName("쿠폰을 생성하면 해당 쿠폰의 재고는 1개 감소한다.")
-    void create_Coupon_Success() {
+    @DisplayName("락 흭득에 실패한다.")
+    void getLock_Fail() throws InterruptedException {
+        RLock mockLock = Mockito.mock(RLock.class);
+
+        Mockito.when(redissonClient.getLock(Mockito.anyString())).thenReturn(mockLock);
+        Mockito.when(mockLock.tryLock(1, 3, TimeUnit.SECONDS)).thenReturn(false);
         Mockito.when(couponStockService.getStock(stockId)).thenReturn(mockStock);
-        Mockito.when(couponService.createCoupon(
+
+        createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto);
+
+        Mockito.verify(couponService, Mockito.never()).createCoupon(
                 userId,
                 createCouponRequestDto.stockId(),
                 createCouponRequestDto.couponName(),
                 createCouponRequestDto.couponType(),
-                createCouponRequestDto.price())
-        ).thenReturn(1);
+                createCouponRequestDto.price());
+        Mockito.verify(couponStockService, Mockito.never()).decreaseStock(mockStock);
+    }
+
+    @Test
+    @DisplayName("쿠폰을 생성하면 해당 쿠폰의 재고는 1개 감소한다.")
+    void create_Coupon_Success() throws InterruptedException {
+
+        RLock mockLock = Mockito.mock(RLock.class);
+
+        Mockito.when(mockLock.tryLock(1, 3, TimeUnit.SECONDS)).thenReturn(true);
+        Mockito.when(redissonClient.getLock(Mockito.anyString())).thenReturn(mockLock);
+
+        Mockito.when(couponStockService.getStock(stockId)).thenReturn(mockStock);
+        Mockito.doNothing().when(couponService).createCoupon(
+                userId,
+                createCouponRequestDto.stockId(),
+                createCouponRequestDto.couponName(),
+                createCouponRequestDto.couponType(),
+                createCouponRequestDto.price());
 
         Mockito.doAnswer(invocation -> {
             mockStock.decrease();
             return null;
-        }).when(couponStockService).decreaseStockAndGetLock(mockStock);
+        }).when(couponStockService).decreaseStock(mockStock);
 
         createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto);
 
         Assertions.assertEquals(total - 1, mockStock.getRemain());
 
-        Mockito.verify(couponStockService).decreaseStockAndGetLock(mockStock);
-    }
-
-    @Test
-    @DisplayName("재고가 0개이하면 쿠폰 생성시 불가하다.")
-    void create_Coupon_Fail_Under_Remain_0() {
-        Mockito.when(couponStockService.getStock(stockId)).thenReturn(zeroStock);
-
-        Assertions.assertThrows(NotEnoughCouponStockException.class,
-                () -> createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto));
+        Mockito.verify(couponStockService).decreaseStock(mockStock);
+        Mockito.verify(mockLock).unlock();
     }
 }
