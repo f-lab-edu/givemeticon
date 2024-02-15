@@ -34,6 +34,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 
     implementation 'org.springframework.security:spring-security-crypto'
 
@@ -72,6 +73,8 @@ jacocoTestReport {
                     fileTree(dir: it, excludes: [
                             "**/*Application*",
                             "**/config/*Config*",
+                            "**/config/*Config*",
+                            "**/annotation/**",
                             "**/dto/*Dto*",
                             "**/request/*Request*",
                             "**/response/*Response*",
@@ -113,6 +116,8 @@ jacocoTestCoverageVerification {
             excludes = [
                     "**/*Application*",
                     "**/config/*Config*",
+                    "**/annotation/**",
+                    "**/aop/**",
                     "**/dto/*Dto*",
                     "**/request/*Request*",
                     "**/response/*Response*",
