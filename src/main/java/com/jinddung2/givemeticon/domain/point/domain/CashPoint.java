@@ -22,4 +22,10 @@ public class CashPoint {
         this.createdDate = createdDate;
     }
 
+    public void addPoint(int price) {
+        if (price < 0) {
+            throw new IllegalArgumentException("추가할 포인트는 양수여야 합니다.");
+        }
+        this.cashPoint += price;
+    }
 }

@@ -32,7 +32,7 @@ public enum ErrorCode {
     NOT_FOUND_ITEM("존재하지 않는 아이템입니다."),
     NOT_FOUND_SALE("존재하지 않는 판매 상품입니다."),
     NOT_REGISTER_ACCOUNT("판매자 등록이 되어 있지 않습니다."),
-    EXPIRED_DATE("유효기간이 이미 지났습니다."),
+    SALE_EXPIRED_DATE("상품 유효기간이 이미 지났습니다."),
     DUPLICATED_BARCODE_NUMBER("이미 등록된 바코드 입니다."),
 
     // Trade
@@ -47,8 +47,11 @@ public enum ErrorCode {
 
     // Coupon
     NOT_FOUND_COUPON_STOCK("쿠폰 재고를 찾을 수 없습니다."),
-    NOT_ENOUGH_COUPON_STOCK("쿠폰이 소진되었습니다.")
-    ;
+    NOT_ENOUGH_COUPON_STOCK("쿠폰이 소진되었습니다."),
+    NOT_FOUND_COUPON("쿠폰을 찾을 수 없습니다."),
+    COUPON_USER_MISMATCH("쿠폰에 등록된 유저가 아닙니다."),
+    COUPON_EXPIRED_DATE("쿠폰 유효기간이 이미 지났습니다."),
+    ALREADY_REDEEMED_COUPON("이미 사용한 쿠폰입니다.");
 
     private final String message;
 

@@ -34,6 +34,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 
     implementation 'org.springframework.security:spring-security-crypto'
 
@@ -42,8 +43,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.session:spring-session-data-redis'
     implementation 'org.redisson:redisson-spring-boot-starter:3.24.3'
-
-
 
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
@@ -74,6 +73,8 @@ jacocoTestReport {
                     fileTree(dir: it, excludes: [
                             "**/*Application*",
                             "**/config/*Config*",
+                            "**/aop/**",
+                            "**/annotation/**",
                             "**/dto/*Dto*",
                             "**/request/*Request*",
                             "**/response/*Response*",
@@ -115,6 +116,8 @@ jacocoTestCoverageVerification {
             excludes = [
                     "**/*Application*",
                     "**/config/*Config*",
+                    "**/annotation/**",
+                    "**/aop/**",
                     "**/dto/*Dto*",
                     "**/request/*Request*",
                     "**/response/*Response*",

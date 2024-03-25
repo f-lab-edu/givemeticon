@@ -45,6 +45,7 @@
     <select id="findById" parameterType="int" resultType="User">
         SELECT id,
                account_id,
+               cash_point_id,
                email,
                password,
                phone,

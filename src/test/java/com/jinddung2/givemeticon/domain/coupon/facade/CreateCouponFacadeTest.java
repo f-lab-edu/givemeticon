@@ -35,6 +35,8 @@ class CreateCouponFacadeTest {
 
     int userId = 1;
     int total = 100;
+    long waitTime = 5L;
+    long releaseTime = 3L;
     CouponStock mockStock;
     CouponStock zeroStock;
 
@@ -47,25 +49,27 @@ class CreateCouponFacadeTest {
 
     @Test
     @DisplayName("쿠폰을 생성하면 해당 쿠폰의 재고는 1개 감소한다.")
-    void create_Coupon_Success() {
+    void create_Coupon_Success() throws InterruptedException {
+
         Mockito.when(couponStockService.getStock(stockId)).thenReturn(mockStock);
-        Mockito.when(couponService.createCoupon(
-                userId,
-                createCouponRequestDto.stockId(),
-                createCouponRequestDto.couponName(),
-                createCouponRequestDto.couponType(),
-                createCouponRequestDto.price())
-        ).thenReturn(1);
 
         Mockito.doAnswer(invocation -> {
             mockStock.decrease();
             return null;
-        }).when(couponStockService).lockAndGetStockForDecrease(mockStock);
+        }).when(couponStockService).decreaseStock(mockStock);
+
+        Mockito.doNothing().when(couponService).createCoupon(
+                userId,
+                createCouponRequestDto.stockId(),
+                createCouponRequestDto.couponName(),
+                createCouponRequestDto.couponType(),
+                createCouponRequestDto.price());
+
 
         createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto);
 
         Assertions.assertEquals(total - 1, mockStock.getRemain());
 
-        Mockito.verify(couponStockService).lockAndGetStockForDecrease(mockStock);
+        Mockito.verify(couponStockService).decreaseStock(mockStock);
     }
 }
