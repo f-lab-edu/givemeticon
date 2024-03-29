@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.domain.point.service;
 
 import com.jinddung2.givemeticon.domain.point.domain.CashPoint;
+import com.jinddung2.givemeticon.domain.point.exception.NotFoundCashPoint;
 import com.jinddung2.givemeticon.domain.point.mapper.CashPointMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,4 +24,7 @@ public class CashPointService {
         return cashPoint.getId();
     }
 
+    public CashPoint getCashPoint(int cashPointId) {
+        return cashPointMapper.findById(cashPointId).orElseThrow(NotFoundCashPoint::new);
+    }
 }

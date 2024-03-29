@@ -47,8 +47,10 @@ public enum ErrorCode {
 
     // Coupon
     NOT_FOUND_COUPON_STOCK("쿠폰 재고를 찾을 수 없습니다."),
-    NOT_ENOUGH_COUPON_STOCK("쿠폰이 소진되었습니다.")
-    ;
+    NOT_ENOUGH_COUPON_STOCK("쿠폰이 소진되었습니다."),
+
+    // CashPoint
+    NOT_FOUND_CASH_POINT("포인트 데이터를 찾을 수 없습니다.");
 
     private final String message;
 

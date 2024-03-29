@@ -13,4 +13,10 @@ VALUES (#{id},
         NOW())
     </insert>
 
+    <select id="findById" parameterType="int" resultType="CashPoint">
+        SELECT id, cash_point
+        FROM cash_point
+        WHERE id = #{id}
+    </select>
+
 </mapper>
