@@ -15,8 +15,7 @@
                             is_used,
                             created_date,
                             expired_date)
-        VALUES (
-                #{id},
+        VALUES (#{id},
                 #{userId},
                 #{stockId},
                 #{name},
@@ -25,8 +24,50 @@
                 #{price},
                 #{isUsed},
                 #{createdDate},
-                #{expiredDate}
-               )
+                #{expiredDate})
     </insert>
 
+    <update id="merge" parameterType="Coupon">
+        UPDATE coupon
+        SET user_id       = #{userId},
+            stock_id      = #{stockId},
+            name          = #{name},
+            coupon_type   = #{couponType},
+            coupon_number = #{couponNumber},
+            price         = #{price},
+            is_used       = #{isUsed},
+            created_date  = #{createdDate},
+            expired_date  = #{expiredDate}
+        WHERE id = #{id};
+    </update>
+
+<!--    <select id="getCouponById">-->
+<!--        SELECT id,-->
+<!--               user_id,-->
+<!--               stock_id,-->
+<!--               name,-->
+<!--               coupon_type,-->
+<!--               coupon_number,-->
+<!--               price,-->
+<!--               is_used,-->
+<!--               created_date,-->
+<!--               expired_date-->
+<!--        FROM coupon-->
+<!--        WHERE id = #{couponId};-->
+<!--    </select>-->
+
+    <select id="getCouponByCouponNumber">
+        SELECT id,
+               user_id,
+               stock_id,
+               name,
+               coupon_type,
+               coupon_number,
+               price,
+               is_used,
+               created_date,
+               expired_date
+        FROM coupon
+        WHERE coupon_number = #{couponNumber};
+    </select>
 </mapper>

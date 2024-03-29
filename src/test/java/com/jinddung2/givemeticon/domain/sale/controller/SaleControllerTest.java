@@ -158,7 +158,7 @@ class SaleControllerTest {
         resultActions
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("유효기간이 이미 지났습니다."));
+                .andExpect(jsonPath("$.data.message").value("상품 유효기간이 이미 지났습니다."));
     }
 
     @Test

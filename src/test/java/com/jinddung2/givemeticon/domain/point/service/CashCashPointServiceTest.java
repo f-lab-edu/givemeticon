@@ -21,7 +21,6 @@ import static org.mockito.Mockito.when;
 class CashCashPointServiceTest {
     @InjectMocks
     CashPointService sut;
-
     @Mock
     CashPointMapper cashPointMapper;
 

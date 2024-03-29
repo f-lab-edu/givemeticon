@@ -9,5 +9,7 @@ import java.util.Optional;
 public interface CashPointMapper {
     int save(CashPoint cashPoint);
 
+    int merge(CashPoint cashPoint);
+
     Optional<CashPoint> findById(int id);
 }
