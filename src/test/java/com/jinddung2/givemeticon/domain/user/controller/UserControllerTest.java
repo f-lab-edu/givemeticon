@@ -7,6 +7,7 @@ import com.jinddung2.givemeticon.domain.account.request.CreateAccountRequest;
 import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.exception.NotPushItemFavorite;
 import com.jinddung2.givemeticon.domain.mail.service.MailSendService;
+import com.jinddung2.givemeticon.domain.point.exception.NotFoundCashPoint;
 import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.LoginRequest;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordResetRequest;
@@ -16,10 +17,7 @@ import com.jinddung2.givemeticon.domain.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.domain.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.domain.user.exception.MisMatchPasswordException;
 import com.jinddung2.givemeticon.domain.user.exception.NotFoundUserException;
-import com.jinddung2.givemeticon.domain.user.facade.CreateAccountFacade;
-import com.jinddung2.givemeticon.domain.user.facade.PasswordResetFacade;
-import com.jinddung2.givemeticon.domain.user.facade.SignUpFacade;
-import com.jinddung2.givemeticon.domain.user.facade.UserItemFavoriteFacade;
+import com.jinddung2.givemeticon.domain.user.facade.*;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,8 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
-import static com.jinddung2.givemeticon.common.exception.ErrorCode.ALREADY_PUSH_ITEMFAVORITE;
-import static com.jinddung2.givemeticon.common.exception.ErrorCode.NOT_PUSH_ITEMFAVORITE;
+import static com.jinddung2.givemeticon.common.exception.ErrorCode.*;
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
@@ -69,6 +66,8 @@ public class UserControllerTest {
     CreateAccountFacade createAccountFacade;
     @MockBean
     UserItemFavoriteFacade userItemFavoriteFacade;
+    @MockBean
+    GetMyPointFacade getMyPointFacade;
 
     MockHttpSession mockHttpSession;
     SignUpRequest signUpRequest;
@@ -85,6 +84,7 @@ public class UserControllerTest {
         int fakeUserId = 100;
         userDto = UserDto.builder()
                 .id(fakeUserId)
+                .cashPointId(1)
                 .email("test1234@example.com")
                 .password("test1234")
                 .build();
@@ -104,7 +104,6 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(signUpRequest)))
                 .andExpect(status().isCreated());
 
-        // Verify
         Mockito.verify(signUpFacade).signUp(signUpRequest);
     }
 
@@ -150,7 +149,6 @@ public class UserControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk());
 
-        // Verify
         Mockito.verify(userService).getUserInfo(userDto.getId());
     }
 
@@ -165,7 +163,6 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
 
-        // Verify
         resultActions
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("FAIL"))
@@ -182,7 +179,6 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(signUpRequest)))
                 .andExpect(status().isOk());
 
-        // Verify
         Mockito.verify(loginService).login(userDto.getId());
     }
 
@@ -191,13 +187,12 @@ public class UserControllerTest {
     void logout_Success() throws Exception {
         willDoNothing().given(loginService).logout();
         mockMvc.perform(MockMvcRequestBuilders
-                        .get("/api/v1/users/logout")
+                        .post("/api/v1/users/logout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(signUpRequest)))
                 .andExpect(status().isOk());
 
-        // Verify
         Mockito.verify(loginService).logout();
     }
 
@@ -212,7 +207,6 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
                 .andExpect(status().isOk());
 
-        // Verify
         Mockito.verify(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
     }
 
@@ -227,7 +221,6 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
                 .andExpect(status().isBadRequest());
 
-        // Verify
         resultActions
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("FAIL"))
@@ -237,7 +230,8 @@ public class UserControllerTest {
     @Test
     @DisplayName("이전 비밀번호가 일치하지 않아 비밀번호 변경에 실패한다.")
     void update_Password_MisMatch_Password() throws Exception {
-        doThrow(new MisMatchPasswordException()).when(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
+        doThrow(new MisMatchPasswordException())
+                .when(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .patch("/api/v1/users/password")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -245,7 +239,6 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
                 .andExpect(status().isBadRequest());
 
-        // Verify
         resultActions
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("FAIL"))
@@ -263,7 +256,6 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(passwordResetRequest)))
                 .andExpect(status().isOk());
 
-        // Verify
         Mockito.verify(passwordResetFacade).resetPasswordAndSendEmail(passwordResetRequest.email());
     }
 
@@ -277,7 +269,6 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
                 .andExpect(status().isOk());
 
-        // Verify
         Mockito.verify(createAccountFacade).createAccount(userDto.getId(), createAccountRequest);
     }
 
@@ -376,5 +367,35 @@ public class UserControllerTest {
                 .andExpect(status().isOk());
 
         Mockito.verify(userItemFavoriteFacade).getMyFavoriteItems(userDto.getId());
+    }
+
+    @Test
+    @DisplayName("내 포인트 조회 api가 성공한다.")
+    void get_my_point() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/users/my-point")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession))
+                .andExpect(status().isOk());
+
+        Mockito.verify(getMyPointFacade).getMyPoint(userDto.getId());
+    }
+
+    @Test
+    @DisplayName("캐시 포인트 데이터가 존재하지 않아 포인트 조회 api가 실패한다.")
+    void get_my_point_fail_not_found_cash_point() throws Exception {
+        Mockito.doThrow(new NotFoundCashPoint())
+                .when(getMyPointFacade).getMyPoint(userDto.getId());
+
+        ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/users/my-point")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .session(mockHttpSession))
+                .andExpect(status().isBadRequest());
+
+        resultActions
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("FAIL"))
+                .andExpect(jsonPath("$.data.message").value(NOT_FOUND_CASH_POINT.getMessage()));
     }
 }

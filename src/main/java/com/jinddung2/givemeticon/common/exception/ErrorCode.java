@@ -51,7 +51,10 @@ public enum ErrorCode {
     NOT_FOUND_COUPON("쿠폰을 찾을 수 없습니다."),
     COUPON_USER_MISMATCH("쿠폰에 등록된 유저가 아닙니다."),
     COUPON_EXPIRED_DATE("쿠폰 유효기간이 이미 지났습니다."),
-    ALREADY_REDEEMED_COUPON("이미 사용한 쿠폰입니다.");
+    ALREADY_REDEEMED_COUPON("이미 사용한 쿠폰입니다."),
+
+    // CashPoint
+    NOT_FOUND_CASH_POINT("포인트 데이터를 찾을 수 없습니다.");
 
     private final String message;
 

@@ -19,12 +19,10 @@
         WHERE id = #{id}
     </update>
 
-    <select id="getCashPointById" parameterType="int">
-        SELECT id,
-               cash_point,
-               created_date
+    <select id="findById" parameterType="int" resultType="CashPoint">
+        SELECT id, cash_point
         FROM cash_point
-        WHERE id = #{cashPointId}
+        WHERE id = #{id}
     </select>
 
 </mapper>

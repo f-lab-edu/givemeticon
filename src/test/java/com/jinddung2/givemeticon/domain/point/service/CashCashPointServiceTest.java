@@ -1,12 +1,8 @@
 package com.jinddung2.givemeticon.domain.point.service;
 
-import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
-import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.point.domain.CashPoint;
+import com.jinddung2.givemeticon.domain.point.exception.NotFoundCashPoint;
 import com.jinddung2.givemeticon.domain.point.mapper.CashPointMapper;
-import com.jinddung2.givemeticon.domain.user.domain.User;
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,10 +10,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,46 +24,40 @@ class CashCashPointServiceTest {
     @Mock
     CashPointMapper cashPointMapper;
 
-    CashPoint cashPoint;
-    int pointId = 1;
-    int defaultPoint = 1000;
-
-    @BeforeEach
-    void setUp() {
-        cashPoint = CashPoint.builder().id(pointId).cashPoint(defaultPoint).build();
-    }
 
     @Test
-    @DisplayName("포인트 1000점 적립에 성공한다.")
+    @DisplayName("회원가입할 때 기본 포인트도 적립한다.")
     void save_default_point(){
-        when(cashPointMapper.save(cashPoint)).thenReturn(cashPoint.getId());
-        cashPointMapper.save(cashPoint);
+        int pointId = 1;
+        when(cashPointMapper.save(any(CashPoint.class))).thenReturn(pointId);
 
         sut.createPoint();
 
-        assertEquals(pointId, cashPoint.getId());
-        assertEquals(defaultPoint, cashPoint.getCashPoint());
+        verify(cashPointMapper).save(any(CashPoint.class));
     }
 
     @Test
-    @DisplayName("포인트 추가에 성공한다.")
-    void add_point_success(){
-        int userId = 1;
-        User user = User.builder().id(userId).cashPointId(pointId).build();
-        Coupon coupon = Coupon.builder()
-                .userId(userId)
-                .name("testCoupon")
-                .couponNumber("COUPON123")
-                .couponType(CouponType.FREE_POINT)
-                .price(defaultPoint)
-                .isUsed(false)
-                .expiredDate(LocalDate.now().plusDays(1))
+    @DisplayName("id를 통해 캐시포인트를 찾으면 캐시포인트 객체를 반환한다.")
+    void when_createPoint_should_be_cash_point(){
+        int pointId = 1, defaultPoint = 1000;
+        CashPoint cashPoint = CashPoint.builder()
+                .id(pointId)
+                .cashPoint(defaultPoint) // Assuming DEFAULT_POINT is accessible here; otherwise, use the actual point value.
                 .build();
-        when(cashPointMapper.getCashPointById(user.getCashPointId())).thenReturn(Optional.of(cashPoint));
-        int agoPoint = cashPoint.getCashPoint();
-        sut.addPoint(user, coupon);
+        when(cashPointMapper.findById(pointId)).thenReturn(Optional.of(cashPoint));
 
-        Assertions.assertThat(cashPoint.getCashPoint()).isEqualTo(agoPoint + coupon.getPrice());
-        verify(cashPointMapper).merge(cashPoint);
+        sut.getCashPoint(pointId);
+
+        verify(cashPointMapper).findById(pointId);
+    }
+
+    @Test
+    @DisplayName("id를 통해 캐시포인트를 찾을 때 존재하지 않으면 NotFoundCashPoint 예외를 발생시킨다.")
+    void when_getCashPoint_with_nonexistent_id_should_throw_NotFoundCashPoint_exception(){
+        int pointId = 1;
+        when(cashPointMapper.findById(pointId)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundCashPoint.class,
+                () -> sut.getCashPoint(pointId));
     }
 }
