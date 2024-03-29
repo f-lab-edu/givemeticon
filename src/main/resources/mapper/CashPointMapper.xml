@@ -6,11 +6,25 @@
 
     <insert id="save" parameterType="CashPoint" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO cash_point (id,
-                           cash_point,
-                           created_date)
-VALUES (#{id},
-        #{cashPoint},
-        NOW())
+                                cash_point,
+                                created_date)
+        VALUES (#{id},
+                #{cashPoint},
+                NOW())
     </insert>
+
+    <update id="merge" parameterType="CashPoint">
+        UPDATE cash_point
+        SET cash_point = #{cashPoint}
+        WHERE id = #{id}
+    </update>
+
+    <select id="getCashPointById" parameterType="int">
+        SELECT id,
+               cash_point,
+               created_date
+        FROM cash_point
+        WHERE id = #{cashPointId}
+    </select>
 
 </mapper>
