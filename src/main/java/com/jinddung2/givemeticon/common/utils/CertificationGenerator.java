@@ -4,10 +4,10 @@ import org.springframework.stereotype.Component;
 
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Random;
 
 @Component
 public class CertificationGenerator {
+
     public String createCertificationNumber() throws NoSuchAlgorithmException {
         String result;
 
@@ -19,8 +19,16 @@ public class CertificationGenerator {
         return result;
     }
 
-    public int createRandomNumber(int bound) {
-        Random random = new Random();
-        return random.nextInt(bound);
+    public String createCouponNumber (int length){
+        String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+        StringBuilder coupon = new StringBuilder();
+
+        for (int i = 1; i <= length; i++) {
+            int idx = random.nextInt(characters.length());
+            coupon.append(characters.charAt(idx));
+        }
+
+        return coupon.toString();
     }
 }
