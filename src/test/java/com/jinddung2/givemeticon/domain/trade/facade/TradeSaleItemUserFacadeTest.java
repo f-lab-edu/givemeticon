@@ -2,6 +2,8 @@ package com.jinddung2.givemeticon.domain.trade.facade;
 
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
+import com.jinddung2.givemeticon.domain.notification.domain.dto.CreateNotificationRequestDto;
+import com.jinddung2.givemeticon.domain.notification.producer.NotificationProducer;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.trade.controller.dto.TradeDto;
@@ -40,6 +42,9 @@ class TradeSaleItemUserFacadeTest {
     ItemService itemService;
     @Mock
     TradeService tradeService;
+
+    @Mock
+    NotificationProducer producer;
 
     int buyerId;
     int saleId;
@@ -85,6 +90,7 @@ class TradeSaleItemUserFacadeTest {
 
         Mockito.verify(saleService).update(sale);
         Mockito.verify(tradeService).save(Mockito.any(Trade.class), Mockito.any(Long.class));
+        Mockito.verify(producer).create(Mockito.any(CreateNotificationRequestDto.class));
     }
 
     @Test
@@ -158,9 +164,13 @@ class TradeSaleItemUserFacadeTest {
     @DisplayName("구매 확정에 성공한다.")
     void buy_Confirmation() {
         Mockito.when(userService.isExists(buyerId)).thenReturn(true);
+        Mockito.when(tradeService.getTrade(tradeId)).thenReturn(trade);
+        Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
+        Mockito.when(itemService.getItem(itemId)).thenReturn(item);
 
         tradeSaleItemUserFacade.buyConfirmation(tradeId, buyerId);
         
         Mockito.verify(tradeService).buyConfirmation(tradeId, buyerId);
+        Mockito.verify(producer).create(Mockito.any(CreateNotificationRequestDto.class));
     }
 }

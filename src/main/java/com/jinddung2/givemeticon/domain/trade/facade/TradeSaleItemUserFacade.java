@@ -2,6 +2,8 @@ package com.jinddung2.givemeticon.domain.trade.facade;
 
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
+import com.jinddung2.givemeticon.domain.notification.domain.dto.CreateNotificationRequestDto;
+import com.jinddung2.givemeticon.domain.notification.producer.NotificationProducer;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.trade.controller.dto.TradeDto;
@@ -27,6 +29,7 @@ public class TradeSaleItemUserFacade {
     private final SaleService saleService;
     private final ItemService itemService;
     private final TradeService tradeService;
+    private final NotificationProducer producer;
 
     @Transactional
     public int transact(int saleId, int buyerId) {
@@ -48,6 +51,8 @@ public class TradeSaleItemUserFacade {
 
         sale.updateBoughtState();
         saleService.update(sale);
+        producer.create(new CreateNotificationRequestDto(saleId, sale.getSellerId(),
+                String.format("%s이(가) 판매되었습니다.", item.getName())));
         return tradeService.save(trade, restDay);
     }
 
@@ -96,6 +101,11 @@ public class TradeSaleItemUserFacade {
     public void buyConfirmation(int tradeId, int buyerId) {
         checkUserExists(buyerId);
         tradeService.buyConfirmation(tradeId, buyerId);
+        Trade trade = tradeService.getTrade(tradeId);
+        Sale sale = saleService.getSale(trade.getSaleId());
+        Item item = itemService.getItem(sale.getItemId());
+        producer.create(new CreateNotificationRequestDto(sale.getId(), sale.getSellerId(),
+                String.format("%s이(가) 구매 확정되었습니다.", item.getName())));
     }
 
     private long getRestDay(LocalDate expiredDate) {
