@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.common.advice;
 
+import com.jinddung2.givemeticon.common.exception.ApiException;
 import com.jinddung2.givemeticon.common.exception.UnauthorizedUserException;
 import com.jinddung2.givemeticon.common.response.ApiResponse;
 import com.jinddung2.givemeticon.common.response.ErrorResult;
@@ -30,6 +31,12 @@ public class CommonExceptionAdvice {
         ErrorResult errorResult = new ErrorResult(e.getMessage());
         log.debug("UnauthorizedUserException Occurred. error msg={}", errorResult);
         return new ResponseEntity<>(ApiResponse.fail(errorResult), HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ApiResponse<ErrorResult>> handleOAuthException(ApiException e) {
+        ErrorResult errorResult = new ErrorResult(e.getMessage());
+        return new ResponseEntity<>(ApiResponse.fail(errorResult), HttpStatus.BAD_REQUEST);
     }
 
 }

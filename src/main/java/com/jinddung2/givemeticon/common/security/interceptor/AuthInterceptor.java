@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.common.security.interceptor;
 
 import com.jinddung2.givemeticon.common.security.provider.JwtTokenProvider;
+import com.jinddung2.givemeticon.domain.oauth.exception.InvalidAuthenticationAttemptException;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,8 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
-
-import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -70,14 +69,12 @@ public class AuthInterceptor implements HandlerInterceptor {
         return id != 0;
     }
 
-    private boolean tokenLoginValidate(HttpServletRequest request) {
+    private void tokenLoginValidate(HttpServletRequest request) {
         String authToken = resolveToken(request);
-        String email = null;
 
-        if (authToken != null && jwtTokenProvider.validateToken(authToken)) {
-            email = getUserIdFromToken(authToken);
+        if (authToken != null || jwtTokenProvider.validateToken(authToken)) {
+            throw new InvalidAuthenticationAttemptException();
         }
-        return !Objects.isNull(email);
     }
 
     private String resolveToken(HttpServletRequest request) {
