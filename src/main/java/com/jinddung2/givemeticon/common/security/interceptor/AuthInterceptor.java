@@ -35,15 +35,13 @@ public class AuthInterceptor implements HandlerInterceptor {
     };
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler){
         log.debug("Login Interceptor preHandler");
 
         if (checkAllowGetUrl(request)) return true;
 
         tokenLoginValidate(request);
-        sessionLoginValidate();
-
-        return true;
+        return sessionLoginValidate();
     }
 
     private boolean checkAllowGetUrl(HttpServletRequest request) {

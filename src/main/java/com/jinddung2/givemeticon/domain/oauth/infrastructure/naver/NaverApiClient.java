@@ -44,7 +44,7 @@ public class NaverApiClient implements OAuthClient {
         HttpEntity<MultiValueMap<String, String>> request = generateHttpRequest(params);
 
         NaverToken naverToken = restTemplate.postForObject(url, request, NaverToken.class);
-        if (naverToken.accessToken() == null || naverToken.accessToken().isEmpty()) throw new OAuthNaverTokenEmptyException();
+        if (naverToken == null || naverToken.accessToken().isEmpty()) throw new OAuthNaverTokenEmptyException();
         return naverToken.accessToken();
     }
 

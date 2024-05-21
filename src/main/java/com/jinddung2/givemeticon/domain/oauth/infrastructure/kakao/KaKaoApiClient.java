@@ -42,7 +42,7 @@ public class KaKaoApiClient implements OAuthClient {
         HttpEntity<MultiValueMap<String, String>> request = generateHttpRequest(params);
 
         KaKaoToken kaKaoToken = restTemplate.postForObject(url, request, KaKaoToken.class);
-        if (kaKaoToken.accessToken() == null || kaKaoToken.accessToken().isEmpty()) throw new OAuthKakaoTokenEmptyException();
+        if (kaKaoToken == null || kaKaoToken.accessToken().isEmpty()) throw new OAuthKakaoTokenEmptyException();
         return kaKaoToken.accessToken();
     }
 
