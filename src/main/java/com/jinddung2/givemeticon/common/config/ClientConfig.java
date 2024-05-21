@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.common.config;
 
+import com.jinddung2.givemeticon.common.exception.ApiResponseErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
@@ -9,6 +10,8 @@ public class ClientConfig {
 
     @Bean
     public RestTemplate restTemplate() {
-        return new RestTemplate();
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.setErrorHandler(new ApiResponseErrorHandler());
+        return restTemplate;
     }
 }
