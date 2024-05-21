@@ -30,7 +30,6 @@ public class OAuthController {
 
     @PostMapping("/kakao")
     public ResponseEntity<ApiResponse<AuthToken>> kakaoLogin(@RequestBody KakaoLoginParam param) {
-        log.info("code={}", param.getAuthorizationCode());
         AuthToken authToken = oAuthLoginService.login(param);
         return new ResponseEntity<>(ApiResponse.success(authToken), HttpStatus.OK);
     }
