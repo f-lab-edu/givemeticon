@@ -1,7 +1,6 @@
 package com.jinddung2.givemeticon.domain.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jinddung2.givemeticon.common.security.utils.JwtTokenUtil;
 import com.jinddung2.givemeticon.domain.account.exception.DuplicatedAccountNumberException;
 import com.jinddung2.givemeticon.domain.account.request.CreateAccountRequest;
 import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavorite;
@@ -48,24 +47,31 @@ public class UserControllerTest {
 
     @Autowired
     MockMvc mockMvc;
+
     @Autowired
-    ObjectMapper objectMapper; // JSON 객체로 변환하기 위한 ObjectMapper
+    ObjectMapper objectMapper;
+
     @MockBean
     SignUpFacade signUpFacade;
+
     @MockBean
-    UserService userService; // MockBean으로 UserService 주입
+    UserService userService;
+
     @MockBean
     LoginService loginService;
-    @MockBean
-    JwtTokenUtil jwtTokenUtil;
+
     @MockBean
     MailSendService mailSendService;
+
     @MockBean
     PasswordResetFacade passwordResetFacade;
+
     @MockBean
     CreateAccountFacade createAccountFacade;
+
     @MockBean
     UserItemFavoriteFacade userItemFavoriteFacade;
+
     @MockBean
     GetMyPointFacade getMyPointFacade;
 

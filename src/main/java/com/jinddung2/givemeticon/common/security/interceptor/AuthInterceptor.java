@@ -1,7 +1,5 @@
 package com.jinddung2.givemeticon.common.security.interceptor;
 
-import com.jinddung2.givemeticon.common.security.provider.JwtTokenProvider;
-import com.jinddung2.givemeticon.domain.oauth.exception.InvalidAuthenticationAttemptException;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -10,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
-import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 @Component
@@ -18,11 +15,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @Slf4j
 public class AuthInterceptor implements HandlerInterceptor {
 
-    private static final String AUTHORIZATION_HEADER = "Authorization";
-    private static final String BEARER_TYPE = "Bearer";
-
     private final LoginService loginService;
-    private final JwtTokenProvider jwtTokenProvider;
 
     private final String[] ALLOW_GET_PATH = {
             "/api/v1/brands/category/**",
@@ -31,59 +24,46 @@ public class AuthInterceptor implements HandlerInterceptor {
             "/api/v1/categories",
             "/api/v1/items/**",
             "/api/v1/sales/**",
-            "/api/v1/sales/items/**"
+            "/api/v1/sales/items/**",
+    };
+
+    private final String[] ALLOW_POST_PATH = {
+            "/api/v1/auth/**"
     };
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler){
         log.debug("Login Interceptor preHandler");
 
-        if (checkAllowGetUrl(request)) return true;
+        if (checkAllowUrl(request)) return true;
 
-        tokenLoginValidate(request);
         return sessionLoginValidate();
     }
 
-    private boolean checkAllowGetUrl(HttpServletRequest request) {
+    private boolean checkAllowUrl(HttpServletRequest request) {
+        String requestURI = request.getRequestURI();
+
         if (request.getMethod().equals(HttpMethod.GET.name())) {
-            String requestURI = request.getRequestURI();
-            for (String allowPath : ALLOW_GET_PATH) {
-                if (isPathMatch(allowPath, requestURI)) {
-                    return true;
-                }
-            }
+            return isPathAllowed(ALLOW_GET_PATH, requestURI);
+        } else if (request.getMethod().equals(HttpMethod.POST.name())) {
+            return isPathAllowed(ALLOW_POST_PATH, requestURI);
         }
         return false;
     }
 
-    private boolean isPathMatch(String patten, String path) {
+    private boolean isPathAllowed(String[] allowedPaths, String requestURI) {
         AntPathMatcher antPathMatcher = new AntPathMatcher();
-        return antPathMatcher.match(patten, path);
+        for (String allowPath : allowedPaths) {
+            if (antPathMatcher.match(allowPath, requestURI)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean sessionLoginValidate() {
         int id = loginService.getLoginUserId();
 
         return id != 0;
-    }
-
-    private void tokenLoginValidate(HttpServletRequest request) {
-        String authToken = resolveToken(request);
-
-        if (authToken != null || jwtTokenProvider.validateToken(authToken)) {
-            throw new InvalidAuthenticationAttemptException();
-        }
-    }
-
-    private String resolveToken(HttpServletRequest request) {
-        String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_TYPE)) {
-            return bearerToken.substring(7);
-        }
-        return null;
-    }
-
-    private String getUserIdFromToken(String accessToken) {
-        return jwtTokenProvider.extractSubject(accessToken);
     }
 }
