@@ -1,66 +1,66 @@
-name: Deploy to Ec2
-
-on:
-  push:
-    branches:
-      - develop
-    type:
-      - closed
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-      # Repo checkout
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.TOKEN_GITHUB }}
-          submodules: true
-
-      # JDK 환경
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      # Gradle Permission
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      # Gradle build
-      - name: Build with Gradle
-        run: ./gradlew clean build -x test --stacktrace
-
-      # Docker build & Push
-      - name: Build and Push docker image to Docker Hub
-        env:
-          REGISTRY: ${{ secrets.DOCKER_USERNAME }}
-          REPOSITORY: ${{ secrets.DOCKER_REPO }}
-          IMAGE_TAG: latest
-        run: |
-          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
-
-      # 서버에서 Docker 이미지 실행
-      - name: Deploy
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.NCP_SERVER_IP }}
-          username: ${{ secrets.NCP_SERVER_USER }}
-          password: ${{ secrets.NCP_SERVER_PASSWORD }}
-          port: ${{ secrets.NCP_SERVER_SSH_PORT }}
-          # 도커 작업
-          script: |
-            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-            ids=$(sudo docker ps -a -q --filter "name=${{ secrets.DOCKER_REPO }}_back")
-            for id in $ids
-            do
-              sudo docker stop $id && docker rm $id
-            done
-            docker image prune -a -f
-            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
-            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }}_back -d ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
+#name: Deploy to Ec2
+#
+#on:
+#  push:
+#    branches:
+#      - develop
+#    type:
+#      - closed
+#
+#jobs:
+#  deploy:
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      # Repo checkout
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#        with:
+#          token: ${{ secrets.TOKEN_GITHUB }}
+#          submodules: true
+#
+#      # JDK 환경
+#      - name: Set up JDK 17
+#        uses: actions/setup-java@v3
+#        with:
+#          java-version: '17'
+#          distribution: 'temurin'
+#
+#      # Gradle Permission
+#      - name: Grant execute permission for gradlew
+#        run: chmod +x gradlew
+#
+#      # Gradle build
+#      - name: Build with Gradle
+#        run: ./gradlew clean build -x test --stacktrace
+#
+#      # Docker build & Push
+#      - name: Build and Push docker image to Docker Hub
+#        env:
+#          REGISTRY: ${{ secrets.DOCKER_USERNAME }}
+#          REPOSITORY: ${{ secrets.DOCKER_REPO }}
+#          IMAGE_TAG: latest
+#        run: |
+#          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+#          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+#          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+#
+#      # 서버에서 Docker 이미지 실행
+#      - name: Deploy
+#        uses: appleboy/ssh-action@master
+#        with:
+#          host: ${{ secrets.NCP_SERVER_IP }}
+#          username: ${{ secrets.NCP_SERVER_USER }}
+#          password: ${{ secrets.NCP_SERVER_PASSWORD }}
+#          port: ${{ secrets.NCP_SERVER_SSH_PORT }}
+#          # 도커 작업
+#          script: |
+#            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+#            ids=$(sudo docker ps -a -q --filter "name=${{ secrets.DOCKER_REPO }}_back")
+#            for id in $ids
+#            do
+#              sudo docker stop $id && docker rm $id
+#            done
+#            docker image prune -a -f
+#            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
+#            docker run -p 8080:8080 --name ${{ secrets.DOCKER_REPO }}_back -d ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest

@@ -5,6 +5,7 @@ import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthClient;
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthLoginParams;
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthProvider;
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthUserInfo;
+import com.jinddung2.givemeticon.domain.oauth.exception.OAuthKakaoTokenEmptyException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,8 +16,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
-
-import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -43,7 +42,7 @@ public class KaKaoApiClient implements OAuthClient {
         HttpEntity<MultiValueMap<String, String>> request = generateHttpRequest(params);
 
         KaKaoToken kaKaoToken = restTemplate.postForObject(url, request, KaKaoToken.class);
-        Objects.requireNonNull(kaKaoToken);
+        if (kaKaoToken == null || kaKaoToken.accessToken().isEmpty()) throw new OAuthKakaoTokenEmptyException();
         return kaKaoToken.accessToken();
     }
 
@@ -68,7 +67,6 @@ public class KaKaoApiClient implements OAuthClient {
         httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         MultiValueMap<String, String> body = params.makeBody();
-        log.info("age body={}", body);
         body.add("grant_type", OAuthConstant.GRANT_TYPE);
         body.add("client_id", clientId);
         return new HttpEntity<>(body, httpHeaders);

@@ -1,7 +1,5 @@
 package com.jinddung2.givemeticon.domain.oauth.service;
 
-import com.jinddung2.givemeticon.domain.oauth.domain.AuthToken;
-import com.jinddung2.givemeticon.domain.oauth.domain.AuthTokenGenerator;
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthLoginParams;
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthUserInfo;
 import com.jinddung2.givemeticon.domain.user.domain.User;
@@ -14,14 +12,12 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class OAuthLoginService {
     private final UserMapper userMapper;
-    private final AuthTokenGenerator authTokenGenerator;
     private final RequestOAuthInfoService requestOAuthInfoService;
     private final PasswordEncoder passwordEncoder;
 
-    public AuthToken login(OAuthLoginParams params) {
+    public int login(OAuthLoginParams params) {
         OAuthUserInfo oAuthUserInfo = requestOAuthInfoService.request(params);
-        Integer userId = findOrCreateUser(oAuthUserInfo);
-        return authTokenGenerator.generate(userId);
+        return findOrCreateUser(oAuthUserInfo);
     }
 
     private Integer findOrCreateUser(OAuthUserInfo oAuthUserInfo) {

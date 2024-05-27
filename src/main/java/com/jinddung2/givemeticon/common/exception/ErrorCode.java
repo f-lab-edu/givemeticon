@@ -6,9 +6,12 @@ import lombok.Getter;
 public enum ErrorCode {
     // AUTH
     UNAUTHENTICATED("로그인이 필요한 기능입니다."),
+    AUTHENTICATION_FAILED("인증 처리 중 문제가 발생했습니다. 로그인 정보를 확인하시거나, 관리자에게 문의해주세요."),
     UNAUTHORIZED("해당 권한이 없습니다."),
     NOT_FOUND_EMAIL("이메일이 존재하지 않습니다."),
     INVALID_CERTIFICATED_NUMBER("인증 번호가 다릅니다."),
+    KAKAO_TOKEN_EMPTY("카카오 토큰이 없습니다."),
+    NAVER_TOKEN_EMPTY("네이버 토큰이 없습니다."),
 
     // USER
     DUPLICATED_EMAIL("이미 존재하는 이메일입니다."),

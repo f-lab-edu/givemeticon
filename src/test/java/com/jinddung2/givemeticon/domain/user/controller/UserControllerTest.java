@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jinddung2.givemeticon.common.security.provider.JwtTokenProvider;
+import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.domain.account.exception.DuplicatedAccountNumberException;
 import com.jinddung2.givemeticon.domain.account.request.CreateAccountRequest;
 import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavorite;
@@ -23,10 +23,11 @@ import com.jinddung2.givemeticon.domain.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,35 +38,43 @@ import static com.jinddung2.givemeticon.common.exception.ErrorCode.*;
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(value = UserController.class)
+@WebMvcTest(value = UserController.class, excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
+        WebConfig.class,
+}))
 public class UserControllerTest {
 
     @Autowired
     MockMvc mockMvc;
+
     @Autowired
-    ObjectMapper objectMapper; // JSON 객체로 변환하기 위한 ObjectMapper
+    ObjectMapper objectMapper;
+
     @MockBean
     SignUpFacade signUpFacade;
+
     @MockBean
-    UserService userService; // MockBean으로 UserService 주입
+    UserService userService;
+
     @MockBean
     LoginService loginService;
-    @MockBean
-    JwtTokenProvider jwtTokenProvider;
+
     @MockBean
     MailSendService mailSendService;
+
     @MockBean
     PasswordResetFacade passwordResetFacade;
+
     @MockBean
     CreateAccountFacade createAccountFacade;
+
     @MockBean
     UserItemFavoriteFacade userItemFavoriteFacade;
+
     @MockBean
     GetMyPointFacade getMyPointFacade;
 
@@ -81,15 +90,15 @@ public class UserControllerTest {
     void setUp() {
         signUpRequest = new SignUpRequest("test1234@example.com", "test1234", "01012345678");
         loginRequest = new LoginRequest("test1234@example.com", "test1234");
-        int fakeUserId = 100;
+        int testUserId = 100;
         userDto = UserDto.builder()
-                .id(fakeUserId)
+                .id(testUserId)
                 .cashPointId(1)
                 .email("test1234@example.com")
                 .password("test1234")
                 .build();
         mockHttpSession = new MockHttpSession();
-        mockHttpSession.setAttribute(LOGIN_USER, fakeUserId);
+        mockHttpSession.setAttribute(LOGIN_USER, testUserId);
         passwordUpdateRequest = new PasswordUpdateRequest("test1234", "newtest1234");
         passwordResetRequest = new PasswordResetRequest("test1234@example.com");
         createAccountRequest = new CreateAccountRequest("testHolder", "0000", "testBank", "000101");
@@ -104,7 +113,7 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(signUpRequest)))
                 .andExpect(status().isCreated());
 
-        Mockito.verify(signUpFacade).signUp(signUpRequest);
+        verify(signUpFacade).signUp(signUpRequest);
     }
 
     @Test
@@ -144,12 +153,11 @@ public class UserControllerTest {
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/info")
                         .session(mockHttpSession)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(signUpRequest)))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andDo(print())
                 .andExpect(status().isOk());
 
-        Mockito.verify(userService).getUserInfo(userDto.getId());
+        verify(userService).getUserInfo(userDto.getId());
     }
 
     @Test
@@ -179,7 +187,7 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(signUpRequest)))
                 .andExpect(status().isOk());
 
-        Mockito.verify(loginService).login(userDto.getId());
+        verify(loginService).login(userDto.getId());
     }
 
     @Test
@@ -189,11 +197,10 @@ public class UserControllerTest {
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/logout")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .session(mockHttpSession)
-                        .content(objectMapper.writeValueAsString(signUpRequest)))
+                        .session(mockHttpSession))
                 .andExpect(status().isOk());
 
-        Mockito.verify(loginService).logout();
+        verify(loginService).logout();
     }
 
     @Test
@@ -207,7 +214,7 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
                 .andExpect(status().isOk());
 
-        Mockito.verify(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
+        verify(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
     }
 
     @Test
@@ -256,7 +263,7 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(passwordResetRequest)))
                 .andExpect(status().isOk());
 
-        Mockito.verify(passwordResetFacade).resetPasswordAndSendEmail(passwordResetRequest.email());
+        verify(passwordResetFacade).resetPasswordAndSendEmail(passwordResetRequest.email());
     }
 
     @Test
@@ -269,7 +276,7 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
                 .andExpect(status().isOk());
 
-        Mockito.verify(createAccountFacade).createAccount(userDto.getId(), createAccountRequest);
+        verify(createAccountFacade).createAccount(userDto.getId(), createAccountRequest);
     }
 
     @Test
@@ -301,14 +308,14 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
                 .andExpect(status().isOk());
 
-        Mockito.verify(userItemFavoriteFacade).pushItemFavorite(userDto.getId(), itemId);
+        verify(userItemFavoriteFacade).pushItemFavorite(userDto.getId(), itemId);
     }
 
     @Test
     @DisplayName("상품에 좋아요를 눌렀지만 이미 좋아요 한 상품이라 실패한다.")
     void push_Favorite_Item_Fail_Already_Item_Favorite() throws Exception {
         int itemId = 1;
-        Mockito.doThrow(new AlreadyPushItemFavorite())
+        doThrow(new AlreadyPushItemFavorite())
                 .when(userItemFavoriteFacade).pushItemFavorite(userDto.getId(), itemId);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/items/" + itemId + "/favorite")
@@ -334,14 +341,14 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
                 .andExpect(status().isOk());
 
-        Mockito.verify(userItemFavoriteFacade).cancelItemFavorite(userDto.getId(), itemId);
+        verify(userItemFavoriteFacade).cancelItemFavorite(userDto.getId(), itemId);
     }
 
     @Test
     @DisplayName("좋아요 한 적이 없는 상품이라 좋아요 취소에 실패한다.")
     void cancel_Favorite_Item_Fail_Not_Push_Item_Favorite() throws Exception {
         int itemId = 1;
-        Mockito.doThrow(new NotPushItemFavorite())
+        doThrow(new NotPushItemFavorite())
                 .when(userItemFavoriteFacade).cancelItemFavorite(userDto.getId(), itemId);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .delete("/api/v1/users/items/" + itemId + "/cancel-favorite")
@@ -366,7 +373,7 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
                 .andExpect(status().isOk());
 
-        Mockito.verify(userItemFavoriteFacade).getMyFavoriteItems(userDto.getId());
+        verify(userItemFavoriteFacade).getMyFavoriteItems(userDto.getId());
     }
 
     @Test
@@ -378,13 +385,13 @@ public class UserControllerTest {
                         .session(mockHttpSession))
                 .andExpect(status().isOk());
 
-        Mockito.verify(getMyPointFacade).getMyPoint(userDto.getId());
+        verify(getMyPointFacade).getMyPoint(userDto.getId());
     }
 
     @Test
     @DisplayName("캐시 포인트 데이터가 존재하지 않아 포인트 조회 api가 실패한다.")
     void get_my_point_fail_not_found_cash_point() throws Exception {
-        Mockito.doThrow(new NotFoundCashPoint())
+        doThrow(new NotFoundCashPoint())
                 .when(getMyPointFacade).getMyPoint(userDto.getId());
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
