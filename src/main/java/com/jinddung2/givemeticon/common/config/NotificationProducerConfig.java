@@ -30,7 +30,6 @@ public class NotificationProducerConfig {
         return new DefaultKafkaProducerFactory<>(notificationProducerConfigs());
     }
 
-    // FIXME: bootstrap-server 변경 예정
     @Bean
     public Map<String, Object> notificationProducerConfigs() {
         Map<String, Object> props = new HashMap<>();

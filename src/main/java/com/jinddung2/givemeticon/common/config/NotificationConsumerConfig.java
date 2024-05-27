@@ -37,7 +37,6 @@ public class NotificationConsumerConfig {
                 new JsonDeserializer<>(CreateNotificationRequestDto.class));
     }
 
-    // FIXME: bootstrap-server 변경 예정
     private Map<String, Object> notificationConsumerConfigs() {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
