@@ -16,7 +16,7 @@ spring:
     port: 587
     properties:
       mail:
-        debug: true
+        debug: false
         smtp.auth: true
         smtp.timeout: 50000
         smtp.starttls.enable: true
