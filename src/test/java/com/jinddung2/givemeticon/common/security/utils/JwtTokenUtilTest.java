@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.common.security.provider;
+package com.jinddung2.givemeticon.common.security.utils;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,10 +14,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MockitoExtension.class)
-class JwtTokenProviderTest {
+class JwtTokenUtilTest {
 
     @Mock
-    JwtTokenProvider jwtTokenProvider;
+    JwtTokenUtil jwtTokenUtil;
 
     String subject;
     String token;
@@ -25,11 +25,11 @@ class JwtTokenProviderTest {
     @BeforeEach
     void setUp() {
         String secretKey = "my1test2secret3keymy1test2secret3keymy1test2secret3keymy1test2secret3key";
-        jwtTokenProvider = new JwtTokenProvider(secretKey);
+        jwtTokenUtil = new JwtTokenUtil(secretKey);
         subject = "testSubject";
         Date expiredTime = new Date(System.currentTimeMillis() + (60 * 60 * 1000));
 
-        token = jwtTokenProvider.generate(subject, expiredTime);
+        token = jwtTokenUtil.generate(subject, expiredTime);
     }
 
     @Test
@@ -43,20 +43,20 @@ class JwtTokenProviderTest {
     @Test
     @DisplayName("토큰 검증에 성공한다.")
     void validate_Token_Fail() {
-        Assertions.assertTrue(jwtTokenProvider.validateToken(token));
+        Assertions.assertTrue(jwtTokenUtil.validateToken(token));
     }
 
     @Test
     @DisplayName("토큰 검증에 실패한다.")
     void validate_Token() {
         String wrongToken = "InvalidToken";
-        Assertions.assertFalse(jwtTokenProvider.validateToken(wrongToken));
+        Assertions.assertFalse(jwtTokenUtil.validateToken(wrongToken));
     }
 
     @Test
     @DisplayName("토큰 추출에 성공한다.")
     void extract_Token() {
-        String result = jwtTokenProvider.extractSubject(token);
+        String result = jwtTokenUtil.extractSubject(token);
 
         Assertions.assertEquals(result, subject);
     }

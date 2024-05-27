@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.mail.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jinddung2.givemeticon.common.security.provider.JwtTokenProvider;
+import com.jinddung2.givemeticon.common.security.utils.JwtTokenUtil;
 import com.jinddung2.givemeticon.domain.mail.exception.EmailNotFoundException;
 import com.jinddung2.givemeticon.domain.mail.exception.InvalidCertificationNumberException;
 import com.jinddung2.givemeticon.domain.mail.service.MailSendService;
@@ -43,7 +43,7 @@ class MailControllerTest {
     LoginService loginService;
 
     @MockBean
-    JwtTokenProvider jwtTokenProvider;
+    JwtTokenUtil jwtTokenUtil;
 
     String email;
     String certificationNumber;

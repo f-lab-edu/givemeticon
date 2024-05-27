@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.oauth.service;
 
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
-import com.jinddung2.givemeticon.common.security.provider.JwtTokenProvider;
+import com.jinddung2.givemeticon.common.security.utils.JwtTokenUtil;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,7 +22,7 @@ public class TokenLoginTest {
     @Mock
     LoginService loginService;
     @Mock
-    JwtTokenProvider jwtTokenProvider;
+    JwtTokenUtil jwtTokenUtil;
     @Mock
     AuthInterceptor authInterceptor;
     @Mock
@@ -35,7 +35,7 @@ public class TokenLoginTest {
 
     @BeforeEach
     void setUp() {
-        authInterceptor = new AuthInterceptor(loginService, jwtTokenProvider);
+        authInterceptor = new AuthInterceptor(loginService, jwtTokenUtil);
         email = "test1234@example.com";
         authToken = "testToken";
     }
@@ -46,8 +46,8 @@ public class TokenLoginTest {
         Object handler = new Object();
 
         Mockito.when(request.getHeader("Authorization")).thenReturn("Bearer " + authToken);
-        Mockito.when(jwtTokenProvider.validateToken(authToken)).thenReturn(true);
-        Mockito.when(jwtTokenProvider.extractSubject(authToken)).thenReturn(email);
+        Mockito.when(jwtTokenUtil.validateToken(authToken)).thenReturn(true);
+        Mockito.when(jwtTokenUtil.extractSubject(authToken)).thenReturn(email);
         Mockito.when(request.getMethod()).thenReturn("POST");
 
         User loginUser = User.builder()

@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jinddung2.givemeticon.common.security.provider.JwtTokenProvider;
+import com.jinddung2.givemeticon.common.security.utils.JwtTokenUtil;
 import com.jinddung2.givemeticon.domain.account.exception.DuplicatedAccountNumberException;
 import com.jinddung2.givemeticon.domain.account.request.CreateAccountRequest;
 import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavorite;
@@ -57,7 +57,7 @@ public class UserControllerTest {
     @MockBean
     LoginService loginService;
     @MockBean
-    JwtTokenProvider jwtTokenProvider;
+    JwtTokenUtil jwtTokenUtil;
     @MockBean
     MailSendService mailSendService;
     @MockBean

@@ -3,7 +3,7 @@ package com.jinddung2.givemeticon.domain.oauth.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
-import com.jinddung2.givemeticon.common.security.provider.JwtTokenProvider;
+import com.jinddung2.givemeticon.common.security.utils.JwtTokenUtil;
 import com.jinddung2.givemeticon.domain.oauth.domain.AuthToken;
 import com.jinddung2.givemeticon.domain.oauth.infrastructure.kakao.KakaoLoginParam;
 import com.jinddung2.givemeticon.domain.oauth.infrastructure.naver.NaverLoginParam;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
                 WebConfig.class,
                 AuthInterceptor.class,
                 LoginService.class,
-                JwtTokenProvider.class
+                JwtTokenUtil.class
         }))
 @AutoConfigureMockMvc(addFilters = false)
 class OAuthControllerTest {

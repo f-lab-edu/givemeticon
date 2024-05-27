@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.common.security.provider;
+package com.jinddung2.givemeticon.common.security.utils;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
@@ -12,10 +12,10 @@ import java.util.Date;
 
 @Component
 @Slf4j
-public class JwtTokenProvider {
+public class JwtTokenUtil {
     private final Key key;
 
-    public JwtTokenProvider(@Value("${jwt.secret-key}") String secretKey) {
+    public JwtTokenUtil(@Value("${jwt.secret-key}") String secretKey) {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
