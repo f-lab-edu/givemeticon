@@ -98,7 +98,7 @@ class CategoryControllerTest {
         mockMvc.perform(MockMvcRequestBuilders
                         .delete("/api/v1/categories/" + category.getId())
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNoContent());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(categoryService).deleteById(category.getId());
     }

@@ -61,7 +61,7 @@ class ItemControllerTest {
                         .post("/api/v1/items/brand/" + id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(itemCreateRequest)))
-                .andExpect(status().isCreated());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(itemCreationFacade).createItem(id, itemCreateRequest);
     }

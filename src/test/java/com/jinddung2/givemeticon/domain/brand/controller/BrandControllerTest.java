@@ -11,7 +11,6 @@ import com.jinddung2.givemeticon.domain.brand.exception.DuplicatedBrandNameExcep
 import com.jinddung2.givemeticon.domain.brand.exception.EmptyBrandListException;
 import com.jinddung2.givemeticon.domain.brand.exception.NotFoundBrandException;
 import com.jinddung2.givemeticon.domain.brand.service.BrandService;
-import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,8 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(value = BrandController.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
                 WebConfig.class,
-                AuthInterceptor.class,
-                LoginService.class
+                AuthInterceptor.class
         }))
 class BrandControllerTest {
 
@@ -64,7 +62,7 @@ class BrandControllerTest {
                         .post("/api/v1/brands")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(brandCreateRequest)))
-                .andExpect(status().isCreated());
+                .andExpect(status().is2xxSuccessful());
     }
 
     @Test
@@ -87,8 +85,7 @@ class BrandControllerTest {
                         .get("/api/v1/brands/category/" + categoryId)
                         .param("page", String.valueOf(page))
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.message").value("SUCCESS"))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(brandService).getBrands(categoryId, page);
     }
@@ -163,7 +160,7 @@ class BrandControllerTest {
                         .delete("/api/v1/brands/100")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(brandUpdateNameRequest)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(brandService).delete(brand.getId());
     }

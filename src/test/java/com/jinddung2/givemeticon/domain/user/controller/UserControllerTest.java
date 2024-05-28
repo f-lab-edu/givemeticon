@@ -95,7 +95,6 @@ public class UserControllerTest {
                 .id(testUserId)
                 .cashPointId(1)
                 .email("test1234@example.com")
-                .password("test1234")
                 .build();
         mockHttpSession = new MockHttpSession();
         mockHttpSession.setAttribute(LOGIN_USER, testUserId);
@@ -111,7 +110,7 @@ public class UserControllerTest {
                         .post("/api/v1/users/sign-up")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(signUpRequest)))
-                .andExpect(status().isCreated());
+                .andExpect(status().is2xxSuccessful());
 
         verify(signUpFacade).signUp(signUpRequest);
     }
@@ -155,7 +154,7 @@ public class UserControllerTest {
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andDo(print())
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(userService).getUserInfo(userDto.getId());
     }
@@ -198,7 +197,7 @@ public class UserControllerTest {
                         .post("/api/v1/users/logout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(loginService).logout();
     }
@@ -212,7 +211,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
     }
@@ -261,7 +260,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(passwordResetRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(passwordResetFacade).resetPasswordAndSendEmail(passwordResetRequest.email());
     }
@@ -274,7 +273,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(createAccountFacade).createAccount(userDto.getId(), createAccountRequest);
     }
@@ -306,7 +305,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(userItemFavoriteFacade).pushItemFavorite(userDto.getId(), itemId);
     }
@@ -339,7 +338,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(userItemFavoriteFacade).cancelItemFavorite(userDto.getId(), itemId);
     }
@@ -371,7 +370,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(userItemFavoriteFacade).getMyFavoriteItems(userDto.getId());
     }

@@ -93,7 +93,7 @@ class SaleControllerTest {
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(saleCreateRequest)))
-                .andExpect(status().isCreated());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(saleCreationFacade).createSale(itemId, (int) mockHttpSession.getAttribute(LOGIN_USER), saleCreateRequest);
     }

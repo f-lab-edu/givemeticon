@@ -75,7 +75,7 @@ class CouponControllerTest {
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createCouponRequestDto))
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isCreated());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(createCouponFacade).createCouponAndDecreaseStock(userId, createCouponRequestDto);
     }

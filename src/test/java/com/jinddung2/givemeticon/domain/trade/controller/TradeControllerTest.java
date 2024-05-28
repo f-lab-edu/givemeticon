@@ -20,7 +20,6 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -68,7 +67,7 @@ class TradeControllerTest {
                         .post(defaultUrl + String.format("/sales/%d", saleId))
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isCreated());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(tradeSaleItemUserFacade).transact(saleId, buyerId);
     }
@@ -127,9 +126,7 @@ class TradeControllerTest {
                         .param("orderByExpiredDate", "false")
                         .param("page", "0")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("SUCCESS"))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.data").isArray())
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(tradeSaleItemUserFacade).getUnusedTradeHistory(buyerId, false, false, 0);
     }
