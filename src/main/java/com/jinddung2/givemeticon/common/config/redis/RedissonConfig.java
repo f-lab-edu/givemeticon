@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.common.config;
+package com.jinddung2.givemeticon.common.config.redis;
 
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;

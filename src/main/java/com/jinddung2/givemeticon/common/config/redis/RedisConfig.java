@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.common.config;
+package com.jinddung2.givemeticon.common.config.redis;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.DeserializationFeature;
