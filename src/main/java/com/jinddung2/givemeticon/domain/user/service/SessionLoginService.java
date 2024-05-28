@@ -14,8 +14,9 @@ public class SessionLoginService implements LoginService {
     private final HttpSession session;
 
     @Override
-    public void login(int id) {
+    public int login(int id) {
         session.setAttribute(LOGIN_USER, id);
+        return getLoginUserId();
     }
 
     @Override
