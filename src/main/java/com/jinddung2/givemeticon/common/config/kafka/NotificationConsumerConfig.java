@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.common.config;
+package com.jinddung2.givemeticon.common.config.kafka;
 
 import com.jinddung2.givemeticon.domain.notification.domain.dto.CreateNotificationRequestDto;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
