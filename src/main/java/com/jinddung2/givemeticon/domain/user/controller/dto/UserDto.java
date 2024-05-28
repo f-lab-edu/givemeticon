@@ -17,7 +17,6 @@ public class UserDto {
     private int accountId;
     private int cashPointId;
     private String email;
-    private String password;
     private String phone;
     private UserRole userRole;
     private boolean isActive;
@@ -29,13 +28,12 @@ public class UserDto {
     private LocalDateTime deletedDate;
 
     @Builder
-    public UserDto(int id, int accountId, int cashPointId, String email, String password, String phone, UserRole userRole, boolean isActive, OAuthProvider provider, LocalDateTime createdDate, LocalDateTime updatedDate, LocalDateTime deletedDate) {
+    public UserDto(int id, int accountId, int cashPointId, String email, String phone, UserRole userRole, boolean isActive, OAuthProvider provider, LocalDateTime createdDate, LocalDateTime updatedDate, LocalDateTime deletedDate) {
         {
             this.id = id;
             this.accountId = accountId;
             this.cashPointId = cashPointId;
             this.email = email;
-            this.password = password;
             this.phone = phone;
             this.userRole = userRole;
             this.isActive = isActive;

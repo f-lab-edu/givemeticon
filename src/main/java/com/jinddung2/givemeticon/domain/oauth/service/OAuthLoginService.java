@@ -2,6 +2,7 @@ package com.jinddung2.givemeticon.domain.oauth.service;
 
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthLoginParams;
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthUserInfo;
+import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
@@ -15,18 +16,18 @@ public class OAuthLoginService {
     private final RequestOAuthInfoService requestOAuthInfoService;
     private final PasswordEncoder passwordEncoder;
 
-    public int login(OAuthLoginParams params) {
+    public UserDto login(OAuthLoginParams params) {
         OAuthUserInfo oAuthUserInfo = requestOAuthInfoService.request(params);
         return findOrCreateUser(oAuthUserInfo);
     }
 
-    private Integer findOrCreateUser(OAuthUserInfo oAuthUserInfo) {
+    private UserDto findOrCreateUser(OAuthUserInfo oAuthUserInfo) {
         return userMapper.findByEmail(oAuthUserInfo.getEmail())
-                .map(User::getId)
+                .map(UserDto::of)
                 .orElseGet(() -> newUser(oAuthUserInfo));
     }
 
-    private Integer newUser(OAuthUserInfo oAuthUserInfo) {
+    private UserDto newUser(OAuthUserInfo oAuthUserInfo) {
         User user = User.builder()
                 .email(oAuthUserInfo.getEmail())
                 .password(passwordEncoder.encode(oAuthUserInfo.getEmail()))
@@ -35,6 +36,6 @@ public class OAuthLoginService {
                 .build();
 
         userMapper.save(user);
-        return user.getId();
+        return UserDto.of(user);
     }
 }

@@ -1,13 +1,10 @@
 package com.jinddung2.givemeticon.domain.item.controller;
 
-import com.jinddung2.givemeticon.common.response.ApiResponse;
 import com.jinddung2.givemeticon.domain.item.controller.dto.ItemDto;
 import com.jinddung2.givemeticon.domain.item.controller.dto.request.ItemCreateRequest;
 import com.jinddung2.givemeticon.domain.item.facade.ItemCreationFacade;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -19,15 +16,13 @@ public class ItemController {
     private final ItemService itemService;
 
     @PostMapping("/brand/{brandId}")
-    public ResponseEntity<ApiResponse<Integer>> createItem(@PathVariable("brandId") int brandId,
+    public int createItem(@PathVariable("brandId") int brandId,
                                                            @RequestBody ItemCreateRequest request) {
-        int id = itemCreationFacade.createItem(brandId, request);
-        return new ResponseEntity<>(ApiResponse.success(id), HttpStatus.CREATED);
+        return itemCreationFacade.createItem(brandId, request);
     }
 
     @GetMapping("/{itemId}")
-    public ResponseEntity<ApiResponse<ItemDto>> getItemAndIncreaseViewCount(@PathVariable("itemId") int itemId) {
-        ItemDto itemDto = itemService.getItemAndIncreaseViewCount(itemId);
-        return new ResponseEntity<>(ApiResponse.success(itemDto), HttpStatus.OK);
+    public ItemDto getItemAndIncreaseViewCount(@PathVariable("itemId") int itemId) {
+        return itemService.getItemAndIncreaseViewCount(itemId);
     }
 }
