@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.user.advice;
 
-import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.common.response.ErrorResult;
+import com.jinddung2.givemeticon.common.config.controller.response.ApiResponse;
+import com.jinddung2.givemeticon.common.config.controller.response.ErrorResult;
 import com.jinddung2.givemeticon.domain.favorite.exception.ItemFavoriteException;
 import com.jinddung2.givemeticon.domain.point.exception.CashPointException;
 import com.jinddung2.givemeticon.domain.user.exception.UserException;

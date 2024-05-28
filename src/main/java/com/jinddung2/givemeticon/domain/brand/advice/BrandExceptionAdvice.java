@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.brand.advice;
 
-import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.common.response.ErrorResult;
+import com.jinddung2.givemeticon.common.config.controller.response.ApiResponse;
+import com.jinddung2.givemeticon.common.config.controller.response.ErrorResult;
 import com.jinddung2.givemeticon.domain.brand.exception.BrandException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

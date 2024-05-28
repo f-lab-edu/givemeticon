@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.mail.advice;
 
-import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.common.response.ErrorResult;
+import com.jinddung2.givemeticon.common.config.controller.response.ApiResponse;
+import com.jinddung2.givemeticon.common.config.controller.response.ErrorResult;
 import com.jinddung2.givemeticon.domain.mail.exception.EmailNotFoundException;
 import com.jinddung2.givemeticon.domain.mail.exception.InvalidCertificationNumberException;
 import lombok.extern.slf4j.Slf4j;

@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.common.response;
+package com.jinddung2.givemeticon.common.config.controller.response;
 
 /**
  * 에러 응답 형식

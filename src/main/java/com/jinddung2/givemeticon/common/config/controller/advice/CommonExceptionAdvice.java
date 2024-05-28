@@ -1,9 +1,9 @@
-package com.jinddung2.givemeticon.common.advice;
+package com.jinddung2.givemeticon.common.config.controller.advice;
 
 import com.jinddung2.givemeticon.common.exception.ApiException;
 import com.jinddung2.givemeticon.common.exception.UnauthorizedUserException;
-import com.jinddung2.givemeticon.common.response.ApiResponse;
-import com.jinddung2.givemeticon.common.response.ErrorResult;
+import com.jinddung2.givemeticon.common.config.controller.response.ApiResponse;
+import com.jinddung2.givemeticon.common.config.controller.response.ErrorResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
