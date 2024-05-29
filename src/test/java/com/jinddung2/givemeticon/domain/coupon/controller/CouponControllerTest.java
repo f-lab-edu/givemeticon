@@ -2,7 +2,6 @@ package com.jinddung2.givemeticon.domain.coupon.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.common.config.WebConfig;
-import com.jinddung2.givemeticon.common.config.controller.exception.ErrorCode;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
 import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponRequestDto;
 import com.jinddung2.givemeticon.domain.coupon.controller.dto.ReDeemCouponRequestDto;

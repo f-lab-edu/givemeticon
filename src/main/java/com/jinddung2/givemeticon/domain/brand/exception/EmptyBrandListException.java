@@ -1,9 +1,7 @@
 package com.jinddung2.givemeticon.domain.brand.exception;
 
-import com.jinddung2.givemeticon.common.config.controller.exception.ErrorCode;
-
 public class EmptyBrandListException extends BrandException {
     public EmptyBrandListException() {
-        super(ErrorCode.PAGE_NUMBER_HAS_EMPTY_BRAND);
+        super(BrandErrorCode.PAGE_NUMBER_HAS_EMPTY_BRAND);
     }
 }
