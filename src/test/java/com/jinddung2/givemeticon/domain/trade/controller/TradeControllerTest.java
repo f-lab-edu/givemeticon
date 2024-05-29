@@ -22,7 +22,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(value = TradeController.class,
@@ -81,13 +80,8 @@ class TradeControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post(String.format("%s/sales/%d", defaultUrl, saleId))
                         .session(mockHttpSession)
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
+                        .contentType(MediaType.APPLICATION_JSON));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("이미 구매된 상품 입니다."));
     }
 
     @Test

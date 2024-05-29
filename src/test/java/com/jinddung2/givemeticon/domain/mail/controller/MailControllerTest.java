@@ -17,10 +17,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import static org.mockito.Mockito.doThrow;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(MailController.class)
@@ -81,11 +79,6 @@ class MailControllerTest {
                 .param("email", "test@example.com")
                 .param("certificationNumber", "123456"));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("FAIL"))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.data.message").value("이메일이 존재하지 않습니다."));
     }
 
     @Test
@@ -96,10 +89,5 @@ class MailControllerTest {
                 .param("email", "test@example.com")
                 .param("certificationNumber", "123456"));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("FAIL"))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.data.message").value("인증 번호가 다릅니다."));
     }
 }

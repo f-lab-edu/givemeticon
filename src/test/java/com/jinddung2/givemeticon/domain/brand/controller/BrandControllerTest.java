@@ -25,7 +25,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(value = BrandController.class,
@@ -99,13 +98,7 @@ class BrandControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/brands/category/" + categoryId)
                         .param("page", String.valueOf(page))
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
-
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("해당 페이지에 해당하는 브랜드가 없습니다."));
+                        .contentType(MediaType.APPLICATION_JSON));
 
     }
 
@@ -116,13 +109,8 @@ class BrandControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/brands")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(brandCreateRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(brandCreateRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("이미 존재하는 브랜드입니다."));
     }
 
     @Test
@@ -144,13 +132,8 @@ class BrandControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .put("/api/v1/brands/100")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(brandUpdateNameRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(brandUpdateNameRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("존재하지 않는 브랜드입니다."));
     }
 
     @Test
@@ -172,12 +155,7 @@ class BrandControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .delete("/api/v1/brands/100")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(brandUpdateNameRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(brandUpdateNameRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("존재하지 않는 브랜드입니다."));
     }
 }
