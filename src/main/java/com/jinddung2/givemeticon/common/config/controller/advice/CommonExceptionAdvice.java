@@ -1,18 +1,20 @@
 package com.jinddung2.givemeticon.common.config.controller.advice;
 
-import com.jinddung2.givemeticon.common.exception.ApiException;
-import com.jinddung2.givemeticon.common.exception.UnauthorizedUserException;
 import com.jinddung2.givemeticon.common.config.controller.response.ApiResponse;
 import com.jinddung2.givemeticon.common.config.controller.response.ErrorResult;
+import com.jinddung2.givemeticon.common.exception.ApiException;
+import com.jinddung2.givemeticon.common.exception.UnauthorizedUserException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice
 @Slf4j
+@Order(2)
+@RestControllerAdvice
 public class CommonExceptionAdvice {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
