@@ -11,8 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice
 @Slf4j
+@RestControllerAdvice(basePackages = "com.jindding2.givemeticon.domain.user")
 public class UserExceptionAdvice {
 
     @ExceptionHandler(UserException.class)

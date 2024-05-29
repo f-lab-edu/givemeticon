@@ -9,8 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice
 @Slf4j
+@RestControllerAdvice(basePackages = "com.jindding2.givemeticon.domain.oauth")
 public class OAuthAdvice {
     @ExceptionHandler(OAuthException.class)
     public ResponseEntity<ApiResponse<ErrorResult>> handleOAuthException(OAuthException e) {

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @Slf4j
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = "com.jindding2.givemeticon.domain.account")
 public class AccountExceptionAdvice {
 
     @ExceptionHandler(AccountException.class)
