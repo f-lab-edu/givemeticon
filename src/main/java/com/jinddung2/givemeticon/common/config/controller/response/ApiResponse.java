@@ -4,7 +4,7 @@ public record ApiResponse<T>(
         String message,
         T data
 ) {
-    public static <T> ApiResponse<?> success() {
+    public static ApiResponse<?> success() {
         return new ApiResponse<>("SUCCESS", "no data");
     }
 
@@ -12,7 +12,7 @@ public record ApiResponse<T>(
         return new ApiResponse<>("SUCCESS", result);
     }
 
-    public static <T> ApiResponse<?> fail() {
+    public static ApiResponse<?> fail() {
         return new ApiResponse<>("FAIL", "no data");
     }
 
