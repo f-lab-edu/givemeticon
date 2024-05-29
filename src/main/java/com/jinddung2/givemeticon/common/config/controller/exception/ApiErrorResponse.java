@@ -11,7 +11,7 @@ import java.util.List;
 @Getter
 @Builder
 @RequiredArgsConstructor
-public class ApiErrorResponse extends RuntimeException {
+public class ApiErrorResponse {
     private final String code;
     private final String message;
 
