@@ -61,22 +61,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private ApiErrorResponse makeErrorResponse(ErrorCode errorCode) {
         return ApiErrorResponse.builder()
-                .code(errorCode.name())
-                .message(errorCode.getMessage())
+                .code(errorCode.getHttpStatus().value())
+                .message(errorCode.getHttpStatus().name())
+                .errorDetail(errorCode.getErrorDetail())
                 .build();
     }
 
-    private ResponseEntity<ApiErrorResponse> handleExceptionInternal(ErrorCode errorCode, String message) {
-        return ResponseEntity.status(errorCode.getHttpStatus())
-                .body(makeErrorResponse(errorCode, message));
-    }
-
-    private ApiErrorResponse makeErrorResponse(ErrorCode errorCode, String message) {
-        return ApiErrorResponse.builder()
-                .code(errorCode.name())
-                .message(message)
-                .build();
-    }
 
     private ResponseEntity<Object> handleExceptionInternal(BindException e, ErrorCode errorCode) {
         return ResponseEntity.status(errorCode.getHttpStatus())
@@ -91,8 +81,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .collect(Collectors.toList());
 
         return ApiErrorResponse.builder()
-                .code(errorCode.name())
-                .message(errorCode.getMessage())
+                .code(errorCode.getHttpStatus().value())
+                .message(errorCode.getHttpStatus().name())
+                .errorDetail(e.getMessage())
                 .errors(validationErrorList)
                 .build();
     }

@@ -24,7 +24,7 @@ public enum TradeErrorCode implements ErrorCode {
     }
 
     @Override
-    public String getMessage() {
+    public String getErrorDetail() {
         return this.message;
     }
 }

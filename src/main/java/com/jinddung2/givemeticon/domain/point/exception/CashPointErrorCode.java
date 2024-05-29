@@ -21,7 +21,7 @@ public enum CashPointErrorCode implements ErrorCode {
     }
 
     @Override
-    public String getMessage() {
+    public String getErrorDetail() {
         return this.message;
     }
 }

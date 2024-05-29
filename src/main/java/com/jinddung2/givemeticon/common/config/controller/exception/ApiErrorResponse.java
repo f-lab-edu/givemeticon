@@ -12,8 +12,9 @@ import java.util.List;
 @Builder
 @RequiredArgsConstructor
 public class ApiErrorResponse {
-    private final String code;
+    private final int code;
     private final String message;
+    private final String errorDetail;
 
 
     @JsonInclude(JsonInclude.Include.NON_EMPTY)

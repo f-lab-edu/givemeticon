@@ -22,7 +22,7 @@ public enum ItemErrorCode implements ErrorCode {
     }
 
     @Override
-    public String getMessage() {
+    public String getErrorDetail() {
         return this.message;
     }
 }
