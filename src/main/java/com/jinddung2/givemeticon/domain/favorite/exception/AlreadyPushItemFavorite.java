@@ -1,6 +1,6 @@
 package com.jinddung2.givemeticon.domain.favorite.exception;
 
-import com.jinddung2.givemeticon.common.exception.ErrorCode;
+import com.jinddung2.givemeticon.common.config.controller.exception.ErrorCode;
 
 public class AlreadyPushItemFavorite extends ItemFavoriteException {
 

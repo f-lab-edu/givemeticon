@@ -1,8 +1,8 @@
 package com.jinddung2.givemeticon.common.config.controller.advice;
 
+import com.jinddung2.givemeticon.common.config.controller.exception.ApiException;
 import com.jinddung2.givemeticon.common.config.controller.response.ApiResponse;
 import com.jinddung2.givemeticon.common.config.controller.response.ErrorResult;
-import com.jinddung2.givemeticon.common.exception.ApiException;
 import com.jinddung2.givemeticon.common.exception.UnauthorizedUserException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;

@@ -1,4 +1,4 @@
-package com.jinddung2.givemeticon.common.exception;
+package com.jinddung2.givemeticon.common.config.controller.exception;
 
 public class ApiException extends RuntimeException{
     int status;

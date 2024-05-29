@@ -34,7 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
-import static com.jinddung2.givemeticon.common.exception.ErrorCode.*;
+import static com.jinddung2.givemeticon.common.config.controller.exception.ErrorCode.*;
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;

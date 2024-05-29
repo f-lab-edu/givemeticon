@@ -1,5 +1,6 @@
-package com.jinddung2.givemeticon.common.exception;
+package com.jinddung2.givemeticon.common.config.controller.hanlder;
 
+import com.jinddung2.givemeticon.common.config.controller.exception.ApiException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.web.client.ResponseErrorHandler;
