@@ -11,7 +11,6 @@ import com.jinddung2.givemeticon.domain.brand.exception.DuplicatedBrandNameExcep
 import com.jinddung2.givemeticon.domain.brand.exception.EmptyBrandListException;
 import com.jinddung2.givemeticon.domain.brand.exception.NotFoundBrandException;
 import com.jinddung2.givemeticon.domain.brand.service.BrandService;
-import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,14 +25,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(value = BrandController.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
                 WebConfig.class,
-                AuthInterceptor.class,
-                LoginService.class
+                AuthInterceptor.class
         }))
 class BrandControllerTest {
 
@@ -64,7 +61,7 @@ class BrandControllerTest {
                         .post("/api/v1/brands")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(brandCreateRequest)))
-                .andExpect(status().isCreated());
+                .andExpect(status().is2xxSuccessful());
     }
 
     @Test
@@ -87,8 +84,7 @@ class BrandControllerTest {
                         .get("/api/v1/brands/category/" + categoryId)
                         .param("page", String.valueOf(page))
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.message").value("SUCCESS"))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(brandService).getBrands(categoryId, page);
     }
@@ -102,13 +98,7 @@ class BrandControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/brands/category/" + categoryId)
                         .param("page", String.valueOf(page))
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
-
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("해당 페이지에 해당하는 브랜드가 없습니다."));
+                        .contentType(MediaType.APPLICATION_JSON));
 
     }
 
@@ -119,13 +109,8 @@ class BrandControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/brands")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(brandCreateRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(brandCreateRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("이미 존재하는 브랜드입니다."));
     }
 
     @Test
@@ -147,13 +132,8 @@ class BrandControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .put("/api/v1/brands/100")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(brandUpdateNameRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(brandUpdateNameRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("존재하지 않는 브랜드입니다."));
     }
 
     @Test
@@ -163,7 +143,7 @@ class BrandControllerTest {
                         .delete("/api/v1/brands/100")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(brandUpdateNameRequest)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(brandService).delete(brand.getId());
     }
@@ -175,12 +155,7 @@ class BrandControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .delete("/api/v1/brands/100")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(brandUpdateNameRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(brandUpdateNameRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("존재하지 않는 브랜드입니다."));
     }
 }

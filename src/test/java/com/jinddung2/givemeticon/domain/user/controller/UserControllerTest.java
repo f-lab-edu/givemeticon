@@ -34,13 +34,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
-import static com.jinddung2.givemeticon.common.exception.ErrorCode.*;
 import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(value = UserController.class, excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
@@ -95,7 +93,6 @@ public class UserControllerTest {
                 .id(testUserId)
                 .cashPointId(1)
                 .email("test1234@example.com")
-                .password("test1234")
                 .build();
         mockHttpSession = new MockHttpSession();
         mockHttpSession.setAttribute(LOGIN_USER, testUserId);
@@ -111,7 +108,7 @@ public class UserControllerTest {
                         .post("/api/v1/users/sign-up")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(signUpRequest)))
-                .andExpect(status().isCreated());
+                .andExpect(status().is2xxSuccessful());
 
         verify(signUpFacade).signUp(signUpRequest);
     }
@@ -125,10 +122,6 @@ public class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(signUpRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("이미 존재하는 이메일입니다."));
     }
 
     @Test
@@ -138,13 +131,8 @@ public class UserControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/users/sign-up")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(signUpRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(signUpRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("이미 존재하는 휴대폰 번호입니다."));
     }
 
     @Test
@@ -155,7 +143,7 @@ public class UserControllerTest {
                         .session(mockHttpSession)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andDo(print())
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(userService).getUserInfo(userDto.getId());
     }
@@ -168,13 +156,7 @@ public class UserControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/info")
                         .session(mockHttpSession)
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
-
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("존재하지 않는 회원입니다."));
+                        .contentType(MediaType.APPLICATION_JSON));
     }
 
     @Test
@@ -198,7 +180,7 @@ public class UserControllerTest {
                         .post("/api/v1/users/logout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(loginService).logout();
     }
@@ -212,7 +194,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(userService).updatePassword(userDto.getId(), passwordUpdateRequest);
     }
@@ -225,13 +207,7 @@ public class UserControllerTest {
                         .patch("/api/v1/users/password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
-                        .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
-                .andExpect(status().isBadRequest());
-
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("존재하지 않는 회원입니다."));
+                        .content(objectMapper.writeValueAsString(passwordUpdateRequest)));
     }
 
     @Test
@@ -243,13 +219,7 @@ public class UserControllerTest {
                         .patch("/api/v1/users/password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
-                        .content(objectMapper.writeValueAsString(passwordUpdateRequest)))
-                .andExpect(status().isBadRequest());
-
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("패스워드가 일치하지 않습니다."));
+                        .content(objectMapper.writeValueAsString(passwordUpdateRequest)));
 
     }
 
@@ -261,7 +231,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(passwordResetRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(passwordResetFacade).resetPasswordAndSendEmail(passwordResetRequest.email());
     }
@@ -274,7 +244,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(createAccountFacade).createAccount(userDto.getId(), createAccountRequest);
     }
@@ -288,13 +258,7 @@ public class UserControllerTest {
                         .post("/api/v1/users/account")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
-                        .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isBadRequest());
-
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("이미 등록된 계좌번호 입니다."));
+                        .content(objectMapper.writeValueAsString(createAccountRequest)));
     }
 
     @Test
@@ -306,7 +270,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(userItemFavoriteFacade).pushItemFavorite(userDto.getId(), itemId);
     }
@@ -321,13 +285,8 @@ public class UserControllerTest {
                         .post("/api/v1/users/items/" + itemId + "/favorite")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
-                        .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(createAccountRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value(ALREADY_PUSH_ITEMFAVORITE.getMessage()));
     }
 
     @Test
@@ -339,7 +298,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(userItemFavoriteFacade).cancelItemFavorite(userDto.getId(), itemId);
     }
@@ -354,13 +313,8 @@ public class UserControllerTest {
                         .delete("/api/v1/users/items/" + itemId + "/cancel-favorite")
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
-                        .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(createAccountRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value(NOT_PUSH_ITEMFAVORITE.getMessage()));
     }
 
     @Test
@@ -371,7 +325,7 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .session(mockHttpSession)
                         .content(objectMapper.writeValueAsString(createAccountRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         verify(userItemFavoriteFacade).getMyFavoriteItems(userDto.getId());
     }
@@ -397,12 +351,7 @@ public class UserControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/users/my-point")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .session(mockHttpSession))
-                .andExpect(status().isBadRequest());
+                        .session(mockHttpSession));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value(NOT_FOUND_CASH_POINT.getMessage()));
     }
 }

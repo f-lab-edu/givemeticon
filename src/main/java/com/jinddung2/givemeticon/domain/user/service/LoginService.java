@@ -4,7 +4,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public interface LoginService {
-    void login(int id);
+    int login(int id);
 
     void logout();
 

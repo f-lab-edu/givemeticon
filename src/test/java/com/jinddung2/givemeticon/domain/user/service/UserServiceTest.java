@@ -52,7 +52,6 @@ class UserServiceTest {
         userDto = UserDto.builder()
                 .id(testUser.getId())
                 .email(testUser.getEmail())
-                .password(passwordEncoder.encode("test1234"))
                 .build();
         passwordUpdateRequest = new PasswordUpdateRequest("test1234", "newtest1234");
     }

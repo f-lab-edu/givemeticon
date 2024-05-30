@@ -1,14 +1,13 @@
 package com.jinddung2.givemeticon.domain.oauth.controller;
 
-import com.jinddung2.givemeticon.common.response.ApiResponse;
 import com.jinddung2.givemeticon.domain.oauth.infrastructure.kakao.KakaoLoginParam;
 import com.jinddung2.givemeticon.domain.oauth.infrastructure.naver.NaverLoginParam;
 import com.jinddung2.givemeticon.domain.oauth.service.OAuthLoginService;
+import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
+import com.jinddung2.givemeticon.domain.user.controller.dto.response.LoginResponse;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,16 +23,16 @@ public class OAuthController {
     private final LoginService loginService;
 
     @PostMapping("/naver")
-    public ResponseEntity<ApiResponse<Void>> naverLogin(@RequestBody NaverLoginParam param) {
-        int userId = oAuthLoginService.login(param);
-        loginService.login(userId);
-        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
+    public LoginResponse naverLogin(@RequestBody NaverLoginParam param) {
+        UserDto userDto = oAuthLoginService.login(param);
+        int sessionId = loginService.login(userDto.getId());
+        return LoginResponse.of(sessionId, userDto);
     }
 
     @PostMapping("/kakao")
-    public ResponseEntity<ApiResponse<Void>> kakaoLogin(@RequestBody KakaoLoginParam param) {
-        int userId = oAuthLoginService.login(param);
-        loginService.login(userId);
-        return new ResponseEntity<>(ApiResponse.success(), HttpStatus.OK);
+    public LoginResponse kakaoLogin(@RequestBody KakaoLoginParam param) {
+        UserDto userDto = oAuthLoginService.login(param);
+        int sessionId = loginService.login(userDto.getId());
+        return LoginResponse.of(sessionId, userDto);
     }
 }

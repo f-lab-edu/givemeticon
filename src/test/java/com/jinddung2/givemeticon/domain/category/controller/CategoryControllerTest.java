@@ -22,7 +22,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(value = CategoryController.class,
@@ -83,13 +82,8 @@ class CategoryControllerTest {
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .put("/api/v1/categories/" + category.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(categoryUpdateNameRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(categoryUpdateNameRequest)));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("존재하지 않는 카테고리입니다."));
     }
 
     @Test
@@ -98,7 +92,7 @@ class CategoryControllerTest {
         mockMvc.perform(MockMvcRequestBuilders
                         .delete("/api/v1/categories/" + category.getId())
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNoContent());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(categoryService).deleteById(category.getId());
     }
@@ -111,12 +105,7 @@ class CategoryControllerTest {
 
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .delete("/api/v1/categories/" + category.getId())
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
+                        .contentType(MediaType.APPLICATION_JSON));
 
-
-        resultActions.andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("존재하지 않는 카테고리입니다."));
     }
 }

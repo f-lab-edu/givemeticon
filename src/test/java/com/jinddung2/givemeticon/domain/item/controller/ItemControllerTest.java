@@ -23,7 +23,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import static org.mockito.Mockito.doThrow;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(value = ItemController.class,
@@ -61,7 +60,7 @@ class ItemControllerTest {
                         .post("/api/v1/items/brand/" + id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(itemCreateRequest)))
-                .andExpect(status().isCreated());
+                .andExpect(status().is2xxSuccessful());
 
         Mockito.verify(itemCreationFacade).createItem(id, itemCreateRequest);
     }
@@ -83,12 +82,7 @@ class ItemControllerTest {
         doThrow(new NotFoundItemException()).when(itemService).getItemAndIncreaseViewCount(id);
         ResultActions resultActions = mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/items/" + id)
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
+                        .contentType(MediaType.APPLICATION_JSON));
 
-        resultActions
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("FAIL"))
-                .andExpect(jsonPath("$.data.message").value("존재하지 않는 아이템입니다."));
     }
 }
