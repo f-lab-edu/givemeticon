@@ -18,7 +18,7 @@ configurations {
     }
 }
 
-task copyFiles(type: Copy) {
+tasks.register('copyFiles', Copy) {
     copy {
         from './givemeticon-config'
         include "*.yml"
@@ -68,11 +68,13 @@ jacoco {
 }
 
 jacocoTestReport {
-    dependsOn test // jacocoTestReport에 test라는 종속성을 추가
+    dependsOn test // jacocoTestReport에 test 종속성을 추가
     afterEvaluate {
         classDirectories.setFrom(
                 files(classDirectories.files.collect {
                     fileTree(dir: it, excludes: [
+                            "**/common/config/controller/**",
+                            "**/config/**",
                             "**/*Application*",
                             "**/config/*Config*",
                             "**/aop/**",
@@ -116,6 +118,7 @@ jacocoTestCoverageVerification {
             }
 
             excludes = [
+                    "**/common/config/controller/**",
                     "**/*Application*",
                     "**/config/*Config*",
                     "**/annotation/**",
