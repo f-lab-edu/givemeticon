@@ -33,6 +33,7 @@ public class SignUpRequest {
     }
 
     public User toEntity(String encryptedPassword) {
+        LocalDateTime now = LocalDateTime.now();
         return User.builder()
                 .email(email)
                 .accountId(0)
@@ -40,8 +41,8 @@ public class SignUpRequest {
                 .phone(phone)
                 .isActive(true)
                 .userRole(UserRole.USER)
-                .createdDate(LocalDateTime.now())
-                .updatedDate(null)
+                .createdDate(now)
+                .updatedDate(now)
                 .deletedDate(null)
                 .build();
     }
