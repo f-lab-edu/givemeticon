@@ -37,8 +37,16 @@ public class UserItemFavoriteFacade {
         List<ItemFavorite> myFavoriteItems = itemFavoriteService.getMyFavorite(userId);
         return myFavoriteItems.stream()
                 .map(itemFavorite -> {
-                    Item item = itemService.getItem(itemFavorite.getItemId());
-                    return ItemFavoriteDto.of(item);
+                    try {
+                        Item item = itemService.getItem(itemFavorite.getItemId());
+                        return ItemFavoriteDto.of(item, false);
+                    } catch (NotFoundItemException e) {
+                        Item deletedItem = Item.builder()
+                                .id(itemFavorite.getItemId())
+                                .name("delete Item")
+                                .build();
+                        return ItemFavoriteDto.of(deletedItem, true);
+                    }
                 })
                 .toList();
     }
