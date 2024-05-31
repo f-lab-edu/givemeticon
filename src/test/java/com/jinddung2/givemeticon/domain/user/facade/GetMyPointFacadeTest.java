@@ -4,6 +4,8 @@ import com.jinddung2.givemeticon.domain.point.domain.CashPoint;
 import com.jinddung2.givemeticon.domain.point.service.CashPointService;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
+import com.jinddung2.givemeticon.fixture.CashPointFixture;
+import com.jinddung2.givemeticon.fixture.UserFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,23 +31,14 @@ class GetMyPointFacadeTest {
     @Test
     @DisplayName("내 포인트를 조회하면 보유 중인 포인트를 가져온다.")
     void when_get_my_point_should_be_return_point() {
-        int userId = 1;
-        int cashPointId = 2;
-        User user = User.builder()
-                .id(userId)
-                .cashPointId(cashPointId)
-                .build();
+        User userFixture = UserFixture.createUserFixture();
+        CashPoint cashPointFixture = CashPointFixture.createCashPointFixture();
 
-        CashPoint cashPoint = CashPoint.builder()
-                .id(cashPointId)
-                .cashPoint(1000)
-                .build();
+        when(userService.getUser(userFixture.getId())).thenReturn(userFixture);
+        when(cashPointService.getCashPoint(cashPointFixture.getId())).thenReturn(cashPointFixture);
 
-        when(userService.getUser(userId)).thenReturn(user);
-        when(cashPointService.getCashPoint(cashPointId)).thenReturn(cashPoint);
+        int myPoint = sut.getMyPoint(userFixture.getId());
 
-        int myPoint = sut.getMyPoint(userId);
-
-        assertThat(myPoint).isEqualTo(cashPoint.getCashPoint());
+        assertThat(myPoint).isEqualTo(cashPointFixture.getCashPoint());
     }
 }

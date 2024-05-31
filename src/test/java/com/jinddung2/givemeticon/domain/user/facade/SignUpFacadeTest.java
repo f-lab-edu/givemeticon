@@ -5,8 +5,8 @@ import com.jinddung2.givemeticon.domain.point.service.CashPointService;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.service.UserService;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
+import com.jinddung2.givemeticon.fixture.CashPointFixture;
+import com.jinddung2.givemeticon.fixture.UserFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,44 +15,32 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 @ExtendWith(MockitoExtension.class)
 class SignUpFacadeTest {
 
     @InjectMocks
-    SignUpFacade signUpFacade;
+    SignUpFacade sut;
     @Mock
     UserService userService;
     @Mock
     CashPointService cashPointService;
 
-    SignUpRequest signUpRequest;
-    User user;
-    CashPoint cashPoint;
-    int defaultPoint = 1000;
-
-    @BeforeEach
-    void setUp() {
-        signUpRequest = new SignUpRequest("test1234@example.com", "test1234", "01012345678");
-        user = User.builder()
-                .id(1)
-                .build();
-        cashPoint = CashPoint.builder()
-                .id(1)
-                .cashPoint(defaultPoint)
-                .build();
-    }
-
     @Test
     @DisplayName("회원가입 할 때 1000 포인트를 갖고 유저가 생성된다.")
     void signUp() {
-        Mockito.when(cashPointService.createPoint()).thenReturn(cashPoint.getId());
-        Mockito.when(userService.signUp(signUpRequest, cashPoint.getId())).thenReturn(user);
+        int defaultPoint = 10000;
+        SignUpRequest request = new SignUpRequest("test1234@example.com", "test1234", "01012345678");
+        User userFixture = UserFixture.createUserFixture(request.getEmail(), request.getPassword());
+        CashPoint cashPointFixture = CashPointFixture.createCashPointFixture(defaultPoint);
+        Mockito.when(cashPointService.createPoint()).thenReturn(cashPointFixture.getId());
+        Mockito.when(userService.signUp(request, cashPointFixture.getId())).thenReturn(userFixture);
 
-        int userId = signUpFacade.signUp(signUpRequest);
+        int userId = sut.signUp(request);
 
-        Assertions.assertEquals(1, userId);
-        Assertions.assertEquals(1, cashPoint.getId());
-        Assertions.assertEquals(cashPoint.getId(), user.getId());
-        Assertions.assertEquals(defaultPoint, cashPoint.getCashPoint());
+        assertThat(userFixture.getId()).isEqualTo(userId);
+        assertThat(userFixture.getCashPointId()).isEqualTo(cashPointFixture.getId());
+        assertThat(cashPointFixture.getCashPoint()).isEqualTo(defaultPoint);
     }
 }
