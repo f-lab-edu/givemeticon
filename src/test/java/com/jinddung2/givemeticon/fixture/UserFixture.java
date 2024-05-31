@@ -27,9 +27,9 @@ public class UserFixture {
     public static User createUserFixture(String email, String password) {
         LocalDateTime now = LocalDateTime.now();
         return User.builder()
-                .id(10)
-                .accountId(11)
-                .cashPointId(12)
+                .id(1)
+                .accountId(2)
+                .cashPointId(3)
                 .email(email)
                 .password(password)
                 .phone("01000000000")
@@ -44,9 +44,9 @@ public class UserFixture {
     public static User createUserFixture(String email, String password, String phone) {
         LocalDateTime now = LocalDateTime.now();
         return User.builder()
-                .id(10)
-                .accountId(11)
-                .cashPointId(12)
+                .id(1)
+                .accountId(2)
+                .cashPointId(3)
                 .email(email)
                 .password(password)
                 .phone(phone)
