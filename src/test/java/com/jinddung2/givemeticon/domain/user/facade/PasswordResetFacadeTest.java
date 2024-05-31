@@ -11,6 +11,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
+
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -23,9 +25,11 @@ class PasswordResetFacadeTest {
     @Mock
     UserService userService;
 
+    LocalDateTime now = LocalDateTime.now();
+
     @Test
     void resetPasswordAndSendEmail() throws MessagingException {
-        User userFixture = UserFixture.createUserFixture();
+        User userFixture = UserFixture.createUserFixture(now);
         String email = userFixture.getEmail();
         String tempPassword = "AbCdEfGh";
         when(mailSendService.sendEmailForTemporaryPassword(email)).thenReturn(tempPassword);

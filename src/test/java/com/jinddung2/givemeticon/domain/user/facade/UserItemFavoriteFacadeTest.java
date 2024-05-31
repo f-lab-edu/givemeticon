@@ -17,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,10 +38,12 @@ class UserItemFavoriteFacadeTest {
     @Mock
     ItemFavoriteService itemFavoriteService;
 
+    LocalDateTime now = LocalDateTime.now();
+
     @Test
     @DisplayName("상품 좋아요에 성공한다.")
     void push_Favorite() {
-        User userFixture = UserFixture.createUserFixture();
+        User userFixture = UserFixture.createUserFixture(now);
         Item itemFixture = ItemFixture.createItemFixture();
 
         when(userService.isExists(userFixture.getId())).thenReturn(true);
@@ -54,7 +57,7 @@ class UserItemFavoriteFacadeTest {
     @Test
     @DisplayName("좋아요를 눌렀던 상품에 좋아요 취소에 성공한다.")
     void cancel_Favorite() {
-        User userFixture = UserFixture.createUserFixture();
+        User userFixture = UserFixture.createUserFixture(now);
         Item itemFixture = ItemFixture.createItemFixture();
 
         when(userService.isExists(userFixture.getId())).thenReturn(true);
@@ -69,7 +72,7 @@ class UserItemFavoriteFacadeTest {
     @DisplayName("좋아요 누른 상품들을 조회한다.")
     void getMyFavoriteItems() {
         int id = 10;
-        User userFixture = UserFixture.createUserFixture();
+        User userFixture = UserFixture.createUserFixture(now);
         Item itemFixture1 = ItemFixture.createItemFixture(id++);
         Item itemFixture2 = ItemFixture.createItemFixture(id++);
         Item itemFixture3 = ItemFixture.createItemFixture(id);

@@ -15,6 +15,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
+
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
@@ -30,12 +32,14 @@ class CreateAccountFacadeTest {
     @Mock
     AccountService accountService;
 
+    LocalDateTime now = LocalDateTime.now();
+
     @Test
     @DisplayName("계좌를 생성한 후에 해당하는 유저의 계좌 id 에 연결에 성공한다.")
     void create_Account_And_Link_User_Account_Id_Success() {
         CreateAccountRequest request = new CreateAccountRequest("testHolder", "0000", "testBank", "000101");
         Account accountFixture = AccountFixture.createAccountFixture(request.accountHolder(), request.accountNumber(), request.bankName(), request.birth());
-        User userFixture = UserFixture.createUserFixture();
+        User userFixture = UserFixture.createUserFixture(now);
 
         when(accountService.create(request)).thenReturn(accountFixture.getId());
         doNothing().when(userService).updateAccount(userFixture.getId(), accountFixture.getId());

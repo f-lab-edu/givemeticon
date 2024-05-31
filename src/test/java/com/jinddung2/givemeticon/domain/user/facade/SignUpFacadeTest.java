@@ -15,6 +15,8 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,12 +29,14 @@ class SignUpFacadeTest {
     @Mock
     CashPointService cashPointService;
 
+    LocalDateTime now = LocalDateTime.now();
+
     @Test
     @DisplayName("회원가입 할 때 1000 포인트를 갖고 유저가 생성된다.")
     void signUp() {
         int defaultPoint = 10000;
         SignUpRequest request = new SignUpRequest("test1234@example.com", "test1234", "01012345678");
-        User userFixture = UserFixture.createUserFixture(request.getEmail(), request.getPassword());
+        User userFixture = UserFixture.createUserFixture(request.getEmail(), request.getPassword(), now);
         CashPoint cashPointFixture = CashPointFixture.createCashPointFixture(defaultPoint);
         Mockito.when(cashPointService.createPoint()).thenReturn(cashPointFixture.getId());
         Mockito.when(userService.signUp(request, cashPointFixture.getId())).thenReturn(userFixture);

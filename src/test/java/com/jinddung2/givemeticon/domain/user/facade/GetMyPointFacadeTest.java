@@ -13,6 +13,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -28,10 +30,12 @@ class GetMyPointFacadeTest {
     @Mock
     CashPointService cashPointService;
 
+    LocalDateTime now = LocalDateTime.now();
+
     @Test
     @DisplayName("내 포인트를 조회하면 보유 중인 포인트를 가져온다.")
     void when_get_my_point_should_be_return_point() {
-        User userFixture = UserFixture.createUserFixture();
+        User userFixture = UserFixture.createUserFixture(now);
         CashPoint cashPointFixture = CashPointFixture.createCashPointFixture();
 
         when(userService.getUser(userFixture.getId())).thenReturn(userFixture);
