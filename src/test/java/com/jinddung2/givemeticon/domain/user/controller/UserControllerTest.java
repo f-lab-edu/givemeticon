@@ -464,9 +464,9 @@ public class UserControllerTest {
         Item itemFixture2 = ItemFixture.createItemFixture(10);
         Item itemFixture3 = ItemFixture.createItemFixture(20);
         List<ItemFavoriteDto> responseBody = new ArrayList<>();
-        responseBody.add(ItemFavoriteDto.of(itemFixture1));
-        responseBody.add(ItemFavoriteDto.of(itemFixture2));
-        responseBody.add(ItemFavoriteDto.of(itemFixture3));
+        responseBody.add(ItemFavoriteDto.of(itemFixture1, false));
+        responseBody.add(ItemFavoriteDto.of(itemFixture2, false));
+        responseBody.add(ItemFavoriteDto.of(itemFixture3, false));
 
         mockHttpSession.setAttribute(LOGIN_USER, userFixture.getId());
         when(userItemFavoriteFacade.getMyFavoriteItems(userFixture.getId())).thenReturn(responseBody);
