@@ -9,7 +9,7 @@ import java.util.Optional;
 @Mapper
 public interface UserMapper {
 
-    int save(User user);
+    User save(User user);
 
     Optional<User> findById(int id);
 
