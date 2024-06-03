@@ -6,6 +6,7 @@ import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthProvider;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.domain.UserRole;
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -13,6 +14,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
+@EqualsAndHashCode
 public class UserDto {
     private int id;
     private int accountId;
