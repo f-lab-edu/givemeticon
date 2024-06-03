@@ -1,5 +1,5 @@
-package com.jinddung2.givemeticon.domain.user.service;
-
+import com.jinddung2.givemeticon.domain.account.domain.Account;
+import com.jinddung2.givemeticon.domain.point.domain.CashPoint;
 import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.LoginRequest;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordUpdateRequest;
@@ -10,7 +10,10 @@ import com.jinddung2.givemeticon.domain.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.domain.user.exception.MisMatchPasswordException;
 import com.jinddung2.givemeticon.domain.user.exception.NotFoundUserException;
 import com.jinddung2.givemeticon.domain.user.mapper.UserMapper;
-import org.junit.jupiter.api.Assertions;
+import com.jinddung2.givemeticon.domain.user.service.UserService;
+import com.jinddung2.givemeticon.fixture.AccountFixture;
+import com.jinddung2.givemeticon.fixture.CashPointFixture;
+import com.jinddung2.givemeticon.fixture.UserFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,69 +23,49 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
     @InjectMocks
-    UserService userService;
+    UserService sut;
     @Mock
     UserMapper userMapper;
     @Mock
     PasswordEncoder passwordEncoder;
+    LocalDateTime now = LocalDateTime.now();
+
     SignUpRequest signUpRequest;
-    LoginRequest loginRequest;
-    PasswordUpdateRequest passwordUpdateRequest;
-    User testUser;
-    UserDto userDto;
-    int pointId = 10;
+    CashPoint cashPointFixture;
+    User userFixture;
 
     @BeforeEach
     void setUp() {
         signUpRequest = new SignUpRequest("test@example.com", "test1234", "01012345678");
-        loginRequest = new LoginRequest("test@example.com", "test1234");
-        testUser = User.builder()
-                .id(1)
-                .email("test@example.com")
-                .password(passwordEncoder.encode("test1234"))
-                .build();
-        userDto = UserDto.builder()
-                .id(testUser.getId())
-                .email(testUser.getEmail())
-                .build();
-        passwordUpdateRequest = new PasswordUpdateRequest("test1234", "newtest1234");
+        cashPointFixture = CashPointFixture.createCashPointFixture();
+        userFixture = UserFixture.createUserFixture(signUpRequest.getEmail(), "encryptedPassword", signUpRequest.getPhone(), cashPointFixture, now);
     }
 
     @Test
     @DisplayName("회원가입에 성공한다")
     void signUp_Success() {
         when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(false);
-        when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(false);
+        when(userMapper.existsByPhone(signUpRequest.getPhone())).thenReturn(false);
+        when(passwordEncoder.encode(signUpRequest.getPassword())).thenReturn("encryptedPassword");
+        when(userMapper.save(any(User.class))).thenReturn(userFixture);
 
-        userService.signUp(signUpRequest, pointId);
+        User result = sut.signUp(signUpRequest, cashPointFixture.getId());
 
-        verify(userMapper).save(any(User.class));
-    }
-
-    @Test
-    @DisplayName("해당 유저의 id가 존재하는지 확인한다.")
-    void exists_By_Id_True() {
-        when(userMapper.existsById(userDto.getId())).thenReturn(true);
-
-        boolean exists = userService.isExists(userDto.getId());
-        Assertions.assertTrue(exists);
-    }
-
-    @Test
-    @DisplayName("해당 유저의 id가 존재하지 않는다.")
-    void exists_By_Id_False() {
-        when(userMapper.existsById(userDto.getId())).thenReturn(false);
-
-        boolean exists = userService.isExists(userDto.getId());
-        Assertions.assertFalse(exists);
+        verify(userMapper).existsByEmail(signUpRequest.getEmail());
+        verify(userMapper).existsByPhone(signUpRequest.getPhone());
+        assertNotNull(result, "The result should not be null");
+        assertThat(result).isEqualTo(userFixture);
     }
 
     @Test
@@ -90,7 +73,7 @@ class UserServiceTest {
     void signUp_Fail_DuplicateEmail() {
         when(userMapper.existsByEmail(signUpRequest.getEmail())).thenReturn(true);
 
-        assertThrows(DuplicatedEmailException.class, () -> userService.signUp(signUpRequest, pointId));
+        assertThrows(DuplicatedEmailException.class, () -> sut.signUp(signUpRequest, cashPointFixture.getId()));
     }
 
     @Test
@@ -98,98 +81,118 @@ class UserServiceTest {
     void signUp_Fail_DuplicatePhone() {
         when(userMapper.existsByPhone(signUpRequest.getPhone())).thenReturn(true);
 
-        assertThrows(DuplicatedPhoneException.class, () -> userService.signUp(signUpRequest, pointId));
+        assertThrows(DuplicatedPhoneException.class, () -> sut.signUp(signUpRequest, cashPointFixture.getId()));
+    }
+
+    @Test
+    @DisplayName("해당 유저의 id가 존재하는지 확인한다.")
+    void exists_By_Id_True() {
+        when(userMapper.existsById(userFixture.getId())).thenReturn(true);
+
+        boolean exists = sut.isExists(userFixture.getId());
+
+        assertThat(exists).isTrue();
+    }
+
+    @Test
+    @DisplayName("해당 유저의 id가 존재하지 않는다.")
+    void exists_By_Id_False() {
+        when(userMapper.existsById(userFixture.getId())).thenReturn(false);
+
+        boolean exists = sut.isExists(userFixture.getId());
+
+        assertThat(exists).isFalse();
     }
 
     @Test
     @DisplayName("id를 통해 유저 정보를 갖고 오는데 성공한다.")
     void get_User_Success() {
-        when(userMapper.findById(testUser.getId())).thenReturn(Optional.of(testUser));
-        UserDto user = userService.getUserInfo(testUser.getId());
-        assertEquals(testUser.getEmail(), user.getEmail());
+        when(userMapper.findById(userFixture.getId())).thenReturn(Optional.of(userFixture));
+
+        UserDto result = sut.getUserInfo(userFixture.getId());
+
+        assertThat(result).isEqualTo(UserDto.of(userFixture));
     }
 
     @Test
     @DisplayName("id를 찾을 수 없어 유저 정보를 갖고 오는데 실패한다.")
     void get_User_Fail_Not_Exists_Email() {
-        when(userMapper.findById(testUser.getId())).thenReturn(Optional.empty());
+        when(userMapper.findById(userFixture.getId())).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundUserException.class, () -> userService.getUser(testUser.getId()));
+        assertThrows(NotFoundUserException.class, () -> sut.getUser(userFixture.getId()));
     }
 
     @Test
-    @DisplayName("이메일에 맞는 패스워드인지 확인한다.")
+    @DisplayName("이메일과 패스워드가 일치하여 로그인 정보를 가져온다.")
     void check_Login_Password_Match_Success() {
-        when(userMapper.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPassword())).thenReturn(true);
+        LoginRequest request = new LoginRequest("test@example.com", "test1234");
+        when(userMapper.findByEmail(request.getEmail())).thenReturn(Optional.of(userFixture));
+        when(passwordEncoder.matches(request.getPassword(), userFixture.getPassword())).thenReturn(true);
 
-        UserDto result = userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword());
+        UserDto result = sut.checkLogin(request.getEmail(), request.getPassword());
 
-        assertNotNull(result);
-        assertEquals(loginRequest.getEmail(), userDto.getEmail());
+        assertNotNull(result, "The result should not be null");
+        assertThat(result).isEqualTo(UserDto.of(userFixture));
     }
 
     @Test
     @DisplayName("이메일에 맞는 패스워드가 아니어서 실패한다.")
     void check_Login_Password_Not_Match_Success() {
-        when(userMapper.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPassword())).thenReturn(false);
+        LoginRequest request = new LoginRequest("test@example.com", "test1234");
+        when(userMapper.findByEmail(request.getEmail())).thenReturn(Optional.of(userFixture));
+        when(passwordEncoder.matches(request.getPassword(), userFixture.getPassword())).thenReturn(false);
 
-        assertThrows(MisMatchPasswordException.class, () -> userService.checkLogin(loginRequest.getEmail(), loginRequest.getPassword()));
+        assertThrows(MisMatchPasswordException.class, () -> sut.checkLogin(request.getEmail(), request.getPassword()));
     }
 
     @Test
     @DisplayName("비밀번호 변경에 성공한다.")
     void update_Password_Success() {
-        // given
-        when(userMapper.findById(1)).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches(passwordUpdateRequest.oldPassword(), testUser.getPassword())).thenReturn(true);
-        when(passwordEncoder.encode(passwordUpdateRequest.newPassword())).thenReturn(passwordUpdateRequest.newPassword());
-        // when
-        userService.updatePassword(1, passwordUpdateRequest);
-        // then
-        verify(userMapper).findById(1);
-        verify(userMapper).updatePassword(1, passwordUpdateRequest.newPassword());
+        PasswordUpdateRequest request = new PasswordUpdateRequest("test1234", "newtest1234");
+        when(userMapper.findById(userFixture.getId())).thenReturn(Optional.of(userFixture));
+        when(passwordEncoder.matches(request.oldPassword(), userFixture.getPassword())).thenReturn(true);
+        when(passwordEncoder.encode(request.newPassword())).thenReturn("encryptedNewPassword");
 
-        Assertions.assertEquals(passwordUpdateRequest.newPassword(), testUser.getPassword());
+        sut.updatePassword(userFixture.getId(), request);
+
+        verify(userMapper).updatePassword(userFixture.getId(), "encryptedNewPassword");
+        assertThat(userFixture.getPassword()).isEqualTo("encryptedNewPassword");
     }
 
     @Test
-    @DisplayName("이전 비밀번호 불일치로 인해 비밀번호 변경에 실패한다.")
+    @DisplayName("이전 비밀번호가 불일치하여 비밀번호 변경에 실패한다.")
     void update_Password_Fail_MisMatch_Old_password() {
-        when(userMapper.findById(1)).thenReturn(Optional.of(testUser));
-        when(testUser.isPasswordMatch(passwordEncoder, passwordUpdateRequest.oldPassword())).thenReturn(false);
+        PasswordUpdateRequest request = new PasswordUpdateRequest("test1234", "newtest1234");
+        when(userMapper.findById(userFixture.getId())).thenReturn(Optional.of(userFixture));
+        when(passwordEncoder.matches(request.oldPassword(), userFixture.getPassword())).thenReturn(false);
 
-        Assertions.assertThrows(MisMatchPasswordException.class,
-                () -> userService.updatePassword(1, passwordUpdateRequest));
+        assertThrows(MisMatchPasswordException.class, () -> sut.updatePassword(userFixture.getId(), request));
     }
 
     @Test
     @DisplayName("유저 비밀번호를 임시 비밀번호로 바꾼다.")
-    public void reset_Password_Success() {
+    void reset_Password_Success() {
         String tempPassword = "01234567890ab";
+        String encryptedPassword = "encryptedPassword";
 
-        when(userMapper.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.encode(tempPassword)).thenReturn(tempPassword);
-        doNothing().when(userMapper).updatePassword(testUser.getId(), tempPassword);
+        when(userMapper.findByEmail(userFixture.getEmail())).thenReturn(Optional.of(userFixture));
+        when(passwordEncoder.encode(tempPassword)).thenReturn(encryptedPassword);
 
-        userService.resetPassword(testUser.getEmail(), tempPassword);
+        sut.resetPassword(userFixture.getEmail(), tempPassword);
 
-        verify(userMapper).findByEmail(testUser.getEmail());
-        verify(userMapper).updatePassword(testUser.getId(), tempPassword);
-
-        Assertions.assertEquals(tempPassword, testUser.getPassword());
+        verify(userMapper).updatePassword(userFixture.getId(), encryptedPassword);
+        assertThat(userFixture.getPassword()).isEqualTo(encryptedPassword);
     }
 
     @Test
-    @DisplayName("해당 유저의 등록된 계좌로 일치시킨다.")
+    @DisplayName("유저가 계좌를 등록한다.")
     void update_Account_Id_Success() {
-        int accountId = 100;
-        when(userMapper.findById(1)).thenReturn(Optional.of(testUser));
-        userService.updateAccount(testUser.getId(), accountId);
+        Account accountFixture = AccountFixture.createAccountFixture();
+        when(userMapper.findById(userFixture.getId())).thenReturn(Optional.of(userFixture));
 
-        verify(userMapper).updateAccount(testUser.getId(), accountId);
+        sut.updateAccount(userFixture.getId(), accountFixture.getId());
 
-        Assertions.assertEquals(100, testUser.getAccountId());
+        verify(userMapper).updateAccount(userFixture.getId(), accountFixture.getId());
+        assertThat(userFixture.getAccountId()).isEqualTo(accountFixture.getId());
     }
 }
