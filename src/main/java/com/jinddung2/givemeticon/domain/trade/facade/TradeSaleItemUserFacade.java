@@ -56,22 +56,13 @@ public class TradeSaleItemUserFacade {
         return tradeService.save(trade, restDay);
     }
 
-
     public TradeDto getTradeDetail(int tradeId, int buyerId) {
         checkUserExists(buyerId);
         Trade trade = tradeService.getTrade(tradeId);
         Sale sale = saleService.getSale(trade.getSaleId());
         Item item = itemService.getItem(sale.getItemId());
 
-        TradeDto tradeDto = TradeDto.of(trade);
-
-        long restDay = getRestDay(sale.getExpirationDate());
-        tradeDto.addRestDay(restDay);
-        tradeDto.addItemPrice(item.getPrice());
-        tradeDto.addExpiredDate(sale.getExpirationDate());
-        tradeDto.addDiscountRate();
-
-        return tradeDto;
+        return TradeDto.of(trade, sale, item);
     }
 
     public List<TradeDto> getUnusedTradeHistory(int buyerId, boolean orderByBoughtDate,
@@ -82,18 +73,9 @@ public class TradeSaleItemUserFacade {
 
         return myUnusedItemHistory.stream()
                 .map(trade -> {
-                    TradeDto tradeDto = TradeDto.of(trade);
-
                     Sale sale = saleService.getSale(trade.getSaleId());
                     Item item = itemService.getItem(sale.getItemId());
-
-                    long restDay = getRestDay(sale.getExpirationDate());
-                    tradeDto.addRestDay(restDay);
-                    tradeDto.addItemPrice(item.getPrice());
-                    tradeDto.addExpiredDate(sale.getExpirationDate());
-                    tradeDto.addDiscountRate();
-
-                    return tradeDto;
+                    return TradeDto.of(trade, sale, item);
                 })
                 .toList();
     }
