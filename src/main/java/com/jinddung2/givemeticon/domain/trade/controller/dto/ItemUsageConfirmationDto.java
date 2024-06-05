@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.trade.controller.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jinddung2.givemeticon.domain.brand.controller.dto.BrandDto;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
@@ -17,6 +18,7 @@ public class ItemUsageConfirmationDto {
     private String itemName;
     private LocalDate expiredDate;
     private String barcodeNum;
+    @JsonProperty(value = "isUsed")
     private boolean isUsed;
 
     @Builder
