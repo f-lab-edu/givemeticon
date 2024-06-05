@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.trade.controller.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
@@ -16,6 +17,7 @@ import java.time.temporal.ChronoUnit;
 @NoArgsConstructor
 public class TradeDto {
     private int id;
+    @JsonProperty(value = "isUsed")
     private boolean isUsed;
     private LocalDate expiredDate;
     private long restDay;
