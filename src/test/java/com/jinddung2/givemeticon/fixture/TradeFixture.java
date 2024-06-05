@@ -25,4 +25,20 @@ public class TradeFixture {
         trade.discountItemPrice(0.05);
         return trade;
     }
+
+    public static Trade createTradeFixture(int id, User buyer, Sale sale, Item item) {
+        LocalDate now = LocalDate.now();
+        Trade trade = Trade.builder()
+                .id(id)
+                .buyerId(buyer.getId())
+                .saleId(sale.getId())
+                .tradePrice(BigDecimal.valueOf(item.getPrice()))
+                .isUsed(false)
+                .isUsedDate(null)
+                .createdDate(now)
+                .build();
+
+        trade.discountItemPrice(0.05);
+        return trade;
+    }
 }

@@ -6,7 +6,7 @@ import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
-import com.jinddung2.givemeticon.domain.trade.controller.dto.ItemUsageConfirmationDTO;
+import com.jinddung2.givemeticon.domain.trade.controller.dto.ItemUsageConfirmationDto;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.service.TradeService;
 import com.jinddung2.givemeticon.domain.user.domain.User;
@@ -76,7 +76,7 @@ class GetItemUsageConfirmationFacadeTest {
         Mockito.when(itemService.getItem(sale.getItemId())).thenReturn(item);
         Mockito.when(brandService.getBrand(item.getBrandId())).thenReturn(brand);
 
-        ItemUsageConfirmationDTO result = getItemUsageConfirmationFacade.getTradeForConfirmUsage(tradeId, buyerId);
+        ItemUsageConfirmationDto result = getItemUsageConfirmationFacade.getTradeForConfirmUsage(tradeId, buyerId);
 
         Assertions.assertEquals(brand.getName(), result.getBrandName());
         Assertions.assertEquals(item.getName(), result.getItemName());
