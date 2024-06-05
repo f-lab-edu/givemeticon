@@ -11,7 +11,6 @@ import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavori
 import com.jinddung2.givemeticon.domain.favorite.exception.FavoriteErrorCode;
 import com.jinddung2.givemeticon.domain.favorite.exception.NotPushItemFavorite;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
-import com.jinddung2.givemeticon.domain.mail.service.MailSendService;
 import com.jinddung2.givemeticon.domain.point.exception.CashPointErrorCode;
 import com.jinddung2.givemeticon.domain.point.exception.NotFoundCashPoint;
 import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
@@ -70,9 +69,6 @@ public class UserControllerTest {
 
     @MockBean
     LoginService loginService;
-
-    @MockBean
-    MailSendService mailSendService;
 
     @MockBean
     PasswordResetFacade passwordResetFacade;
