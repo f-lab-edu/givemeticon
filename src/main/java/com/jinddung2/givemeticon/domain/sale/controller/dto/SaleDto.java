@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.sale.controller.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,6 +19,7 @@ public class SaleDto {
     private int sellerId;
     private String barcode;
     private LocalDate expirationDate;
+    @JsonProperty(value = "isBought")
     private boolean isBought;
     private Date isBoughtDate;
     private LocalDateTime createdDate;
