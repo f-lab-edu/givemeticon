@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.trade.domain;
 
+import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.trade.exception.InvalidDiscountRateException;
 import lombok.Builder;
 import lombok.Getter;
@@ -31,14 +32,15 @@ public class Trade {
         this.createdDate = createdDate;
     }
 
-    public void discountItemPrice(double discountRate) {
+    public void discountItemPrice(Item item,double discountRate) {
         if (discountRate < 0 || discountRate > 1) {
             throw new InvalidDiscountRateException();
         }
 
-        BigDecimal discountPrice = tradePrice.multiply(BigDecimal.valueOf(discountRate))
+        BigDecimal originalPrice = BigDecimal.valueOf(item.getPrice());
+        BigDecimal discountPrice = originalPrice.multiply(BigDecimal.valueOf(discountRate))
                 .setScale(0, RoundingMode.HALF_UP);
-        this.tradePrice = tradePrice.subtract(discountPrice);
+        this.tradePrice = originalPrice.subtract(discountPrice);
     }
 
     public void buyConfirmation() {

@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.trade.service;
 
+import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.NotFoundTradeException;
 import com.jinddung2.givemeticon.domain.trade.exception.NotMatchBuyOwnership;
@@ -25,9 +26,9 @@ public class TradeService {
     private final TradeMapper tradeMapper;
 
     @Transactional(propagation = Propagation.REQUIRED)
-    public int save(Trade trade, long daysUntilExpiration) {
+    public int save(Trade trade, Item item, long daysUntilExpiration) {
         double discountRate = daysUntilExpiration > 7L ? STANDARD.getDiscountRate() : WEEKLY_DISCOUNT.getDiscountRate();
-        trade.discountItemPrice(discountRate);
+        trade.discountItemPrice(item, discountRate);
         tradeMapper.save(trade);
         return trade.getId();
     }
