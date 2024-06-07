@@ -10,8 +10,6 @@ import com.jinddung2.givemeticon.domain.trade.controller.dto.TradeDto;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import com.jinddung2.givemeticon.domain.trade.service.TradeService;
-import com.jinddung2.givemeticon.domain.user.exception.NotFoundUserException;
-import com.jinddung2.givemeticon.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +23,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TradeSaleItemUserFacade {
 
-    private final UserService userService;
     private final SaleService saleService;
     private final ItemService itemService;
     private final TradeService tradeService;
@@ -33,7 +30,6 @@ public class TradeSaleItemUserFacade {
 
     @Transactional
     public int transact(int saleId, int buyerId) {
-        checkUserExists(buyerId);
         Sale sale = saleService.getSale(saleId);
 
         if (sale.isBought()) {
@@ -57,7 +53,6 @@ public class TradeSaleItemUserFacade {
     }
 
     public TradeDto getTradeDetail(int tradeId, int buyerId) {
-        checkUserExists(buyerId);
         Trade trade = tradeService.getTrade(tradeId);
         Sale sale = saleService.getSale(trade.getSaleId());
         Item item = itemService.getItem(sale.getItemId());
@@ -67,7 +62,6 @@ public class TradeSaleItemUserFacade {
 
     public List<TradeDto> getUnusedTradeHistory(int buyerId, boolean orderByBoughtDate,
                                                 boolean orderByExpiredDate, int page) {
-        checkUserExists(buyerId);
 
         List<Trade> myUnusedItemHistory = tradeService.getMyUnusedItemHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
 
@@ -81,7 +75,6 @@ public class TradeSaleItemUserFacade {
     }
 
     public void buyConfirmation(int tradeId, int buyerId) {
-        checkUserExists(buyerId);
         tradeService.buyConfirmation(tradeId, buyerId);
         Trade trade = tradeService.getTrade(tradeId);
         Sale sale = saleService.getSale(trade.getSaleId());
@@ -92,11 +85,5 @@ public class TradeSaleItemUserFacade {
 
     private long getRestDay(LocalDate expiredDate) {
         return ChronoUnit.DAYS.between(LocalDate.now(), expiredDate);
-    }
-
-    private void checkUserExists(int userId) {
-        if (!userService.isExists(userId)) {
-            throw new NotFoundUserException();
-        }
     }
 }
