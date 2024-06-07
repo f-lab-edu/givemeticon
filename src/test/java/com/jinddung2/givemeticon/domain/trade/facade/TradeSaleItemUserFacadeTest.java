@@ -12,30 +12,32 @@ import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import com.jinddung2.givemeticon.domain.trade.service.TradeService;
 import com.jinddung2.givemeticon.domain.user.domain.User;
-import com.jinddung2.givemeticon.domain.user.service.UserService;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
+import com.jinddung2.givemeticon.fixture.ItemFixture;
+import com.jinddung2.givemeticon.fixture.SaleFixture;
+import com.jinddung2.givemeticon.fixture.TradeFixture;
+import com.jinddung2.givemeticon.fixture.UserFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TradeSaleItemUserFacadeTest {
 
     @InjectMocks
-    TradeSaleItemUserFacade tradeSaleItemUserFacade;
+    TradeSaleItemUserFacade sut;
 
-    @Mock
-    UserService userService;
     @Mock
     SaleService saleService;
     @Mock
@@ -46,131 +48,110 @@ class TradeSaleItemUserFacadeTest {
     @Mock
     NotificationProducer producer;
 
-    int buyerId;
-    int saleId;
-    int itemId;
-    int tradeId;
-
-    User user;
-
-    Sale sale;
-
-    Item item;
-    int itemPrice;
-    Trade trade;
-
-    @BeforeEach
-    void setUp() {
-        buyerId = 1;
-        saleId = 2;
-        itemId = 3;
-        tradeId = 4;
-        itemPrice = 10000;
-        user = User.builder().id(buyerId).build();
-        sale = Sale.builder().id(saleId).itemId(itemId).isBought(false).expirationDate(LocalDate.now().plusDays(30)).build();
-        item = Item.builder().id(itemId).price(itemPrice).build();
-        trade = Trade.builder().id(tradeId).saleId(saleId).buyerId(buyerId).tradePrice(BigDecimal.valueOf(itemPrice)).build();
-        trade.discountItemPrice(DiscountRatePolicy.STANDARD.getDiscountRate());
-    }
+    LocalDateTime now = LocalDateTime.now();
 
     @Test
     @DisplayName("거래에 성공한다.")
     void transact() {
-        Mockito.when(userService.isExists(buyerId)).thenReturn(true);
-        Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
-        Mockito.when(itemService.getItem(itemId)).thenReturn(item);
+        User buyer = UserFixture.createUserFixture(now);
+        Item item = ItemFixture.createItemFixture();
+        Sale sale = SaleFixture.createSaleFixture(buyer, item);
+        Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
+        trade.discountItemPrice(item, DiscountRatePolicy.STANDARD.getDiscountRate());
 
-        Mockito.when(tradeService.save(Mockito.any(Trade.class), Mockito.any(Long.class))).thenReturn(tradeId);
+        when(saleService.getSale(sale.getId())).thenReturn(sale);
+        when(itemService.getItem(item.getId())).thenReturn(item);
+        when(tradeService.save(any(Trade.class), any(Item.class), anyLong())).thenReturn(trade.getId());
 
+        sut.transact(sale.getId(), buyer.getId());
 
-        int transactId = tradeSaleItemUserFacade.transact(saleId, buyerId);
+        assertThat(sale.isBought()).isTrue();
 
-        Assertions.assertEquals(tradeId, transactId);
-        Assertions.assertTrue(sale.isBought());
-
-        Mockito.verify(saleService).update(sale);
-        Mockito.verify(tradeService).save(Mockito.any(Trade.class), Mockito.any(Long.class));
-        Mockito.verify(producer).create(Mockito.any(CreateNotificationRequestDto.class));
+        verify(saleService).update(sale);
+        verify(tradeService).save(any(Trade.class), any(Item.class), anyLong());
+        verify(producer).create(any(CreateNotificationRequestDto.class));
     }
 
     @Test
     @DisplayName("이미 구매한 상품이라 거래에 실패한다.")
     void transact_Fail_Already_Bought() {
-        Mockito.when(userService.isExists(user.getId())).thenReturn(true);
-        sale = Mockito.mock(Sale.class);
-        Mockito.when(sale.isBought()).thenReturn(true);
+        User buyer = UserFixture.createUserFixture(now);
+        Item item = ItemFixture.createItemFixture();
+        Sale sale = SaleFixture.createBoughtSaleFixture(buyer, item);
 
-        Assertions.assertTrue(sale.isBought());
+        when(saleService.getSale(sale.getId())).thenReturn(sale);
 
-        Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
-
-        Assertions.assertThrows(AlreadyBoughtSaleException.class, () -> {
-            tradeSaleItemUserFacade.transact(saleId, buyerId);
-        });
+        assertThatThrownBy(() -> sut.transact(sale.getId(), buyer.getId()))
+                .isInstanceOf(AlreadyBoughtSaleException.class);
     }
 
     @Test
     @DisplayName("거래 상세 페이지 가져오는데 성공한다.")
     void get_Trade_Detail() {
-        Mockito.when(userService.isExists(buyerId)).thenReturn(true);
-        Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
-        Mockito.when(itemService.getItem(itemId)).thenReturn(item);
-        Mockito.when(tradeService.getTrade(tradeId)).thenReturn(trade);
+        User buyer = UserFixture.createUserFixture(now);
+        Item item = ItemFixture.createItemFixture();
+        Sale sale = SaleFixture.createSaleFixture(buyer, item);
+        Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
+        when(saleService.getSale(sale.getId())).thenReturn(sale);
+        when(itemService.getItem(item.getId())).thenReturn(item);
+        when(tradeService.getTrade(trade.getId())).thenReturn(trade);
 
-        TradeDto result = tradeSaleItemUserFacade.getTradeDetail(tradeId, buyerId);
+        TradeDto result = sut.getTradeDetail(trade.getId(), buyer.getId());
 
-        Assertions.assertEquals(trade.getTradePrice(), result.getTradePrice());
+        assertEquals(trade.getTradePrice(), result.getTradePrice());
 
-        Mockito.verify(tradeService).getTrade(trade.getId());
-        Mockito.verify(saleService).getSale(trade.getSaleId());
-        Mockito.verify(itemService).getItem(sale.getItemId());
+        verify(tradeService).getTrade(trade.getId());
+        verify(saleService).getSale(trade.getSaleId());
+        verify(itemService).getItem(sale.getItemId());
     }
 
     @Test
     @DisplayName("구매 목록 중 사용하지 않은 아이템을 조회한다.")
     void get_My_Unused_Trade_History() {
+        User buyer = UserFixture.createUserFixture(now);
+        Item item1 = ItemFixture.createItemFixture(12);
+        Item item2 = ItemFixture.createItemFixture(22);
+        Item item3 = ItemFixture.createItemFixture(32);
+        Sale sale1 = SaleFixture.createSaleFixture(11, buyer, item1);
+        Sale sale2 = SaleFixture.createSaleFixture(21, buyer, item2);
+        Sale sale3 = SaleFixture.createSaleFixture(31, buyer, item3);
+        Trade trade1 = TradeFixture.createTradeFixture(10, buyer, sale1, item1);
+        Trade trade2 = TradeFixture.createTradeFixture(20, buyer, sale2, item2);
+        Trade trade3 = TradeFixture.createTradeFixture(30, buyer, sale3, item3);
+
         boolean orderByBoughtDate = true;
         boolean orderByExpiredDate = false;
         int page = 0;
 
-        Mockito.when(userService.isExists(user.getId())).thenReturn(true);
+        when(tradeService.getMyUnusedItemHistory(buyer.getId(), orderByBoughtDate, orderByExpiredDate, page))
+                .thenReturn(Arrays.asList(trade1, trade2, trade3));
+        when(saleService.getSale(anyInt())).thenReturn(sale1, sale2, sale3);
+        when(itemService.getItem(anyInt())).thenReturn(item1, item2, item3);
 
-        Trade trade2 = Trade.builder().id(tradeId).saleId(saleId).buyerId(buyerId).tradePrice(BigDecimal.valueOf(itemPrice)).build();
-        Trade trade3 = Trade.builder().id(tradeId).saleId(saleId).buyerId(buyerId).tradePrice(BigDecimal.valueOf(itemPrice)).build();
+        List<TradeDto> result = sut.getUnusedTradeHistory(buyer.getId(), orderByBoughtDate, orderByExpiredDate, page);
 
-        Mockito.when(tradeService.getMyUnusedItemHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page))
-                .thenReturn(Arrays.asList(trade, trade2, trade3));
+        assertEquals(3, result.size());
 
-        Sale sale2 = sale = Sale.builder().id(saleId).itemId(itemId).isBought(false).expirationDate(LocalDate.now().plusDays(30)).build();
-        Sale sale3 = sale = Sale.builder().id(saleId).itemId(itemId).isBought(false).expirationDate(LocalDate.now().plusDays(30)).build();
-
-        Mockito.when(saleService.getSale(Mockito.anyInt())).thenReturn(sale, sale2, sale3);
-
-        Item item2 = Item.builder().id(itemId).price(itemPrice).build();
-        Item item3 = Item.builder().id(itemId).price(itemPrice).build();
-
-        Mockito.when(itemService.getItem(Mockito.anyInt())).thenReturn(item, item2, item3);
-
-        List<TradeDto> result = tradeSaleItemUserFacade.getUnusedTradeHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
-
-        Assertions.assertEquals(3, result.size());
-
-        Mockito.verify(tradeService, Mockito.times(1)).getMyUnusedItemHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
-        Mockito.verify(saleService, Mockito.times(3)).getSale(Mockito.anyInt());
-        Mockito.verify(itemService, Mockito.times(3)).getItem(Mockito.anyInt());
+        verify(tradeService, times(1)).getMyUnusedItemHistory(buyer.getId(), orderByBoughtDate, orderByExpiredDate, page);
+        verify(saleService, times(3)).getSale(anyInt());
+        verify(itemService, times(3)).getItem(anyInt());
     }
 
     @Test
     @DisplayName("구매 확정에 성공한다.")
     void buy_Confirmation() {
-        Mockito.when(userService.isExists(buyerId)).thenReturn(true);
-        Mockito.when(tradeService.getTrade(tradeId)).thenReturn(trade);
-        Mockito.when(saleService.getSale(saleId)).thenReturn(sale);
-        Mockito.when(itemService.getItem(itemId)).thenReturn(item);
+        User buyer = UserFixture.createUserFixture(now);
+        Item item = ItemFixture.createItemFixture();
+        Sale sale = SaleFixture.createSaleFixture(buyer, item);
+        Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
 
-        tradeSaleItemUserFacade.buyConfirmation(tradeId, buyerId);
+        when(tradeService.getTrade(trade.getId())).thenReturn(trade);
+        when(saleService.getSale(sale.getId())).thenReturn(sale);
+        when(itemService.getItem(item.getId())).thenReturn(item);
+
+        sut.buyConfirmation(trade.getId(), buyer.getId());
         
-        Mockito.verify(tradeService).buyConfirmation(tradeId, buyerId);
-        Mockito.verify(producer).create(Mockito.any(CreateNotificationRequestDto.class));
+        verify(tradeService).buyConfirmation(trade.getId(), buyer.getId());
+        verify(producer).create(any(CreateNotificationRequestDto.class));
     }
 }

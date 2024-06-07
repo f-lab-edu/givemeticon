@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon;
 
 import com.jinddung2.givemeticon.common.config.WebConfig;
+import com.jinddung2.givemeticon.common.config.controller.advice.GlobalExceptionHandler;
 import com.jinddung2.givemeticon.common.security.interceptor.AuthInterceptor;
 import com.jinddung2.givemeticon.domain.user.service.LoginService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +19,7 @@ import java.time.LocalDateTime;
                 WebConfig.class,
                 AuthInterceptor.class
         }))
-@Import(TestConfig.class)
+@Import({TestConfig.class, GlobalExceptionHandler.class})
 public abstract class BasicControllerTest {
 
         @MockBean

@@ -67,7 +67,6 @@ class TradeControllerTest extends BasicControllerTest {
         User buyer = UserFixture.createUserFixture(now);
         Item item = ItemFixture.createItemFixture();
         Sale sale = SaleFixture.createSaleFixture(buyer, item);
-        mockHttpSession.setAttribute(LOGIN_USER, buyer.getId());
 
         doThrow(new AlreadyBoughtSaleException()).when(tradeSaleItemUserFacade).transact(sale.getId(), buyer.getId());
 
