@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.sale.facade;
 
+import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import com.jinddung2.givemeticon.domain.sale.controller.dto.MySaleDto;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
@@ -26,7 +27,7 @@ public class SaleItemTradeFacade {
         List<Sale> mySales = saleService.getMySales(userId, page);
         return mySales.stream().filter(Sale::isBought)
                 .map(sale -> {
-                    String itemName = itemService.getItem(sale.getItemId()).getName();
+                    Item item = itemService.getItem(sale.getItemId());
                     BigDecimal price = tradeService.getTradeBySaleId(sale.getId())
                             .filter(Trade::isUsed)
                             .map(Trade::getTradePrice)
@@ -34,13 +35,7 @@ public class SaleItemTradeFacade {
                     if (price.equals(BigDecimal.ZERO)) {
                         return null;
                     }
-                    return MySaleDto.of(
-                            itemName,
-                            sale.getExpirationDate(),
-                            sale.getIsBoughtDate(),
-                            sale.getBarcode(),
-                            price
-                    );
+                    return MySaleDto.of(item, sale, price);
                 })
                 .filter(Objects::nonNull)
                 .toList();
