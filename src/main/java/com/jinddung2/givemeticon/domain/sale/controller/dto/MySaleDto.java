@@ -2,9 +2,7 @@ package com.jinddung2.givemeticon.domain.sale.controller.dto;
 
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,6 +10,8 @@ import java.util.Date;
 
 @Getter
 @NoArgsConstructor
+@EqualsAndHashCode
+@ToString
 public class MySaleDto {
 
     private String itemName;

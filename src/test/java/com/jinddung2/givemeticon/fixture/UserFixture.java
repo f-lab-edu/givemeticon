@@ -24,6 +24,22 @@ public class UserFixture {
                 .build();
     }
 
+    public static User createOnlyUserFixture(LocalDateTime now) {
+        return User.builder()
+                .id(1)
+                .accountId(0)
+                .cashPointId(3)
+                .email("test@test.com")
+                .password("test1234")
+                .phone("01000000000")
+                .userRole(UserRole.USER)
+                .isActive(true)
+                .provider(null)
+                .createdDate(now)
+                .updatedDate(now)
+                .build();
+    }
+
     public static User createUserFixture(String email, String password, LocalDateTime now) {
         return User.builder()
                 .id(1)

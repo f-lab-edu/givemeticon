@@ -14,7 +14,7 @@ import java.time.LocalDate;
 class SaleCreateValidatorTest {
 
     @InjectMocks
-    SaleCreateValidator saleCreateValidator;
+    SaleCreateValidator sut;
 
     @Test
     void validate_Fail_Expired_Date() {
@@ -23,6 +23,6 @@ class SaleCreateValidatorTest {
                 LocalDate.of(1997, 4, 18));
 
         Assertions.assertThrows(ExpiredSaleException.class,
-                () -> saleCreateValidator.validate(saleCreateRequest));
+                () -> sut.validate(saleCreateRequest));
     }
 }
