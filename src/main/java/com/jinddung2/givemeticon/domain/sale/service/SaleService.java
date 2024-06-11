@@ -77,12 +77,12 @@ public class SaleService {
                 .collect(Collectors.toList());
     }
 
-    public List<Sale> getMySales(int userId) {
+    public List<Sale> getMyTradedSales(int userId) {
         return saleMapper.findMySalesBySellerId(userId);
     }
 
-    public List<Sale> getMySales(int userId, int page) {
+    public List<Sale> getMyTradedSales(int userId, int page) {
         Map<String, Object> pageInfo = makePagingParamMap(userId, page, SALE.getSize());
-        return saleMapper.findMySales(pageInfo);
+        return saleMapper.findMyTradedSales(pageInfo);
     }
 }
