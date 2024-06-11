@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.sale.controller.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
+@EqualsAndHashCode
 public class SaleDto {
 
     private int id;

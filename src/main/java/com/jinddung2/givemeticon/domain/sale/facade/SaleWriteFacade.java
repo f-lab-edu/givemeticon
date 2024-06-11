@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class SaleCreationFacade {
+public class SaleWriteFacade {
 
     private final ItemService itemService;
     private final UserService userService;

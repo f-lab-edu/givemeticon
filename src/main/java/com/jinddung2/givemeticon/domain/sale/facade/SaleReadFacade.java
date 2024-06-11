@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.sale.facade;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import com.jinddung2.givemeticon.domain.sale.controller.dto.MySaleDto;
+import com.jinddung2.givemeticon.domain.sale.controller.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
@@ -16,12 +17,16 @@ import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
-public class SaleItemTradeFacade {
+public class SaleReadFacade {
 
-    private final SaleService saleService;
     private final ItemService itemService;
+    private final SaleService saleService;
     private final TradeService tradeService;
 
+    public List<SaleDto> getSalesForItem(int itemId) {
+        Item item = itemService.getItem(itemId);
+        return saleService.getAvailableSalesForItem(item);
+    }
 
     public List<MySaleDto> getConfirmedSalesBySellerId(int userId, int page) {
         List<Sale> mySales = saleService.getMySales(userId, page);
@@ -39,5 +44,20 @@ public class SaleItemTradeFacade {
                 })
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    public BigDecimal getTotalAmountForSales(int userId) {
+        List<Sale> sales = saleService.getMySales(userId);
+
+        return sales.stream().map(
+                sale -> tradeService.getTradeBySaleId(sale.getId())
+                        .filter(Trade::isUsed)
+                        .map(Trade::getTradePrice)
+                        .orElse(BigDecimal.ZERO)
+        ).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public SaleDto getAvailableSales(int saleId) {
+        return saleService.getAvailableSaleForItem(saleId);
     }
 }
