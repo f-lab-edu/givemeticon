@@ -7,6 +7,7 @@ import com.jinddung2.givemeticon.domain.sale.controller.dto.SaleDto;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
+import com.jinddung2.givemeticon.domain.trade.exception.NotFoundTradeException;
 import com.jinddung2.givemeticon.domain.trade.service.TradeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,18 +29,14 @@ public class SaleReadFacade {
         return saleService.getAvailableSalesForItem(item);
     }
 
-    public List<MySaleDto> getConfirmedSalesBySellerId(int userId, int page) {
-        List<Sale> mySales = saleService.getMySales(userId, page);
-        return mySales.stream().filter(Sale::isBought)
+    public List<MySaleDto> getTradedAndConfirmedSales(int userId, int page) {
+        List<Sale> mySales = saleService.getMyTradedSales(userId, page);
+        return mySales.stream()
                 .map(sale -> {
                     Item item = itemService.getItem(sale.getItemId());
                     BigDecimal price = tradeService.getTradeBySaleId(sale.getId())
-                            .filter(Trade::isUsed)
                             .map(Trade::getTradePrice)
-                            .orElse(BigDecimal.ZERO);
-                    if (price.equals(BigDecimal.ZERO)) {
-                        return null;
-                    }
+                            .orElseThrow(NotFoundTradeException::new);
                     return MySaleDto.of(item, sale, price);
                 })
                 .filter(Objects::nonNull)
@@ -47,7 +44,7 @@ public class SaleReadFacade {
     }
 
     public BigDecimal getTotalAmountForSales(int userId) {
-        List<Sale> sales = saleService.getMySales(userId);
+        List<Sale> sales = saleService.getMyTradedSales(userId);
 
         return sales.stream().map(
                 sale -> tradeService.getTradeBySaleId(sale.getId())

@@ -42,7 +42,7 @@ public class SaleController {
     @GetMapping("/my")
     public List<MySaleDto> getConfirmedSalesBySellerId(@SessionAttribute(name = LOGIN_USER) int userId,
                                                                                     @RequestParam(name = "page", defaultValue = "0") int page) {
-        return saleReadFacade.getConfirmedSalesBySellerId(userId, page);
+        return saleReadFacade.getTradedAndConfirmedSales(userId, page);
     }
 
     @GetMapping("/my/total-amount")
