@@ -16,8 +16,8 @@ public class ItemService {
     private final ItemMapper itemMapper;
 
     public Item saveOrUpdate(Item item) {
-        itemMapper.saveOrUpdate(item);
-        return getItem(item.getId());
+        int id = itemMapper.saveOrUpdate(item);
+        return getItem(id);
     }
 
     public Item getItem(int itemId) {
@@ -27,7 +27,7 @@ public class ItemService {
     public ItemDto getItemAndIncreaseViewCount(int itemId) {
         Item item = getItem(itemId);
         item.increaseViewCount();
-//        itemMapper.increaseViewCount(itemId);
+
         itemMapper.saveOrUpdate(item);
         return ItemDto.of(item);
     }

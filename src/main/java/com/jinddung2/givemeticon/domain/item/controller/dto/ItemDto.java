@@ -2,16 +2,14 @@ package com.jinddung2.givemeticon.domain.item.controller.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @NoArgsConstructor
+@EqualsAndHashCode
 public class ItemDto {
 
     private int id;
