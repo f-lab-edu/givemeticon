@@ -3,7 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.jinddung2.givemeticon.domain.item.mapper.ItemMapper">
-    <insert id="save" parameterType="Item" useGeneratedKeys="true" keyProperty="id">
+    <insert id="saveOrUpdate" parameterType="Item" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO item (id,
                           brand_id,
                           name,
@@ -18,6 +18,11 @@
                 #{viewCount},
                 NOW(),
                 NOW())
+        ON DUPLICATE KEY UPDATE brand_id     = VALUES(brand_id),
+                                name         = VALUES(name),
+                                price        = VALUES(price),
+                                view_count   = VALUES(view_count),
+                                updated_date = NOW()
     </insert>
 
     <select id="findById" parameterType="int" resultType="Item">
@@ -26,9 +31,4 @@
         WHERE id = #{itemId}
     </select>
 
-    <update id="increaseViewCount" parameterType="int">
-        UPDATE item
-        SET view_count = view_count + 1
-        WHERE id = #{itemId}
-    </update>
 </mapper>

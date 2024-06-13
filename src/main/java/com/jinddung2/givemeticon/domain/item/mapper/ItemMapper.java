@@ -8,9 +8,8 @@ import java.util.Optional;
 @Mapper
 public interface ItemMapper {
 
-    int save(Item item);
+    int saveOrUpdate(Item item);
 
     Optional<Item> findById(int itemId);
 
-    int increaseViewCount(int itemId);
 }
