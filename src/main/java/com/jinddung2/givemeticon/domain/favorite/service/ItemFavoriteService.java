@@ -29,11 +29,11 @@ public class ItemFavoriteService {
         itemFavoriteMapper.save(itemFavorite);
     }
 
-
     public void cancelItemFavorite(int userId, int itemId) {
         ItemFavorite itemFavorite = getItemFavoriteByUserIDAndItemId(userId, itemId)
                 .orElseThrow(NotPushItemFavorite::new);
-        itemFavoriteMapper.deleteById(itemFavorite.getId());
+        itemFavorite.cancel();
+        itemFavoriteMapper.update(itemFavorite);
     }
 
     private Optional<ItemFavorite> getItemFavoriteByUserIDAndItemId(int userId, int itemId) {
