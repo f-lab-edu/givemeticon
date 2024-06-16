@@ -4,96 +4,113 @@ import com.jinddung2.givemeticon.domain.favorite.domain.ItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.exception.NotPushItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMapper;
+import com.jinddung2.givemeticon.domain.item.domain.Item;
+import com.jinddung2.givemeticon.domain.user.domain.User;
+import com.jinddung2.givemeticon.fixture.ItemFavoriteFixture;
+import com.jinddung2.givemeticon.fixture.ItemFixture;
+import com.jinddung2.givemeticon.fixture.UserFixture;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ItemFavoriteServiceTest {
 
     @InjectMocks
-    ItemFavoriteService itemFavoriteService;
+    ItemFavoriteService sut;
 
     @Mock
     ItemFavoriteMapper itemFavoriteMapper;
 
-    int userId, itemId;
-    ItemFavorite itemFavorite;
-
-    @BeforeEach
-    void setUp() {
-        userId = 1;
-        itemId = 2;
-
-        itemFavorite = ItemFavorite.builder()
-                .id(1)
-                .itemId(itemId)
-                .userId(userId)
-                .isFavorite(true)
-                .build();
-    }
+    LocalDateTime now = LocalDateTime.now();
 
     @Test
     @DisplayName("아이템 좋아요 누른 것을 확인한다.")
     void push_New_Favorite() {
-        Mockito.when(itemFavoriteMapper.findByIdByUserIDAndItemId(userId, itemId)).thenReturn(Optional.empty());
+        User user = UserFixture.createUserFixture(now);
+        Item item = ItemFixture.createItemFixture();
+        ItemFavorite itemFavorite = ItemFavoriteFixture.createItemFavoriteFixture(user, item);
 
-        itemFavoriteService.insertFavorite(userId, itemId);
+        when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId())).thenReturn(Optional.empty());
 
-        Mockito.verify(itemFavoriteMapper).save(Mockito.any(ItemFavorite.class));
-        Assertions.assertTrue(itemFavorite.isFavorite());
+        sut.insertFavorite(user.getId(), item.getId());
+
+        assertThat(itemFavorite.getItemId()).isEqualTo(item.getId());
+        assertThat(itemFavorite.getUserId()).isEqualTo(user.getId());
+        assertThat(itemFavorite.isFavorite()).isTrue();
     }
 
     @Test
     @DisplayName("이미 좋아요한 아이템이라 좋아요에 실패한다.")
     void push_New_Favorite_Fail_Already_Item_Favorite() {
-        Mockito.when(itemFavoriteMapper.findByIdByUserIDAndItemId(userId, itemId)).thenReturn(Optional.of(itemFavorite));
+        User user = UserFixture.createUserFixture(now);
+        Item item = ItemFixture.createItemFixture();
+        ItemFavorite itemFavorite = ItemFavoriteFixture.createItemFavoriteFixture(user, item);
+        when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId()))
+                .thenReturn(Optional.of(itemFavorite));
 
         Assertions.assertThrows(AlreadyPushItemFavorite.class,
-                () -> itemFavoriteService.insertFavorite(userId, itemId));
+                () -> sut.insertFavorite(user.getId(), item.getId()));
     }
 
     @Test
     @DisplayName("눌렀던 좋아요가 취소된 것을 확인한다.")
     void cancel_Favorite() {
-        Mockito.when(itemFavoriteMapper.findByIdByUserIDAndItemId(userId, itemId)).thenReturn(Optional.of(itemFavorite));
+        User user = UserFixture.createUserFixture(now);
+        Item item = ItemFixture.createItemFixture();
+        ItemFavorite itemFavorite = ItemFavoriteFixture.createItemFavoriteFixture(user, item);
+        when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId()))
+                .thenReturn(Optional.of(itemFavorite));
 
-        itemFavoriteService.cancelItemFavorite(userId, itemId);
+        sut.cancelItemFavorite(user.getId(), item.getId());
 
-        Mockito.verify(itemFavoriteMapper).deleteById(itemFavorite.getId());
+        assertThat(itemFavorite.getItemId()).isEqualTo(item.getId());
+        assertThat(itemFavorite.getUserId()).isEqualTo(user.getId());
+        assertThat(itemFavorite.isFavorite()).isFalse();
     }
 
     @Test
     @DisplayName("좋아요를 하지 않은 상품이라 좋아요 취소에 실패한다.")
     void cancel_Favorite_Fail_Not_Push_Item_Favorite() {
-        Mockito.when(itemFavoriteMapper.findByIdByUserIDAndItemId(userId, itemId)).thenReturn(Optional.empty());
+        User user = UserFixture.createUserFixture(now);
+        Item item = ItemFixture.createItemFixture();
+
+        when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId())).thenReturn(Optional.empty());
 
         Assertions.assertThrows(NotPushItemFavorite.class,
-                () -> itemFavoriteService.cancelItemFavorite(userId, itemId));
+                () -> sut.cancelItemFavorite(user.getId(), item.getId()));
     }
 
     @Test
     @DisplayName("내가 좋아요한 것들을 모두 조회한다.")
     void get_My_Favorites() {
-        List<ItemFavorite> fakeFavorites = Arrays.asList(
-                new ItemFavorite(1, 1, 101, true),
-                new ItemFavorite(2, 1, 102, true)
+        User user = UserFixture.createUserFixture(now);
+        Item item1 = ItemFixture.createItemFixture();
+        Item item2 = ItemFixture.createItemFixture();
+        List<ItemFavorite> expected = Arrays.asList(
+                ItemFavoriteFixture.createItemFavoriteFixture(user, item1),
+                ItemFavoriteFixture.createItemFavoriteFixture(user, item2)
         );
 
-        Mockito.when(itemFavoriteMapper.findFavoritesByUserId(Mockito.anyInt())).thenReturn(fakeFavorites);
+        when(itemFavoriteMapper.findFavoritesByUserId(user.getId())).thenReturn(expected);
 
-        List<ItemFavorite> result = itemFavoriteService.getMyFavorite(1);
+        List<ItemFavorite> result = sut.getMyFavorite(user.getId());
 
-        Assertions.assertEquals(fakeFavorites.size(), result.size());
+        Assertions.assertEquals(expected.size(), result.size());
+        for (int i = 0; i < result.size(); i++) {
+            assertThat(result.get(i)).isEqualTo(expected.get(i));
+        }
     }
 }
