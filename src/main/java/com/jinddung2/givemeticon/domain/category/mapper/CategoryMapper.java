@@ -16,5 +16,5 @@ public interface CategoryMapper {
 
     void deleteById(int id);
 
-    List<String> findAll();
+    List<Category> findAll();
 }
