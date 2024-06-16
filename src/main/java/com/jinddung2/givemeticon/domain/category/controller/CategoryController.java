@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.domain.category.controller;
 
 import com.jinddung2.givemeticon.domain.category.controller.request.CategoryUpdateNameRequest;
+import com.jinddung2.givemeticon.domain.category.domain.Category;
 import com.jinddung2.givemeticon.domain.category.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -15,7 +16,7 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping()
-    public List<String> getAllCategories() {
+    public List<Category> getAllCategories() {
         return categoryService.getAllCategories();
     }
 
