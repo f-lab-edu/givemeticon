@@ -17,4 +17,8 @@ public class ItemFavorite {
         this.itemId = itemId;
         this.isFavorite = isFavorite;
     }
+
+    public void cancel() {
+        this.isFavorite = false;
+    }
 }
