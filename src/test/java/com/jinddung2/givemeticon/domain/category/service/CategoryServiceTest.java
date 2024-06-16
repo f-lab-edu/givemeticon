@@ -4,97 +4,93 @@ import com.jinddung2.givemeticon.domain.category.controller.request.CategoryUpda
 import com.jinddung2.givemeticon.domain.category.domain.Category;
 import com.jinddung2.givemeticon.domain.category.exception.NotFoundCategoryException;
 import com.jinddung2.givemeticon.domain.category.mapper.CategoryMapper;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
+import com.jinddung2.givemeticon.fixture.CategoryFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CategoryServiceTest {
 
     @InjectMocks
-    CategoryService categoryService;
+    CategoryService sut;
 
     @Mock
     CategoryMapper categoryMapper;
 
-    Category category;
-    CategoryUpdateNameRequest categoryUpdateNameRequest;
-    List<String> categoryList;
-
-    @BeforeEach
-    void setUp() {
-        category = new Category(1, "testCategory");
-        categoryUpdateNameRequest = new CategoryUpdateNameRequest("updateName");
-
-        categoryList = Arrays.asList(
-                "category1",
-                "category2",
-                "category3");
-    }
-
     @Test
     @DisplayName("카테고리 전체 조회에 성공한다.")
     void get_All_Categories_Success() {
-        Mockito.when(categoryMapper.findAll()).thenReturn(categoryList);
+        Category category1 = CategoryFixture.createCategoryFixture(10);
+        Category category2 = CategoryFixture.createCategoryFixture(20);
+        Category category3 = CategoryFixture.createCategoryFixture(30);
+        List<Category> expected = List.of(category1, category2, category3);
 
-        List<String> allCategories = categoryService.getAllCategories();
+        when(categoryMapper.findAll()).thenReturn(expected);
 
-        Assertions.assertEquals(categoryList.size(), allCategories.size());
+        List<Category> result = sut.getAllCategories();
+
+        assertThat(result.size()).isEqualTo(expected.size());
+        for (int i = 0; i < result.size(); i++) {
+            assertThat(result.get(i)).isEqualTo(expected.get(i));
+        }
     }
 
     @Test
     @DisplayName("카테고리명을 바꾸는데 성공한다.")
     void update_Name_Success() {
-        Mockito.when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.of(category));
-        doNothing().when(categoryMapper).updateName(category.getId(), categoryUpdateNameRequest.name());
+        Category category = CategoryFixture.createCategoryFixture();
+        CategoryUpdateNameRequest request = new CategoryUpdateNameRequest("updateName");
+        when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.of(category));
+        doNothing().when(categoryMapper).updateName(category.getId(), request.name());
 
-        categoryService.updateName(category.getId(), categoryUpdateNameRequest.name());
+        sut.updateName(category.getId(), request.name());
 
-        assertEquals(category.getName(), categoryUpdateNameRequest.name());
+        assertThat(category.getName()).isEqualTo(request.name());
     }
 
     @Test
     @DisplayName("브랜드를 찾을 수 없어 브랜드명을 바꾸는데 실패한다.")
     void update_Name_Fail_Not_Found_Brand() {
-        Mockito.when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.empty());
+        Category category = CategoryFixture.createCategoryFixture();
+        CategoryUpdateNameRequest request = new CategoryUpdateNameRequest("updateName");
+        when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.empty());
 
         assertThrows(NotFoundCategoryException.class, () -> {
-            categoryService.updateName(category.getId(), categoryUpdateNameRequest.name());
+            sut.updateName(category.getId(), request.name());
         });
     }
 
     @Test
     @DisplayName("카테고리 삭제에 성공한다")
     void delete_Brand_Success() {
-        Mockito.when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.of(category));
+        Category category = CategoryFixture.createCategoryFixture();
+        when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.of(category));
 
-        categoryService.deleteById(category.getId());
+        sut.deleteById(category.getId());
 
-        Mockito.verify(categoryMapper).deleteById(category.getId());
+        verify(categoryMapper).deleteById(category.getId());
     }
 
     @Test
     @DisplayName("카테고리를 찾을 수 없어 브랜드 제거에 실패한다.")
     void delete_Brand_Fail_Not_Found_Brand() {
-        Mockito.when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.empty());
+        Category category = CategoryFixture.createCategoryFixture();
+        when(categoryMapper.findById(any(Integer.class))).thenReturn(Optional.empty());
 
         assertThrows(NotFoundCategoryException.class, () -> {
-            categoryService.deleteById(category.getId());
+            sut.deleteById(category.getId());
         });
     }
 }
