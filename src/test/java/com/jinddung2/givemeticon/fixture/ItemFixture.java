@@ -31,4 +31,17 @@ public class ItemFixture {
                 .updatedDate(now)
                 .build();
     }
+
+    public static Item createItemFixtureWithViewCount(int viewCount) {
+        LocalDateTime now = LocalDateTime.now();
+        return Item.builder()
+                .id(4)
+                .brandId(5)
+                .name("testItem")
+                .price(10000)
+                .viewCount(viewCount)
+                .createdDate(now)
+                .updatedDate(now)
+                .build();
+    }
 }
