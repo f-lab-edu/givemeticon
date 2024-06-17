@@ -11,4 +11,12 @@ public class BrandFixture {
                 .name("testBrand")
                 .build();
     }
+
+    public static Brand createBrandFixture(int id) {
+        return Brand.builder()
+                .id(id)
+                .categoryId(8)
+                .name("testBrand" + id)
+                .build();
+    }
 }
