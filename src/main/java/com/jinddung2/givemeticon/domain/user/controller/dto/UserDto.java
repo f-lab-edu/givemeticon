@@ -1,10 +1,12 @@
 package com.jinddung2.givemeticon.domain.user.controller.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthProvider;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.domain.user.domain.UserRole;
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
+@EqualsAndHashCode
 public class UserDto {
     private int id;
     private int accountId;
@@ -19,6 +22,7 @@ public class UserDto {
     private String email;
     private String phone;
     private UserRole userRole;
+    @JsonProperty("isActive")
     private boolean isActive;
     private OAuthProvider provider;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Seoul")

@@ -40,11 +40,16 @@
                is_favorite
         FROM item_favorite
         WHERE user_id = #{userId}
+        AND is_favorite = true
     </select>
 
-    <delete id="deleteById" parameterType="int">
-        DELETE
-        FROM item_favorite
-        WHERE id = #{id}
-    </delete>
+    <update id="update" parameterType="ItemFavorite">
+        UPDATE item_favorite
+        SET
+            user_id = #{userId},
+            item_id = #{itemId},
+            is_favorite = #{isFavorite}
+        WHERE
+            id = #{id}
+    </update>
 </mapper>

@@ -4,16 +4,20 @@
 
 <mapper namespace="com.jinddung2.givemeticon.domain.category.mapper.CategoryMapper">
 
+    <resultMap id="categoryResultMap" type="Category">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+    </resultMap>
+
     <select id="findById" parameterType="int" resultType="Category">
         SELECT id, name
         FROM category
         where id = #{id}
     </select>
 
-    <select id="findAll" resultType="String">
-        SELECT name
+    <select id="findAll" resultType="Category" resultMap="categoryResultMap">
+        SELECT id, name
         FROM category
-        ORDER BY id ASC
     </select>
 
     <update id="updateName">

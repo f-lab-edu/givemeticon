@@ -1,6 +1,6 @@
 package com.jinddung2.givemeticon.domain.trade.controller;
 
-import com.jinddung2.givemeticon.domain.trade.controller.dto.ItemUsageConfirmationDTO;
+import com.jinddung2.givemeticon.domain.trade.controller.dto.ItemUsageConfirmationDto;
 import com.jinddung2.givemeticon.domain.trade.controller.dto.TradeDto;
 import com.jinddung2.givemeticon.domain.trade.facade.GetItemUsageConfirmationFacade;
 import com.jinddung2.givemeticon.domain.trade.facade.TradeSaleItemUserFacade;
@@ -36,7 +36,7 @@ public class TradeController {
     }
 
     @GetMapping("{id}/confirm-usage")
-    public ItemUsageConfirmationDTO getTradeForConfirmUsage(
+    public ItemUsageConfirmationDto getTradeForConfirmUsage(
             @PathVariable("id") int tradeId,
             @SessionAttribute(name = LOGIN_USER) int buyerId
     ) {

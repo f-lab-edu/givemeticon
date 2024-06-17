@@ -14,21 +14,19 @@ import org.springframework.kafka.core.KafkaTemplate;
 class NotificationProducerTest {
 
     @InjectMocks
-    private NotificationProducer notificationProducer;
+    private NotificationProducer sut;
 
     @Mock
     private KafkaTemplate<String, CreateNotificationRequestDto> kafkaTemplate;
 
-    int saleId = 1;
-    int sellerId = 2;
-
     @Test
     @DisplayName("알람 요청을 만들어 \"alarm\" 이라는 토픽을 카프카 큐에 넣는다.")
     void create() {
+        int saleId = 1, sellerId = 2;
         CreateNotificationRequestDto fakeDto =
                 new CreateNotificationRequestDto(saleId, sellerId, "fakeMessage");
 
-        notificationProducer.create(fakeDto);
+        sut.create(fakeDto);
 
         Mockito.verify(kafkaTemplate).send(Mockito.eq("alarm"), Mockito.eq(fakeDto));
     }

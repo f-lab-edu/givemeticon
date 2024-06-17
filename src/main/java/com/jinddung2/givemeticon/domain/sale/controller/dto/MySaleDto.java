@@ -1,8 +1,8 @@
 package com.jinddung2.givemeticon.domain.sale.controller.dto;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import com.jinddung2.givemeticon.domain.item.domain.Item;
+import com.jinddung2.givemeticon.domain.sale.domain.Sale;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -10,6 +10,8 @@ import java.util.Date;
 
 @Getter
 @NoArgsConstructor
+@EqualsAndHashCode
+@ToString
 public class MySaleDto {
 
     private String itemName;
@@ -27,12 +29,12 @@ public class MySaleDto {
         this.price = price;
     }
 
-    public static MySaleDto of(String itemName, LocalDate expirationDate, Date isBoughtDate, String barcode, BigDecimal price) {
+    public static MySaleDto of(Item item, Sale sale, BigDecimal price) {
         return MySaleDto.builder()
-                .itemName(itemName)
-                .expiredDate(expirationDate)
-                .isBoughtDate(isBoughtDate)
-                .barcode(barcode)
+                .itemName(item.getName())
+                .expiredDate(sale.getExpirationDate())
+                .isBoughtDate(sale.getIsBoughtDate())
+                .barcode(sale.getBarcode())
                 .price(price)
                 .build();
     }

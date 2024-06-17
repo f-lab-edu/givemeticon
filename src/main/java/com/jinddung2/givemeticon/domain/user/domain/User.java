@@ -1,10 +1,7 @@
 package com.jinddung2.givemeticon.domain.user.domain;
 
 import com.jinddung2.givemeticon.domain.oauth.domain.oauth.OAuthProvider;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
@@ -12,6 +9,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor
 @ToString
+@EqualsAndHashCode
 public class User {
     private int id;
     private int accountId;

@@ -17,5 +17,5 @@ public interface ItemFavoriteMapper {
 
     List<ItemFavorite> findFavoritesByUserId(int userId);
 
-    void deleteById(int id);
+    void update(ItemFavorite itemFavorite);
 }

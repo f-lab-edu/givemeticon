@@ -23,5 +23,5 @@ public interface SaleMapper {
 
     List<Sale> findMySalesBySellerId(int userId);
 
-    List<Sale> findMySales(@Param("pageInfo") Map<String, Object> pageInfo);
+    List<Sale> findMyTradedSales(@Param("pageInfo") Map<String, Object> pageInfo);
 }
