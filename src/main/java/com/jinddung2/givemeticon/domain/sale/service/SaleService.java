@@ -11,8 +11,6 @@ import com.jinddung2.givemeticon.domain.sale.mapper.SaleMapper;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -42,7 +40,6 @@ public class SaleService {
         return sale.getId();
     }
 
-    @Transactional(propagation = Propagation.REQUIRED)
     public int update(Sale sale) {
         saleMapper.update(sale);
         return sale.getId();
