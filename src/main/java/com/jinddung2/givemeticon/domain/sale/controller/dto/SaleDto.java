@@ -1,52 +1,51 @@
 package com.jinddung2.givemeticon.domain.sale.controller.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-@Getter
-@NoArgsConstructor
-@EqualsAndHashCode
-public class SaleDto {
+import static com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy.STANDARD;
+import static com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy.WEEKLY_DISCOUNT;
 
-    private int id;
-    private int itemId;
-    private int sellerId;
-    private String barcode;
-    private LocalDate expirationDate;
-    @JsonProperty(value = "isBought")
-    private boolean isBought;
-    private Date isBoughtDate;
-    private LocalDateTime createdDate;
+public record SaleDto(
+        int id,
+        int itemId,
+        int sellerId,
+        String barcode,
+        BigDecimal discountedPrice,
+        LocalDate expirationDate,
+        @JsonProperty(value = "isBought") boolean isBought,
+        Date isBoughtDate,
+        LocalDateTime createdDate
+) {
 
-    @Builder
-    public SaleDto(int id, int itemId, int sellerId, String barcode, LocalDate expirationDate, boolean isBought, Date isBoughtDate, LocalDateTime createdDate) {
-        this.id = id;
-        this.itemId = itemId;
-        this.sellerId = sellerId;
-        this.barcode = barcode;
-        this.expirationDate = expirationDate;
-        this.isBought = isBought;
-        this.isBoughtDate = isBoughtDate;
-        this.createdDate = createdDate;
+    public static SaleDto of(Sale sale, Item item) {
+        long restDay = sale.getRestDay();
+        double discountRate = restDay > 7L ? STANDARD.getDiscountRate() : WEEKLY_DISCOUNT.getDiscountRate();
+        return new SaleDto(
+                sale.getId(),
+                sale.getItemId(),
+                sale.getSellerId(),
+                sale.getBarcode(),
+                calculateSalePrice(item.getPrice(), discountRate),
+                sale.getExpirationDate(),
+                sale.isBought(),
+                sale.getIsBoughtDate(),
+                sale.getCreatedDate()
+        );
     }
 
-    public static SaleDto of(Sale sale) {
-        return SaleDto.builder()
-                .id(sale.getId())
-                .itemId(sale.getItemId())
-                .sellerId(sale.getSellerId())
-                .barcode(sale.getBarcode())
-                .expirationDate(sale.getExpirationDate())
-                .isBought(sale.isBought())
-                .isBoughtDate(sale.getIsBoughtDate())
-                .build();
+    private static BigDecimal calculateSalePrice(int price, double discountRate) {
+        BigDecimal originalPrice = BigDecimal.valueOf(price);
+        BigDecimal discountPrice = originalPrice.multiply(BigDecimal.valueOf(discountRate))
+                .setScale(0, RoundingMode.HALF_UP);
+
+        return originalPrice.subtract(discountPrice);
     }
 }
