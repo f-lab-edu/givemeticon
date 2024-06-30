@@ -67,10 +67,6 @@ public class SaleService {
             throw new ExpiredSaleException();
         }
 
-        long restDay = sale.getRestDay();
-        double discountRate = restDay > 7L ? STANDARD.getDiscountRate() : WEEKLY_DISCOUNT.getDiscountRate();
-        BigDecimal discountedPrice = sale.calculateSalePrice(item.getPrice(), discountRate);
-
         return SaleDto.of(sale, item);
     }
 
