@@ -54,11 +54,14 @@ class SaleReadFacadeTest {
     void get_Sales_By_ItemId_Success() {
         Item item = ItemFixture.createItemFixture();
         User seller = UserFixture.createUserFixture(now);
-        SaleDto sale1 = SaleDto.of(SaleFixture.createSaleFixture(10, seller, item));
-        SaleDto sale2 = SaleDto.of(SaleFixture.createSaleFixture(20, seller, item));
-        SaleDto sale3 = SaleDto.of(SaleFixture.createSaleFixture(30, seller, item));
+        Sale sale1 = SaleFixture.createSaleFixture(10, seller, item);
+        Sale sale2 = SaleFixture.createSaleFixture(20, seller, item);
+        Sale sale3 = SaleFixture.createSaleFixture(30, seller, item);
+        SaleDto saleDto1 = SaleDto.of(sale1, item);
+        SaleDto saleDto2 = SaleDto.of(sale2, item);
+        SaleDto saleDto3 = SaleDto.of(sale3, item);
         when(itemService.getItem(item.getId())).thenReturn(item);
-        List<SaleDto> sales = List.of(sale1, sale2, sale3);
+        List<SaleDto> sales = List.of(saleDto1, saleDto2, saleDto3);
         when(saleService.getAvailableSalesForItem(item)).thenReturn(sales);
 
         List<SaleDto> result = sut.getSalesForItem(item.getId());
