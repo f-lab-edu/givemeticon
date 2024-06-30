@@ -12,7 +12,6 @@ import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleExcepti
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -20,8 +19,6 @@ import java.util.stream.Collectors;
 
 import static com.jinddung2.givemeticon.common.utils.PaginationUtil.makePagingParamMap;
 import static com.jinddung2.givemeticon.common.utils.constants.PageSize.SALE;
-import static com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy.STANDARD;
-import static com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy.WEEKLY_DISCOUNT;
 
 @Service
 @RequiredArgsConstructor
@@ -71,12 +68,7 @@ public class SaleService {
         List<Sale> sales = saleMapper.findNotBoughtSalesByItemId(item.getId());
         return sales.stream()
                 .filter(sale -> !sale.getExpirationDate().isBefore(LocalDate.now()))
-                .map(sale -> {
-                    long restDay = sale.getRestDay();
-                    double discountRate = restDay > 7L ? STANDARD.getDiscountRate() : WEEKLY_DISCOUNT.getDiscountRate();
-                    BigDecimal discountedPrice = sale.calculateSalePrice(item.getPrice(), discountRate);
-                    return SaleDto.of(sale, item);
-                })
+                .map(sale -> SaleDto.of(sale, item))
                 .collect(Collectors.toList());
     }
 

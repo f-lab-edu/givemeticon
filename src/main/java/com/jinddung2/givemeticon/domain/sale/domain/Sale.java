@@ -5,8 +5,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -62,14 +60,6 @@ public class Sale {
     public void updateBoughtState() {
         this.isBought = true;
         this.isBoughtDate = Date.valueOf(LocalDate.now());
-    }
-
-    public BigDecimal calculateSalePrice(int price, double discountRate) {
-        BigDecimal originalPrice = BigDecimal.valueOf(price);
-        BigDecimal discountPrice = originalPrice.multiply(BigDecimal.valueOf(discountRate))
-                .setScale(0, RoundingMode.HALF_UP);
-
-        return originalPrice.subtract(discountPrice);
     }
 
     public long getRestDay() {
