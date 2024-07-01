@@ -16,23 +16,22 @@ import java.util.Optional;
 
 import static com.jinddung2.givemeticon.common.utils.PaginationUtil.makePagingParamMap;
 import static com.jinddung2.givemeticon.common.utils.constants.PageSize.TRADE;
-import static com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy.STANDARD;
-import static com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy.WEEKLY_DISCOUNT;
 
 @Service
 @RequiredArgsConstructor
 public class TradeService {
 
+    private final DiscountService discountService;
     private final TradeMapper tradeMapper;
 
     @Transactional
     public int save(Sale sale, Item item, int buyerId) {
+        double discountRate = discountService.getDiscountRate(sale.getRestDay());
         Trade trade = Trade.builder()
                 .buyerId(buyerId)
                 .saleId(sale.getId())
                 .isUsed(false)
                 .build();
-        double discountRate = sale.getRestDay() > 7L ? STANDARD.getDiscountRate() : WEEKLY_DISCOUNT.getDiscountRate();
         trade.discountItemPrice(item, discountRate);
         tradeMapper.save(trade);
         return trade.getId();
