@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -30,6 +29,7 @@ import static com.jinddung2.givemeticon.common.utils.PaginationUtil.makePagingPa
 import static com.jinddung2.givemeticon.common.utils.constants.PageSize.TRADE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TradeServiceTest {
@@ -40,10 +40,13 @@ class TradeServiceTest {
     @Mock
     TradeMapper tradeMapper;
 
+    @Mock
+    DiscountService discountService;
+
     LocalDateTime now = LocalDateTime.now();
 
     @Test
-    @DisplayName("상품 기간이 1주일 초과하면 기존 상품의 10% 할인된 가격으로 거래 상품이 등록된다..")
+    @DisplayName("상품 기간이 1주일 초과하면 STANDARD 정책이 적용되어 10% 할인된 가격으로 거래된다.")
     void save_10PER_Discount_Trade() {
         double discountRate = 0.10;
         User buyer = UserFixture.createUserFixture(now);
@@ -61,7 +64,7 @@ class TradeServiceTest {
     }
 
     @Test
-    @DisplayName("상품 기간이 1주일 이하라면 기존 상품의 15% 할인된 가격으로 거래 상품이 등록된다.")
+    @DisplayName("상품 기간이 1주일 이하면 WEEKLY 정책이 적용되어 15% 할인된 가격으로 거래된다.")
     void save_15PER_Discount_Trade() {
         double discountRate = 0.15;
         User buyer = UserFixture.createUserFixture(now);
@@ -87,7 +90,7 @@ class TradeServiceTest {
         Sale sale = SaleFixture.createSaleFixture(buyer, item);
         Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
 
-        Mockito.when(tradeMapper.findById(trade.getId())).thenReturn(Optional.of(trade));
+        when(tradeMapper.findById(trade.getId())).thenReturn(Optional.of(trade));
 
         Trade result = sut.getTrade(trade.getId());
 
@@ -103,7 +106,7 @@ class TradeServiceTest {
         Sale sale = SaleFixture.createSaleFixture(buyer, item);
         Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
 
-        Mockito.when(tradeMapper.findBySaleId(trade.getSaleId())).thenReturn(Optional.of(trade));
+        when(tradeMapper.findBySaleId(trade.getSaleId())).thenReturn(Optional.of(trade));
 
         Optional<Trade> result = sut.getTradeBySaleId(trade.getSaleId());
 
@@ -119,7 +122,7 @@ class TradeServiceTest {
         Sale sale = SaleFixture.createSaleFixture(buyer, item);
         Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
 
-        Mockito.when(tradeMapper.findBySaleId(trade.getSaleId())).thenReturn(Optional.empty());
+        when(tradeMapper.findBySaleId(trade.getSaleId())).thenReturn(Optional.empty());
 
         Optional<Trade> result = sut.getTradeBySaleId(trade.getSaleId());
 
@@ -134,7 +137,7 @@ class TradeServiceTest {
         Sale sale = SaleFixture.createSaleFixture(buyer, item);
         Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
 
-        Mockito.when(tradeMapper.findById(trade.getId())).thenReturn(Optional.empty());
+        when(tradeMapper.findById(trade.getId())).thenReturn(Optional.empty());
 
         assertThrows(NotFoundTradeException.class,
                 () -> sut.getTrade(trade.getId()));
@@ -155,7 +158,7 @@ class TradeServiceTest {
 
         List<Trade> tradeList = new ArrayList<>();
         tradeList.add(trade);
-        Mockito.when(tradeMapper.findMyBoughtGifticon(pageInfo, orderByBoughtDate, orderByExpiredDate)).thenReturn(tradeList);
+        when(tradeMapper.findMyBoughtGifticon(pageInfo, orderByBoughtDate, orderByExpiredDate)).thenReturn(tradeList);
 
         List<Trade> result = sut.getMyUnusedItemHistory(buyer.getId(), orderByBoughtDate, orderByExpiredDate, page);
 
@@ -170,7 +173,7 @@ class TradeServiceTest {
         Sale sale = SaleFixture.createSaleFixture(buyer, item);
         Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
 
-        Mockito.when(tradeMapper.findById(trade.getId())).thenReturn(Optional.of(trade));
+        when(tradeMapper.findById(trade.getId())).thenReturn(Optional.of(trade));
 
         sut.buyConfirmation(trade.getId(), buyer.getId());
 
@@ -186,7 +189,7 @@ class TradeServiceTest {
         Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
 
         Trade fakeTrade = Trade.builder().isUsed(true).buyerId(buyer.getId()).build();
-        Mockito.when(tradeMapper.findById(trade.getId())).thenReturn(Optional.of(fakeTrade));
+        when(tradeMapper.findById(trade.getId())).thenReturn(Optional.of(fakeTrade));
 
         sut.buyConfirmation(trade.getId(), buyer.getId());
 
