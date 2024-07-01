@@ -11,8 +11,6 @@ import com.jinddung2.givemeticon.domain.sale.mapper.SaleMapper;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -31,15 +29,14 @@ public class SaleService {
     public int save(int itemId, int sellerId, SaleCreateRequest request) {
         validateDuplicateBarcode(request.barcode());
 
-        Sale itemVariant = request.toEntity();
-        itemVariant.updateItemId(itemId);
-        itemVariant.updateSellerId(sellerId);
+        Sale sale = request.toEntity();
+        sale.updateItemId(itemId);
+        sale.updateSellerId(sellerId);
 
-        saleMapper.save(itemVariant);
-        return itemVariant.getId();
+        saleMapper.save(sale);
+        return sale.getId();
     }
 
-    @Transactional(propagation = Propagation.REQUIRED)
     public int update(Sale sale) {
         saleMapper.update(sale);
         return sale.getId();
@@ -55,9 +52,7 @@ public class SaleService {
         return saleMapper.findById(saleId).orElseThrow(NotFoundSaleException::new);
     }
 
-    public SaleDto getAvailableSaleForItem(int saleId) {
-        Sale sale = getSale(saleId);
-
+    public SaleDto getAvailableSaleForItem(Sale sale, Item item) {
         if (sale.isBought() && sale.getIsBoughtDate() != null) {
             throw new AlreadyBoughtSaleException();
         }
@@ -66,14 +61,14 @@ public class SaleService {
             throw new ExpiredSaleException();
         }
 
-        return SaleDto.of(sale);
+        return SaleDto.of(sale, item);
     }
 
     public List<SaleDto> getAvailableSalesForItem(Item item) {
         List<Sale> sales = saleMapper.findNotBoughtSalesByItemId(item.getId());
         return sales.stream()
                 .filter(sale -> !sale.getExpirationDate().isBefore(LocalDate.now()))
-                .map(SaleDto::of)
+                .map(sale -> SaleDto.of(sale, item))
                 .collect(Collectors.toList());
     }
 

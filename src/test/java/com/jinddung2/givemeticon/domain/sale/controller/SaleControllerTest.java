@@ -169,7 +169,7 @@ class SaleControllerTest extends BasicControllerTest {
         User seller = UserFixture.createUserFixture(now);
         Item item = ItemFixture.createItemFixture();
         Sale sale = SaleFixture.createSaleFixture(seller, item);
-        SaleDto result = SaleDto.of(sale);
+        SaleDto result = SaleDto.of(sale, item);
 
         when(saleReadFacade.getAvailableSales(sale.getId())).thenReturn(result);
         mockMvc.perform(MockMvcRequestBuilders
@@ -178,14 +178,13 @@ class SaleControllerTest extends BasicControllerTest {
                         .sessionAttr(LOGIN_USER, seller.getId()))
                 .andExpect(status().is2xxSuccessful())
                 .andExpect(jsonPath("$.message").value("SUCCESS"))
-                .andExpect(jsonPath("$.data.id").value(result.getId()))
-                .andExpect(jsonPath("$.data.itemId").value(result.getItemId()))
-                .andExpect(jsonPath("$.data.sellerId").value(result.getSellerId()))
-                .andExpect(jsonPath("$.data.barcode").value(result.getBarcode()))
-                .andExpect(jsonPath("$.data.expirationDate").value(result.getExpirationDate().toString()))
+                .andExpect(jsonPath("$.data.id").value(result.id()))
+                .andExpect(jsonPath("$.data.itemId").value(result.itemId()))
+                .andExpect(jsonPath("$.data.sellerId").value(result.sellerId()))
+                .andExpect(jsonPath("$.data.barcode").value(result.barcode()))
+                .andExpect(jsonPath("$.data.expirationDate").value(result.expirationDate().toString()))
                 .andExpect(jsonPath("$.data.isBought").value(result.isBought()))
-                .andExpect(jsonPath("$.data.isBoughtDate").value(result.getIsBoughtDate().toString()))
-                .andExpect(jsonPath("$.data.createdDate").value(result.getCreatedDate()));
+                .andExpect(jsonPath("$.data.isBoughtDate").value(result.isBoughtDate().toString()));
 
         verify(saleReadFacade).getAvailableSales(sale.getId());
     }
@@ -220,10 +219,11 @@ class SaleControllerTest extends BasicControllerTest {
         Sale sale1 = SaleFixture.createSaleFixture(10, seller, item);
         Sale sale2 = SaleFixture.createSaleFixture(10, seller, item);
         Sale sale3 = SaleFixture.createSaleFixture(10, seller, item);
+
         List<SaleDto> responseBody = new ArrayList<>();
-        responseBody.add(SaleDto.of(sale1));
-        responseBody.add(SaleDto.of(sale2));
-        responseBody.add(SaleDto.of(sale3));
+        responseBody.add(SaleDto.of(sale1, item));
+        responseBody.add(SaleDto.of(sale2, item));
+        responseBody.add(SaleDto.of(sale3, item));
 
         when(saleReadFacade.getSalesForItem(item.getId())).thenReturn(responseBody);
 

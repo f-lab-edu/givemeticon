@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 @Getter
 @NoArgsConstructor
@@ -59,5 +60,9 @@ public class Sale {
     public void updateBoughtState() {
         this.isBought = true;
         this.isBoughtDate = Date.valueOf(LocalDate.now());
+    }
+
+    public long getRestDay() {
+        return ChronoUnit.DAYS.between(LocalDate.now(), this.expirationDate);
     }
 }
