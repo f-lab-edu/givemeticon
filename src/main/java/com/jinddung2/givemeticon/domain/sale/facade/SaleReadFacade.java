@@ -55,6 +55,8 @@ public class SaleReadFacade {
     }
 
     public SaleDto getAvailableSales(int saleId) {
-        return saleService.getAvailableSaleForItem(saleId);
+        Sale sale = saleService.getSale(saleId);
+        Item item = itemService.getItem(sale.getItemId());
+        return saleService.getAvailableSaleForItem(sale, item);
     }
 }

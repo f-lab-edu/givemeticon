@@ -79,12 +79,10 @@ class SaleServiceTest {
         User seller = UserFixture.createUserFixture(now);
         Item item = ItemFixture.createItemFixture();
         Sale sale = SaleFixture.createSaleFixture(seller, item);
-        Mockito.when(saleMapper.findById(sale.getId())).thenReturn(Optional.of(sale));
-        SaleDto expected = SaleDto.of(sale);
+        SaleDto expected = SaleDto.of(sale, item);
 
-        SaleDto result = sut.getAvailableSaleForItem(sale.getId());
+        SaleDto result = sut.getAvailableSaleForItem(sale, item);
 
-        Mockito.verify(saleMapper).findById(sale.getId());
         assertThat(result).isEqualTo(expected);
     }
 
@@ -101,25 +99,24 @@ class SaleServiceTest {
     }
 
     @Test
-    @DisplayName("판매 상품이 유효기긴이 지났기에 단건 조회에 실패한다.")
+    @DisplayName("판매 상품이 유효기간이 지나서 단건 조회에 실패한다.")
     void get_Sale_Fail_Expired() {
-        Sale fakeSale = Sale.builder().id(20).expirationDate(LocalDate.now().minusDays(1)).build();
-        Mockito.when(saleMapper.findById(fakeSale.getId())).thenReturn(Optional.of(fakeSale));
+        Item item = ItemFixture.createItemFixture();
+        Sale sale = Sale.builder().id(20).itemId(item.getId()).expirationDate(LocalDate.now().minusDays(1)).build();
 
         Assertions.assertThrows(ExpiredSaleException.class,
-                () -> sut.getAvailableSaleForItem(fakeSale.getId()));
+                () -> sut.getAvailableSaleForItem(sale, item));
     }
 
     @Test
-    @DisplayName("판매 상품이 이미 거래 되어 단건 조회에 실패한다.")
+    @DisplayName("이미 거래된 상품이라 단건 조회에 실패한다.")
     void get_Sale_Fail_Already_Bought() {
         User seller = UserFixture.createUserFixture(now);
         Item item = ItemFixture.createItemFixture();
         Sale sale = SaleFixture.createBoughtSaleFixture(seller, item);
-        Mockito.when(saleMapper.findById(sale.getId())).thenReturn(Optional.of(sale));
 
         Assertions.assertThrows(AlreadyBoughtSaleException.class,
-                () -> sut.getAvailableSaleForItem(sale.getId()));
+                () -> sut.getAvailableSaleForItem(sale, item));
     }
 
     @Test
@@ -131,7 +128,9 @@ class SaleServiceTest {
         Sale sale2 = SaleFixture.createSaleFixture(20, seller, item);
         Sale sale3 = SaleFixture.createSaleFixture(30, seller, item);
         List<Sale> sales = List.of(sale1, sale2, sale3);
-        List<SaleDto> expected = sales.stream().map(SaleDto::of).toList();
+        List<SaleDto> expected = sales.stream()
+                .map(sale -> SaleDto.of(sale, item))
+                .toList();
 
         Mockito.when(saleMapper.findNotBoughtSalesByItemId(item.getId())).thenReturn(sales);
 
