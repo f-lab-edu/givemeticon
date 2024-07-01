@@ -10,7 +10,6 @@ import com.jinddung2.givemeticon.fixture.ItemFixture;
 import com.jinddung2.givemeticon.fixture.SaleFixture;
 import com.jinddung2.givemeticon.fixture.TradeFixture;
 import com.jinddung2.givemeticon.fixture.UserFixture;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +29,7 @@ import java.util.Optional;
 import static com.jinddung2.givemeticon.common.utils.PaginationUtil.makePagingParamMap;
 import static com.jinddung2.givemeticon.common.utils.constants.PageSize.TRADE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
 class TradeServiceTest {
@@ -55,9 +55,8 @@ class TradeServiceTest {
         BigDecimal discountPrice = originalPrice.multiply(BigDecimal.valueOf(discountRate))
                 .setScale(0, RoundingMode.HALF_UP);
         BigDecimal expected = originalPrice.subtract(discountPrice);
-        sut.save(trade, item, 8L);
+        sut.save(sale, item, buyer.getId());
 
-        Mockito.verify(tradeMapper).save(trade);
         assertThat(trade.getTradePrice()).isEqualTo(expected);
     }
 
@@ -75,9 +74,8 @@ class TradeServiceTest {
                 .setScale(0, RoundingMode.HALF_UP);
         BigDecimal expected = originalPrice.subtract(discountPrice);
 
-        sut.save(trade, item, 7L);
+        sut.save(sale, item, buyer.getId());
 
-        Mockito.verify(tradeMapper).save(trade);
         assertThat(trade.getTradePrice()).isEqualTo(expected);
     }
 
@@ -93,8 +91,8 @@ class TradeServiceTest {
 
         Trade result = sut.getTrade(trade.getId());
 
-        Assertions.assertEquals(trade.getId(), result.getId());
-        Assertions.assertEquals(trade.getTradePrice(), result.getTradePrice());
+        assertThat(trade.getId()).isEqualTo(result.getId());
+        assertThat(trade.getTradePrice()).isEqualTo(result.getTradePrice());
     }
 
     @Test
@@ -109,8 +107,8 @@ class TradeServiceTest {
 
         Optional<Trade> result = sut.getTradeBySaleId(trade.getSaleId());
 
-        Assertions.assertTrue(result.isPresent());
-        Assertions.assertFalse(result.get().isUsed());
+        assertThat(result.isPresent()).isTrue();
+        assertThat(result.get().isUsed()).isFalse();
     }
 
     @Test
@@ -125,7 +123,7 @@ class TradeServiceTest {
 
         Optional<Trade> result = sut.getTradeBySaleId(trade.getSaleId());
 
-        Assertions.assertTrue(result.isEmpty());
+        assertThat(result.isEmpty()).isTrue();
     }
 
     @Test
@@ -138,7 +136,7 @@ class TradeServiceTest {
 
         Mockito.when(tradeMapper.findById(trade.getId())).thenReturn(Optional.empty());
 
-        Assertions.assertThrows(NotFoundTradeException.class,
+        assertThrows(NotFoundTradeException.class,
                 () -> sut.getTrade(trade.getId()));
     }
 
@@ -161,8 +159,7 @@ class TradeServiceTest {
 
         List<Trade> result = sut.getMyUnusedItemHistory(buyer.getId(), orderByBoughtDate, orderByExpiredDate, page);
 
-        Assertions.assertEquals(result.size(), tradeList.size());
-
+        assertThat(result.size()).isEqualTo(tradeList.size());
     }
 
     @Test
@@ -177,12 +174,11 @@ class TradeServiceTest {
 
         sut.buyConfirmation(trade.getId(), buyer.getId());
 
-        Mockito.verify(tradeMapper).updateIsUsedAndIsUsedDate(trade.getId());
-        Assertions.assertTrue(trade.isUsed());
+        assertThat(trade.isUsed()).isTrue();
     }
 
     @Test
-    @DisplayName("이미 구매 확정인 상태라서 구매 확정을 취소한다.")
+    @DisplayName("이미 구매 확정된 상태라서 구매 확정을 취소한다.")
     void buy_Confirmation_Fail_Already_Buy_Confirmation() {
         User buyer = UserFixture.createUserFixture(now);
         Item item = ItemFixture.createItemFixture();
@@ -194,7 +190,6 @@ class TradeServiceTest {
 
         sut.buyConfirmation(trade.getId(), buyer.getId());
 
-        Mockito.verify(tradeMapper).updateIsUsedAndIsUsedDate(trade.getId());
-        Assertions.assertFalse(trade.isUsed());
+        assertThat(trade.isUsed()).isFalse();
     }
 }

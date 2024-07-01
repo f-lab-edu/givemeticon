@@ -1,13 +1,13 @@
 package com.jinddung2.givemeticon.domain.trade.service;
 
 import com.jinddung2.givemeticon.domain.item.domain.Item;
+import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.NotFoundTradeException;
 import com.jinddung2.givemeticon.domain.trade.exception.NotMatchBuyOwnership;
 import com.jinddung2.givemeticon.domain.trade.mapper.TradeMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -25,9 +25,14 @@ public class TradeService {
 
     private final TradeMapper tradeMapper;
 
-    @Transactional(propagation = Propagation.REQUIRED)
-    public int save(Trade trade, Item item, long daysUntilExpiration) {
-        double discountRate = daysUntilExpiration > 7L ? STANDARD.getDiscountRate() : WEEKLY_DISCOUNT.getDiscountRate();
+    @Transactional
+    public int save(Sale sale, Item item, int buyerId) {
+        Trade trade = Trade.builder()
+                .buyerId(buyerId)
+                .saleId(sale.getId())
+                .isUsed(false)
+                .build();
+        double discountRate = sale.getRestDay() > 7L ? STANDARD.getDiscountRate() : WEEKLY_DISCOUNT.getDiscountRate();
         trade.discountItemPrice(item, discountRate);
         tradeMapper.save(trade);
         return trade.getId();

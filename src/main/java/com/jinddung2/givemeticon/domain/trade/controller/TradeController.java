@@ -2,8 +2,8 @@ package com.jinddung2.givemeticon.domain.trade.controller;
 
 import com.jinddung2.givemeticon.domain.trade.controller.dto.ItemUsageConfirmationDto;
 import com.jinddung2.givemeticon.domain.trade.controller.dto.TradeDto;
-import com.jinddung2.givemeticon.domain.trade.facade.GetItemUsageConfirmationFacade;
-import com.jinddung2.givemeticon.domain.trade.facade.TradeSaleItemUserFacade;
+import com.jinddung2.givemeticon.domain.trade.facade.TradeReadeFacade;
+import com.jinddung2.givemeticon.domain.trade.facade.TradeWriteFacade;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,15 +16,15 @@ import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.L
 @RequestMapping("/api/v1/trades")
 public class TradeController {
 
-    private final TradeSaleItemUserFacade tradeSaleItemUserFacade;
-    private final GetItemUsageConfirmationFacade itemUsageConfirmationFacade;
+    private final TradeWriteFacade tradeWriteFacade;
+    private final TradeReadeFacade tradeReadeFacade;
 
     @PostMapping("/sales/{saleId}")
     public int createTrade(
             @PathVariable("saleId") int saleId,
             @SessionAttribute(name = LOGIN_USER) int buyerId
     ) {
-        return tradeSaleItemUserFacade.transact(saleId, buyerId);
+        return tradeWriteFacade.transact(saleId, buyerId);
     }
 
     @GetMapping("/{id}")
@@ -32,7 +32,7 @@ public class TradeController {
             @PathVariable("id") int tradeId,
             @SessionAttribute(name = LOGIN_USER) int buyerId
     ) {
-        return tradeSaleItemUserFacade.getTradeDetail(tradeId, buyerId);
+        return tradeReadeFacade.getTradeDetail(tradeId, buyerId);
     }
 
     @GetMapping("{id}/confirm-usage")
@@ -40,7 +40,7 @@ public class TradeController {
             @PathVariable("id") int tradeId,
             @SessionAttribute(name = LOGIN_USER) int buyerId
     ) {
-        return itemUsageConfirmationFacade.getTradeForConfirmUsage(tradeId, buyerId);
+        return tradeReadeFacade.getTradeForConfirmUsage(tradeId, buyerId);
     }
 
     @GetMapping("/my")
@@ -50,7 +50,7 @@ public class TradeController {
             @RequestParam(name = "orderByExpiredDate", defaultValue = "false") boolean orderByExpiredDate,
             @RequestParam(name = "page", defaultValue = "0") int page
     ) {
-        return tradeSaleItemUserFacade.getUnusedTradeHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
+        return tradeReadeFacade.getUnusedTradeHistory(buyerId, orderByBoughtDate, orderByExpiredDate, page);
     }
 
     @PutMapping("/{id}")
@@ -58,7 +58,7 @@ public class TradeController {
             @PathVariable("id") int tradeId,
             @SessionAttribute(name = LOGIN_USER) int buyerId
     ) {
-        tradeSaleItemUserFacade.buyConfirmation(tradeId, buyerId);
+        tradeWriteFacade.buyConfirmation(tradeId, buyerId);
         return "Successfully buy confirmation";
     }
 

@@ -10,8 +10,8 @@ import com.jinddung2.givemeticon.domain.trade.controller.dto.TradeDto;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import com.jinddung2.givemeticon.domain.trade.exception.TradeErrorCode;
-import com.jinddung2.givemeticon.domain.trade.facade.GetItemUsageConfirmationFacade;
-import com.jinddung2.givemeticon.domain.trade.facade.TradeSaleItemUserFacade;
+import com.jinddung2.givemeticon.domain.trade.facade.TradeReadeFacade;
+import com.jinddung2.givemeticon.domain.trade.facade.TradeWriteFacade;
 import com.jinddung2.givemeticon.domain.user.domain.User;
 import com.jinddung2.givemeticon.fixture.*;
 import org.junit.jupiter.api.DisplayName;
@@ -35,10 +35,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TradeControllerTest extends BasicControllerTest {
 
     @MockBean
-    TradeSaleItemUserFacade tradeSaleItemUserFacade;
+    TradeWriteFacade tradeWriteFacade;
 
     @MockBean
-    GetItemUsageConfirmationFacade getItemUsageConfirmationFacade;
+    TradeReadeFacade tradeReadeFacade;
 
     @Test
     @DisplayName("거래에 성공한다.")
@@ -49,7 +49,7 @@ class TradeControllerTest extends BasicControllerTest {
         Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
         mockHttpSession.setAttribute(LOGIN_USER, buyer.getId());
 
-        when(tradeSaleItemUserFacade.transact(sale.getId(), buyer.getId())).thenReturn(trade.getId());
+        when(tradeWriteFacade.transact(sale.getId(), buyer.getId())).thenReturn(trade.getId());
 
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/trades/sales/" + sale.getId())
@@ -58,7 +58,7 @@ class TradeControllerTest extends BasicControllerTest {
                 .andExpect(jsonPath("$.message").value("SUCCESS"))
                 .andExpect(jsonPath("$.data").value(trade.getId()));
 
-        verify(tradeSaleItemUserFacade, times(1)).transact(sale.getId(), buyer.getId());
+        verify(tradeWriteFacade, times(1)).transact(sale.getId(), buyer.getId());
     }
 
     @Test
@@ -68,7 +68,7 @@ class TradeControllerTest extends BasicControllerTest {
         Item item = ItemFixture.createItemFixture();
         Sale sale = SaleFixture.createSaleFixture(buyer, item);
 
-        doThrow(new AlreadyBoughtSaleException()).when(tradeSaleItemUserFacade).transact(sale.getId(), buyer.getId());
+        doThrow(new AlreadyBoughtSaleException()).when(tradeWriteFacade).transact(sale.getId(), buyer.getId());
 
         mockMvc.perform(MockMvcRequestBuilders
                         .post("/api/v1/trades/sales/" + sale.getId())
@@ -88,7 +88,7 @@ class TradeControllerTest extends BasicControllerTest {
         Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
         TradeDto result = TradeDto.of(trade, sale, item);
 
-        when(tradeSaleItemUserFacade.getTradeDetail(trade.getId(), buyer.getId())).thenReturn(result);
+        when(tradeReadeFacade.getTradeDetail(trade.getId(), buyer.getId())).thenReturn(result);
 
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/trades/" + trade.getId())
@@ -105,7 +105,7 @@ class TradeControllerTest extends BasicControllerTest {
                 .andExpect(jsonPath("$.data.itemPrice").value(result.getItemPrice()))
                 .andExpect(jsonPath("$.data.discountRate").value(result.getDiscountRate()));
 
-        verify(tradeSaleItemUserFacade).getTradeDetail(trade.getId(), buyer.getId());
+        verify(tradeReadeFacade).getTradeDetail(trade.getId(), buyer.getId());
     }
 
     @Test
@@ -118,7 +118,7 @@ class TradeControllerTest extends BasicControllerTest {
         Brand brand = BrandFixture.createBrandFixture();
         ItemUsageConfirmationDto result = ItemUsageConfirmationDto.of(trade, sale, item, BrandDto.of(brand));
 
-        when(getItemUsageConfirmationFacade.getTradeForConfirmUsage(trade.getId(), buyer.getId())).thenReturn(result);
+        when(tradeReadeFacade.getTradeForConfirmUsage(trade.getId(), buyer.getId())).thenReturn(result);
 
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/trades/" + trade.getId() + "/confirm-usage")
@@ -132,7 +132,7 @@ class TradeControllerTest extends BasicControllerTest {
                 .andExpect(jsonPath("$.data.barcodeNum").value(result.getBarcodeNum()))
                 .andExpect(jsonPath("$.data.isUsed").value(result.isUsed()));
 
-        verify(getItemUsageConfirmationFacade).getTradeForConfirmUsage(trade.getId(), buyer.getId());
+        verify(tradeReadeFacade).getTradeForConfirmUsage(trade.getId(), buyer.getId());
     }
 
     @Test
@@ -149,7 +149,7 @@ class TradeControllerTest extends BasicControllerTest {
         responseBody.add(TradeDto.of(trade2, sale, item));
         responseBody.add(TradeDto.of(trade3, sale, item));
 
-        when(tradeSaleItemUserFacade.getUnusedTradeHistory(buyer.getId(), false, false, 0))
+        when(tradeReadeFacade.getUnusedTradeHistory(buyer.getId(), false, false, 0))
                 .thenReturn(responseBody);
 
         mockMvc.perform(MockMvcRequestBuilders
@@ -169,7 +169,7 @@ class TradeControllerTest extends BasicControllerTest {
                 .andExpect(jsonPath("$.data[2].id").exists())
                 .andExpect(jsonPath("$.data[2].isUsed").value(false));
 
-        verify(tradeSaleItemUserFacade).getUnusedTradeHistory(buyer.getId(), false, false, 0);
+        verify(tradeReadeFacade).getUnusedTradeHistory(buyer.getId(), false, false, 0);
     }
 
     @Test
@@ -181,7 +181,7 @@ class TradeControllerTest extends BasicControllerTest {
         Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
         String result = "Successfully buy confirmation";
 
-        doNothing().when(tradeSaleItemUserFacade).buyConfirmation(trade.getId(), buyer.getId());
+        doNothing().when(tradeWriteFacade).buyConfirmation(trade.getId(), buyer.getId());
 
         mockMvc.perform(MockMvcRequestBuilders
                         .put("/api/v1/trades/" + trade.getId())
@@ -191,6 +191,6 @@ class TradeControllerTest extends BasicControllerTest {
                 .andExpect(jsonPath("$.message").value("SUCCESS"))
                 .andExpect(jsonPath("$.data").value(result));
 
-        verify(tradeSaleItemUserFacade).buyConfirmation(trade.getId(), buyer.getId());
+        verify(tradeWriteFacade).buyConfirmation(trade.getId(), buyer.getId());
     }
 }
