@@ -1,26 +1,24 @@
 package com.jinddung2.givemeticon.domain.trade.facade;
 
+import com.jinddung2.givemeticon.domain.brand.controller.dto.BrandDto;
+import com.jinddung2.givemeticon.domain.brand.domain.Brand;
+import com.jinddung2.givemeticon.domain.brand.service.BrandService;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
-import com.jinddung2.givemeticon.domain.notification.domain.dto.CreateNotificationRequestDto;
-import com.jinddung2.givemeticon.domain.notification.producer.NotificationProducer;
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
+import com.jinddung2.givemeticon.domain.trade.controller.dto.ItemUsageConfirmationDto;
 import com.jinddung2.givemeticon.domain.trade.controller.dto.TradeDto;
-import com.jinddung2.givemeticon.domain.trade.domain.DiscountRatePolicy;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
-import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import com.jinddung2.givemeticon.domain.trade.service.TradeService;
 import com.jinddung2.givemeticon.domain.user.domain.User;
-import com.jinddung2.givemeticon.fixture.ItemFixture;
-import com.jinddung2.givemeticon.fixture.SaleFixture;
-import com.jinddung2.givemeticon.fixture.TradeFixture;
-import com.jinddung2.givemeticon.fixture.UserFixture;
+import com.jinddung2.givemeticon.fixture.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
@@ -28,15 +26,18 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class TradeSaleItemUserFacadeTest {
+class TradeReadeFacadeTest {
 
     @InjectMocks
-    TradeSaleItemUserFacade sut;
+    TradeReadeFacade sut;
+
+    @Mock
+    BrandService brandService;
 
     @Mock
     SaleService saleService;
@@ -45,44 +46,29 @@ class TradeSaleItemUserFacadeTest {
     @Mock
     TradeService tradeService;
 
-    @Mock
-    NotificationProducer producer;
-
     LocalDateTime now = LocalDateTime.now();
 
     @Test
-    @DisplayName("거래에 성공한다.")
-    void transact() {
+    @DisplayName("사용확인을 위한 거래데이터를 가져오는데 성공한다.")
+    void get_Trade_For_Confirm_Usage() {
         User buyer = UserFixture.createUserFixture(now);
         Item item = ItemFixture.createItemFixture();
         Sale sale = SaleFixture.createSaleFixture(buyer, item);
+        Brand brand = BrandFixture.createBrandFixture();
+
         Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
-        trade.discountItemPrice(item, DiscountRatePolicy.STANDARD.getDiscountRate());
+        Mockito.when(tradeService.getTrade(trade.getId())).thenReturn(trade);
+        Mockito.when(saleService.getSale(trade.getSaleId())).thenReturn(sale);
+        Mockito.when(itemService.getItem(sale.getItemId())).thenReturn(item);
+        Mockito.when(brandService.getBrand(item.getBrandId())).thenReturn(BrandDto.of(brand));
 
-        when(saleService.getSale(sale.getId())).thenReturn(sale);
-        when(itemService.getItem(item.getId())).thenReturn(item);
-        when(tradeService.save(any(Trade.class), any(Item.class), anyLong())).thenReturn(trade.getId());
+        ItemUsageConfirmationDto result = sut.getTradeForConfirmUsage(trade.getId(), buyer.getId());
 
-        sut.transact(sale.getId(), buyer.getId());
-
-        assertThat(sale.isBought()).isTrue();
-
-        verify(saleService).update(sale);
-        verify(tradeService).save(any(Trade.class), any(Item.class), anyLong());
-        verify(producer).create(any(CreateNotificationRequestDto.class));
-    }
-
-    @Test
-    @DisplayName("이미 구매한 상품이라 거래에 실패한다.")
-    void transact_Fail_Already_Bought() {
-        User buyer = UserFixture.createUserFixture(now);
-        Item item = ItemFixture.createItemFixture();
-        Sale sale = SaleFixture.createBoughtSaleFixture(buyer, item);
-
-        when(saleService.getSale(sale.getId())).thenReturn(sale);
-
-        assertThatThrownBy(() -> sut.transact(sale.getId(), buyer.getId()))
-                .isInstanceOf(AlreadyBoughtSaleException.class);
+        assertThat(brand.getName()).isEqualTo(result.getBrandName());
+        assertThat(item.getName()).isEqualTo(result.getItemName());
+        assertThat(sale.getExpirationDate()).isEqualTo(result.getExpiredDate());
+        assertThat(sale.getBarcode()).isEqualTo(result.getBarcodeNum());
+        assertThat(trade.isUsed()).isEqualTo(result.isUsed());
     }
 
     @Test
@@ -135,23 +121,5 @@ class TradeSaleItemUserFacadeTest {
         verify(tradeService, times(1)).getMyUnusedItemHistory(buyer.getId(), orderByBoughtDate, orderByExpiredDate, page);
         verify(saleService, times(3)).getSale(anyInt());
         verify(itemService, times(3)).getItem(anyInt());
-    }
-
-    @Test
-    @DisplayName("구매 확정에 성공한다.")
-    void buy_Confirmation() {
-        User buyer = UserFixture.createUserFixture(now);
-        Item item = ItemFixture.createItemFixture();
-        Sale sale = SaleFixture.createSaleFixture(buyer, item);
-        Trade trade = TradeFixture.createTradeFixture(buyer, sale, item);
-
-        when(tradeService.getTrade(trade.getId())).thenReturn(trade);
-        when(saleService.getSale(sale.getId())).thenReturn(sale);
-        when(itemService.getItem(item.getId())).thenReturn(item);
-
-        sut.buyConfirmation(trade.getId(), buyer.getId());
-        
-        verify(tradeService).buyConfirmation(trade.getId(), buyer.getId());
-        verify(producer).create(any(CreateNotificationRequestDto.class));
     }
 }
