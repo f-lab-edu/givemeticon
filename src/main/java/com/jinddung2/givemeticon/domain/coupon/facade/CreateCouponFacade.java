@@ -19,11 +19,23 @@ public class CreateCouponFacade {
 
     @DistributedLock(key = "#requestDto.couponName")
     public void createCouponAndDecreaseStock(int userId, CreateCouponRequestDto requestDto) {
-        CouponStock stock = couponStockService.getStock(requestDto.stockId());
+        String requestId = couponStockService.enqueueCouponRequest(userId);
 
-        couponStockService.decreaseStock(stock);
-        couponService.createCoupon(
-                userId, requestDto.stockId(), requestDto.couponName(), requestDto.couponType(), requestDto.price()
-        );
+        try {
+            boolean isProcessed = couponStockService.processCouponRequest(requestId);
+            if (isProcessed) {
+                CouponStock stock = couponStockService.getStock(requestDto.stockId());
+
+                couponStockService.decreaseStock(stock);
+                couponService.createCoupon(
+                        userId, requestDto.stockId(), requestDto.couponName(), requestDto.couponType(), requestDto.price()
+                );
+            } else {
+                log.warn("Coupon request {} was not processed due to concurrency issue", requestId);
+            }
+        } finally {
+            couponStockService.removeCouponRequest(requestId);
+        }
     }
 }
+

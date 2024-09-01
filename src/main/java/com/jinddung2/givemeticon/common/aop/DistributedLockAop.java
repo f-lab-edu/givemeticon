@@ -48,12 +48,13 @@ public class DistributedLockAop {
                 return aopForTransaction.proceed(joinPoint);
             }
         } catch (InterruptedException e) {
+            log.error("Lock acquisition interrupted", e);
             throw new InterruptedException();
         } finally {
             try {
                 rLock.unlock();
             } catch (IllegalMonitorStateException e) {
-                log.warn("Redisson Lock Already UnLock {} {}", method.getName(), key);
+                log.error("Redisson Lock Already UnLock {} {}", method.getName(), key);
             }
         }
     }
