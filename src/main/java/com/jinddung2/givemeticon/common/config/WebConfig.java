@@ -15,6 +15,7 @@ public class WebConfig implements WebMvcConfigurer {
     private final String[] EXCLUDE_PATH = {
             "/favicon.ico",
             "/error",
+            "/threads",
             "/api/v1/users/sign-up",
             "/api/v1/users/login",
             "/api/v1/mails/send-certification",

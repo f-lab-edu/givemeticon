@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>서버 스레드 정보</title>
+</head>
+<body>
+<h1>서버 스레드 정보</h1>
+<pre>
+        <div th:each="entry : ${threads}">
+            <p>
+                <strong>스레드 이름:</strong> <span th:text="${entry.key}"></span><br>
+                <strong>스택 트레이스:</strong><br>
+                <span th:text="${entry.value}"></span>
+            </p>
+        </div>
+    </pre>
+</body>
+</html>
