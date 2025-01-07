@@ -18,13 +18,13 @@ configurations {
     }
 }
 
-tasks.register('copyFiles', Copy) {
-    copy {
-        from './givemeticon-config'
-        include "*.yml"
-        into 'src/main/resources'
-    }
+task copyFiles(type: Copy) {
+    from './givemeticon-config'  // 복사할 원본 경로
+    include "*.yml"              // .yml 파일만 포함
+    into 'src/main/resources'    // 복사할 대상 경로
 }
+
+processResources.dependsOn(copyFiles)  // processResources 작업 전에 copyFiles 작업 실행
 
 repositories {
     mavenCentral()

@@ -31,3 +31,20 @@ mybatis:
   type-aliases-package: com.jinddung2.givemeticon.domain.*
   configuration:
     map-underscore-to-camel-case: true
+
+management:
+  info:
+    java:
+      enabled: true
+    os:
+      enabled: true
+#  server:
+#    port: 9292
+  endpoint:
+    health:
+#      show-details: always
+      show-components: always
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
