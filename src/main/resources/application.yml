@@ -1,5 +1,8 @@
 server:
   port: 8080
+  tomcat:
+    mbeanregistry:
+      enabled: true
 
 spring:
   datasource:
@@ -38,13 +41,14 @@ management:
       enabled: true
     os:
       enabled: true
-#  server:
-#    port: 9292
   endpoint:
     health:
 #      show-details: always
       show-components: always
+    prometheus:
+      enabled: true
   endpoints:
     web:
       exposure:
-        include: health, info, prometheus
+        include: "*"
+#        include: health, info, metrics, prometheus
