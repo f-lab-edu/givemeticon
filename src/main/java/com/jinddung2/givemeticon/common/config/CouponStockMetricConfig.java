@@ -24,7 +24,7 @@ public class CouponStockMetricConfig {
                 int couponStockId = mapping.getId();
 
                 // 각 쿠폰 ID에 대한 Gauge 등록
-                Gauge.builder("coupon.stock.current",
+                Gauge.builder("my.coupon.stock.current",
                                 couponStockService,
                                 service -> service.getStock(couponStockId).getRemain())
                         .tag("couponId", String.valueOf(couponStockId))
