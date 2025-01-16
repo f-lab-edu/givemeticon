@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -49,6 +50,10 @@ public class CouponStockService {
     public void decreaseStock(CouponStock stock) {
         stock.decrease();
         couponStockMapper.decreaseStock(stock.getId(), stock.getRemain());
+    }
+
+    public List<CouponStock> getActiveCouponStockIds() {
+        return couponStockMapper.findActiveCouponStocks();
     }
 
 }

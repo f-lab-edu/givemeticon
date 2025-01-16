@@ -4,10 +4,21 @@
 
 <mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponStockMapper">
 
+    <resultMap id="couponStockResultMap" type="CouponStock">
+        <result property="id" column="id"/>
+        <result property="total" column="total"/>
+        <result property="remain" column="remain"/>
+    </resultMap>
+
     <select id="findById" parameterType="int" resultType="CouponStock">
         SELECT id, total, remain
         FROM coupon_stock
         WHERE id = #{id}
+    </select>
+
+    <select id="findActiveCouponStocks" resultType="java.util.List" resultMap="couponStockResultMap">
+        SELECT id, total, remain
+        FROM coupon_stock
     </select>
 
     <update id="decreaseStock" parameterType="int">

@@ -4,6 +4,7 @@ import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 @Mapper
@@ -12,4 +13,6 @@ public interface CouponStockMapper {
 
     void decreaseStock(@Param("id") int id,
                        @Param("remain") int remain);
+
+    List<CouponStock> findActiveCouponStocks();
 }
