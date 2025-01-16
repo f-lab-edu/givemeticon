@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -21,29 +20,47 @@ public class CouponStockService {
     private final CouponStockMapper couponStockMapper;
     private final RedisTemplate<String, String> redisTemplate;
     private static final String COUPON_REQUEST_QUEUE = "couponRequestQueue";
+    private static final String COUPON_ISSUED_SET = "couponIssuedSet";
 
     public CouponStock getStock(int stockId) {
         return couponStockMapper.findById(stockId)
                 .orElseThrow(NotFoundCouponStock::new);
     }
 
-    public String enqueueCouponRequest(int userId) {
-        String requestId = UUID.randomUUID().toString();
+    public boolean enqueueCouponRequest(int userId) {
+        // 1. 이미 쿠폰 발급 이력 확인
+        Boolean isIssued = redisTemplate.opsForSet().isMember(COUPON_ISSUED_SET, String.valueOf(userId));
+        if (isIssued != null && isIssued) {
+            log.warn("User {} has already received a coupon.", userId);
+            return false;
+        }
+
         long timestamp = System.currentTimeMillis();
 
-        redisTemplate.opsForZSet().add(COUPON_REQUEST_QUEUE, String.valueOf(userId), timestamp);
+        // 2. Queue(ZSet) 중복 요청 확인
+        boolean exists = redisTemplate.opsForZSet().score(COUPON_REQUEST_QUEUE, String.valueOf(userId)) != null;
+        if (exists) {
+            log.warn("User {} already has a pending request", userId);
+            return false;
+        }
 
-        return requestId;
+        // 3. ZSet에 추가
+        redisTemplate.opsForZSet().add(COUPON_REQUEST_QUEUE, String.valueOf(userId), timestamp);
+        return true;
     }
 
-    public boolean processCouponRequest(String requestId) {
+    public void markAsIssued(int userId) {
+        redisTemplate.opsForSet().add(COUPON_ISSUED_SET, String.valueOf(userId));
+    }
+
+    public boolean processCouponRequest(int userId) {
         Set<String> earliestRequest = redisTemplate.opsForZSet().range(COUPON_REQUEST_QUEUE, 0, 0);
 
-        return earliestRequest != null && earliestRequest.contains(requestId);
+        return earliestRequest != null && earliestRequest.contains(String.valueOf(userId));
     }
 
-    public void removeCouponRequest(String requestId) {
-        redisTemplate.opsForZSet().remove(COUPON_REQUEST_QUEUE, requestId);
+    public void removeCouponRequest(int userId) {
+        redisTemplate.opsForZSet().remove(COUPON_REQUEST_QUEUE, String.valueOf(userId));
     }
 
     @Transactional
@@ -52,7 +69,7 @@ public class CouponStockService {
         couponStockMapper.decreaseStock(stock.getId(), stock.getRemain());
     }
 
-    public List<CouponStock> getActiveCouponStockIds() {
+    public List<CouponStock> getActiveCouponStocks() {
         return couponStockMapper.findActiveCouponStocks();
     }
 
