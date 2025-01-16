@@ -1,6 +1,8 @@
 package com.jinddung2.givemeticon.domain.coupon.service;
 
+import com.jinddung2.givemeticon.common.exception.GiveMeTiConException;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
+import com.jinddung2.givemeticon.domain.coupon.exception.CouponErrorCode;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotFoundCouponStock;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponStockMapper;
 import lombok.RequiredArgsConstructor;
@@ -27,12 +29,13 @@ public class CouponStockService {
                 .orElseThrow(NotFoundCouponStock::new);
     }
 
-    public boolean enqueueCouponRequest(int userId) {
+    public void enqueueCouponRequest(int userId) {
         // 1. 이미 쿠폰 발급 이력 확인
         Boolean isIssued = redisTemplate.opsForSet().isMember(COUPON_ISSUED_SET, String.valueOf(userId));
         if (isIssued != null && isIssued) {
-            log.warn("User {} has already received a coupon.", userId);
-            return false;
+            log.warn("User {} - Error: {}, Message: {}", userId, CouponErrorCode.COUPON_ALREADY_ISSUED.name(),
+                    CouponErrorCode.COUPON_ALREADY_ISSUED.getErrorDetail());
+            throw new GiveMeTiConException(CouponErrorCode.COUPON_ALREADY_ISSUED);
         }
 
         long timestamp = System.currentTimeMillis();
@@ -40,13 +43,13 @@ public class CouponStockService {
         // 2. Queue(ZSet) 중복 요청 확인
         boolean exists = redisTemplate.opsForZSet().score(COUPON_REQUEST_QUEUE, String.valueOf(userId)) != null;
         if (exists) {
-            log.warn("User {} already has a pending request", userId);
-            return false;
+            log.warn("User {} - Error: {}, Message: {}", userId, CouponErrorCode.COUPON_REQUEST_PENDING.name(),
+                    CouponErrorCode.COUPON_REQUEST_PENDING.getErrorDetail());
+            throw new GiveMeTiConException(CouponErrorCode.COUPON_REQUEST_PENDING);
         }
 
         // 3. ZSet에 추가
         redisTemplate.opsForZSet().add(COUPON_REQUEST_QUEUE, String.valueOf(userId), timestamp);
-        return true;
     }
 
     public void markAsIssued(int userId) {
