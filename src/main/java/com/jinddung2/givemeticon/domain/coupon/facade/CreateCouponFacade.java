@@ -17,24 +17,31 @@ public class CreateCouponFacade {
     private final CouponService couponService;
     private final CouponStockService couponStockService;
 
-    @DistributedLock(key = "#requestDto.couponName")
+    @DistributedLock(key = "#requestDto.stockId")
     public void createCouponAndDecreaseStock(int userId, CreateCouponRequestDto requestDto) {
-        String requestId = couponStockService.enqueueCouponRequest(userId);
+        // 1. 쿠폰 요청을 ZSet에 등록
+        couponStockService.enqueueCouponRequest(userId);
 
         try {
-            boolean isProcessed = couponStockService.processCouponRequest(requestId);
+            // 2. 선착순 확인
+            boolean isProcessed = couponStockService.processCouponRequest(userId);
             if (isProcessed) {
+                // 3. 재고 차감 및 쿠폰 발급
                 CouponStock stock = couponStockService.getStock(requestDto.stockId());
 
                 couponStockService.decreaseStock(stock);
                 couponService.createCoupon(
                         userId, requestDto.stockId(), requestDto.couponName(), requestDto.couponType(), requestDto.price()
                 );
+
+                // 4. 발급 완료 이력 저장
+                couponStockService.markAsIssued(userId);
             } else {
-                log.warn("Coupon request {} was not processed due to concurrency issue", requestId);
+                log.warn("Coupon request {} was not processed due to concurrency issue", userId);
             }
         } finally {
-            couponStockService.removeCouponRequest(requestId);
+            // 5. ZSet에서 요청 제거
+            couponStockService.removeCouponRequest(userId);
         }
     }
 }

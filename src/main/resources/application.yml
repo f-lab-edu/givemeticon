@@ -1,5 +1,8 @@
 server:
   port: 8080
+  tomcat:
+    mbeanregistry:
+      enabled: true
 
 spring:
   datasource:
@@ -31,3 +34,21 @@ mybatis:
   type-aliases-package: com.jinddung2.givemeticon.domain.*
   configuration:
     map-underscore-to-camel-case: true
+
+management:
+  info:
+    java:
+      enabled: true
+    os:
+      enabled: true
+  endpoint:
+    health:
+#      show-details: always
+      show-components: always
+    prometheus:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+#        include: health, info, metrics, prometheus

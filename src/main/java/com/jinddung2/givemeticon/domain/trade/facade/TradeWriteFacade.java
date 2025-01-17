@@ -9,10 +9,12 @@ import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
 import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import com.jinddung2.givemeticon.domain.trade.service.TradeService;
+import io.micrometer.core.annotation.Timed;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Timed(value = "my.trade")
 @Service
 @RequiredArgsConstructor
 public class TradeWriteFacade {
@@ -37,6 +39,7 @@ public class TradeWriteFacade {
         saleService.update(sale);
         producer.create(new CreateNotificationRequestDto(saleId, sale.getSellerId(),
                 String.format("%s이(가) 판매되었습니다.", item.getName())));
+
         return tradeId;
     }
 

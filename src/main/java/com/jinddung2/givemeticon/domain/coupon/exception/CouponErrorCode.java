@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum CouponErrorCode implements ErrorCode {
 
+    COUPON_ALREADY_ISSUED(HttpStatus.CONFLICT, "사용자가 이미 쿠폰을 발급받았습니다."),
+    COUPON_REQUEST_PENDING(HttpStatus.TOO_MANY_REQUESTS, "사용자의 쿠폰 요청이 이미 진행 중입니다."),
     NOT_FOUND_COUPON_STOCK(HttpStatus.NOT_FOUND, "쿠폰 재고를 찾을 수 없습니다."),
     NOT_ENOUGH_COUPON_STOCK(HttpStatus.CONFLICT, "쿠폰이 소진되었습니다."),
     NOT_FOUND_COUPON(HttpStatus.NOT_FOUND, "쿠폰을 찾을 수 없습니다."),
