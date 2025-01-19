@@ -33,28 +33,43 @@ public class DistributedLockAop {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
         DistributedLock distributedLock = method.getAnnotation(DistributedLock.class);
+
+        // 동적으로 키 생성
         String key = REDISSON_LOCK_PREFIX + CustomSpringELParser.getDynamicValue(
                 signature.getParameterNames(),
                 joinPoint.getArgs(),
                 distributedLock.key()
         );
 
+        // 락 객체 생성
         RLock rLock = redissonClient.getLock(key);
+
         try {
+            // 락 획득 시도
             boolean available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
             if (!available) {
-                return false;
-            } else {
-                return aopForTransaction.proceed(joinPoint);
+                log.warn("Unable to acquire lock for key: {}", key);
+                return false; // 락 획득 실패 시 바로 반환
             }
+
+            // 원래 로직 실행
+            return aopForTransaction.proceed(joinPoint);
+
         } catch (InterruptedException e) {
-            log.error("Lock acquisition interrupted", e);
-            throw new InterruptedException();
+            log.error("Lock acquisition interrupted for key: {}", key, e);
+            Thread.currentThread().interrupt(); // 인터럽트 상태 복원
+            throw e;
+
         } finally {
-            try {
-                rLock.unlock();
-            } catch (IllegalMonitorStateException e) {
-                log.error("Redisson Lock Already UnLock {} {}", method.getName(), key);
+            // 락 해제 로직
+            if (rLock.isHeldByCurrentThread()) {
+                try {
+                    rLock.unlock();
+                } catch (IllegalMonitorStateException | IllegalStateException e) {
+                    log.warn("Failed to unlock or lock already released: key = {}", key, e);
+                }
+            } else {
+                log.debug("Lock not held by current thread or already released: key = {}", key);
             }
         }
     }
