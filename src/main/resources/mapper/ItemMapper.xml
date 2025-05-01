@@ -8,25 +8,22 @@
                           brand_id,
                           name,
                           price,
-                          view_count,
                           created_date,
                           updated_date)
         VALUES (#{id},
                 #{brandId},
                 #{name},
                 #{price},
-                #{viewCount},
                 NOW(),
                 NOW())
         ON DUPLICATE KEY UPDATE brand_id     = VALUES(brand_id),
                                 name         = VALUES(name),
                                 price        = VALUES(price),
-                                view_count   = VALUES(view_count),
                                 updated_date = NOW()
     </insert>
 
     <select id="findById" parameterType="int" resultType="Item">
-        SELECT id, brand_id, name, price, view_count, created_date, updated_date
+        SELECT id, brand_id, name, price, created_date, updated_date
         FROM item
         WHERE id = #{itemId}
     </select>

@@ -14,7 +14,6 @@ public class Item {
     private int brandId;
     private String name;
     private int price;
-    private int viewCount;
     private LocalDateTime createdDate;
     private LocalDateTime updatedDate;
 
@@ -23,7 +22,6 @@ public class Item {
                 int brandId,
                 String name,
                 int price,
-                int viewCount,
                 LocalDateTime createdDate,
                 LocalDateTime updatedDate
     ) {
@@ -31,7 +29,6 @@ public class Item {
         this.brandId = brandId;
         this.name = name;
         this.price = price;
-        this.viewCount = viewCount;
         this.createdDate = createdDate;
         this.updatedDate = updatedDate;
     }
@@ -40,7 +37,4 @@ public class Item {
         this.brandId = brandId;
     }
 
-    public void increaseViewCount() {
-        this.viewCount++;
-    }
 }

@@ -13,7 +13,6 @@ public class ItemFixture {
                 .brandId(5)
                 .name("testItem")
                 .price(10000)
-                .viewCount(10)
                 .createdDate(now)
                 .updatedDate(now)
                 .build();
@@ -26,20 +25,6 @@ public class ItemFixture {
                 .brandId(5)
                 .name("testItem" + id)
                 .price(10000)
-                .viewCount(10)
-                .createdDate(now)
-                .updatedDate(now)
-                .build();
-    }
-
-    public static Item createItemFixtureWithViewCount(int viewCount) {
-        LocalDateTime now = LocalDateTime.now();
-        return Item.builder()
-                .id(4)
-                .brandId(5)
-                .name("testItem")
-                .price(10000)
-                .viewCount(viewCount)
                 .createdDate(now)
                 .updatedDate(now)
                 .build();

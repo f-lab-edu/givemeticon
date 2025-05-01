@@ -39,7 +39,6 @@ public class ItemDto {
                 .brandId(item.getBrandId())
                 .name(item.getName())
                 .price(item.getPrice())
-                .viewCount(item.getViewCount())
                 .createdDate(item.getCreatedDate())
                 .updatedDate(item.getUpdatedDate())
                 .build();

@@ -60,8 +60,7 @@ class ItemControllerTest extends BasicControllerTest {
                 .andExpect(jsonPath("$.data.id").value(response.getId()))
                 .andExpect(jsonPath("$.data.brandId").value(response.getBrandId()))
                 .andExpect(jsonPath("$.data.name").value(response.getName()))
-                .andExpect(jsonPath("$.data.price").value(response.getPrice()))
-                .andExpect(jsonPath("$.data.viewCount").value(response.getViewCount()));
+                .andExpect(jsonPath("$.data.price").value(response.getPrice()));
 
         Mockito.verify(itemWriteFacade).createItem(brand.getId(), request);
     }
@@ -69,12 +68,11 @@ class ItemControllerTest extends BasicControllerTest {
     @Test
     @DisplayName("전시용 아이템 단건 조회에 성공한다.")
     void getItem_Success() throws Exception {
-        int defaultViewCount = 5;
-        Item item = ItemFixture.createItemFixtureWithViewCount(defaultViewCount);
-        item.increaseViewCount();
+        int userId = 1;
+        Item item = ItemFixture.createItemFixture();
         ItemDto response = ItemDto.of(item);
 
-        when(itemService.getItemAndIncreaseViewCount(item.getId())).thenReturn(response);
+        when(itemService.getItemAndIncreaseViewCount(item.getId(), userId)).thenReturn(response);
 
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/items/" + item.getId())
@@ -85,17 +83,17 @@ class ItemControllerTest extends BasicControllerTest {
                 .andExpect(jsonPath("$.data.id").value(response.getId()))
                 .andExpect(jsonPath("$.data.brandId").value(response.getBrandId()))
                 .andExpect(jsonPath("$.data.name").value(response.getName()))
-                .andExpect(jsonPath("$.data.price").value(response.getPrice()))
-                .andExpect(jsonPath("$.data.viewCount").value(defaultViewCount + 1));
+                .andExpect(jsonPath("$.data.price").value(response.getPrice()));
 
-        Mockito.verify(itemService).getItemAndIncreaseViewCount(item.getId());
+        Mockito.verify(itemService).getItemAndIncreaseViewCount(item.getId(), userId);
     }
 
     @Test
     @DisplayName("전시용 아이템이 존재하지 않아 단건 조회에 실패한다.")
     void getItem_Fail_Not_Found_Item() throws Exception {
+        int userId = 1;
         Brand brand = BrandFixture.createBrandFixture();
-        doThrow(new NotFoundItemException()).when(itemService).getItemAndIncreaseViewCount(brand.getId());
+        doThrow(new NotFoundItemException()).when(itemService).getItemAndIncreaseViewCount(brand.getId(), userId);
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/items/" + brand.getId())
                         .contentType(MediaType.APPLICATION_JSON))

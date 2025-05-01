@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMetaMapper">
+
+    <insert id="save">
+        INSERT INTO item_favorite_meta(
+                                       id,
+                                       item_id,
+                                       like_count,
+                                       view_count)
+        VALUES (#{id},
+                #{item_id},
+                0,
+                0)
+    </insert>
+</mapper>

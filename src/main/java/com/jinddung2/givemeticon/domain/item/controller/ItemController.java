@@ -7,6 +7,8 @@ import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/items")
@@ -22,7 +24,8 @@ public class ItemController {
     }
 
     @GetMapping("/{itemId}")
-    public ItemDto getItemAndIncreaseViewCount(@PathVariable("itemId") int itemId) {
-        return itemService.getItemAndIncreaseViewCount(itemId);
+    public ItemDto getItem(@PathVariable("itemId") int itemId,
+                           @SessionAttribute(name = LOGIN_USER) int userId) {
+        return itemService.getItemAndIncreaseViewCount(itemId, userId);
     }
 }

@@ -1,6 +1,5 @@
 package com.jinddung2.givemeticon.domain.item.service;
 
-import com.jinddung2.givemeticon.domain.item.controller.dto.ItemDto;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.mapper.ItemMapper;
@@ -48,18 +47,6 @@ class ItemServiceTest {
         Item result = sut.getItem(item.getId());
 
         assertThat(result).isEqualTo(item);
-    }
-
-    @Test
-    @DisplayName("아이템 조회에 성공하여 조회수가 증가한다.")
-    void get_Item_Increase_View_Count_Success() {
-        int defaultViewCount = 5;
-        Item item = ItemFixture.createItemFixtureWithViewCount(defaultViewCount);
-        when(itemMapper.findById(item.getId())).thenReturn(Optional.of(item));
-
-        ItemDto result = sut.getItemAndIncreaseViewCount(item.getId());
-
-        assertThat(result.getViewCount()).isEqualTo(defaultViewCount + 1);
     }
 
     @Test
