@@ -4,6 +4,7 @@ import com.jinddung2.givemeticon.domain.item.controller.dto.ItemDto;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import com.jinddung2.givemeticon.domain.item.mapper.ItemMapper;
+import com.jinddung2.givemeticon.domain.item.mapper.ItemViewMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,7 @@ import java.util.Optional;
 public class ItemService {
 
     private final ItemMapper itemMapper;
+    private final ItemViewMapper itemViewMapper;
 
     public Item saveOrUpdate(Item item) {
         int id = itemMapper.saveOrUpdate(item);
@@ -24,9 +26,9 @@ public class ItemService {
         return itemMapper.findById(itemId).orElseThrow(NotFoundItemException::new);
     }
 
-    public ItemDto getItemAndIncreaseViewCount(int itemId) {
+    public ItemDto getItemAndIncreaseViewCount(int itemId, int userId) {
         Item item = getItem(itemId);
-        item.increaseViewCount();
+        itemViewMapper.save(itemId, userId);
 
         itemMapper.saveOrUpdate(item);
         return ItemDto.of(item);
