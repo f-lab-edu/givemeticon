@@ -24,7 +24,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
@@ -61,9 +60,7 @@ class TradeWriteFacadeTest {
 
         sut.transact(sale.getId(), buyer.getId());
 
-        assertThat(sale.isBought()).isTrue();
-
-        verify(saleService).update(sale);
+        verify(saleService).markAsBoughtIfAvailable(sale.getId());
         verify(tradeService).save(sale, item, buyer.getId());
         verify(producer).create(any(CreateNotificationRequestDto.class));
     }
@@ -76,9 +73,12 @@ class TradeWriteFacadeTest {
         Sale sale = SaleFixture.createBoughtSaleFixture(buyer, item);
 
         when(saleService.getSale(sale.getId())).thenReturn(sale);
+        doThrow(new AlreadyBoughtSaleException()).when(saleService).markAsBoughtIfAvailable(sale.getId());
 
         assertThatThrownBy(() -> sut.transact(sale.getId(), buyer.getId()))
                 .isInstanceOf(AlreadyBoughtSaleException.class);
+
+        verify(tradeService, never()).save(any(Sale.class), any(Item.class), anyInt());
     }
 
     @Test

@@ -120,6 +120,27 @@ class SaleServiceTest {
     }
 
     @Test
+    @DisplayName("판매 상태 변경은 조건부 업데이트가 성공한 경우에만 성공한다.")
+    void markAsBoughtIfAvailable() {
+        int saleId = 1;
+        Mockito.when(saleMapper.updateBoughtStateIfNotBought(saleId)).thenReturn(1);
+
+        sut.markAsBoughtIfAvailable(saleId);
+
+        Mockito.verify(saleMapper).updateBoughtStateIfNotBought(saleId);
+    }
+
+    @Test
+    @DisplayName("조건부 업데이트가 실패하면 이미 판매된 상품으로 처리한다.")
+    void markAsBoughtIfAvailable_Fail_AlreadyBought() {
+        int saleId = 1;
+        Mockito.when(saleMapper.updateBoughtStateIfNotBought(saleId)).thenReturn(0);
+
+        Assertions.assertThrows(AlreadyBoughtSaleException.class,
+                () -> sut.markAsBoughtIfAvailable(saleId));
+    }
+
+    @Test
     @DisplayName("판매 상품 재고조회에 성공한다.")
     void get_Sales_By_ItemId_Success() {
         User seller = UserFixture.createUserFixture(now);

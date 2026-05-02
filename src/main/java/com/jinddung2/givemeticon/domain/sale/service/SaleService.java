@@ -42,6 +42,13 @@ public class SaleService {
         return sale.getId();
     }
 
+    public void markAsBoughtIfAvailable(int saleId) {
+        int updatedRows = saleMapper.updateBoughtStateIfNotBought(saleId);
+        if (updatedRows != 1) {
+            throw new AlreadyBoughtSaleException();
+        }
+    }
+
     public void validateDuplicateBarcode(String barcode) {
         if (saleMapper.existsByBarcode(barcode)) {
             throw new DuplicatedBarcodeException();

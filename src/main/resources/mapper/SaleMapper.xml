@@ -56,6 +56,15 @@
         WHERE id = #{id}
     </update>
 
+    <update id="updateBoughtStateIfNotBought" parameterType="int">
+        UPDATE sale
+        SET is_bought = true,
+            is_bought_date = CURRENT_DATE,
+            updated_date = NOW()
+        WHERE id = #{saleId}
+          AND is_bought = false
+    </update>
+
     <select id="existsByBarcode" parameterType="String" resultType="boolean">
         SELECT EXISTS
                        (SELECT 1 FROM sale WHERE barcode = #{barcode})
