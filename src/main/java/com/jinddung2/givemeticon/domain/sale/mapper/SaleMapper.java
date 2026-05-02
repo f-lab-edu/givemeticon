@@ -15,6 +15,8 @@ public interface SaleMapper {
 
     void update(Sale sale);
 
+    int updateBoughtStateIfNotBought(@Param("saleId") int saleId);
+
     boolean existsByBarcode(String barcode);
 
     Optional<Sale> findById(int saleId);

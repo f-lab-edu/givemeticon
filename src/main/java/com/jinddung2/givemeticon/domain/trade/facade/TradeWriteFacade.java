@@ -7,7 +7,6 @@ import com.jinddung2.givemeticon.domain.notification.producer.NotificationProduc
 import com.jinddung2.givemeticon.domain.sale.domain.Sale;
 import com.jinddung2.givemeticon.domain.sale.service.SaleService;
 import com.jinddung2.givemeticon.domain.trade.domain.Trade;
-import com.jinddung2.givemeticon.domain.trade.exception.AlreadyBoughtSaleException;
 import com.jinddung2.givemeticon.domain.trade.service.TradeService;
 import io.micrometer.core.annotation.Timed;
 import lombok.RequiredArgsConstructor;
@@ -27,16 +26,11 @@ public class TradeWriteFacade {
     @Transactional
     public int transact(int saleId, int buyerId) {
         Sale sale = saleService.getSale(saleId);
-
-        if (sale.isBought()) {
-            throw new AlreadyBoughtSaleException();
-        }
+        saleService.markAsBoughtIfAvailable(saleId);
 
         Item item = itemService.getItem(sale.getItemId());
         int tradeId = tradeService.save(sale, item, buyerId);
 
-        sale.updateBoughtState();
-        saleService.update(sale);
         producer.create(new CreateNotificationRequestDto(saleId, sale.getSellerId(),
                 String.format("%s이(가) 판매되었습니다.", item.getName())));
 
