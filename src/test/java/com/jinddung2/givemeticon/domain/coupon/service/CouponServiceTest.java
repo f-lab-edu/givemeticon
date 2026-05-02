@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.coupon.service;
 import com.jinddung2.givemeticon.common.utils.CertificationGenerator;
 import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
+import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyRedeemedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotFoundCoupon;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +18,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,7 +52,7 @@ class CouponServiceTest {
     }
 
     @Test
-    @DisplayName("쿠폰을 사용하면 쿠폰사용상태가 true로 바뀌고 db에 merge 된다.")
+    @DisplayName("쿠폰을 사용하면 조건부 업데이트가 성공한다.")
     void use_coupon_success(){
         int userId = 1;
         Coupon coupon = Coupon.builder()
@@ -63,11 +63,29 @@ class CouponServiceTest {
                 .isUsed(false)
                 .expiredDate(LocalDate.now().plusDays(1))
                 .build();
+        when(couponMapper.updateUsedIfUnused(coupon.getId())).thenReturn(1);
 
         sut.useCoupon(coupon);
 
-        assertTrue(coupon.isUsed());
-        verify(couponMapper).merge(coupon);
+        verify(couponMapper).updateUsedIfUnused(coupon.getId());
+        verify(couponMapper, never()).merge(coupon);
+    }
+
+    @Test
+    @DisplayName("조건부 업데이트가 실패하면 이미 사용한 쿠폰으로 처리한다.")
+    void use_coupon_fail_already_redeemed() {
+        Coupon coupon = Coupon.builder()
+                .userId(1)
+                .name("testCoupon")
+                .couponNumber("COUPON123")
+                .couponType(CouponType.FREE_POINT)
+                .isUsed(false)
+                .expiredDate(LocalDate.now().plusDays(1))
+                .build();
+        when(couponMapper.updateUsedIfUnused(coupon.getId())).thenReturn(0);
+
+        assertThrows(AlreadyRedeemedCouponException.class,
+                () -> sut.useCoupon(coupon));
     }
 
     @Test

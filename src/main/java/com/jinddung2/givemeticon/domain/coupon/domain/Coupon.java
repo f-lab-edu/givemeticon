@@ -66,6 +66,11 @@ public class Coupon {
         validateExpiration(currentDate);
     }
 
+    public void validateRedeemRequest(int userId, LocalDate currentDate) {
+        validateUserOwnership(userId);
+        validateExpiration(currentDate);
+    }
+
     private void validateUserOwnership(int userId) {
         if (this.userId != userId) {
             throw new CouponUserMismatchException();
