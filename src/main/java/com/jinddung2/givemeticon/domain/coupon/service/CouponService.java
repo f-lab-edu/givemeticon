@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.coupon.service;
 import com.jinddung2.givemeticon.common.utils.CertificationGenerator;
 import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
+import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyRedeemedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotFoundCoupon;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import lombok.RequiredArgsConstructor;
@@ -39,8 +40,10 @@ public class CouponService {
     }
 
     public void useCoupon(Coupon coupon) {
-        coupon.useCoupon();
-        couponMapper.merge(coupon);
+        int updatedRows = couponMapper.updateUsedIfUnused(coupon.getId());
+        if (updatedRows != 1) {
+            throw new AlreadyRedeemedCouponException();
+        }
     }
 
     public Coupon getCoupon(String couponNumber) {

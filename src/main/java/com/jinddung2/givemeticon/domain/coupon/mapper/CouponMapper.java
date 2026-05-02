@@ -2,6 +2,7 @@ package com.jinddung2.givemeticon.domain.coupon.mapper;
 
 import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.Optional;
 
@@ -10,6 +11,8 @@ public interface CouponMapper {
     int save(Coupon coupon);
 
     int merge(Coupon coupon);
+
+    int updateUsedIfUnused(@Param("id") int id);
 
     Optional<Coupon> getCouponById(int couponId);
 

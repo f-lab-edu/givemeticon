@@ -41,6 +41,13 @@
         WHERE id = #{id};
     </update>
 
+    <update id="updateUsedIfUnused" parameterType="int">
+        UPDATE coupon
+        SET is_used = true
+        WHERE id = #{id}
+          AND is_used = false
+    </update>
+
 <!--    <select id="getCouponById">-->
 <!--        SELECT id,-->
 <!--               user_id,-->
