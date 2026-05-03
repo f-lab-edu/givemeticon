@@ -26,14 +26,22 @@ public class CashPointService {
         return cashPoint.getId();
     }
 
+    @Transactional
     public void addPoint(User user, Coupon coupon) {
-        CashPoint cashPoint = cashPointMapper.findById(user.getCashPointId())
-                .orElseThrow();
-        cashPoint.addPoint(coupon.getPrice());
-        cashPointMapper.merge(cashPoint);
+        validatePointAmount(coupon.getPrice());
+        int updatedRows = cashPointMapper.incrementCashPoint(user.getCashPointId(), coupon.getPrice());
+        if (updatedRows != 1) {
+            throw new NotFoundCashPoint();
+        }
     }
 
     public CashPoint getCashPoint(int cashPointId) {
         return cashPointMapper.findById(cashPointId).orElseThrow(NotFoundCashPoint::new);
+    }
+
+    private void validatePointAmount(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("추가할 포인트는 양수여야 합니다.");
+        }
     }
 }

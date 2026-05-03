@@ -13,9 +13,9 @@
                 NOW())
     </insert>
 
-    <update id="merge" parameterType="CashPoint">
+    <update id="incrementCashPoint">
         UPDATE cash_point
-        SET cash_point = #{cashPoint}
+        SET cash_point = cash_point + #{amount}
         WHERE id = #{id}
     </update>
 
