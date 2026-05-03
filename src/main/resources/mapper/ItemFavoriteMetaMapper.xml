@@ -6,12 +6,10 @@
 
     <insert id="save">
         INSERT INTO item_favorite_meta(
-                                       id,
                                        item_id,
                                        like_count,
                                        view_count)
-        VALUES (#{id},
-                #{item_id},
+        VALUES (#{itemId},
                 0,
                 0)
     </insert>

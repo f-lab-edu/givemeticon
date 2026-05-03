@@ -26,18 +26,7 @@ public class RedeemCouponFacade {
         Coupon coupon = couponService.getCoupon(requestDto.couponNumber());
 
         LocalDate currentDate = LocalDate.now();
-        coupon.isValidate(userId, currentDate);
-        /*if (coupon.getUserId() != userId) {
-            throw new CouponUserMismatchException();
-        }
-
-        if (coupon.isUsed()) {
-            throw new AlreadyRedeemedCouponException();
-        }
-
-        if (currentDate.isAfter(coupon.getExpiredDate())) {
-            throw new ExpiredCouponException();
-        }*/
+        coupon.validateRedeemRequest(userId, currentDate);
 
         couponService.useCoupon(coupon);
         cashPointService.addPoint(user, coupon);

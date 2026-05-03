@@ -5,7 +5,6 @@ import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponStockService;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +13,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class CreateCouponFacadeTest {
@@ -49,8 +50,10 @@ class CreateCouponFacadeTest {
 
     @Test
     @DisplayName("쿠폰을 생성하면 해당 쿠폰의 재고는 1개 감소한다.")
-    void create_Coupon_Success() throws InterruptedException {
+    void create_Coupon_Success() {
 
+        Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId);
+        Mockito.when(couponStockService.processCouponRequest(userId)).thenReturn(true);
         Mockito.when(couponStockService.getStock(stockId)).thenReturn(mockStock);
 
         Mockito.doAnswer(invocation -> {
@@ -65,11 +68,18 @@ class CreateCouponFacadeTest {
                 createCouponRequestDto.couponType(),
                 createCouponRequestDto.price());
 
-
         createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto);
 
-        Assertions.assertEquals(total - 1, mockStock.getRemain());
-
-        Mockito.verify(couponStockService).decreaseStock(mockStock);
+        verify(couponStockService).enqueueCouponRequest(userId);
+        verify(couponStockService).processCouponRequest(userId);
+        verify(couponStockService).decreaseStock(mockStock);
+        verify(couponService).createCoupon(
+                userId,
+                createCouponRequestDto.stockId(),
+                createCouponRequestDto.couponName(),
+                createCouponRequestDto.couponType(),
+                createCouponRequestDto.price());
+        verify(couponStockService).markAsIssued(userId);
+        verify(couponStockService).removeCouponRequest(userId);
     }
 }

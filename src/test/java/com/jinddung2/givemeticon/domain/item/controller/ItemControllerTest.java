@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static com.jinddung2.givemeticon.domain.user.constants.SessionConstants.LOGIN_USER;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -76,8 +77,8 @@ class ItemControllerTest extends BasicControllerTest {
 
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/items/" + item.getId())
+                        .sessionAttr(LOGIN_USER, userId)
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().is2xxSuccessful())
                 .andExpect(status().is2xxSuccessful())
                 .andExpect(jsonPath("$.message").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.id").value(response.getId()))
@@ -96,6 +97,7 @@ class ItemControllerTest extends BasicControllerTest {
         doThrow(new NotFoundItemException()).when(itemService).getItemAndIncreaseViewCount(brand.getId(), userId);
         mockMvc.perform(MockMvcRequestBuilders
                         .get("/api/v1/items/" + brand.getId())
+                        .sessionAttr(LOGIN_USER, userId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().is4xxClientError())
                 .andExpect(jsonPath("$.code").value(ItemErrorCode.NOT_FOUND_ITEM.getHttpStatus().value()))
