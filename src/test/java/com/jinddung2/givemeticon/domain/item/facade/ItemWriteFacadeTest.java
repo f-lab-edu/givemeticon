@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.item.facade;
 import com.jinddung2.givemeticon.domain.brand.controller.dto.BrandDto;
 import com.jinddung2.givemeticon.domain.brand.domain.Brand;
 import com.jinddung2.givemeticon.domain.brand.service.BrandService;
+import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMetaMapper;
 import com.jinddung2.givemeticon.domain.item.controller.dto.ItemDto;
 import com.jinddung2.givemeticon.domain.item.controller.dto.request.ItemCreateRequest;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +33,9 @@ class ItemWriteFacadeTest {
     @Mock
     BrandService brandService;
 
+    @Mock
+    ItemFavoriteMetaMapper itemFavoriteMetaMapper;
+
     @Test
     @DisplayName("아이템 생성에 성공한다.")
     void create_Item_Success() {
@@ -43,5 +48,6 @@ class ItemWriteFacadeTest {
         ItemDto result = sut.createItem(brand.getId(), request);
 
         assertThat(result).isEqualTo(ItemDto.of(item));
+        verify(itemFavoriteMetaMapper).save(item.getId());
     }
 }
