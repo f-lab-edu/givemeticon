@@ -17,7 +17,7 @@ public class NotificationProducer {
     }
 
     public void create(CreateNotificationRequestDto request) {
-        kafkaTemplate.send(TOPIC_NAME, request);
+        kafkaTemplate.send(TOPIC_NAME, request.eventId(), request);
         log.info("kafka producer message request={}", request);
     }
 }

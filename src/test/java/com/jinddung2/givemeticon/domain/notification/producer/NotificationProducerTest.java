@@ -28,6 +28,6 @@ class NotificationProducerTest {
 
         sut.create(fakeDto);
 
-        Mockito.verify(kafkaTemplate).send(Mockito.eq("alarm"), Mockito.eq(fakeDto));
+        Mockito.verify(kafkaTemplate).send(Mockito.eq("alarm"), Mockito.eq(fakeDto.eventId()), Mockito.eq(fakeDto));
     }
 }
