@@ -5,5 +5,5 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface NotificationMapper {
-    int save(Notification notification);
+    int saveIdempotently(Notification notification);
 }
