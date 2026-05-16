@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.item.service;
 
+import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMetaMapper;
 import com.jinddung2.givemeticon.domain.item.controller.dto.ItemDto;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
@@ -16,6 +17,7 @@ public class ItemService {
 
     private final ItemMapper itemMapper;
     private final ItemViewMapper itemViewMapper;
+    private final ItemFavoriteMetaMapper itemFavoriteMetaMapper;
 
     public Item saveOrUpdate(Item item) {
         int id = itemMapper.saveOrUpdate(item);
@@ -29,8 +31,8 @@ public class ItemService {
     public ItemDto getItemAndIncreaseViewCount(int itemId, int userId) {
         Item item = getItem(itemId);
         itemViewMapper.save(itemId, userId);
+        itemFavoriteMetaMapper.increaseViewCount(itemId);
 
-        itemMapper.saveOrUpdate(item);
         return ItemDto.of(item);
     }
 

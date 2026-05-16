@@ -8,4 +8,8 @@ public interface ItemFavoriteMetaMapper {
 
     void save(@Param("itemId") int itemId);
 
+    void increaseViewCount(@Param("itemId") int itemId);
+
+    void increaseLikeCount(@Param("itemId") int itemId);
+
 }

@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.favorite.service;
 import com.jinddung2.givemeticon.domain.favorite.domain.ItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.exception.NotPushItemFavorite;
+import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMetaMapper;
 import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMapper;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.user.domain.User;
@@ -23,6 +24,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +37,9 @@ class ItemFavoriteServiceTest {
 
     @Mock
     ItemFavoriteMapper itemFavoriteMapper;
+
+    @Mock
+    ItemFavoriteMetaMapper itemFavoriteMetaMapper;
 
     LocalDateTime now = LocalDateTime.now();
 
@@ -50,6 +57,8 @@ class ItemFavoriteServiceTest {
         assertThat(itemFavorite.getItemId()).isEqualTo(item.getId());
         assertThat(itemFavorite.getUserId()).isEqualTo(user.getId());
         assertThat(itemFavorite.isFavorite()).isTrue();
+        verify(itemFavoriteMapper).save(any(ItemFavorite.class));
+        verify(itemFavoriteMetaMapper).increaseLikeCount(item.getId());
     }
 
     @Test
@@ -63,6 +72,9 @@ class ItemFavoriteServiceTest {
 
         Assertions.assertThrows(AlreadyPushItemFavorite.class,
                 () -> sut.insertFavorite(user.getId(), item.getId()));
+
+        verify(itemFavoriteMapper, never()).save(any(ItemFavorite.class));
+        verify(itemFavoriteMetaMapper, never()).increaseLikeCount(item.getId());
     }
 
     @Test
