@@ -28,4 +28,34 @@
         WHERE id = #{itemId}
     </select>
 
+    <select id="findPopularItemsOrderByLikeCount"
+            resultType="com.jinddung2.givemeticon.domain.item.controller.dto.PopularItemDto">
+        SELECT i.id,
+               i.brand_id,
+               i.name,
+               i.price,
+               m.like_count,
+               m.view_count
+        FROM item_favorite_meta m
+        JOIN item i
+          ON i.id = m.item_id
+        ORDER BY m.like_count DESC, m.item_id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findPopularItemsOrderByViewCount"
+            resultType="com.jinddung2.givemeticon.domain.item.controller.dto.PopularItemDto">
+        SELECT i.id,
+               i.brand_id,
+               i.name,
+               i.price,
+               m.like_count,
+               m.view_count
+        FROM item_favorite_meta m
+        JOIN item i
+          ON i.id = m.item_id
+        ORDER BY m.view_count DESC, m.item_id DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>
