@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.givemeticon.BasicControllerTest;
 import com.jinddung2.givemeticon.domain.brand.domain.Brand;
 import com.jinddung2.givemeticon.domain.item.controller.dto.ItemDto;
+import com.jinddung2.givemeticon.domain.item.controller.dto.PopularItemDto;
 import com.jinddung2.givemeticon.domain.item.controller.dto.request.ItemCreateRequest;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.exception.ItemErrorCode;
@@ -21,6 +22,8 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+
+import java.util.List;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -87,6 +90,36 @@ class ItemControllerTest extends BasicControllerTest {
                 .andExpect(jsonPath("$.data.price").value(response.getPrice()));
 
         Mockito.verify(itemService).getItemAndIncreaseViewCount(item.getId(), userId);
+    }
+
+    @Test
+    @DisplayName("인기 아이템 목록 조회에 성공한다.")
+    void getPopularItems_Success() throws Exception {
+        PopularItemDto response = new PopularItemDto();
+        response.setId(1);
+        response.setBrandId(2);
+        response.setName("popular item");
+        response.setPrice(1000);
+        response.setLikeCount(10);
+        response.setViewCount(20);
+
+        when(itemService.getPopularItems("LIKE", 50)).thenReturn(List.of(response));
+
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get("/api/v1/items/popular")
+                        .param("sort", "LIKE")
+                        .param("limit", "50")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().is2xxSuccessful())
+                .andExpect(jsonPath("$.message").value("SUCCESS"))
+                .andExpect(jsonPath("$.data[0].id").value(response.getId()))
+                .andExpect(jsonPath("$.data[0].brandId").value(response.getBrandId()))
+                .andExpect(jsonPath("$.data[0].name").value(response.getName()))
+                .andExpect(jsonPath("$.data[0].price").value(response.getPrice()))
+                .andExpect(jsonPath("$.data[0].likeCount").value(response.getLikeCount()))
+                .andExpect(jsonPath("$.data[0].viewCount").value(response.getViewCount()));
+
+        Mockito.verify(itemService).getPopularItems("LIKE", 50);
     }
 
     @Test

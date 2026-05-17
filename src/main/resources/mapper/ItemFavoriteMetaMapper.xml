@@ -13,4 +13,16 @@
                 0,
                 0)
     </insert>
+
+    <update id="increaseViewCount">
+        UPDATE item_favorite_meta
+        SET view_count = view_count + 1
+        WHERE item_id = #{itemId}
+    </update>
+
+    <update id="increaseLikeCount">
+        UPDATE item_favorite_meta
+        SET like_count = like_count + 1
+        WHERE item_id = #{itemId}
+    </update>
 </mapper>
