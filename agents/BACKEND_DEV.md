@@ -26,3 +26,17 @@ Implement the smallest reliable backend change that satisfies the task.
 5. Test Result
 6. Tradeoffs
 7. Remaining Risk
+
+## Git Workflow
+
+Before implementation:
+
+1. Read current-task.md
+2. Generate Issue
+3. Generate Branch Name
+
+After implementation:
+
+1. Generate Commit Message
+2. Generate PR Draft
+3. Generate ADR if architecture changed

@@ -1,17 +1,75 @@
----
-name: 기본-템플릿
-about: PR 템플릿 공통화
-title: Feat#No.
-labels: enhancement
-assignees: JinDDung2
-
----
 - close #{이슈번호}
 
-## 목표 및 요구사항
+# Why
 
-> 목표:
+왜 이 작업을 수행했는가?
 
-* 해당 작업에 관한 요구사항에 대해 정리 합니다.
+---
 
-## 세부설명
+# What Changed
+
+주요 변경사항
+
+### Application
+
+*
+
+### Database
+
+*
+
+### Infrastructure
+
+*
+
+---
+
+# Key Decisions
+
+중요한 설계 결정
+
+### Decision
+
+*
+
+### Reason
+
+*
+
+### Alternatives Considered
+
+*
+
+---
+
+# Validation
+
+어떻게 검증했는가?
+
+### Unit Test
+
+*
+
+### Integration Test
+
+*
+
+### Concurrency Test
+
+*
+
+---
+
+# Risks
+
+남아있는 위험
+
+*
+
+---
+
+# Rollback Plan
+
+문제 발생 시 복구 방법
+
+*

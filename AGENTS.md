@@ -24,3 +24,24 @@ This repository is for learning backend development and building hiring-ready po
 - Do not scan the whole repository unless required.
 - Start from README, current-task.md, and related files only.
 - Summarize findings before opening more files.
+
+# Engineering Workflow
+
+Before implementation:
+
+1. Generate Git Issue
+2. Generate Branch Name
+3. Create Implementation Plan
+
+After implementation:
+
+1. Generate Review Result
+2. Generate Commit Message
+3. Generate Pull Request
+
+Generate ADR when:
+
+- Database schema changes
+- Transaction strategy changes
+- Lock strategy changes
+- Event architecture changes
