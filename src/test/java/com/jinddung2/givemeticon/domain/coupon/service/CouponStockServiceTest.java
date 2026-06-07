@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.domain.coupon.service;
 
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
+import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotFoundCouponStock;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponStockMapper;
 import org.junit.jupiter.api.Assertions;
@@ -11,7 +12,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.redisson.api.RedissonClient;
 
 import java.util.Optional;
 
@@ -24,14 +24,8 @@ class CouponStockServiceTest {
     @Mock
     CouponStockMapper couponStockMapper;
 
-    @Mock
-    RedissonClient redissonClient;
-
     int stockId = 1;
     int total = 100;
-
-    @Mock
-    CouponStock mockStock = CouponStock.of(total);
 
     @Test
     @DisplayName("쿠폰 재고 객체를 가져오는데 성공한다.")
@@ -56,13 +50,21 @@ class CouponStockServiceTest {
     }
 
     @Test
-    @DisplayName("쿠폰 재고 감소에 성공한다.")
-    void decrease_Stock() throws InterruptedException {
+    @DisplayName("쿠폰 재고 감소는 조건부 update affected row가 1이면 성공한다.")
+    void decrease_Stock() {
+        Mockito.when(couponStockMapper.decreaseStockIfEnough(stockId)).thenReturn(1);
 
-        couponStockService.decreaseStock(mockStock);
+        couponStockService.decreaseStock(stockId);
 
-        Mockito.verify(mockStock).decrease();
-        Mockito.verify(couponStockMapper).decreaseStock(mockStock.getId(), mockStock.getRemain());
+        Mockito.verify(couponStockMapper).decreaseStockIfEnough(stockId);
+    }
 
+    @Test
+    @DisplayName("쿠폰 재고 감소 affected row가 0이면 재고 부족 예외가 발생한다.")
+    void decrease_Stock_Fail_Not_Enough_Stock() {
+        Mockito.when(couponStockMapper.decreaseStockIfEnough(stockId)).thenReturn(0);
+
+        Assertions.assertThrows(NotEnoughCouponStockException.class,
+                () -> couponStockService.decreaseStock(stockId));
     }
 }

@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.coupon.service;
 import com.jinddung2.givemeticon.common.utils.CertificationGenerator;
 import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
+import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyIssuedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyRedeemedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotFoundCoupon;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
@@ -42,13 +43,29 @@ class CouponServiceTest {
         int couponLength = 16;
 
         String randomNum = "1234567812345678";
-        when(couponMapper.save(any(Coupon.class))).thenReturn(2);
+        when(couponMapper.saveIfNotIssued(any(Coupon.class))).thenReturn(1);
         when(certificationGenerator.createCouponNumber(couponLength)).thenReturn(randomNum);
 
         sut.createCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price);
 
-        verify(couponMapper).save(any(Coupon.class));
+        verify(couponMapper).saveIfNotIssued(any(Coupon.class));
         verify(certificationGenerator).createCouponNumber(couponLength);
+    }
+
+    @Test
+    @DisplayName("동일 사용자와 재고의 쿠폰이 이미 발급된 경우 쿠폰 생성에 실패한다.")
+    void create_coupon_fail_already_issued() {
+        int stockId = 1;
+        String couponName = "테스트 선착순 쿠폰";
+        int price = 10_000;
+        int userId = 1;
+        int couponLength = 16;
+
+        when(certificationGenerator.createCouponNumber(couponLength)).thenReturn("1234567812345678");
+        when(couponMapper.saveIfNotIssued(any(Coupon.class))).thenReturn(0);
+
+        assertThrows(AlreadyIssuedCouponException.class,
+                () -> sut.createCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price));
     }
 
     @Test

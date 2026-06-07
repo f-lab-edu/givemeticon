@@ -21,9 +21,10 @@
         FROM coupon_stock
     </select>
 
-    <update id="decreaseStock" parameterType="int">
+    <update id="decreaseStockIfEnough" parameterType="int">
         UPDATE coupon_stock
-        SET remain = #{remain}
+        SET remain = remain - 1
         WHERE id = #{id}
+          AND remain > 0
     </update>
 </mapper>

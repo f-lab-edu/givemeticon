@@ -10,6 +10,8 @@ import java.util.Optional;
 public interface CouponMapper {
     int save(Coupon coupon);
 
+    int saveIfNotIssued(Coupon coupon);
+
     int merge(Coupon coupon);
 
     int updateUsedIfUnused(@Param("id") int id);

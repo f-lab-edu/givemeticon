@@ -3,6 +3,7 @@ package com.jinddung2.givemeticon.domain.coupon.service;
 import com.jinddung2.givemeticon.common.utils.CertificationGenerator;
 import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
+import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyIssuedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyRedeemedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotFoundCoupon;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
@@ -36,7 +37,10 @@ public class CouponService {
 
         coupon.validatePrice(price);
         coupon.validateExpiredDate();
-        couponMapper.save(coupon);
+        int insertedRows = couponMapper.saveIfNotIssued(coupon);
+        if (insertedRows != 1) {
+            throw new AlreadyIssuedCouponException();
+        }
     }
 
     public void useCoupon(Coupon coupon) {
