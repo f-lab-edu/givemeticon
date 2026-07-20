@@ -69,6 +69,15 @@
           AND is_used = false
     </update>
 
+    <select id="existsByUserIdAndStockId" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM coupon
+            WHERE user_id = #{userId}
+              AND stock_id = #{stockId}
+        )
+    </select>
+
 <!--    <select id="getCouponById">-->
 <!--        SELECT id,-->
 <!--               user_id,-->

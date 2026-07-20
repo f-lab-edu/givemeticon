@@ -6,6 +6,7 @@ import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyIssuedCouponExce
 import com.jinddung2.givemeticon.domain.coupon.exception.CouponErrorCode;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotFoundCouponStock;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
+import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponStockMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,19 +23,20 @@ import java.util.Set;
 public class CouponStockService {
 
     private final CouponStockMapper couponStockMapper;
+    private final CouponMapper couponMapper;
     private final RedisTemplate<String, String> redisTemplate;
     private static final String COUPON_REQUEST_QUEUE = "couponRequestQueue";
     private static final String COUPON_ISSUED_SET = "couponIssuedSet";
+    private static final long DEGRADED_MODE_ALLOWED_DELAY_MILLIS = 100L;
 
     public CouponStock getStock(int stockId) {
         return couponStockMapper.findById(stockId)
                 .orElseThrow(NotFoundCouponStock::new);
     }
 
-    public void enqueueCouponRequest(int userId) {
+    public void enqueueCouponRequest(int userId, int stockId) {
         // 1. 이미 쿠폰 발급 이력 확인
-        Boolean isIssued = redisTemplate.opsForSet().isMember(COUPON_ISSUED_SET, String.valueOf(userId));
-        if (isIssued != null && isIssued) {
+        if (isAlreadyIssued(userId, stockId)) {
             log.warn("User {} - Error: {}, Message: {}", userId, CouponErrorCode.COUPON_ALREADY_ISSUED.name(),
                     CouponErrorCode.COUPON_ALREADY_ISSUED.getErrorDetail());
             throw new AlreadyIssuedCouponException();
@@ -43,7 +45,7 @@ public class CouponStockService {
         long timestamp = System.currentTimeMillis();
 
         // 2. Queue(ZSet) 중복 요청 확인
-        boolean exists = redisTemplate.opsForZSet().score(COUPON_REQUEST_QUEUE, String.valueOf(userId)) != null;
+        boolean exists = hasPendingRequest(userId);
         if (exists) {
             log.warn("User {} - Error: {}, Message: {}", userId, CouponErrorCode.COUPON_REQUEST_PENDING.name(),
                     CouponErrorCode.COUPON_REQUEST_PENDING.getErrorDetail());
@@ -51,21 +53,79 @@ public class CouponStockService {
         }
 
         // 3. ZSet에 추가
-        redisTemplate.opsForZSet().add(COUPON_REQUEST_QUEUE, String.valueOf(userId), timestamp);
+        try {
+            redisTemplate.opsForZSet().add(COUPON_REQUEST_QUEUE, String.valueOf(userId), timestamp);
+        } catch (RuntimeException e) {
+            log.warn("cacheFallback=couponRequestQueue action=add reason={} userId={}",
+                    e.getClass().getSimpleName(), userId);
+        }
+    }
+
+    private boolean isAlreadyIssued(int userId, int stockId) {
+        try {
+            Boolean isIssued = redisTemplate.opsForSet().isMember(COUPON_ISSUED_SET, String.valueOf(userId));
+            if (isIssued == null) {
+                return existsIssuedCouponInDb(userId, stockId, "redis-null");
+            }
+            return isIssued;
+        } catch (RuntimeException e) {
+            return existsIssuedCouponInDb(userId, stockId, e.getClass().getSimpleName());
+        }
+    }
+
+    private boolean existsIssuedCouponInDb(int userId, int stockId, String reason) {
+        long startedAt = System.nanoTime();
+        boolean exists = couponMapper.existsByUserIdAndStockId(userId, stockId);
+        long elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000;
+        log.warn("cacheFallback=couponIssuedSet reason={} userId={} stockId={} elapsedMs={} allowedMs={} result={}",
+                reason, userId, stockId, elapsedMillis, DEGRADED_MODE_ALLOWED_DELAY_MILLIS, exists);
+        return exists;
+    }
+
+    private boolean hasPendingRequest(int userId) {
+        try {
+            return redisTemplate.opsForZSet().score(COUPON_REQUEST_QUEUE, String.valueOf(userId)) != null;
+        } catch (RuntimeException e) {
+            log.warn("cacheFallback=couponRequestQueue action=score reason={} userId={}",
+                    e.getClass().getSimpleName(), userId);
+            return false;
+        }
     }
 
     public void markAsIssued(int userId) {
-        redisTemplate.opsForSet().add(COUPON_ISSUED_SET, String.valueOf(userId));
+        try {
+            redisTemplate.opsForSet().add(COUPON_ISSUED_SET, String.valueOf(userId));
+        } catch (RuntimeException e) {
+            log.warn("cacheFallback=couponIssuedSet action=add reason={} userId={}",
+                    e.getClass().getSimpleName(), userId);
+        }
     }
 
     public boolean processCouponRequest(int userId) {
-        Set<String> earliestRequest = redisTemplate.opsForZSet().range(COUPON_REQUEST_QUEUE, 0, 0);
+        Set<String> earliestRequest;
+        try {
+            earliestRequest = redisTemplate.opsForZSet().range(COUPON_REQUEST_QUEUE, 0, 0);
+        } catch (RuntimeException e) {
+            log.warn("cacheFallback=couponRequestQueue action=range reason={} userId={}",
+                    e.getClass().getSimpleName(), userId);
+            return true;
+        }
 
-        return earliestRequest != null && earliestRequest.contains(String.valueOf(userId));
+        if (earliestRequest == null) {
+            log.warn("cacheFallback=couponRequestQueue action=range reason=redis-null userId={}", userId);
+            return true;
+        }
+
+        return earliestRequest.contains(String.valueOf(userId));
     }
 
     public void removeCouponRequest(int userId) {
-        redisTemplate.opsForZSet().remove(COUPON_REQUEST_QUEUE, String.valueOf(userId));
+        try {
+            redisTemplate.opsForZSet().remove(COUPON_REQUEST_QUEUE, String.valueOf(userId));
+        } catch (RuntimeException e) {
+            log.warn("cacheFallback=couponRequestQueue action=remove reason={} userId={}",
+                    e.getClass().getSimpleName(), userId);
+        }
     }
 
     @Transactional

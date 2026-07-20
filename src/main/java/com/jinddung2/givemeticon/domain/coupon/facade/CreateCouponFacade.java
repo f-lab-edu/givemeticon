@@ -19,7 +19,7 @@ public class CreateCouponFacade {
     @DistributedLock(key = "#requestDto.stockId")
     public void createCouponAndDecreaseStock(int userId, CreateCouponRequestDto requestDto) {
         // 1. 쿠폰 요청을 ZSet에 등록
-        couponStockService.enqueueCouponRequest(userId);
+        couponStockService.enqueueCouponRequest(userId, requestDto.stockId());
 
         try {
             // 2. 선착순 확인
