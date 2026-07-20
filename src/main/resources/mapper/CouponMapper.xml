@@ -27,6 +27,27 @@
                 #{expiredDate})
     </insert>
 
+    <insert id="saveIfNotIssued" parameterType="Coupon" useGeneratedKeys="true" keyProperty="id">
+        INSERT IGNORE INTO coupon (user_id,
+                                   stock_id,
+                                   name,
+                                   coupon_type,
+                                   coupon_number,
+                                   price,
+                                   is_used,
+                                   created_date,
+                                   expired_date)
+        VALUES (#{userId},
+                #{stockId},
+                #{name},
+                #{couponType},
+                #{couponNumber},
+                #{price},
+                #{isUsed},
+                #{createdDate},
+                #{expiredDate})
+    </insert>
+
     <update id="merge" parameterType="Coupon">
         UPDATE coupon
         SET user_id       = #{userId},

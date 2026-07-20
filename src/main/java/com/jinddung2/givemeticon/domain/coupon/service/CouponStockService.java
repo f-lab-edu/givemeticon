@@ -2,8 +2,10 @@ package com.jinddung2.givemeticon.domain.coupon.service;
 
 import com.jinddung2.givemeticon.common.exception.GiveMeTiConException;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
+import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyIssuedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.CouponErrorCode;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotFoundCouponStock;
+import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponStockMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +37,7 @@ public class CouponStockService {
         if (isIssued != null && isIssued) {
             log.warn("User {} - Error: {}, Message: {}", userId, CouponErrorCode.COUPON_ALREADY_ISSUED.name(),
                     CouponErrorCode.COUPON_ALREADY_ISSUED.getErrorDetail());
-            throw new GiveMeTiConException(CouponErrorCode.COUPON_ALREADY_ISSUED);
+            throw new AlreadyIssuedCouponException();
         }
 
         long timestamp = System.currentTimeMillis();
@@ -67,9 +69,11 @@ public class CouponStockService {
     }
 
     @Transactional
-    public void decreaseStock(CouponStock stock) {
-        stock.decrease();
-        couponStockMapper.decreaseStock(stock.getId(), stock.getRemain());
+    public void decreaseStock(int stockId) {
+        int updatedRows = couponStockMapper.decreaseStockIfEnough(stockId);
+        if (updatedRows != 1) {
+            throw new NotEnoughCouponStockException();
+        }
     }
 
     public List<CouponStock> getActiveCouponStocks() {

@@ -2,7 +2,6 @@ package com.jinddung2.givemeticon.domain.coupon.facade;
 
 import com.jinddung2.givemeticon.common.annotation.DistributedLock;
 import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponRequestDto;
-import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponStockService;
 import lombok.RequiredArgsConstructor;
@@ -27,9 +26,7 @@ public class CreateCouponFacade {
             boolean isProcessed = couponStockService.processCouponRequest(userId);
             if (isProcessed) {
                 // 3. 재고 차감 및 쿠폰 발급
-                CouponStock stock = couponStockService.getStock(requestDto.stockId());
-
-                couponStockService.decreaseStock(stock);
+                couponStockService.decreaseStock(requestDto.stockId());
                 couponService.createCoupon(
                         userId, requestDto.stockId(), requestDto.couponName(), requestDto.couponType(), requestDto.price()
                 );
@@ -45,4 +42,3 @@ public class CreateCouponFacade {
         }
     }
 }
-

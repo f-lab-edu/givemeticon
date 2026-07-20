@@ -1,8 +1,8 @@
 package com.jinddung2.givemeticon.domain.coupon.facade;
 
 import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponRequestDto;
-import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
+import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponStockService;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +14,8 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,13 +40,9 @@ class CreateCouponFacadeTest {
     int total = 100;
     long waitTime = 5L;
     long releaseTime = 3L;
-    CouponStock mockStock;
-    CouponStock zeroStock;
 
     @BeforeEach
     void setUp() {
-        mockStock = CouponStock.of(total);
-        zeroStock = CouponStock.of(0);
         createCouponRequestDto = new CreateCouponRequestDto(stockId, couponName, CouponType.FREE_POINT, price);
     }
 
@@ -54,12 +52,7 @@ class CreateCouponFacadeTest {
 
         Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId);
         Mockito.when(couponStockService.processCouponRequest(userId)).thenReturn(true);
-        Mockito.when(couponStockService.getStock(stockId)).thenReturn(mockStock);
-
-        Mockito.doAnswer(invocation -> {
-            mockStock.decrease();
-            return null;
-        }).when(couponStockService).decreaseStock(mockStock);
+        Mockito.doNothing().when(couponStockService).decreaseStock(stockId);
 
         Mockito.doNothing().when(couponService).createCoupon(
                 userId,
@@ -72,7 +65,7 @@ class CreateCouponFacadeTest {
 
         verify(couponStockService).enqueueCouponRequest(userId);
         verify(couponStockService).processCouponRequest(userId);
-        verify(couponStockService).decreaseStock(mockStock);
+        verify(couponStockService).decreaseStock(stockId);
         verify(couponService).createCoupon(
                 userId,
                 createCouponRequestDto.stockId(),
@@ -80,6 +73,27 @@ class CreateCouponFacadeTest {
                 createCouponRequestDto.couponType(),
                 createCouponRequestDto.price());
         verify(couponStockService).markAsIssued(userId);
+        verify(couponStockService).removeCouponRequest(userId);
+    }
+
+    @Test
+    @DisplayName("쿠폰 재고가 부족하면 쿠폰을 생성하지 않는다.")
+    void create_Coupon_Fail_Not_Enough_Stock() {
+        Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId);
+        Mockito.when(couponStockService.processCouponRequest(userId)).thenReturn(true);
+        Mockito.doThrow(new NotEnoughCouponStockException()).when(couponStockService).decreaseStock(stockId);
+
+        assertThrows(NotEnoughCouponStockException.class,
+                () -> createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto));
+
+        verify(couponStockService).decreaseStock(stockId);
+        verify(couponService, never()).createCoupon(
+                userId,
+                createCouponRequestDto.stockId(),
+                createCouponRequestDto.couponName(),
+                createCouponRequestDto.couponType(),
+                createCouponRequestDto.price());
+        verify(couponStockService, never()).markAsIssued(userId);
         verify(couponStockService).removeCouponRequest(userId);
     }
 }

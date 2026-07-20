@@ -11,8 +11,7 @@ import java.util.Optional;
 public interface CouponStockMapper {
     Optional<CouponStock> findById(int id);
 
-    void decreaseStock(@Param("id") int id,
-                       @Param("remain") int remain);
+    int decreaseStockIfEnough(@Param("id") int id);
 
     List<CouponStock> findActiveCouponStocks();
 }
