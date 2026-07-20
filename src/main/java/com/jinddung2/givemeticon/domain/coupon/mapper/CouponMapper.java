@@ -16,6 +16,8 @@ public interface CouponMapper {
 
     int updateUsedIfUnused(@Param("id") int id);
 
+    boolean existsByUserIdAndStockId(@Param("userId") int userId, @Param("stockId") int stockId);
+
     Optional<Coupon> getCouponById(int couponId);
 
     Optional<Coupon> getCouponByCouponNumber(String couponNumber);

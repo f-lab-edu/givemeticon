@@ -50,7 +50,7 @@ class CreateCouponFacadeTest {
     @DisplayName("쿠폰을 생성하면 해당 쿠폰의 재고는 1개 감소한다.")
     void create_Coupon_Success() {
 
-        Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId);
+        Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId, stockId);
         Mockito.when(couponStockService.processCouponRequest(userId)).thenReturn(true);
         Mockito.doNothing().when(couponStockService).decreaseStock(stockId);
 
@@ -63,7 +63,7 @@ class CreateCouponFacadeTest {
 
         createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto);
 
-        verify(couponStockService).enqueueCouponRequest(userId);
+        verify(couponStockService).enqueueCouponRequest(userId, stockId);
         verify(couponStockService).processCouponRequest(userId);
         verify(couponStockService).decreaseStock(stockId);
         verify(couponService).createCoupon(
@@ -79,7 +79,7 @@ class CreateCouponFacadeTest {
     @Test
     @DisplayName("쿠폰 재고가 부족하면 쿠폰을 생성하지 않는다.")
     void create_Coupon_Fail_Not_Enough_Stock() {
-        Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId);
+        Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId, stockId);
         Mockito.when(couponStockService.processCouponRequest(userId)).thenReturn(true);
         Mockito.doThrow(new NotEnoughCouponStockException()).when(couponStockService).decreaseStock(stockId);
 
