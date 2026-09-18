@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.common.aop;
 
 import com.jinddung2.givemeticon.common.annotation.DistributedLock;
+import com.jinddung2.givemeticon.common.exception.LockAcquisitionFailedException;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.junit.jupiter.api.DisplayName;
@@ -32,8 +33,8 @@ class DistributedLockAopTest {
         when(rLock.tryLock(5L, 3L, TimeUnit.SECONDS)).thenReturn(false);
 
         assertThatThrownBy(() -> sut.lock(joinPoint))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Failed to acquire distributed lock");
+                .isInstanceOf(LockAcquisitionFailedException.class)
+                .hasMessage("요청이 많아 처리 중입니다. 잠시 후 다시 시도해주세요.");
 
         verify(aopForTransaction, never()).proceed(joinPoint);
         verify(rLock, never()).unlock();

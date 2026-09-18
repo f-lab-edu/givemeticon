@@ -1,6 +1,7 @@
 package com.jinddung2.givemeticon.common.aop;
 
 import com.jinddung2.givemeticon.common.annotation.DistributedLock;
+import com.jinddung2.givemeticon.common.exception.LockAcquisitionFailedException;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -40,23 +41,20 @@ public class DistributedLockAop {
         );
 
         RLock rLock = redissonClient.getLock(key);
+        boolean locked = false;
         try {
-            boolean available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
-            if (!available) {
-                return false;
-            } else {
-                return aopForTransaction.proceed(joinPoint);
+            locked = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
+            if (!locked) {
+                throw new LockAcquisitionFailedException();
             }
+            return aopForTransaction.proceed(joinPoint);
         } catch (InterruptedException e) {
             log.error("Lock acquisition interrupted", e);
             throw new InterruptedException();
         } finally {
-            try {
+            if (locked && rLock.isHeldByCurrentThread()) {
                 rLock.unlock();
-            } catch (IllegalMonitorStateException e) {
-                log.error("Redisson Lock Already UnLock {} {}", method.getName(), key);
             }
         }
     }
 }
-
