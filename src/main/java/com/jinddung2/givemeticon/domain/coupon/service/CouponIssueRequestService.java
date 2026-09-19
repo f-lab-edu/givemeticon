@@ -51,6 +51,20 @@ public class CouponIssueRequestService {
         return couponIssueRequestMapper.findStalePending(olderThanMinutes);
     }
 
+    /**
+     * 비동기 발급 워커가 이 재고(stockId)에서 다음으로 처리할 접수 1건을 고른다. id ASC로만
+     * 골라야 같은 행사 안에서 접수 순서가 지켜진다 - 호출자(CreateCouponFacade)가 재고별
+     * 분산 락을 쥔 채로 불러야, 두 앱 인스턴스가 동시에 "다음 건"을 서로 다르게 고르지 않는다.
+     */
+    public Optional<CouponIssueRequest> findOldestPendingByStockId(int stockId) {
+        return couponIssueRequestMapper.findOldestPendingByStockId(stockId);
+    }
+
+    /** 지금 PENDING 건이 남아있는 재고(stockId) 목록. 비동기 워커가 매 폴링마다 훑는다. */
+    public List<Integer> findDistinctPendingStockIds() {
+        return couponIssueRequestMapper.findDistinctPendingStockIds();
+    }
+
     @Transactional
     public void markIssued(long requestId, int couponId) {
         couponIssueRequestMapper.markIssued(requestId, couponId);

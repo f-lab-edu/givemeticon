@@ -4,8 +4,10 @@ import com.jinddung2.givemeticon.GivemeticonApplication;
 import com.jinddung2.givemeticon.common.utils.CertificationGenerator;
 import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponRequestDto;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
+import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
 import com.jinddung2.givemeticon.domain.coupon.facade.CreateCouponFacade;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -112,6 +114,17 @@ class CouponIssuanceTransactionRegressionTest {
             rs.next();
             return rs.getInt(1);
         }
+    }
+
+    @Test
+    @DisplayName("실제 재고 소진 시 @DistributedLock+AopForTransaction 체인을 통해서도 NotEnoughCouponStockException이 그대로 전파된다")
+    void realStockExhaustion_throughRealAopChain_propagatesExpectedException() throws Exception {
+        int stockId = createStock(0);
+        int userId = 555555;
+        CreateCouponRequestDto requestDto = new CreateCouponRequestDto(stockId, "테스트 쿠폰", CouponType.FREE_POINT, 1000);
+
+        assertThatThrownBy(() -> createCouponFacade.createCouponAndDecreaseStock(userId, requestDto))
+                .isInstanceOf(NotEnoughCouponStockException.class);
     }
 
     @Test

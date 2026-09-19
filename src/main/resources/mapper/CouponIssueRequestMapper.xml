@@ -51,6 +51,24 @@
         ORDER BY id
     </select>
 
+    <!-- 비동기 발급 워커가 이 재고(stock_id)에서 다음으로 처리할 접수 1건을 고른다.
+         id ASC로만 골라야 같은 행사(stock_id) 안에서 접수 순서가 지켜진다. -->
+    <select id="findOldestPendingByStockId" resultType="CouponIssueRequest">
+        SELECT
+        <include refid="columns"/>
+        FROM coupon_issue_request
+        WHERE stock_id = #{stockId}
+          AND status = 'PENDING'
+        ORDER BY id ASC
+        LIMIT 1
+    </select>
+
+    <select id="findDistinctPendingStockIds" resultType="int">
+        SELECT DISTINCT stock_id
+        FROM coupon_issue_request
+        WHERE status = 'PENDING'
+    </select>
+
     <update id="markIssued">
         UPDATE coupon_issue_request
         SET status       = 'ISSUED',

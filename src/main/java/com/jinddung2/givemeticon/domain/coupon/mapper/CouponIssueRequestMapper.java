@@ -17,6 +17,10 @@ public interface CouponIssueRequestMapper {
 
     List<CouponIssueRequest> findStalePending(@Param("olderThanMinutes") long olderThanMinutes);
 
+    Optional<CouponIssueRequest> findOldestPendingByStockId(@Param("stockId") int stockId);
+
+    List<Integer> findDistinctPendingStockIds();
+
     int markIssued(@Param("id") long id, @Param("couponId") int couponId);
 
     int markRejected(@Param("id") long id, @Param("reason") String reason);
