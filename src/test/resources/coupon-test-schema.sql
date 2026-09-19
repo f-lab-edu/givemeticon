@@ -25,3 +25,16 @@ CREATE TABLE IF NOT EXISTS coupon (
     expired_date  DATE        NOT NULL,
     UNIQUE KEY uk_coupon_user_stock (user_id, stock_id)
 );
+
+-- src/main/resources/db/migration/V20260919__add_coupon_issue_request.sql
+CREATE TABLE IF NOT EXISTS coupon_issue_request (
+    id           BIGINT PRIMARY KEY AUTO_INCREMENT,
+    stock_id     INT          NOT NULL,
+    user_id      INT          NOT NULL,
+    status       VARCHAR(20)  NOT NULL,
+    coupon_id    INT          NULL,
+    reason       VARCHAR(255) NULL,
+    created_date DATETIME(6)  NOT NULL,
+    updated_date DATETIME(6)  NOT NULL,
+    UNIQUE KEY uk_coupon_issue_request_user_stock (user_id, stock_id)
+);

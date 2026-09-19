@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponIssueRequestMapper">
+
+    <insert id="insertIgnore" parameterType="CouponIssueRequest" useGeneratedKeys="true" keyProperty="id">
+        INSERT IGNORE INTO coupon_issue_request (stock_id,
+                                                  user_id,
+                                                  status,
+                                                  created_date,
+                                                  updated_date)
+        VALUES (#{stockId},
+                #{userId},
+                #{status},
+                NOW(6),
+                NOW(6))
+    </insert>
+
+    <select id="findByUserIdAndStockId" resultType="CouponIssueRequest">
+        SELECT id,
+               stock_id,
+               user_id,
+               status,
+               coupon_id,
+               reason,
+               created_date,
+               updated_date
+        FROM coupon_issue_request
+        WHERE user_id = #{userId}
+          AND stock_id = #{stockId}
+    </select>
+
+    <update id="markIssued">
+        UPDATE coupon_issue_request
+        SET status       = 'ISSUED',
+            coupon_id    = #{couponId},
+            updated_date = NOW(6)
+        WHERE id = #{id}
+          AND status = 'PENDING'
+    </update>
+
+    <update id="markRejected">
+        UPDATE coupon_issue_request
+        SET status       = 'REJECTED',
+            reason       = #{reason},
+            updated_date = NOW(6)
+        WHERE id = #{id}
+          AND status = 'PENDING'
+    </update>
+</mapper>
