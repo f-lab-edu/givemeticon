@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: givemeticon
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # 앱은 컨테이너 밖(호스트)에서 ./gradlew bootRun으로 띄운다고 가정한다.
+      # host.docker.internal은 Docker Desktop(Mac/Windows)에서 기본 동작하고,
+      # docker-compose.observability.yml의 extra_hosts가 Linux에서도 이를 보장한다.
+      - targets: ["host.docker.internal:8080"]

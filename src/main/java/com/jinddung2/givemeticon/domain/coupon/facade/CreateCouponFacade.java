@@ -13,10 +13,14 @@ import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockExc
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponIssueRequestService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Component
@@ -27,6 +31,7 @@ public class CreateCouponFacade {
     private final CouponService couponService;
     private final CouponIssueRequestService couponIssueRequestService;
     private final CouponMapper couponMapper;
+    private final MeterRegistry meterRegistry;
 
     /**
      * 접수(coupon_issue_request 삽입) → 발급(재고 차감 + 쿠폰 생성, 하나의 트랜잭션) 순서로
@@ -63,7 +68,8 @@ public class CreateCouponFacade {
             throw new GiveMeTiConException(CouponErrorCode.COUPON_REQUEST_PENDING);
         }
 
-        attemptIssuance(request.getId(), userId, stockId, requestDto.couponName(), requestDto.couponType(), requestDto.price());
+        attemptIssuance(request.getId(), userId, stockId, requestDto.couponName(), requestDto.couponType(), requestDto.price(),
+                request.getCreatedDate(), "immediate");
     }
 
     /**
@@ -94,26 +100,48 @@ public class CreateCouponFacade {
             couponIssueRequestService.markIssued(current.getId(), existingCoupon.get().getId());
             log.info("Recovered coupon request id={} by backfilling existing coupon id={} (markIssued had failed to run)",
                     current.getId(), existingCoupon.get().getId());
+            recordIssueDuration(current.getCreatedDate(), "issued", "recovered_backfill");
             return;
         }
 
         log.info("Recovering coupon request id={} userId={} stockId={} - no coupon exists yet, retrying issuance",
                 current.getId(), current.getUserId(), current.getStockId());
         attemptIssuance(current.getId(), current.getUserId(), current.getStockId(),
-                current.getCouponName(), current.getCouponType(), current.getPrice());
+                current.getCouponName(), current.getCouponType(), current.getPrice(),
+                current.getCreatedDate(), "recovered");
     }
 
-    private void attemptIssuance(long requestId, int userId, int stockId, String couponName, CouponType couponType, int price) {
+    private void attemptIssuance(long requestId, int userId, int stockId, String couponName, CouponType couponType, int price,
+                                  LocalDateTime acceptedAt, String path) {
         try {
             int couponId = couponService.issueCoupon(userId, stockId, couponName, couponType, price);
             couponIssueRequestService.markIssued(requestId, couponId);
+            recordIssueDuration(acceptedAt, "issued", path);
         } catch (NotEnoughCouponStockException e) {
             couponIssueRequestService.markRejected(requestId, CouponErrorCode.NOT_ENOUGH_COUPON_STOCK.name());
+            recordIssueDuration(acceptedAt, "rejected", path);
             throw e;
         } catch (AlreadyIssuedCouponException e) {
             couponIssueRequestService.markRejected(requestId, CouponErrorCode.COUPON_ALREADY_ISSUED.name());
+            recordIssueDuration(acceptedAt, "rejected", path);
             throw e;
         }
+    }
+
+    /**
+     * 접수(request.createdDate)부터 이 요청의 결과가 최종 확정된 시점까지 걸린 시간을 기록한다.
+     * 즉시 처리(immediate)는 사실상 HTTP 응답시간과 겹치지만, 장애로 PENDING에 머물다 복구
+     * 배치가 뒤늦게 정리한 경우(recovered, recovered_backfill)는 이 지표로만 보인다 - 부하
+     * 목표(정상 시 접수 p95 2초, 최종 결과 3분)를 이 타이머로 직접 관찰한다.
+     */
+    private void recordIssueDuration(LocalDateTime acceptedAt, String outcome, String path) {
+        Timer.builder("coupon.issue.duration")
+                .description("쿠폰 접수부터 최종 결과 확정까지 걸린 시간")
+                .tag("outcome", outcome)
+                .tag("path", path)
+                .publishPercentileHistogram()
+                .register(meterRegistry)
+                .record(Duration.between(acceptedAt, LocalDateTime.now()));
     }
 
     private RuntimeException toRejectionException(String reason) {
