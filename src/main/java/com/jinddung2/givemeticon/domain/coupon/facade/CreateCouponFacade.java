@@ -27,9 +27,8 @@ public class CreateCouponFacade {
             // 2. 선착순 확인 (재고 단위 대기열 기준)
             boolean isProcessed = couponStockService.processCouponRequest(userId, stockId);
             if (isProcessed) {
-                // 3. 재고 차감 및 쿠폰 발급
-                couponStockService.decreaseStock(stockId);
-                couponService.createCoupon(
+                // 3. 재고 차감과 쿠폰 발급을 하나의 트랜잭션으로 원자 처리
+                couponService.issueCoupon(
                         userId, stockId, requestDto.couponName(), requestDto.couponType(), requestDto.price()
                 );
 
