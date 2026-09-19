@@ -47,52 +47,36 @@ class CreateCouponFacadeTest {
     }
 
     @Test
-    @DisplayName("쿠폰을 생성하면 해당 쿠폰의 재고는 1개 감소한다.")
+    @DisplayName("쿠폰을 생성하면 재고 차감과 쿠폰 발급이 하나의 호출(issueCoupon)로 원자 처리된다.")
     void create_Coupon_Success() {
-
         Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId, stockId);
         Mockito.when(couponStockService.processCouponRequest(userId, stockId)).thenReturn(true);
-        Mockito.doNothing().when(couponStockService).decreaseStock(stockId);
-
-        Mockito.doNothing().when(couponService).createCoupon(
-                userId,
-                createCouponRequestDto.stockId(),
-                createCouponRequestDto.couponName(),
-                createCouponRequestDto.couponType(),
-                createCouponRequestDto.price());
+        Mockito.doNothing().when(couponService).issueCoupon(
+                userId, stockId, createCouponRequestDto.couponName(), createCouponRequestDto.couponType(), createCouponRequestDto.price());
 
         createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto);
 
         verify(couponStockService).enqueueCouponRequest(userId, stockId);
         verify(couponStockService).processCouponRequest(userId, stockId);
-        verify(couponStockService).decreaseStock(stockId);
-        verify(couponService).createCoupon(
-                userId,
-                createCouponRequestDto.stockId(),
-                createCouponRequestDto.couponName(),
-                createCouponRequestDto.couponType(),
-                createCouponRequestDto.price());
+        verify(couponService).issueCoupon(
+                userId, stockId, createCouponRequestDto.couponName(), createCouponRequestDto.couponType(), createCouponRequestDto.price());
         verify(couponStockService).markAsIssued(userId);
         verify(couponStockService).removeCouponRequest(userId, stockId);
     }
 
     @Test
-    @DisplayName("쿠폰 재고가 부족하면 쿠폰을 생성하지 않는다.")
+    @DisplayName("쿠폰 재고가 부족하면 쿠폰을 발급하지 않고, 대기열 등록은 정리된다.")
     void create_Coupon_Fail_Not_Enough_Stock() {
         Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId, stockId);
         Mockito.when(couponStockService.processCouponRequest(userId, stockId)).thenReturn(true);
-        Mockito.doThrow(new NotEnoughCouponStockException()).when(couponStockService).decreaseStock(stockId);
+        Mockito.doThrow(new NotEnoughCouponStockException()).when(couponService).issueCoupon(
+                userId, stockId, createCouponRequestDto.couponName(), createCouponRequestDto.couponType(), createCouponRequestDto.price());
 
         assertThrows(NotEnoughCouponStockException.class,
                 () -> createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto));
 
-        verify(couponStockService).decreaseStock(stockId);
-        verify(couponService, never()).createCoupon(
-                userId,
-                createCouponRequestDto.stockId(),
-                createCouponRequestDto.couponName(),
-                createCouponRequestDto.couponType(),
-                createCouponRequestDto.price());
+        verify(couponService).issueCoupon(
+                userId, stockId, createCouponRequestDto.couponName(), createCouponRequestDto.couponType(), createCouponRequestDto.price());
         verify(couponStockService, never()).markAsIssued(userId);
         verify(couponStockService).removeCouponRequest(userId, stockId);
     }
@@ -105,13 +89,8 @@ class CreateCouponFacadeTest {
 
         createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto);
 
-        verify(couponStockService, never()).decreaseStock(stockId);
-        verify(couponService, never()).createCoupon(
-                userId,
-                createCouponRequestDto.stockId(),
-                createCouponRequestDto.couponName(),
-                createCouponRequestDto.couponType(),
-                createCouponRequestDto.price());
+        verify(couponService, never()).issueCoupon(
+                userId, stockId, createCouponRequestDto.couponName(), createCouponRequestDto.couponType(), createCouponRequestDto.price());
         verify(couponStockService, never()).markAsIssued(userId);
         verify(couponStockService).removeCouponRequest(userId, stockId);
     }

@@ -5,11 +5,14 @@ import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyIssuedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyRedeemedCouponException;
+import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotFoundCoupon;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
+import com.jinddung2.givemeticon.domain.coupon.mapper.CouponStockMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,6 +32,9 @@ class CouponServiceTest {
 
     @Mock
     CouponMapper couponMapper;
+
+    @Mock
+    CouponStockMapper couponStockMapper;
 
     @Mock
     CertificationGenerator certificationGenerator;
@@ -66,6 +72,41 @@ class CouponServiceTest {
 
         assertThrows(AlreadyIssuedCouponException.class,
                 () -> sut.createCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price));
+    }
+
+    @Test
+    @DisplayName("issueCoupon: 재고 차감과 쿠폰 생성을 순서대로 수행해 성공한다.")
+    void issue_coupon_success() {
+        int stockId = 1;
+        String couponName = "테스트 선착순 쿠폰";
+        int price = 10_000;
+        int userId = 1;
+
+        when(couponStockMapper.decreaseStockIfEnough(stockId)).thenReturn(1);
+        when(certificationGenerator.createCouponNumber(16)).thenReturn("1234567812345678");
+        when(couponMapper.saveIfNotIssued(any(Coupon.class))).thenReturn(1);
+
+        sut.issueCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price);
+
+        InOrder inOrder = inOrder(couponStockMapper, couponMapper);
+        inOrder.verify(couponStockMapper).decreaseStockIfEnough(stockId);
+        inOrder.verify(couponMapper).saveIfNotIssued(any(Coupon.class));
+    }
+
+    @Test
+    @DisplayName("issueCoupon: 재고가 없으면 쿠폰을 생성하지 않고 재고 부족 예외를 던진다.")
+    void issue_coupon_fail_not_enough_stock() {
+        int stockId = 1;
+        String couponName = "테스트 선착순 쿠폰";
+        int price = 10_000;
+        int userId = 1;
+
+        when(couponStockMapper.decreaseStockIfEnough(stockId)).thenReturn(0);
+
+        assertThrows(NotEnoughCouponStockException.class,
+                () -> sut.issueCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price));
+
+        verify(couponMapper, never()).saveIfNotIssued(any(Coupon.class));
     }
 
     @Test
