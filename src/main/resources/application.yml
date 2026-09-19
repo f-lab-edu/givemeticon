@@ -8,6 +8,17 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # db/migration에 없는 테이블(user, coupon, coupon_stock 등)이 이미 있는 환경이
+    # 대부분이라, 스키마가 비어있지 않은데 flyway_schema_history가 없으면 baseline
+    # 버전(기본값 1)으로 기록만 남기고 시작한다. 우리 마이그레이션(V20260919~)은 전부
+    # baseline보다 버전이 높으므로 baseline 여부와 무관하게 정상적으로 실행된다 -
+    # 즉 이미 존재하는 레거시 테이블을 건드리지 않으면서, 아직 적용되지 않은 우리
+    # 마이그레이션은 그대로 적용된다.
+    baseline-on-migrate: true
+
   thymeleaf:
     enabled: true
     prefix: classpath:/templates/

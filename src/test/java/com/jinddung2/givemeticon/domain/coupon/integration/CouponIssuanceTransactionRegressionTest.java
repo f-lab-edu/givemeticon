@@ -38,8 +38,13 @@ import static org.mockito.Mockito.doThrow;
  * coupon insert rolls back the whole attempt, leaving remain unchanged.
  *
  * Requires the local infra stack (docker-compose.infra.yml up); boots the full application
- * context against localhost:3306/6379/6380/9092. The coupon/coupon_stock tables are created
- * here if missing (does not touch the app's real schema/migrations).
+ * context against localhost:3306/6379/6380/9092. coupon/coupon_stock aren't managed by any
+ * Flyway migration (they predate it), so this test still creates them manually if missing.
+ * coupon_issue_request IS Flyway-managed (db/migration/V20260919*.sql) and is deliberately
+ * NOT created here - this doubles as the regression check that Flyway actually applies it
+ * when the Spring context boots (spring.flyway.enabled=true, see application.yml): if Flyway
+ * were misconfigured, every test below would fail with "table 'coupon_issue_request' doesn't
+ * exist" instead of exercising real business logic.
  */
 @Tag("integration")
 @SpringBootTest(classes = GivemeticonApplication.class, webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -67,12 +72,17 @@ class CouponIssuanceTransactionRegressionTest {
                     "name VARCHAR(255) NOT NULL, coupon_type VARCHAR(50) NOT NULL, coupon_number VARCHAR(64) NOT NULL, " +
                     "price INT NOT NULL, is_used TINYINT(1) NOT NULL DEFAULT 0, created_date DATE NOT NULL, " +
                     "expired_date DATE NOT NULL, UNIQUE KEY uk_coupon_user_stock (user_id, stock_id))");
-            statement.execute("CREATE TABLE IF NOT EXISTS coupon_issue_request (" +
-                    "id BIGINT PRIMARY KEY AUTO_INCREMENT, stock_id INT NOT NULL, user_id INT NOT NULL, " +
-                    "coupon_name VARCHAR(255) NOT NULL, coupon_type VARCHAR(50) NOT NULL, price INT NOT NULL, " +
-                    "status VARCHAR(20) NOT NULL, coupon_id INT NULL, reason VARCHAR(255) NULL, " +
-                    "created_date DATETIME(6) NOT NULL, updated_date DATETIME(6) NOT NULL, " +
-                    "UNIQUE KEY uk_coupon_issue_request_user_stock (user_id, stock_id))");
+            // coupon_issue_request is intentionally NOT created here - see class javadoc.
+            // Drop it (and Flyway's record of having applied it) so this test is repeatable:
+            // Flyway must genuinely re-create it when the Spring context boots below.
+            statement.execute("DROP TABLE IF EXISTS coupon_issue_request");
+            try (ResultSet historyTableCheck = statement.executeQuery(
+                    "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() " +
+                            "AND table_name = 'flyway_schema_history'")) {
+                if (historyTableCheck.next()) {
+                    statement.execute("DELETE FROM flyway_schema_history WHERE script LIKE '%coupon_issue_request%'");
+                }
+            }
         }
     }
 
