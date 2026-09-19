@@ -75,7 +75,7 @@ class CouponServiceTest {
     }
 
     @Test
-    @DisplayName("issueCoupon: 재고 차감과 쿠폰 생성을 순서대로 수행해 성공한다.")
+    @DisplayName("issueCoupon: 재고 차감과 쿠폰 생성을 순서대로 수행해 성공하고, 생성된 쿠폰 id를 반환한다.")
     void issue_coupon_success() {
         int stockId = 1;
         String couponName = "테스트 선착순 쿠폰";
@@ -84,13 +84,28 @@ class CouponServiceTest {
 
         when(couponStockMapper.decreaseStockIfEnough(stockId)).thenReturn(1);
         when(certificationGenerator.createCouponNumber(16)).thenReturn("1234567812345678");
-        when(couponMapper.saveIfNotIssued(any(Coupon.class))).thenReturn(1);
+        when(couponMapper.saveIfNotIssued(any(Coupon.class))).thenAnswer(invocation -> {
+            Coupon coupon = invocation.getArgument(0);
+            setCouponId(coupon, 777);
+            return 1;
+        });
 
-        sut.issueCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price);
+        int couponId = sut.issueCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price);
 
+        assertThat(couponId).isEqualTo(777);
         InOrder inOrder = inOrder(couponStockMapper, couponMapper);
         inOrder.verify(couponStockMapper).decreaseStockIfEnough(stockId);
         inOrder.verify(couponMapper).saveIfNotIssued(any(Coupon.class));
+    }
+
+    private void setCouponId(Coupon coupon, int id) {
+        try {
+            java.lang.reflect.Field field = Coupon.class.getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(coupon, id);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Test

@@ -28,7 +28,7 @@ public class CouponService {
      * 실패하면 나머지도 함께 롤백되어, 재고만 줄고 쿠폰은 없는 상태가 영구히 남지 않는다.
      */
     @Transactional
-    public void issueCoupon(int userId, int stockId, String couponName, CouponType couponType, int price) {
+    public int issueCoupon(int userId, int stockId, String couponName, CouponType couponType, int price) {
         int updatedRows = couponStockMapper.decreaseStockIfEnough(stockId);
         if (updatedRows != 1) {
             throw new NotEnoughCouponStockException();
@@ -39,6 +39,7 @@ public class CouponService {
         if (insertedRows != 1) {
             throw new AlreadyIssuedCouponException();
         }
+        return coupon.getId();
     }
 
     @Transactional

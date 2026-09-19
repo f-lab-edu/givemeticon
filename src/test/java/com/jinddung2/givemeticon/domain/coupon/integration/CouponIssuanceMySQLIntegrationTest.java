@@ -97,7 +97,7 @@ class CouponIssuanceMySQLIntegrationTest {
         couponMapper = sqlSessionTemplate.getMapper(CouponMapper.class);
         couponStockMapper = sqlSessionTemplate.getMapper(CouponStockMapper.class);
         couponService = new CouponService(couponMapper, couponStockMapper, new CertificationGenerator());
-        couponStockService = new CouponStockService(couponStockMapper, couponMapper, null);
+        couponStockService = new CouponStockService(couponStockMapper);
     }
 
     private static void applySchema() throws Exception {

@@ -67,6 +67,11 @@ class CouponIssuanceTransactionRegressionTest {
                     "name VARCHAR(255) NOT NULL, coupon_type VARCHAR(50) NOT NULL, coupon_number VARCHAR(64) NOT NULL, " +
                     "price INT NOT NULL, is_used TINYINT(1) NOT NULL DEFAULT 0, created_date DATE NOT NULL, " +
                     "expired_date DATE NOT NULL, UNIQUE KEY uk_coupon_user_stock (user_id, stock_id))");
+            statement.execute("CREATE TABLE IF NOT EXISTS coupon_issue_request (" +
+                    "id BIGINT PRIMARY KEY AUTO_INCREMENT, stock_id INT NOT NULL, user_id INT NOT NULL, " +
+                    "status VARCHAR(20) NOT NULL, coupon_id INT NULL, reason VARCHAR(255) NULL, " +
+                    "created_date DATETIME(6) NOT NULL, updated_date DATETIME(6) NOT NULL, " +
+                    "UNIQUE KEY uk_coupon_issue_request_user_stock (user_id, stock_id))");
         }
     }
 
