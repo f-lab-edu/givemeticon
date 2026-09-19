@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.point.mapper.CashPointEarnHistoryMapper">
+
+    <insert id="insertIgnore" parameterType="CashPointEarnHistory" useGeneratedKeys="true" keyProperty="id">
+        INSERT IGNORE INTO cash_point_earn_history (cash_point_id,
+                                                     coupon_id,
+                                                     amount,
+                                                     earned_date,
+                                                     expired_date)
+        VALUES (#{cashPointId},
+                #{couponId},
+                #{amount},
+                #{earnedDate},
+                #{expiredDate})
+    </insert>
+</mapper>

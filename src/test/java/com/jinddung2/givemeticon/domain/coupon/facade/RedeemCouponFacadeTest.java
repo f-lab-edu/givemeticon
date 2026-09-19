@@ -18,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,7 +61,7 @@ class RedeemCouponFacadeTest {
         verify(userService).getUser(userId);
         verify(couponService).getCoupon(requestDto.couponNumber());
         verify(couponService).useCoupon(testCoupon);
-        verify(cashPointService).addPoint(testUser, testCoupon);
+        verify(cashPointService).addPointForCouponRedeem(eq(testUser), eq(testCoupon), any(LocalDate.class));
     }
 
     @Test
@@ -84,6 +86,6 @@ class RedeemCouponFacadeTest {
         assertThatThrownBy(() -> sut.redeemCoupon(userId, requestDto))
                 .isInstanceOf(AlreadyRedeemedCouponException.class);
 
-        verify(cashPointService, never()).addPoint(testUser, testCoupon);
+        verify(cashPointService, never()).addPointForCouponRedeem(eq(testUser), eq(testCoupon), any(LocalDate.class));
     }
 }

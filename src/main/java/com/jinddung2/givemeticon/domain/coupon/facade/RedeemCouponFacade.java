@@ -29,6 +29,6 @@ public class RedeemCouponFacade {
         coupon.validateRedeemRequest(userId, currentDate);
 
         couponService.useCoupon(coupon);
-        cashPointService.addPoint(user, coupon);
+        cashPointService.addPointForCouponRedeem(user, coupon, currentDate);
     }
 }

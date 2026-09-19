@@ -78,13 +78,17 @@ class CouponIssuanceTransactionRegressionTest {
                     "expired_date DATE NOT NULL)");
             // coupon_issue_request is intentionally NOT created here - see class javadoc.
             // Drop it (and Flyway's record of having applied it) so this test is repeatable:
-            // Flyway must genuinely re-create it when the Spring context boots below.
+            // Flyway must genuinely re-create it when the Spring context boots below. Matching
+            // by version prefix (not script name) is deliberate: matching on script name alone
+            // previously missed V20260919_2 (its filename doesn't contain "coupon_issue_request"
+            // as a contiguous substring), leaving a version gap that made Flyway's validate()
+            // fail on the second run in the same session ("out of order" migration history).
             statement.execute("DROP TABLE IF EXISTS coupon_issue_request");
             try (ResultSet historyTableCheck = statement.executeQuery(
                     "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() " +
                             "AND table_name = 'flyway_schema_history'")) {
                 if (historyTableCheck.next()) {
-                    statement.execute("DELETE FROM flyway_schema_history WHERE script LIKE '%coupon_issue_request%'");
+                    statement.execute("DELETE FROM flyway_schema_history WHERE version IN ('20260919', '20260919.2')");
                 }
             }
         }
