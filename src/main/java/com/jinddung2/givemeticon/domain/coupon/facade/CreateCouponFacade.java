@@ -18,17 +18,19 @@ public class CreateCouponFacade {
 
     @DistributedLock(key = "#requestDto.stockId")
     public void createCouponAndDecreaseStock(int userId, CreateCouponRequestDto requestDto) {
-        // 1. 쿠폰 요청을 ZSet에 등록
-        couponStockService.enqueueCouponRequest(userId, requestDto.stockId());
+        int stockId = requestDto.stockId();
+
+        // 1. 쿠폰 요청을 재고별 ZSet에 등록
+        couponStockService.enqueueCouponRequest(userId, stockId);
 
         try {
-            // 2. 선착순 확인
-            boolean isProcessed = couponStockService.processCouponRequest(userId);
+            // 2. 선착순 확인 (재고 단위 대기열 기준)
+            boolean isProcessed = couponStockService.processCouponRequest(userId, stockId);
             if (isProcessed) {
                 // 3. 재고 차감 및 쿠폰 발급
-                couponStockService.decreaseStock(requestDto.stockId());
+                couponStockService.decreaseStock(stockId);
                 couponService.createCoupon(
-                        userId, requestDto.stockId(), requestDto.couponName(), requestDto.couponType(), requestDto.price()
+                        userId, stockId, requestDto.couponName(), requestDto.couponType(), requestDto.price()
                 );
 
                 // 4. 발급 완료 이력 저장
@@ -38,7 +40,7 @@ public class CreateCouponFacade {
             }
         } finally {
             // 5. ZSet에서 요청 제거
-            couponStockService.removeCouponRequest(userId);
+            couponStockService.removeCouponRequest(userId, stockId);
         }
     }
 }
