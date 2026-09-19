@@ -1,0 +1,5 @@
+# mysql-loadtest와 함께 활성화하는 비교 전용 프로필.
+# Redis 락은 DB 트랜잭션 시작 전 AOP에서 획득되고, 커밋 후 finally에서 해제된다.
+coupon:
+  distributed-lock:
+    enabled: true

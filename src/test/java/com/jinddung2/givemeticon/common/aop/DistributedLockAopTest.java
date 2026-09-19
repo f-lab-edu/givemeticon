@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.TimeUnit;
@@ -23,7 +24,7 @@ class DistributedLockAopTest {
     private final RedissonClient redissonClient = mock(RedissonClient.class);
     private final AopForTransaction aopForTransaction = mock(AopForTransaction.class);
     private final RLock rLock = mock(RLock.class);
-    private final DistributedLockAop sut = new DistributedLockAop(redissonClient, aopForTransaction);
+    private final DistributedLockAop sut = new DistributedLockAop(redissonClient, aopForTransaction, new SimpleMeterRegistry());
 
     @Test
     @DisplayName("락 획득 실패 시 성공으로 처리하지 않고 unlock도 호출하지 않는다.")
