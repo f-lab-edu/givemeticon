@@ -19,6 +19,13 @@
         WHERE id = #{id}
     </update>
 
+    <update id="decreaseCashPoint">
+        UPDATE cash_point
+        SET cash_point = cash_point - #{amount}
+        WHERE id = #{id}
+          AND cash_point >= #{amount}
+    </update>
+
     <select id="findById" parameterType="int" resultType="CashPoint">
         SELECT id, cash_point
         FROM cash_point

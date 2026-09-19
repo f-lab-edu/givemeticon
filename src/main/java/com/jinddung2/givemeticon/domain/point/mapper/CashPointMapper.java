@@ -13,5 +13,8 @@ public interface CashPointMapper {
     int incrementCashPoint(@Param("id") int id,
                            @Param("amount") int amount);
 
+    int decreaseCashPoint(@Param("id") int id,
+                          @Param("amount") int amount);
+
     Optional<CashPoint> findById(int id);
 }
