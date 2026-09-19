@@ -51,7 +51,7 @@ class CreateCouponFacadeTest {
     void create_Coupon_Success() {
 
         Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId, stockId);
-        Mockito.when(couponStockService.processCouponRequest(userId)).thenReturn(true);
+        Mockito.when(couponStockService.processCouponRequest(userId, stockId)).thenReturn(true);
         Mockito.doNothing().when(couponStockService).decreaseStock(stockId);
 
         Mockito.doNothing().when(couponService).createCoupon(
@@ -64,7 +64,7 @@ class CreateCouponFacadeTest {
         createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto);
 
         verify(couponStockService).enqueueCouponRequest(userId, stockId);
-        verify(couponStockService).processCouponRequest(userId);
+        verify(couponStockService).processCouponRequest(userId, stockId);
         verify(couponStockService).decreaseStock(stockId);
         verify(couponService).createCoupon(
                 userId,
@@ -73,14 +73,14 @@ class CreateCouponFacadeTest {
                 createCouponRequestDto.couponType(),
                 createCouponRequestDto.price());
         verify(couponStockService).markAsIssued(userId);
-        verify(couponStockService).removeCouponRequest(userId);
+        verify(couponStockService).removeCouponRequest(userId, stockId);
     }
 
     @Test
     @DisplayName("쿠폰 재고가 부족하면 쿠폰을 생성하지 않는다.")
     void create_Coupon_Fail_Not_Enough_Stock() {
         Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId, stockId);
-        Mockito.when(couponStockService.processCouponRequest(userId)).thenReturn(true);
+        Mockito.when(couponStockService.processCouponRequest(userId, stockId)).thenReturn(true);
         Mockito.doThrow(new NotEnoughCouponStockException()).when(couponStockService).decreaseStock(stockId);
 
         assertThrows(NotEnoughCouponStockException.class,
@@ -94,6 +94,25 @@ class CreateCouponFacadeTest {
                 createCouponRequestDto.couponType(),
                 createCouponRequestDto.price());
         verify(couponStockService, never()).markAsIssued(userId);
-        verify(couponStockService).removeCouponRequest(userId);
+        verify(couponStockService).removeCouponRequest(userId, stockId);
+    }
+
+    @Test
+    @DisplayName("[회귀] 서로 다른 재고의 대기열 판정으로 처리가 막히면, 발급을 시도하지 않고 대기열 등록만 정리된다.")
+    void create_Coupon_Skipped_When_Not_Processed() {
+        Mockito.doNothing().when(couponStockService).enqueueCouponRequest(userId, stockId);
+        Mockito.when(couponStockService.processCouponRequest(userId, stockId)).thenReturn(false);
+
+        createCouponFacade.createCouponAndDecreaseStock(userId, createCouponRequestDto);
+
+        verify(couponStockService, never()).decreaseStock(stockId);
+        verify(couponService, never()).createCoupon(
+                userId,
+                createCouponRequestDto.stockId(),
+                createCouponRequestDto.couponName(),
+                createCouponRequestDto.couponType(),
+                createCouponRequestDto.price());
+        verify(couponStockService, never()).markAsIssued(userId);
+        verify(couponStockService).removeCouponRequest(userId, stockId);
     }
 }

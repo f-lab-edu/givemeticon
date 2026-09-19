@@ -25,9 +25,18 @@ public class CouponStockService {
     private final CouponStockMapper couponStockMapper;
     private final CouponMapper couponMapper;
     private final RedisTemplate<String, String> redisTemplate;
-    private static final String COUPON_REQUEST_QUEUE = "couponRequestQueue";
+    private static final String COUPON_REQUEST_QUEUE_PREFIX = "couponRequestQueue:";
     private static final String COUPON_ISSUED_SET = "couponIssuedSet";
     private static final long DEGRADED_MODE_ALLOWED_DELAY_MILLIS = 100L;
+
+    /**
+     * 재고(stockId)별로 분리된 접수 대기열 키. 이전에는 이 키가 모든 재고가 공유하는
+     * 전역 키(couponRequestQueue)였는데, 그 때문에 서로 무관한 재고의 신청끼리 서로를
+     * 차단하는 문제가 있었다(재고 A의 잔여 접수가 재고 B의 신규 신청을 대기 상태로 오판).
+     */
+    private String requestQueueKey(int stockId) {
+        return COUPON_REQUEST_QUEUE_PREFIX + stockId;
+    }
 
     public CouponStock getStock(int stockId) {
         return couponStockMapper.findById(stockId)
@@ -44,8 +53,8 @@ public class CouponStockService {
 
         long timestamp = System.currentTimeMillis();
 
-        // 2. Queue(ZSet) 중복 요청 확인
-        boolean exists = hasPendingRequest(userId);
+        // 2. Queue(ZSet) 중복 요청 확인 (동일 재고 기준)
+        boolean exists = hasPendingRequest(userId, stockId);
         if (exists) {
             log.warn("User {} - Error: {}, Message: {}", userId, CouponErrorCode.COUPON_REQUEST_PENDING.name(),
                     CouponErrorCode.COUPON_REQUEST_PENDING.getErrorDetail());
@@ -54,10 +63,10 @@ public class CouponStockService {
 
         // 3. ZSet에 추가
         try {
-            redisTemplate.opsForZSet().add(COUPON_REQUEST_QUEUE, String.valueOf(userId), timestamp);
+            redisTemplate.opsForZSet().add(requestQueueKey(stockId), String.valueOf(userId), timestamp);
         } catch (RuntimeException e) {
-            log.warn("cacheFallback=couponRequestQueue action=add reason={} userId={}",
-                    e.getClass().getSimpleName(), userId);
+            log.warn("cacheFallback=couponRequestQueue action=add reason={} userId={} stockId={}",
+                    e.getClass().getSimpleName(), userId, stockId);
         }
     }
 
@@ -82,12 +91,12 @@ public class CouponStockService {
         return exists;
     }
 
-    private boolean hasPendingRequest(int userId) {
+    private boolean hasPendingRequest(int userId, int stockId) {
         try {
-            return redisTemplate.opsForZSet().score(COUPON_REQUEST_QUEUE, String.valueOf(userId)) != null;
+            return redisTemplate.opsForZSet().score(requestQueueKey(stockId), String.valueOf(userId)) != null;
         } catch (RuntimeException e) {
-            log.warn("cacheFallback=couponRequestQueue action=score reason={} userId={}",
-                    e.getClass().getSimpleName(), userId);
+            log.warn("cacheFallback=couponRequestQueue action=score reason={} userId={} stockId={}",
+                    e.getClass().getSimpleName(), userId, stockId);
             return false;
         }
     }
@@ -101,30 +110,30 @@ public class CouponStockService {
         }
     }
 
-    public boolean processCouponRequest(int userId) {
+    public boolean processCouponRequest(int userId, int stockId) {
         Set<String> earliestRequest;
         try {
-            earliestRequest = redisTemplate.opsForZSet().range(COUPON_REQUEST_QUEUE, 0, 0);
+            earliestRequest = redisTemplate.opsForZSet().range(requestQueueKey(stockId), 0, 0);
         } catch (RuntimeException e) {
-            log.warn("cacheFallback=couponRequestQueue action=range reason={} userId={}",
-                    e.getClass().getSimpleName(), userId);
+            log.warn("cacheFallback=couponRequestQueue action=range reason={} userId={} stockId={}",
+                    e.getClass().getSimpleName(), userId, stockId);
             return true;
         }
 
         if (earliestRequest == null) {
-            log.warn("cacheFallback=couponRequestQueue action=range reason=redis-null userId={}", userId);
+            log.warn("cacheFallback=couponRequestQueue action=range reason=redis-null userId={} stockId={}", userId, stockId);
             return true;
         }
 
         return earliestRequest.contains(String.valueOf(userId));
     }
 
-    public void removeCouponRequest(int userId) {
+    public void removeCouponRequest(int userId, int stockId) {
         try {
-            redisTemplate.opsForZSet().remove(COUPON_REQUEST_QUEUE, String.valueOf(userId));
+            redisTemplate.opsForZSet().remove(requestQueueKey(stockId), String.valueOf(userId));
         } catch (RuntimeException e) {
-            log.warn("cacheFallback=couponRequestQueue action=remove reason={} userId={}",
-                    e.getClass().getSimpleName(), userId);
+            log.warn("cacheFallback=couponRequestQueue action=remove reason={} userId={} stockId={}",
+                    e.getClass().getSimpleName(), userId, stockId);
         }
     }
 

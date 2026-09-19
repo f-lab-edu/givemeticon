@@ -120,21 +120,21 @@ class CouponStockServiceTest {
                 .thenThrow(new RuntimeException("redis down"));
         Mockito.when(couponMapper.existsByUserIdAndStockId(userId, stockId)).thenReturn(false);
         Mockito.when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
-        Mockito.when(zSetOperations.score("couponRequestQueue", String.valueOf(userId))).thenReturn(null);
+        Mockito.when(zSetOperations.score("couponRequestQueue:" + stockId, String.valueOf(userId))).thenReturn(null);
 
         couponStockService.enqueueCouponRequest(userId, stockId);
 
         Mockito.verify(couponMapper).existsByUserIdAndStockId(userId, stockId);
-        Mockito.verify(zSetOperations).add(Mockito.eq("couponRequestQueue"), Mockito.eq(String.valueOf(userId)), Mockito.anyDouble());
+        Mockito.verify(zSetOperations).add(Mockito.eq("couponRequestQueue:" + stockId), Mockito.eq(String.valueOf(userId)), Mockito.anyDouble());
     }
 
     @Test
     @DisplayName("대기열 캐시 히트 시 현재 요청이 처리 대상이면 true를 반환한다.")
     void processCouponRequest_QueueCacheHit_ReturnsTrue() {
         Mockito.when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
-        Mockito.when(zSetOperations.range("couponRequestQueue", 0, 0)).thenReturn(Set.of(String.valueOf(userId)));
+        Mockito.when(zSetOperations.range("couponRequestQueue:" + stockId, 0, 0)).thenReturn(Set.of(String.valueOf(userId)));
 
-        boolean result = couponStockService.processCouponRequest(userId);
+        boolean result = couponStockService.processCouponRequest(userId, stockId);
 
         Assertions.assertTrue(result);
     }
@@ -143,11 +143,25 @@ class CouponStockServiceTest {
     @DisplayName("대기열 Redis 조회 실패 시 Degraded Mode로 DB 정합성 경로 진행을 허용한다.")
     void processCouponRequest_QueueCacheFailure_AllowsDegradedPath() {
         Mockito.when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
-        Mockito.when(zSetOperations.range("couponRequestQueue", 0, 0))
+        Mockito.when(zSetOperations.range("couponRequestQueue:" + stockId, 0, 0))
                 .thenThrow(new RuntimeException("redis down"));
 
-        boolean result = couponStockService.processCouponRequest(userId);
+        boolean result = couponStockService.processCouponRequest(userId, stockId);
 
         Assertions.assertTrue(result);
+    }
+
+    @Test
+    @DisplayName("[회귀] 서로 다른 재고의 대기 요청은 서로 다른 큐 키를 사용해 더 이상 서로를 차단하지 않는다.")
+    void processCouponRequest_DifferentStock_UsesIndependentQueueKey() {
+        int otherStockId = stockId + 1;
+        Mockito.when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
+        Mockito.when(zSetOperations.range("couponRequestQueue:" + otherStockId, 0, 0))
+                .thenReturn(Set.of(String.valueOf(userId)));
+
+        boolean result = couponStockService.processCouponRequest(userId, otherStockId);
+
+        Assertions.assertTrue(result);
+        Mockito.verify(zSetOperations, Mockito.never()).range(Mockito.eq("couponRequestQueue:" + stockId), Mockito.anyLong(), Mockito.anyLong());
     }
 }
