@@ -1,0 +1,91 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: /scripts/coupon-arrival-rate.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 2000 max VUs, 40s max duration (incl. graceful stop):
+              * unique_member_first_request: 1000.00 iterations/s for 10s (maxVUs: 200-2000, gracefulStop: 30s)
+
+
+running (00.9s), 0470/0471 VUs, 67 complete and 0 interrupted iterations
+unique_member_first_request   [   9% ] 0470/0471 VUs  00.9s/10s  1000.00 iters/s
+
+running (01.9s), 0812/0812 VUs, 250 complete and 0 interrupted iterations
+unique_member_first_request   [  19% ] 0812/0812 VUs  01.9s/10s  1000.00 iters/s
+
+running (02.9s), 1135/1136 VUs, 434 complete and 0 interrupted iterations
+unique_member_first_request   [  29% ] 1135/1136 VUs  02.9s/10s  1000.00 iters/s
+
+running (03.9s), 1445/1445 VUs, 611 complete and 0 interrupted iterations
+unique_member_first_request   [  39% ] 1445/1445 VUs  03.9s/10s  1000.00 iters/s
+
+running (04.9s), 1777/1778 VUs, 844 complete and 0 interrupted iterations
+unique_member_first_request   [  49% ] 1777/1778 VUs  04.9s/10s  1000.00 iters/s
+
+running (05.9s), 1964/1967 VUs, 1143 complete and 0 interrupted iterations
+unique_member_first_request   [  59% ] 1964/1967 VUs  05.9s/10s  1000.00 iters/s
+
+running (06.9s), 1999/2000 VUs, 1555 complete and 0 interrupted iterations
+unique_member_first_request   [  69% ] 1999/2000 VUs  06.9s/10s  1000.00 iters/s
+
+running (07.9s), 1998/2000 VUs, 2049 complete and 0 interrupted iterations
+unique_member_first_request   [  79% ] 1998/2000 VUs  07.9s/10s  1000.00 iters/s
+
+running (08.9s), 1997/2000 VUs, 2516 complete and 0 interrupted iterations
+unique_member_first_request   [  89% ] 1997/2000 VUs  08.9s/10s  1000.00 iters/s
+
+running (09.9s), 2000/2000 VUs, 2998 complete and 0 interrupted iterations
+unique_member_first_request   [  99% ] 2000/2000 VUs  09.9s/10s  1000.00 iters/s
+
+running (10.9s), 1480/2000 VUs, 3545 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 1998/2000 VUs  10s  1000.00 iters/s
+
+running (11.9s), 1002/2000 VUs, 4023 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 1998/2000 VUs  10s  1000.00 iters/s
+
+running (12.9s), 0458/2000 VUs, 4567 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 1998/2000 VUs  10s  1000.00 iters/s
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 5025    370.083324/s
+    checks_succeeded...: 100.00% 5025 out of 5025
+    checks_failed......: 0.00%   0 out of 5025
+
+    ✓ business response or no server error
+
+    CUSTOM
+    coupon_issue_business_response_under_2s...: 7.74%  389 out of 5025
+    coupon_issue_issued.......................: 1000   73.648423/s
+    coupon_issue_rejected.....................: 4025   296.434901/s
+
+    HTTP
+    http_req_duration.........................: avg=3.68s min=143.15ms med=3.86s max=6.32s p(90)=4.48s p(95)=4.68s
+      { expected_response:true }..............: avg=2.33s min=143.15ms med=2.46s max=5.47s p(90)=3.59s p(95)=3.84s
+    http_req_failed...........................: 80.09% 4025 out of 5025
+    http_reqs.................................: 5025   370.083324/s
+
+    EXECUTION
+    dropped_iterations........................: 4976   366.474551/s
+    iteration_duration........................: avg=3.69s min=147.83ms med=3.86s max=6.32s p(90)=4.48s p(95)=4.69s
+    iterations................................: 5025   370.083324/s
+    vus.......................................: 458    min=458          max=2000
+    vus_max...................................: 2000   min=471          max=2000
+
+    NETWORK
+    data_received.............................: 1.0 MB 75 kB/s
+    data_sent.................................: 1.6 MB 118 kB/s
+
+
+
+
+running (13.6s), 0000/2000 VUs, 5025 complete and 0 interrupted iterations
+unique_member_first_request ✓ [ 100% ] 0000/2000 VUs  10s  1000.00 iters/s

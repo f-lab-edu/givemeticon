@@ -1,0 +1,72 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Redis 락 선점 순서 비교 실험 보고서</title><style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.5;margin:0;color:#17212b;background:#f6f8fa}main{max-width:1300px;margin:auto;padding:28px}section{background:#fff;padding:22px;margin:16px 0;border-radius:10px;box-shadow:0 1px 3px #0001}h1,h2{margin-top:0}.fact{border-left:5px solid #1769aa;padding:12px;background:#eef6fc;margin:8px 0}.warn{border-left-color:#b54708;background:#fff7ed}table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{border:1px solid #d0d7de;padding:6px;text-align:left;vertical-align:top}th{background:#f6f8fa}code{background:#f1f3f5;padding:1px 4px;font-size:0.95em}@media(max-width:900px){table{display:block;overflow:auto}}</style></head><body><main>
+<h1>Redis 분산 락을 DB 커넥션보다 먼저 획득하면 DB 대기·응답시간이 개선되는가</h1>
+<p>생성 시각: 2026-09-19T12:39:47.235Z · 대상 커밋: eabac70c740627dd729619d81d4ea77affe2546f · 락 적용 순서: Redis 락 획득 → DB 커넥션·트랜잭션 사용(재고 조건부 UPDATE + 유니크 제약 그대로) → 커밋 완료 → 락 해제(DistributedLockAop, AopForTransaction REQUIRES_NEW)</p>
+<section><h2>1. 의사결정 요약</h2><p class="fact warn"><strong>200 req/s:</strong> DB 락 대기는 줄었지만(1289→0), 전체 응답시간(p95 2651.0 ms→5929.4 ms)은 개선되지 않았다 - Redis 락 획득 평균 대기 2010.7 ms가 DB 대기 감소분을 상쇄했을 가능성이 있다. DB 대기가 Redis 대기로 자리만 옮겼다면 고객이 기다리는 총 시간은 그대로일 수 있다.</p><p class="fact warn"><strong>500 req/s:</strong> DB 락 대기는 줄었지만(3999→0), 전체 응답시간(p95 5728.0 ms→10000.5 ms)은 개선되지 않았다 - Redis 락 획득 평균 대기 1952.2 ms가 DB 대기 감소분을 상쇄했을 가능성이 있다. DB 대기가 Redis 대기로 자리만 옮겼다면 고객이 기다리는 총 시간은 그대로일 수 있다.</p></section>
+<section><h2>2. 실험 조건</h2><ul>
+<li>풀 크기는 두 조건에서 동일하게 고정했다(아래 표의 "풀" 값). SQL·재고 조건부 UPDATE·유니크 제약·트랜잭션 경계는 두 조건 동일.</li>
+<li>MySQL만: <code>mysql-loadtest</code> 프로필(<code>coupon.distributed-lock.enabled=false</code>) - DistributedLockAop 빈 자체가 생성되지 않아 재고별 동시 쓰기가 조건부 UPDATE/유니크 제약만으로 처리된다.</li>
+<li>Redis 락 → DB: <code>mysql-loadtest,redis-lock-loadtest</code> 프로필 - 같은 Facade 호출이 재고별 Redis 락(획득 대기 최대 5s, 보유 최대 3s) 안에서 실행된다.</li>
+<li>k6 constant-arrival-rate의 <code>maxVUs</code>를 <code>max(2000, rate*12)</code>로 넉넉히 잡아, dropped_iterations가 k6 설정 자체의 VU 부족이 아니라 서버가 그 요청률을 못 받아내 iteration이 계속 점유돼 있었다는 신호로 해석되게 했다. 아래 표의 "VU 사용" 열이 상한에 근접(⚠︎)하면 이 여유조차 부족했다는 뜻이므로 그 실행의 숫자는 참고만 한다.</li>
+</ul></section>
+<section><h2>3. 결과 비교 (요청률별 MySQL만 vs Redis 락 → DB)</h2>
+<table><thead><tr><th>조건</th><th>HTTP p50/p95/p99</th><th>2초 내 업무응답</th><th>실제 발급 처리량</th><th>실제/누락 iteration</th><th>VU 사용(최대/설정, 사용률)</th><th>iteration 평균/p95</th><th>Hikari active/pool, pending 최대</th><th>DB 락 대기 표본, 누적 증가</th><th>Redis 락 획득/보유/타임아웃</th><th>차단 SQL 표본</th></tr></thead><tbody><tr><th colspan="11">목표 200 req/s (풀 20 고정)</th></tr><tr>
+        <td>MySQL만<br><code>lockorder-mysql-only-200rps-pool20-001</code></td>
+        <td>1138.7 ms / 2651.0 ms / 3216.8 ms</td>
+        <td>85.6%</td>
+        <td>100.0/s (1000/844)</td>
+        <td>1844 / 157</td>
+        <td>343/352 (97.4%) ⚠︎VU 상한 근접</td>
+        <td>1146.5 ms / 2651.5 ms</td>
+        <td>20/20, pending 최대 42</td>
+        <td>703 표본, 누적 1289 증가</td>
+        <td>해당 없음(MySQL만)</td>
+        <td>2/4 표본에 차단 SQL 있음<br><code>2026-09-19 21:29:27.819912	243	277	`givemeticon_loadtest`.`coupon_stock`	PRIMARY...</code></td>
+      </tr><tr>
+        <td>Redis 락 → DB<br><code>lockorder-redis-before-db-200rps-pool20-001</code></td>
+        <td>3137.3 ms / 5929.4 ms / 6558.9 ms</td>
+        <td>19.1%</td>
+        <td>100.0/s (1000/816)</td>
+        <td>1816 / 184</td>
+        <td>675/677 (99.7%) ⚠︎VU 상한 근접</td>
+        <td>3241.3 ms / 5930.7 ms</td>
+        <td>1/20, pending 최대 0</td>
+        <td>0 표본, 누적 0 증가</td>
+        <td>획득 2010.7 ms · 보유 6.5 ms · 타임아웃 217건</td>
+        <td>0/7 표본에 차단 SQL 있음</td>
+      </tr><tr><th colspan="11">목표 500 req/s (풀 20 고정)</th></tr><tr>
+        <td>MySQL만<br><code>lockorder-mysql-only-500rps-pool20-001</code></td>
+        <td>3983.3 ms / 5728.0 ms / 6781.8 ms</td>
+        <td>6.9%</td>
+        <td>100.0/s (1000/3018)</td>
+        <td>4018 / 982</td>
+        <td>1742/1758 (99.1%) ⚠︎VU 상한 근접</td>
+        <td>3957.1 ms / 5728.4 ms</td>
+        <td>0/20, pending 최대 0</td>
+        <td>703 표본, 누적 3999 증가</td>
+        <td>해당 없음(MySQL만)</td>
+        <td>4/5 표본에 차단 SQL 있음<br><code>2026-09-19 21:30:00.789242	281	245	`givemeticon_loadtest`.`coupon_stock`	PRIMARY...</code></td>
+      </tr><tr>
+        <td>Redis 락 → DB<br><code>lockorder-redis-before-db-500rps-pool20-001</code></td>
+        <td>7577.6 ms / 10000.5 ms / 10001.2 ms</td>
+        <td>7.8%</td>
+        <td>100.0/s (1000/1933)</td>
+        <td>3643 / 1358</td>
+        <td>2245/2275 (98.7%) ⚠︎VU 상한 근접</td>
+        <td>7043.4 ms / 10001.4 ms</td>
+        <td>1/20, pending 최대 0</td>
+        <td>0 표본, 누적 0 증가</td>
+        <td>획득 1952.2 ms · 보유 5.5 ms · 타임아웃 476건</td>
+        <td>0/8 표본에 차단 SQL 있음</td>
+      </tr></tbody></table>
+<p>무효 실행 없음.</p>
+</section>
+<section><h2>4. 읽는 법</h2><ul>
+<li><strong>DB 락 대기 누적 증가</strong>는 <code>Innodb_row_lock_waits</code>(누적 카운터)의 실행 시작 대비 끝 값 차이다 - 이 실행 동안 실제로 행 락을 기다린 횟수.</li>
+<li><strong>Redis 락 획득</strong>은 <code>coupon.redis_lock.acquire</code> 타이머의 outcome=acquired 평균이다 - 락을 실제로 얻기까지 기다린 시간. <strong>보유</strong>는 <code>coupon.redis_lock.hold</code> - 락을 쥔 채로 DB 작업(커밋 포함)에 걸린 시간. <strong>타임아웃</strong>은 waitTime(5s) 안에 획득하지 못해 실패한 건수.</li>
+<li>DB 대기가 줄었다고 곧바로 "개선"이라 판단하지 않는다 - Redis 락 획득 대기가 그만큼 늘었다면 고객이 체감하는 총 대기시간(HTTP p95)은 그대로거나 더 나빠질 수 있다. §1의 판단은 DB 대기·HTTP 응답시간·실제 처리량 세 가지를 함께 본다.</li>
+<li>VU 사용률이 상한에 근접한 실행은 k6 자체의 VU 여유 부족이 결과에 섞여 있을 수 있으므로 참고용으로만 본다.</li>
+</ul></section>
+<section><h2>5. 한계</h2><p>요청률별 1회씩만 실행했다(반복 없음 - 변동폭 미측정). 풀 크기 변화와의 조합, 3회 반복, 자원(CPU/메모리/GC) 상세, 오픈 순간 집중 패턴은 미실행이다. 이 실험은 발급 처리(<code>issueCoupon</code>) 단계만 다루며, 접수 단계(현재 비동기로 분리된 <code>acceptOnly</code>)는 애초에 락을 쓰지 않으므로 대상이 아니다.</p>
+<p>실행: <code>scripts/loadtest/setup-isolated-db.sh</code> → 두 앱을 원하는 프로필 조합/서로 다른 포트로 기동 → <code>RUN_ID=lockorder-&lt;mysql-only|redis-before-db&gt;-&lt;rate&gt;rps-pool&lt;n&gt;-001 LOCK_MODE=&lt;mysql-only|redis-before-db&gt; STOCK_TOTAL=1000 ISSUE_RATE=&lt;rate&gt; DURATION=10s LOADTEST_HIKARI_MAX=&lt;n&gt; scripts/loadtest/run-arrival-rate.sh</code> → <code>node scripts/loadtest/generate-lock-ordering-report.js</code>.</p></section>
+</main></body></html>

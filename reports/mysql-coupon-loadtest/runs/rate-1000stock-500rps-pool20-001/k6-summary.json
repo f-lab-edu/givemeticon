@@ -1,0 +1,144 @@
+{
+    "metrics": {
+        "http_req_receiving": {
+            "avg": 0.10887831577709851,
+            "min": 0.006625,
+            "med": 0.046834,
+            "max": 5.471166,
+            "p(90)": 0.23483340000000005,
+            "p(95)": 0.4115749999999999
+        },
+        "vus_max": {
+            "max": 899,
+            "value": 899,
+            "min": 311
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "http_req_waiting": {
+            "max": 4404.19996,
+            "p(90)": 2398.6499426,
+            "p(95)": 2716.3986843999996,
+            "avg": 1490.3948659802445,
+            "min": 118.261958,
+            "med": 1454.647959
+        },
+        "dropped_iterations": {
+            "rate": 72.32562649208035,
+            "count": 747
+        },
+        "vus": {
+            "value": 359,
+            "min": 311,
+            "max": 889
+        },
+        "http_req_sending": {
+            "med": 0.04175,
+            "max": 7.141292,
+            "p(90)": 0.1588666,
+            "p(95)": 0.26676659999999947,
+            "avg": 0.09197187373618622,
+            "min": 0.003292
+        },
+        "data_received": {
+            "count": 855371,
+            "rate": 82818.26433488254
+        },
+        "http_reqs": {
+            "count": 4253,
+            "rate": 411.7816458779353
+        },
+        "coupon_issue_issued": {
+            "rate": 96.82145447400313,
+            "count": 1000
+        },
+        "coupon_issue_rejected": {
+            "count": 3253,
+            "rate": 314.9601914039322
+        },
+        "http_req_duration{expected_response:true}": {
+            "med": 1900.063522,
+            "max": 4328.016669,
+            "p(90)": 2729.2072136,
+            "p(95)": 2834.83258675,
+            "avg": 1914.7578514689978,
+            "min": 288.562
+        },
+        "http_req_failed": {
+            "passes": 3253,
+            "fails": 1000,
+            "value": 0.7648718551610628
+        },
+        "iterations": {
+            "count": 4253,
+            "rate": 411.7816458779353
+        },
+        "data_sent": {
+            "count": 1348201,
+            "rate": 130534.7817433055
+        },
+        "coupon_issue_business_response_under_2s": {
+            "passes": 3297,
+            "fails": 956,
+            "value": 0.7752174935339761
+        },
+        "http_req_blocked": {
+            "med": 0.009417,
+            "max": 43.897417,
+            "p(90)": 2.3680332000000006,
+            "p(95)": 3.9064589999999995,
+            "avg": 1.0707112266635321,
+            "min": 0.001041
+        },
+        "http_req_connecting": {
+            "avg": 1.0013166821067483,
+            "min": 0,
+            "med": 0,
+            "max": 43.835084,
+            "p(90)": 2.1150422,
+            "p(95)": 3.5978667999999994
+        },
+        "http_req_duration": {
+            "max": 4404.312002,
+            "p(90)": 2398.750968,
+            "p(95)": 2716.4619846,
+            "avg": 1490.595716169763,
+            "min": 118.355209,
+            "med": 1454.847542
+        },
+        "iteration_duration": {
+            "med": 1456.439626,
+            "max": 4405.878669,
+            "p(90)": 2399.7680259999997,
+            "p(95)": 2717.0073345999995,
+            "avg": 1492.0906711370853,
+            "min": 118.560458
+        },
+        "checks": {
+            "passes": 4253,
+            "fails": 0,
+            "value": 1
+        }
+    },
+    "root_group": {
+        "checks": {
+            "business response or no server error": {
+                "path": "::business response or no server error",
+                "id": "3040b42634dd809cbd2dedfb0ea7679c",
+                "passes": 4253,
+                "fails": 0,
+                "name": "business response or no server error"
+            }
+        },
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {}
+    }
+}

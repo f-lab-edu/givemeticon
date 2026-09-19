@@ -1,0 +1,7 @@
+stock	4	100	0	100
+coupon_count	100
+duplicate_coupon_users	0
+request_status	ISSUED	100
+request_status	REJECTED	900
+unresolved_pending	0
+order_evidence	1003	2002	1000

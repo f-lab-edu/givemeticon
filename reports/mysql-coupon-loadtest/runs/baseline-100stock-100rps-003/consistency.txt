@@ -1,0 +1,6 @@
+stock	3	100	95	5
+coupon_count	5
+duplicate_coupon_users	0
+request_status	ISSUED	5
+unresolved_pending	0
+order_evidence	2	802	5

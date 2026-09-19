@@ -1,0 +1,5 @@
+timestamp_utc,innodb_lock_waits,lock_wait_rows,pending_requests
+2026-09-19T12:29:25Z,284,630,153
+2026-09-19T12:29:28Z,772,703,197
+2026-09-19T12:29:32Z,1546,0,16
+2026-09-19T12:29:35Z,1573,0,2

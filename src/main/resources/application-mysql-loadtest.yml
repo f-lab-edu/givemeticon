@@ -1,0 +1,54 @@
+# 로컬 MySQL 기준선 전용 프로필. 운영 프로필에서는 절대 활성화하지 않는다.
+server:
+  tomcat:
+    threads:
+      max: ${LOADTEST_TOMCAT_THREADS:200}
+
+spring:
+  datasource:
+    url: ${LOADTEST_DB_URL:jdbc:mysql://localhost:3306/givemeticon_loadtest}
+    username: ${LOADTEST_DB_USER:root}
+    password: ${LOADTEST_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${LOADTEST_HIKARI_MAX:10}
+      minimum-idle: ${LOADTEST_HIKARI_MIN_IDLE:10}
+      connection-timeout: ${LOADTEST_HIKARI_CONNECTION_TIMEOUT_MS:30000}
+  flyway:
+    enabled: false
+  data:
+    redis:
+      mail:
+        host: localhost
+        port: 6379
+      coupon:
+        host: localhost
+        port: 6380
+
+coupon:
+  # MySQL 조건부 UPDATE/유니크 키 기준선을 보기 위한 실험 전용 설정.
+  # 운영 기본값은 true이며 DistributedLockAop가 그대로 유지된다.
+  distributed-lock:
+    enabled: false
+
+# NotificationConsumerConfig의 필수 값. 쿠폰 부하에는 메시지를 발행하지 않는다.
+bootstrap:
+  server: localhost:9092
+
+# 부하 실험에서 호출하지 않는 외부 기능의 빈 초기화용 더미 값이다. 비밀값이 아니다.
+mail:
+  title:
+    certification: loadtest
+  domain:
+    name: http://localhost
+oauth:
+  kakao:
+    client-id: loadtest
+    url:
+      auth: http://localhost
+      api: http://localhost
+  naver:
+    client-id: loadtest
+    client-secret: loadtest
+    url:
+      auth: http://localhost
+      api: http://localhost
