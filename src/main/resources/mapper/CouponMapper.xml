@@ -78,6 +78,22 @@
         )
     </select>
 
+    <select id="findByUserIdAndStockId">
+        SELECT id,
+               user_id,
+               stock_id,
+               name,
+               coupon_type,
+               coupon_number,
+               price,
+               is_used,
+               created_date,
+               expired_date
+        FROM coupon
+        WHERE user_id = #{userId}
+          AND stock_id = #{stockId}
+    </select>
+
 <!--    <select id="getCouponById">-->
 <!--        SELECT id,-->
 <!--               user_id,-->

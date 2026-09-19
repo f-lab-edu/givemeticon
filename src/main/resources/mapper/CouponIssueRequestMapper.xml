@@ -7,28 +7,48 @@
     <insert id="insertIgnore" parameterType="CouponIssueRequest" useGeneratedKeys="true" keyProperty="id">
         INSERT IGNORE INTO coupon_issue_request (stock_id,
                                                   user_id,
+                                                  coupon_name,
+                                                  coupon_type,
+                                                  price,
                                                   status,
                                                   created_date,
                                                   updated_date)
         VALUES (#{stockId},
                 #{userId},
+                #{couponName},
+                #{couponType},
+                #{price},
                 #{status},
                 NOW(6),
                 NOW(6))
     </insert>
 
+    <sql id="columns">
+        id, stock_id, user_id, coupon_name, coupon_type, price, status, coupon_id, reason, created_date, updated_date
+    </sql>
+
     <select id="findByUserIdAndStockId" resultType="CouponIssueRequest">
-        SELECT id,
-               stock_id,
-               user_id,
-               status,
-               coupon_id,
-               reason,
-               created_date,
-               updated_date
+        SELECT
+        <include refid="columns"/>
         FROM coupon_issue_request
         WHERE user_id = #{userId}
           AND stock_id = #{stockId}
+    </select>
+
+    <select id="findById" resultType="CouponIssueRequest">
+        SELECT
+        <include refid="columns"/>
+        FROM coupon_issue_request
+        WHERE id = #{id}
+    </select>
+
+    <select id="findStalePending" resultType="CouponIssueRequest">
+        SELECT
+        <include refid="columns"/>
+        FROM coupon_issue_request
+        WHERE status = 'PENDING'
+          AND updated_date &lt; DATE_SUB(NOW(6), INTERVAL #{olderThanMinutes} MINUTE)
+        ORDER BY id
     </select>
 
     <update id="markIssued">

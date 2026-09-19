@@ -4,6 +4,7 @@ import com.jinddung2.givemeticon.domain.coupon.domain.CouponIssueRequest;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 @Mapper
@@ -11,6 +12,10 @@ public interface CouponIssueRequestMapper {
     int insertIgnore(CouponIssueRequest request);
 
     Optional<CouponIssueRequest> findByUserIdAndStockId(@Param("userId") int userId, @Param("stockId") int stockId);
+
+    Optional<CouponIssueRequest> findById(@Param("id") long id);
+
+    List<CouponIssueRequest> findStalePending(@Param("olderThanMinutes") long olderThanMinutes);
 
     int markIssued(@Param("id") long id, @Param("couponId") int couponId);
 

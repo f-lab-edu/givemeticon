@@ -2,6 +2,7 @@ package com.jinddung2.givemeticon.domain.coupon.service;
 
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponIssueRequest;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponRequestStatus;
+import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponIssueRequestMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,13 +32,16 @@ class CouponIssueRequestServiceTest {
 
     int userId = 1;
     int stockId = 100;
+    String couponName = "테스트 쿠폰";
+    int price = 1000;
 
     @Test
     @DisplayName("처음 접수하는 (userId, stockId)는 새 행을 만들고 newlyAccepted=true를 반환한다.")
     void accept_firstTime_insertsNewRowAndReportsNewlyAccepted() {
         when(couponIssueRequestMapper.insertIgnore(any(CouponIssueRequest.class))).thenReturn(1);
 
-        CouponIssueRequestService.AcceptResult result = couponIssueRequestService.accept(userId, stockId);
+        CouponIssueRequestService.AcceptResult result =
+                couponIssueRequestService.accept(userId, stockId, couponName, CouponType.FREE_POINT, price);
 
         assertThat(result.newlyAccepted()).isTrue();
         assertThat(result.request().getStatus()).isEqualTo(CouponRequestStatus.PENDING);
@@ -50,15 +54,29 @@ class CouponIssueRequestServiceTest {
         CouponIssueRequest existing = CouponIssueRequest.builder()
                 .userId(userId)
                 .stockId(stockId)
+                .couponName(couponName)
+                .couponType(CouponType.FREE_POINT)
+                .price(price)
                 .status(CouponRequestStatus.ISSUED)
                 .build();
         when(couponIssueRequestMapper.insertIgnore(any(CouponIssueRequest.class))).thenReturn(0);
         when(couponIssueRequestMapper.findByUserIdAndStockId(userId, stockId)).thenReturn(Optional.of(existing));
 
-        CouponIssueRequestService.AcceptResult result = couponIssueRequestService.accept(userId, stockId);
+        CouponIssueRequestService.AcceptResult result =
+                couponIssueRequestService.accept(userId, stockId, couponName, CouponType.FREE_POINT, price);
 
         assertThat(result.newlyAccepted()).isFalse();
         assertThat(result.request()).isSameAs(existing);
+    }
+
+    @Test
+    @DisplayName("오래 멈춰있는 PENDING 조회는 매퍼에 기준 분(minutes)을 그대로 전달한다.")
+    void findStalePending_delegatesToMapper() {
+        when(couponIssueRequestMapper.findStalePending(1L)).thenReturn(java.util.List.of());
+
+        couponIssueRequestService.findStalePending(1L);
+
+        verify(couponIssueRequestMapper).findStalePending(1L);
     }
 
     @Test
