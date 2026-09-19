@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -223,6 +224,108 @@ class CreateCouponFacadeTest {
                 .isInstanceOf(NotEnoughCouponStockException.class);
 
         verify(couponIssueRequestService).markRejected(stale.getId(), CouponErrorCode.NOT_ENOUGH_COUPON_STOCK.name());
+    }
+
+    // --- acceptOnly / processNextPendingForStock / getOwnRequest (접수 동기, 발급 비동기) ---
+
+    @Test
+    @DisplayName("[비동기 접수] 접수만 하고 발급은 시도하지 않는다.")
+    void acceptOnly_DoesNotAttemptIssuance() {
+        CouponIssueRequest request = pendingRequest();
+        when(couponIssueRequestService.accept(userId, stockId, couponName, CouponType.FREE_POINT, price))
+                .thenReturn(new CouponIssueRequestService.AcceptResult(request, true));
+
+        CouponIssueRequest result = createCouponFacade.acceptOnly(userId, createCouponRequestDto);
+
+        assertThat(result).isEqualTo(request);
+        assertThat(result.getStatus()).isEqualTo(CouponRequestStatus.PENDING);
+        verify(couponService, never()).issueCoupon(anyInt(), anyInt(), anyString(), any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("[비동기 접수] 이미 처리된 접수를 다시 접수해도 예외 없이 현재 상태를 그대로 반환한다.")
+    void acceptOnly_Retry_ReturnsCurrentStateWithoutThrowing() {
+        CouponIssueRequest issued = pendingRequestBuilder().status(CouponRequestStatus.ISSUED).build();
+        when(couponIssueRequestService.accept(userId, stockId, couponName, CouponType.FREE_POINT, price))
+                .thenReturn(new CouponIssueRequestService.AcceptResult(issued, false));
+
+        CouponIssueRequest result = createCouponFacade.acceptOnly(userId, createCouponRequestDto);
+
+        assertThat(result.getStatus()).isEqualTo(CouponRequestStatus.ISSUED);
+    }
+
+    @Test
+    @DisplayName("[비동기 워커] 처리할 PENDING이 없으면 false를 반환한다.")
+    void processNextPendingForStock_NoPending_ReturnsFalse() {
+        when(couponIssueRequestService.findOldestPendingByStockId(stockId)).thenReturn(Optional.empty());
+
+        boolean result = createCouponFacade.processNextPendingForStock(stockId);
+
+        assertThat(result).isFalse();
+        verify(couponService, never()).issueCoupon(anyInt(), anyInt(), anyString(), any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("[비동기 워커] 가장 오래된 PENDING 1건을 발급하고 true를 반환한다.")
+    void processNextPendingForStock_IssuesOldestPending() {
+        CouponIssueRequest oldest = pendingRequest();
+        when(couponIssueRequestService.findOldestPendingByStockId(stockId)).thenReturn(Optional.of(oldest));
+        when(couponIssueRequestService.findById(oldest.getId())).thenReturn(Optional.of(oldest));
+        when(couponMapper.findByUserIdAndStockId(userId, stockId)).thenReturn(Optional.empty());
+        when(couponService.issueCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price)).thenReturn(555);
+
+        boolean result = createCouponFacade.processNextPendingForStock(stockId);
+
+        assertThat(result).isTrue();
+        verify(couponIssueRequestService).markIssued(oldest.getId(), 555);
+    }
+
+    @Test
+    @DisplayName("[비동기 워커] 재고 소진 시 REJECTED로 기록한 뒤 예외를 그대로 던진다 - AopForTransaction이 커밋이 아니라 롤백하게 하기 위함(회귀: 안에서 삼키면 UnexpectedRollbackException).")
+    void processNextPendingForStock_StockExhausted_MarksRejectedAndRethrows() {
+        CouponIssueRequest oldest = pendingRequest();
+        when(couponIssueRequestService.findOldestPendingByStockId(stockId)).thenReturn(Optional.of(oldest));
+        when(couponIssueRequestService.findById(oldest.getId())).thenReturn(Optional.of(oldest));
+        when(couponMapper.findByUserIdAndStockId(userId, stockId)).thenReturn(Optional.empty());
+        when(couponService.issueCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price))
+                .thenThrow(new NotEnoughCouponStockException());
+
+        assertThatThrownBy(() -> createCouponFacade.processNextPendingForStock(stockId))
+                .isInstanceOf(NotEnoughCouponStockException.class);
+
+        verify(couponIssueRequestService).markRejected(oldest.getId(), CouponErrorCode.NOT_ENOUGH_COUPON_STOCK.name());
+    }
+
+    @Test
+    @DisplayName("[상태 조회] 본인 접수는 그대로 반환한다.")
+    void getOwnRequest_ReturnsRequest() {
+        CouponIssueRequest request = pendingRequest();
+        when(couponIssueRequestService.findById(request.getId())).thenReturn(Optional.of(request));
+
+        CouponIssueRequest result = createCouponFacade.getOwnRequest(userId, request.getId());
+
+        assertThat(result).isEqualTo(request);
+    }
+
+    @Test
+    @DisplayName("[상태 조회] 존재하지 않는 접수 ID는 예외를 던진다.")
+    void getOwnRequest_NotFound_Throws() {
+        when(couponIssueRequestService.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> createCouponFacade.getOwnRequest(userId, 999L))
+                .isInstanceOf(com.jinddung2.givemeticon.domain.coupon.exception.CouponRequestNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("[상태 조회] 다른 회원의 접수 ID를 조회하면 예외를 던진다.")
+    void getOwnRequest_OtherUsersRequest_Throws() {
+        CouponIssueRequest othersRequest = CouponIssueRequest.builder()
+                .userId(userId + 1).stockId(stockId).couponName(couponName).couponType(CouponType.FREE_POINT)
+                .price(price).status(CouponRequestStatus.PENDING).createdDate(java.time.LocalDateTime.now()).build();
+        when(couponIssueRequestService.findById(othersRequest.getId())).thenReturn(Optional.of(othersRequest));
+
+        assertThatThrownBy(() -> createCouponFacade.getOwnRequest(userId, othersRequest.getId()))
+                .isInstanceOf(com.jinddung2.givemeticon.domain.coupon.exception.CouponUserMismatchException.class);
     }
 
     private void setCouponId(Coupon coupon, int id) {
