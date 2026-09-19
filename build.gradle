@@ -63,8 +63,23 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    // integration 태그 테스트는 로컬 docker-compose.infra.yml(MySQL/Redis/Kafka)이
+    // 떠 있어야 통과한다. CI에는 그 인프라가 없으므로 기본 test에서는 제외하고,
+    // 아래 integrationTest 태스크로 로컬에서 별도 실행한다.
+    useJUnitPlatform {
+        excludeTags 'integration'
+    }
     finalizedBy jacocoTestReport // test 작업이 끝나고 jacocoTestReport를 실행
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Runs @Tag("integration") tests against the local docker-compose.infra.yml stack.'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'integration'
+    }
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
 }
 
 jacoco {
