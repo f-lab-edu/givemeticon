@@ -17,6 +17,8 @@ public class WebConfig implements WebMvcConfigurer {
             "/error",
             "/threads",
             "/actuator/**",
+            // 이 경로의 Controller는 mysql-loadtest 프로필에서만 등록된다.
+            "/internal/loadtest/**",
             "/api/v1/users/sign-up",
             "/api/v1/users/login",
             "/api/v1/mails/send-certification",
