@@ -32,7 +32,8 @@ public class UserService {
         User user = request.toEntity(encryptedPassword);
         user.updateUserRole(UserRole.USER);
         user.setUpCashPoint(cashPointId);
-        return userMapper.save(user);
+        userMapper.save(user);
+        return user;
     }
 
     public User getUser(int userId) {

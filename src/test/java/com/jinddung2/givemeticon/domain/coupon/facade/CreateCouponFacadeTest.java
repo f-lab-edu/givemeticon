@@ -12,12 +12,14 @@ import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockExc
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponIssueRequestService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
@@ -45,6 +47,9 @@ class CreateCouponFacadeTest {
     @Mock
     CouponMapper couponMapper;
 
+    @Spy
+    SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
     CreateCouponRequestDto createCouponRequestDto;
 
     int stockId = 1;
@@ -68,7 +73,8 @@ class CreateCouponFacadeTest {
                 .couponName(couponName)
                 .couponType(CouponType.FREE_POINT)
                 .price(price)
-                .status(CouponRequestStatus.PENDING);
+                .status(CouponRequestStatus.PENDING)
+                .createdDate(java.time.LocalDateTime.now());
     }
 
     @Test

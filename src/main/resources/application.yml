@@ -5,6 +5,9 @@ server:
       enabled: true
 
 spring:
+  application:
+    name: givemeticon
+
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
@@ -63,3 +66,16 @@ management:
       exposure:
         include: "*"
 #        include: health, info, metrics, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      # 응답시간(http.server.requests)은 p50/p95/p99 계산을 위해 히스토그램을 켠다.
+      # 발급 지연(coupon.issue.duration)은 코드(CreateCouponFacade)에서 이미
+      # publishPercentileHistogram()으로 켜져 있고, 여기서는 부하 목표(정상 시 접수
+      # p95 2초, 최종 결과 3분)에 맞춘 SLO 버킷만 추가한다.
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 100ms,200ms,500ms,1s,2s,3s
+        coupon.issue.duration: 500ms,1s,2s,5s,30s,1m,3m,5m

@@ -28,7 +28,7 @@ public class CouponIssueRequest {
 
     @Builder
     public CouponIssueRequest(int stockId, int userId, String couponName, CouponType couponType, int price,
-                               CouponRequestStatus status, Integer couponId, String reason) {
+                               CouponRequestStatus status, Integer couponId, String reason, LocalDateTime createdDate) {
         this.stockId = stockId;
         this.userId = userId;
         this.couponName = couponName;
@@ -37,8 +37,14 @@ public class CouponIssueRequest {
         this.status = status;
         this.couponId = couponId;
         this.reason = reason;
+        this.createdDate = createdDate;
     }
 
+    /**
+     * createdDate는 실제 DB 컬럼 값(insertIgnore가 NOW(6)로 채움)을 대체하지 않는다 - 새로
+     * 접수되는 요청은 응답으로 DB 값을 다시 읽어오지 않으므로, 접수 직전 시각을 근사치로
+     * 남겨 지연 시간 측정(CreateCouponFacade) 등 인메모리에서만 쓰이게 한다.
+     */
     public static CouponIssueRequest pending(int userId, int stockId, String couponName, CouponType couponType, int price) {
         return CouponIssueRequest.builder()
                 .userId(userId)
@@ -47,6 +53,7 @@ public class CouponIssueRequest {
                 .couponType(couponType)
                 .price(price)
                 .status(CouponRequestStatus.PENDING)
+                .createdDate(LocalDateTime.now())
                 .build();
     }
 }
