@@ -1,0 +1,78 @@
+# Local infra for givemeticon (MySQL + Redis x2 + Kafka), wired to match
+# givemeticon-config/application-local.yml.
+#
+# Usage:
+#   docker compose -f docker-compose.infra.yml up -d
+#   docker compose -f docker-compose.infra.yml down          # stop, keep data
+#   docker compose -f docker-compose.infra.yml down -v       # stop, wipe data
+#
+# NOTE: givemeticon.sql in the repo root does not match the current schema
+# (missing coupon/point/etc. tables, uses old table names). It is NOT loaded
+# automatically here. Apply your real DDL against `givemeticon` yourself.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: givemeticon-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: jin19970418
+      MYSQL_DATABASE: givemeticon
+      TZ: Asia/Seoul
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - givemeticon-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pjin19970418"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis-mail:
+    image: redis:7-alpine
+    container_name: givemeticon-redis-mail
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - givemeticon-redis-mail-data:/data
+
+  redis-coupon:
+    image: redis:7-alpine
+    container_name: givemeticon-redis-coupon
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - givemeticon-redis-coupon-data:/data
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: givemeticon-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      CLUSTER_ID: "RiOqR6y_SdiGe8ZPSvgt5g"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - givemeticon-kafka-data:/var/lib/kafka/data
+
+volumes:
+  givemeticon-mysql-data:
+  givemeticon-redis-mail-data:
+  givemeticon-redis-coupon-data:
+  givemeticon-kafka-data:

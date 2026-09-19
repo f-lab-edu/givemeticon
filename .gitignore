@@ -6,6 +6,9 @@ build/
 !**/src/test/**/build/
 application-*.yml
 
+### local working notes ###
+기록/
+
 ### STS ###
 .apt_generated
 .classpath
