@@ -26,8 +26,15 @@ export const options = {
       rate,
       timeUnit: '1s',
       duration,
-      preAllocatedVUs: Number(__ENV.PRE_ALLOCATED_VUS || Math.max(50, rate)),
-      maxVUs: Number(__ENV.MAX_VUS || Math.max(200, rate * 2)),
+      // 이전 실행에서 maxVUs가 실제 vus.max와 거의 같았다(예: 962/980, 1880/1889) - VU
+      // 부족 자체가 dropped_iterations의 원인인지, 서버 응답 지연으로 iteration이 오래
+      // 점유돼 그런 것인지 구분할 수 없었다는 뜻이다. iteration_duration은 HTTP_TIMEOUT
+      // (기본 10s)까지 늘어날 수 있으므로, rate*timeout 만큼의 동시 in-flight iteration을
+      // 담을 여유를 항상 확보한다 - 그래야 dropped_iterations가 남더라도 "서버가 이
+      // 요청률을 감당하지 못해 iteration이 계속 점유돼 있었다"는 신호로 해석할 수 있다
+      // (k6 설정 부족이 아니라).
+      preAllocatedVUs: Number(__ENV.PRE_ALLOCATED_VUS || Math.max(500, rate * 6)),
+      maxVUs: Number(__ENV.MAX_VUS || Math.max(2000, rate * 12)),
     },
   },
   // 기본 --summary-export는 p90/p95만 담는다. p99까지 표에 채우려면 명시해야 한다.
