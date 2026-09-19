@@ -12,7 +12,6 @@ import com.jinddung2.givemeticon.domain.favorite.exception.FavoriteErrorCode;
 import com.jinddung2.givemeticon.domain.favorite.exception.NotPushItemFavorite;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.point.exception.CashPointErrorCode;
-import com.jinddung2.givemeticon.domain.point.exception.NotEnoughCashPointException;
 import com.jinddung2.givemeticon.domain.point.exception.NotFoundCashPoint;
 import com.jinddung2.givemeticon.domain.user.controller.dto.UserDto;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.*;
@@ -82,9 +81,6 @@ public class UserControllerTest {
 
     @MockBean
     GetMyPointFacade getMyPointFacade;
-
-    @MockBean
-    SpendCashPointFacade spendCashPointFacade;
 
     MockHttpSession mockHttpSession;
     LocalDateTime now = LocalDateTime.now();
@@ -528,44 +524,5 @@ public class UserControllerTest {
                 .andExpect(jsonPath("$.errorDetail").value(CashPointErrorCode.NOT_FOUND_CASH_POINT.getErrorDetail()));
         ;
 
-    }
-
-    @Test
-    @DisplayName("내 포인트 사용 api가 성공한다.")
-    void spend_my_point() throws Exception {
-        User userFixture = UserFixture.createUserFixture(now);
-        SpendCashPointRequest request = new SpendCashPointRequest(3_000);
-
-        mockHttpSession.setAttribute(LOGIN_USER, userFixture.getId());
-        willDoNothing().given(spendCashPointFacade).spendPoint(userFixture.getId(), request.amount());
-
-        mockMvc.perform(MockMvcRequestBuilders
-                        .post("/api/v1/users/my-point/spend")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-                        .session(mockHttpSession))
-                .andExpect(status().is2xxSuccessful());
-
-        verify(spendCashPointFacade, times(1)).spendPoint(userFixture.getId(), request.amount());
-    }
-
-    @Test
-    @DisplayName("사용 가능한 포인트가 부족하면 포인트 사용 api가 실패한다.")
-    void spend_my_point_fail_not_enough_cash_point() throws Exception {
-        User userFixture = UserFixture.createUserFixture(now);
-        SpendCashPointRequest request = new SpendCashPointRequest(100_000);
-
-        mockHttpSession.setAttribute(LOGIN_USER, userFixture.getId());
-        doThrow(new NotEnoughCashPointException())
-                .when(spendCashPointFacade).spendPoint(userFixture.getId(), request.amount());
-
-        mockMvc.perform(MockMvcRequestBuilders
-                        .post("/api/v1/users/my-point/spend")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-                        .session(mockHttpSession))
-                .andExpect(status().is4xxClientError())
-                .andExpect(jsonPath("$.code").value(CashPointErrorCode.NOT_ENOUGH_CASH_POINT.getHttpStatus().value()))
-                .andExpect(jsonPath("$.errorDetail").value(CashPointErrorCode.NOT_ENOUGH_CASH_POINT.getErrorDetail()));
     }
 }

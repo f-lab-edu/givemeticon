@@ -28,7 +28,6 @@ public class UserController {
     private final PasswordResetFacade passwordResetFacade;
     private final CreateAccountFacade createAccountFacade;
     private final GetMyPointFacade getMyPointFacade;
-    private final SpendCashPointFacade spendCashPointFacade;
 
     @PostMapping("/sign-up")
     public int signUp(@RequestBody @Validated SignUpRequest request) {
@@ -74,13 +73,6 @@ public class UserController {
     @GetMapping("/my-point")
     public int getMyPoint(@SessionAttribute(name = LOGIN_USER) int userId) {
         return getMyPointFacade.getMyPoint(userId);
-    }
-
-    @PostMapping("/my-point/spend")
-    public String spendMyPoint(@SessionAttribute(name = LOGIN_USER) int userId,
-                                                                   @RequestBody @Validated SpendCashPointRequest request) {
-        spendCashPointFacade.spendPoint(userId, request.amount());
-        return "Successfully spend point";
     }
 
     @PatchMapping("/password")

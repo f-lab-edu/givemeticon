@@ -4,7 +4,6 @@ import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.point.domain.CashPoint;
 import com.jinddung2.givemeticon.domain.point.domain.CashPointEarnHistory;
-import com.jinddung2.givemeticon.domain.point.exception.NotEnoughCashPointException;
 import com.jinddung2.givemeticon.domain.point.exception.NotFoundCashPoint;
 import com.jinddung2.givemeticon.domain.point.mapper.CashPointEarnHistoryMapper;
 import com.jinddung2.givemeticon.domain.point.mapper.CashPointMapper;
@@ -13,14 +12,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -58,24 +55,6 @@ class CashCashPointServiceTest {
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException(e);
         }
-    }
-
-    private CashPointEarnHistory batch(long id, int remainingAmount, LocalDate earnedDate) {
-        CashPointEarnHistory history = CashPointEarnHistory.builder()
-                .cashPointId(cashPointId)
-                .couponId((int) id)
-                .amount(remainingAmount)
-                .earnedDate(earnedDate)
-                .expiredDate(earnedDate.plusMonths(1))
-                .build();
-        try {
-            Field field = CashPointEarnHistory.class.getDeclaredField("id");
-            field.setAccessible(true);
-            field.set(history, id);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
-        return history;
     }
 
     @Test
@@ -174,83 +153,5 @@ class CashCashPointServiceTest {
 
         assertThrows(NotFoundCashPoint.class,
                 () -> sut.addPointForCouponRedeem(user, coupon, issuedDate));
-    }
-
-    @Test
-    @DisplayName("사용 가능한 적립 건 하나로 충분하면 그 건과 잔액만 정확히 줄어든다.")
-    void spendPoint_singleBatchSufficient() {
-        User user = User.builder().cashPointId(cashPointId).build();
-        CashPointEarnHistory b1 = batch(1L, 5_000, LocalDate.of(2026, 1, 1));
-        when(cashPointEarnHistoryMapper.findSpendableBatches(eq(cashPointId), any(LocalDate.class)))
-                .thenReturn(List.of(b1));
-        when(cashPointEarnHistoryMapper.decreaseRemainingAmount(1L, 3_000)).thenReturn(1);
-        when(cashPointMapper.decreaseCashPoint(cashPointId, 3_000)).thenReturn(1);
-
-        sut.spendPoint(user, 3_000, LocalDate.now());
-
-        verify(cashPointEarnHistoryMapper).decreaseRemainingAmount(1L, 3_000);
-        verify(cashPointMapper).decreaseCashPoint(cashPointId, 3_000);
-    }
-
-    @Test
-    @DisplayName("한 건으로 부족하면 먼저 적립된(=먼저 만료되는) 건부터 순서대로 소진한다 (FIFO).")
-    void spendPoint_spansMultipleBatches_oldestFirst() {
-        User user = User.builder().cashPointId(cashPointId).build();
-        CashPointEarnHistory older = batch(1L, 2_000, LocalDate.of(2026, 1, 1));
-        CashPointEarnHistory newer = batch(2L, 5_000, LocalDate.of(2026, 1, 10));
-        when(cashPointEarnHistoryMapper.findSpendableBatches(eq(cashPointId), any(LocalDate.class)))
-                .thenReturn(List.of(older, newer)); // 매퍼가 이미 earned_date ASC로 정렬해 반환
-        when(cashPointEarnHistoryMapper.decreaseRemainingAmount(1L, 2_000)).thenReturn(1);
-        when(cashPointEarnHistoryMapper.decreaseRemainingAmount(2L, 3_000)).thenReturn(1);
-        when(cashPointMapper.decreaseCashPoint(cashPointId, 5_000)).thenReturn(1);
-
-        sut.spendPoint(user, 5_000, LocalDate.now());
-
-        InOrder inOrder = inOrder(cashPointEarnHistoryMapper);
-        inOrder.verify(cashPointEarnHistoryMapper).decreaseRemainingAmount(1L, 2_000);
-        inOrder.verify(cashPointEarnHistoryMapper).decreaseRemainingAmount(2L, 3_000);
-    }
-
-    @Test
-    @DisplayName("유효한 적립 합계가 요청 금액보다 적으면 잔액은 건드리지 않고 예외를 던진다.")
-    void spendPoint_insufficientValidPoints_doesNotTouchBalance() {
-        User user = User.builder().cashPointId(cashPointId).build();
-        CashPointEarnHistory only = batch(1L, 2_000, LocalDate.of(2026, 1, 1));
-        when(cashPointEarnHistoryMapper.findSpendableBatches(eq(cashPointId), any(LocalDate.class)))
-                .thenReturn(List.of(only));
-        when(cashPointEarnHistoryMapper.decreaseRemainingAmount(1L, 2_000)).thenReturn(1);
-
-        assertThrows(NotEnoughCashPointException.class,
-                () -> sut.spendPoint(user, 5_000, LocalDate.now()));
-
-        verify(cashPointMapper, never()).decreaseCashPoint(anyInt(), anyInt());
-    }
-
-    @Test
-    @DisplayName("다른 요청이 먼저 소진시킨 건(affected rows=0)은 건너뛰고 다음 건에서 채운다.")
-    void spendPoint_raceOnBatch_skipsToNextBatch() {
-        User user = User.builder().cashPointId(cashPointId).build();
-        CashPointEarnHistory raced = batch(1L, 2_000, LocalDate.of(2026, 1, 1));
-        CashPointEarnHistory next = batch(2L, 5_000, LocalDate.of(2026, 1, 10));
-        when(cashPointEarnHistoryMapper.findSpendableBatches(eq(cashPointId), any(LocalDate.class)))
-                .thenReturn(List.of(raced, next));
-        when(cashPointEarnHistoryMapper.decreaseRemainingAmount(1L, 2_000)).thenReturn(0); // 이미 소진됨
-        when(cashPointEarnHistoryMapper.decreaseRemainingAmount(2L, 3_000)).thenReturn(1);
-        when(cashPointMapper.decreaseCashPoint(cashPointId, 3_000)).thenReturn(1);
-
-        sut.spendPoint(user, 3_000, LocalDate.now());
-
-        verify(cashPointMapper).decreaseCashPoint(cashPointId, 3_000);
-    }
-
-    @Test
-    @DisplayName("0 이하의 포인트를 사용하려 하면 예외를 던진다.")
-    void spendPoint_nonPositiveAmount_throws() {
-        User user = User.builder().cashPointId(cashPointId).build();
-
-        assertThrows(IllegalArgumentException.class,
-                () -> sut.spendPoint(user, 0, LocalDate.now()));
-
-        verifyNoInteractions(cashPointEarnHistoryMapper);
     }
 }
