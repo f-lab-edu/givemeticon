@@ -18,6 +18,8 @@ public interface CouponMapper {
 
     boolean existsByUserIdAndStockId(@Param("userId") int userId, @Param("stockId") int stockId);
 
+    Optional<Coupon> findByUserIdAndStockId(@Param("userId") int userId, @Param("stockId") int stockId);
+
     Optional<Coupon> getCouponById(int couponId);
 
     Optional<Coupon> getCouponByCouponNumber(String couponNumber);

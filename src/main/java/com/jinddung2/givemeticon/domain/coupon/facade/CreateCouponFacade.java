@@ -3,16 +3,21 @@ package com.jinddung2.givemeticon.domain.coupon.facade;
 import com.jinddung2.givemeticon.common.annotation.DistributedLock;
 import com.jinddung2.givemeticon.common.exception.GiveMeTiConException;
 import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponRequestDto;
+import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponIssueRequest;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponRequestStatus;
+import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyIssuedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.CouponErrorCode;
 import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockException;
+import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponIssueRequestService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -21,6 +26,7 @@ public class CreateCouponFacade {
 
     private final CouponService couponService;
     private final CouponIssueRequestService couponIssueRequestService;
+    private final CouponMapper couponMapper;
 
     /**
      * 접수(coupon_issue_request 삽입) → 발급(재고 차감 + 쿠폰 생성, 하나의 트랜잭션) 순서로
@@ -33,7 +39,8 @@ public class CreateCouponFacade {
     public void createCouponAndDecreaseStock(int userId, CreateCouponRequestDto requestDto) {
         int stockId = requestDto.stockId();
 
-        CouponIssueRequestService.AcceptResult accepted = couponIssueRequestService.accept(userId, stockId);
+        CouponIssueRequestService.AcceptResult accepted = couponIssueRequestService.accept(
+                userId, stockId, requestDto.couponName(), requestDto.couponType(), requestDto.price());
         CouponIssueRequest request = accepted.request();
 
         if (request.getStatus() == CouponRequestStatus.ISSUED) {
@@ -49,22 +56,62 @@ public class CreateCouponFacade {
         // status == PENDING
         if (!accepted.newlyAccepted()) {
             // 이전 접수가 처리 중이거나, 처리 도중 장애로 결과가 확정되지 못한 채 남아있다.
-            // 결과가 불확실한 상태이므로 조용히 재시도하지 않고 확인 중임을 알린다.
+            // 결과가 불확실한 상태이므로 조용히 재시도하지 않고 확인 중임을 알린다. 이 상태는
+            // CouponIssueRequestRecoveryScheduler가 일정 시간 뒤 자동으로 찾아 정리한다.
             log.warn("Coupon request userId={} stockId={} requestId={} is still PENDING from an earlier attempt - outcome uncertain",
                     userId, stockId, request.getId());
             throw new GiveMeTiConException(CouponErrorCode.COUPON_REQUEST_PENDING);
         }
 
+        attemptIssuance(request.getId(), userId, stockId, requestDto.couponName(), requestDto.couponType(), requestDto.price());
+    }
+
+    /**
+     * 장애 복구 배치가 호출하는 진입점. PENDING인 채로 오래 멈춰있는 접수 하나를 재검토해
+     * 실제 상태에 맞게 정리한다:
+     *   1) 그 사이 이미 처리됐다면(다른 복구 실행과 경합 등) 아무 것도 하지 않는다.
+     *   2) 발급까지는 성공했는데 markIssued만 누락된 경우(재고 차감+쿠폰 생성은 issueCoupon
+     *      한 트랜잭션으로 묶여 있으므로, 쿠폰이 존재한다는 것은 그 트랜잭션이 커밋됐다는
+     *      뜻이다) - 있는 사실을 그대로 기록만 한다(재고를 다시 건드리지 않는다).
+     *   3) 쿠폰이 없다면 애초에 발급 트랜잭션이 실행/커밋된 적이 없다는 뜻이므로(재고도
+     *      소모되지 않았으므로) 접수 시점에 저장해둔 값 그대로 발급을 새로 시도한다.
+     * 재고별 분산 락으로 감싸 살아있는 클라이언트 요청과 경합하지 않게 한다.
+     */
+    @DistributedLock(key = "#request.stockId")
+    public void recoverPendingRequest(CouponIssueRequest request) {
+        CouponIssueRequest current = couponIssueRequestService.findById(request.getId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "coupon_issue_request " + request.getId() + " disappeared during recovery"));
+
+        if (current.getStatus() != CouponRequestStatus.PENDING) {
+            log.info("Coupon request id={} was already resolved to {} before recovery ran - skipping",
+                    current.getId(), current.getStatus());
+            return;
+        }
+
+        Optional<Coupon> existingCoupon = couponMapper.findByUserIdAndStockId(current.getUserId(), current.getStockId());
+        if (existingCoupon.isPresent()) {
+            couponIssueRequestService.markIssued(current.getId(), existingCoupon.get().getId());
+            log.info("Recovered coupon request id={} by backfilling existing coupon id={} (markIssued had failed to run)",
+                    current.getId(), existingCoupon.get().getId());
+            return;
+        }
+
+        log.info("Recovering coupon request id={} userId={} stockId={} - no coupon exists yet, retrying issuance",
+                current.getId(), current.getUserId(), current.getStockId());
+        attemptIssuance(current.getId(), current.getUserId(), current.getStockId(),
+                current.getCouponName(), current.getCouponType(), current.getPrice());
+    }
+
+    private void attemptIssuance(long requestId, int userId, int stockId, String couponName, CouponType couponType, int price) {
         try {
-            int couponId = couponService.issueCoupon(
-                    userId, stockId, requestDto.couponName(), requestDto.couponType(), requestDto.price()
-            );
-            couponIssueRequestService.markIssued(request.getId(), couponId);
+            int couponId = couponService.issueCoupon(userId, stockId, couponName, couponType, price);
+            couponIssueRequestService.markIssued(requestId, couponId);
         } catch (NotEnoughCouponStockException e) {
-            couponIssueRequestService.markRejected(request.getId(), CouponErrorCode.NOT_ENOUGH_COUPON_STOCK.name());
+            couponIssueRequestService.markRejected(requestId, CouponErrorCode.NOT_ENOUGH_COUPON_STOCK.name());
             throw e;
         } catch (AlreadyIssuedCouponException e) {
-            couponIssueRequestService.markRejected(request.getId(), CouponErrorCode.COUPON_ALREADY_ISSUED.name());
+            couponIssueRequestService.markRejected(requestId, CouponErrorCode.COUPON_ALREADY_ISSUED.name());
             throw e;
         }
     }

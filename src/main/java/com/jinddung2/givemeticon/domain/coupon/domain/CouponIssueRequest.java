@@ -17,6 +17,9 @@ public class CouponIssueRequest {
     private long id;
     private int stockId;
     private int userId;
+    private String couponName;
+    private CouponType couponType;
+    private int price;
     private CouponRequestStatus status;
     private Integer couponId;
     private String reason;
@@ -24,18 +27,25 @@ public class CouponIssueRequest {
     private LocalDateTime updatedDate;
 
     @Builder
-    public CouponIssueRequest(int stockId, int userId, CouponRequestStatus status, Integer couponId, String reason) {
+    public CouponIssueRequest(int stockId, int userId, String couponName, CouponType couponType, int price,
+                               CouponRequestStatus status, Integer couponId, String reason) {
         this.stockId = stockId;
         this.userId = userId;
+        this.couponName = couponName;
+        this.couponType = couponType;
+        this.price = price;
         this.status = status;
         this.couponId = couponId;
         this.reason = reason;
     }
 
-    public static CouponIssueRequest pending(int userId, int stockId) {
+    public static CouponIssueRequest pending(int userId, int stockId, String couponName, CouponType couponType, int price) {
         return CouponIssueRequest.builder()
                 .userId(userId)
                 .stockId(stockId)
+                .couponName(couponName)
+                .couponType(couponType)
+                .price(price)
                 .status(CouponRequestStatus.PENDING)
                 .build();
     }
