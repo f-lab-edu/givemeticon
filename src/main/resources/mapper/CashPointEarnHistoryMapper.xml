@@ -8,12 +8,36 @@
         INSERT IGNORE INTO cash_point_earn_history (cash_point_id,
                                                      coupon_id,
                                                      amount,
+                                                     remaining_amount,
                                                      earned_date,
                                                      expired_date)
         VALUES (#{cashPointId},
                 #{couponId},
                 #{amount},
+                #{remainingAmount},
                 #{earnedDate},
                 #{expiredDate})
     </insert>
+
+    <select id="findSpendableBatches" resultType="CashPointEarnHistory">
+        SELECT id,
+               cash_point_id,
+               coupon_id,
+               amount,
+               remaining_amount,
+               earned_date,
+               expired_date
+        FROM cash_point_earn_history
+        WHERE cash_point_id = #{cashPointId}
+          AND remaining_amount > 0
+          AND expired_date >= #{today}
+        ORDER BY earned_date ASC, id ASC
+    </select>
+
+    <update id="decreaseRemainingAmount">
+        UPDATE cash_point_earn_history
+        SET remaining_amount = remaining_amount - #{take}
+        WHERE id = #{id}
+          AND remaining_amount >= #{take}
+    </update>
 </mapper>
