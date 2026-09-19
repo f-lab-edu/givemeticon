@@ -7,6 +7,7 @@ import com.jinddung2.givemeticon.domain.user.controller.dto.request.LoginRequest
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.PasswordUpdateRequest;
 import com.jinddung2.givemeticon.domain.user.controller.dto.request.SignUpRequest;
 import com.jinddung2.givemeticon.domain.user.domain.User;
+import com.jinddung2.givemeticon.domain.user.domain.UserRole;
 import com.jinddung2.givemeticon.domain.user.exception.DuplicatedEmailException;
 import com.jinddung2.givemeticon.domain.user.exception.DuplicatedPhoneException;
 import com.jinddung2.givemeticon.domain.user.exception.MisMatchPasswordException;
@@ -48,19 +49,25 @@ class UserServiceTest {
         SignUpRequest request = new SignUpRequest("test@example.com", "test1234", "01012345678");
         CashPoint cashPointFixture = CashPointFixture.createCashPointFixture();
         String encryptedPassword = "encryptedPassword";
-        User userFixture = UserFixture.createUserFixture(request.getEmail(), encryptedPassword, request.getPhone(), cashPointFixture, now);
 
         when(userMapper.existsByEmail(request.getEmail())).thenReturn(false);
         when(userMapper.existsByPhone(request.getPhone())).thenReturn(false);
         when(passwordEncoder.encode(request.getPassword())).thenReturn(encryptedPassword);
-        when(userMapper.save(any(User.class))).thenReturn(userFixture);
 
         User result = sut.signUp(request, cashPointFixture.getId());
 
         verify(userMapper).existsByEmail(request.getEmail());
         verify(userMapper).existsByPhone(request.getPhone());
+        verify(userMapper).save(result);
         assertNotNull(result);
-        assertThat(result).isEqualTo(userFixture);
+        // save()는 실제 DB에서는 useGeneratedKeys로 result.id를 채우지만(MyBatis가
+        // insert 인자 객체를 그대로 mutate), 이 단위 테스트는 매퍼를 목으로 대체하므로
+        // id 채움까지는 검증하지 않는다 - 서비스가 넘긴 값 그대로를 반환하는지만 본다.
+        assertThat(result.getEmail()).isEqualTo(request.getEmail());
+        assertThat(result.getPassword()).isEqualTo(encryptedPassword);
+        assertThat(result.getPhone()).isEqualTo(request.getPhone());
+        assertThat(result.getCashPointId()).isEqualTo(cashPointFixture.getId());
+        assertThat(result.getUserRole()).isEqualTo(UserRole.USER);
     }
 
     @Test
