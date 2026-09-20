@@ -1,0 +1,4 @@
+timestamp_utc,jvm1_cpu_pct,jvm2_cpu_pct,mysql_cpu_pct,redis_coupon_cpu_pct,k6_cpu_pct
+2026-09-20T07:28:06Z,0.4,0.7,26.70,2.25,115.32
+2026-09-20T07:28:12Z,37.4,35.1,148.27,1.58,
+2026-09-20T07:28:19Z,2.2,22.1,20.71,0.42,
