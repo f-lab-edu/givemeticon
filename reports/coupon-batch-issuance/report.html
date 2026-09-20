@@ -1,0 +1,397 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>접수/발급 분리 + 묶음 차감 비교 실험 보고서</title><style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.5;margin:0;color:#17212b;background:#f6f8fa}main{max-width:1300px;margin:auto;padding:28px}section{background:#fff;padding:22px;margin:16px 0;border-radius:10px;box-shadow:0 1px 3px #0001}h1,h2{margin-top:0}.fact{border-left:5px solid #1769aa;padding:12px;background:#eef6fc;margin:8px 0}.warn{border-left-color:#b54708;background:#fff7ed}.warn-inline{color:#b54708;font-weight:600}table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{border:1px solid #d0d7de;padding:6px;text-align:left;vertical-align:top}th{background:#f6f8fa}code{background:#f1f3f5;padding:1px 4px;font-size:0.95em}@media(max-width:900px){table{display:block;overflow:auto}}</style></head><body><main>
+<h1>쿠폰 발급을 "접수/발급 분리 + 묶음 차감"으로 바꾸면 기존 동기 발급 대비 어떤가</h1>
+<p>생성 시각: 2026-09-20T07:06:02.278Z · 대상 커밋: 521b2284620832028267683b0ef52d65092da265 · 접수: <code>POST /internal/loadtest/coupons/requests</code>(원장 INSERT만) · 발급: <code>CouponBatchIssueWorker</code>가 접수번호 오름차순 N건을 한 트랜잭션에서 재고 N차감 → 쿠폰 다건 INSERT → 신청 다건 ISSUED, 부족분은 SOLD_OUT 처리</p>
+<section><h2>1. 의사결정 요약</h2><p class="fact"><strong>500 req/s:</strong> n50: 최종 완료 31.4 s(기준선 22.6 s 대비 초과), 접수 p95 9740 ms(기준선 10002 ms) · n100: 최종 완료 20.0 s(기준선 22.6 s 대비 이내), 접수 p95 6242 ms(기준선 10002 ms) · n200: 최종 완료 23.8 s(기준선 22.6 s 대비 초과), 접수 p95 7932 ms(기준선 10002 ms)</p><p class="fact"><strong>1000 req/s:</strong> n50: 최종 완료 41.1 s(기준선 29.7 s 대비 초과), 접수 p95 10114 ms(기준선 10063 ms) · n100: 최종 완료 36.0 s(기준선 29.7 s 대비 초과), 접수 p95 10060 ms(기준선 10063 ms) · n200: 최종 완료 39.8 s(기준선 29.7 s 대비 초과), 접수 p95 9653 ms(기준선 10063 ms)</p></section>
+<section><h2>2. 실험 조건</h2><ul>
+<li>두 Spring JVM, Hikari max=10/앱(고정), 단일 MySQL, 재고 1,000, k6 constant-arrival-rate 10초 - run마다 새 coupon_stock 행을 쓴다.</li>
+<li>동기 기준선: <code>coupon.issue-worker.mode=off</code>(두 비동기 워커 모두 끔) + k6가 <code>POST /internal/loadtest/coupons</code>(동기 발급)를 호출.</li>
+<li>접수/발급 분리 + 묶음 차감: <code>coupon.issue-worker.mode=batch</code>, <code>coupon.batch-issue.size=N</code>(50/100/200) + k6가 <code>POST /internal/loadtest/coupons/requests</code>(접수만)를 호출, 실제 발급은 CouponBatchIssueWorker가 별도 처리.</li>
+<li>도착률 500·1,000 req/s × 묶음 크기 50·100·200 × 각 3회 반복, k6 maxVUs는 도착률의 12배 이상으로 VU 부족이 dropped_iterations의 원인이 되지 않게 했다.</li>
+</ul></section>
+<section><h2>3. 조합별 요약(각 3회 반복 평균)</h2>
+<table><thead><tr><th>구성</th><th>도착률</th><th>반복</th><th>접수 HTTP p95(평균, 범위)</th><th>2초 내 접수 비율(평균)</th><th>최종 발급 완료(평균, 범위)</th><th>신청별 접수→확정 p95(평균)</th><th>선착순 위반</th><th>PENDING 잔존</th></tr></thead><tbody>
+<tr>
+    <td>sync</td><td>500</td>
+    <td>3회 <span class="warn-inline">⚠︎도착률 미달 포함</span></td>
+    <td>10002 ms (10001–10003)</td>
+    <td>0.7%</td>
+    <td>22.6 s (18–25s)</td>
+    <td>10002 ms</td>
+    <td class="">위반 0</td>
+    <td class="">0</td>
+  </tr><tr>
+    <td>sync</td><td>1000</td>
+    <td>3회 <span class="warn-inline">⚠︎도착률 미달 포함</span></td>
+    <td>10063 ms (10003–10180)</td>
+    <td>1.2%</td>
+    <td>29.7 s (21–45s)</td>
+    <td>10063 ms</td>
+    <td class="">위반 0</td>
+    <td class="">0</td>
+  </tr><tr>
+    <td>n50</td><td>500</td>
+    <td>3회 <span class="warn-inline">⚠︎도착률 미달 포함</span></td>
+    <td>9740 ms (9211–10007)</td>
+    <td>14.7%</td>
+    <td>31.4 s (27–37s)</td>
+    <td>24393 ms</td>
+    <td class="">위반 0</td>
+    <td class="">0</td>
+  </tr><tr>
+    <td>n50</td><td>1000</td>
+    <td>3회 <span class="warn-inline">⚠︎도착률 미달 포함</span></td>
+    <td>10114 ms (10006–10320)</td>
+    <td>3.4%</td>
+    <td>41.1 s (41–42s)</td>
+    <td>22427 ms</td>
+    <td class="">위반 0</td>
+    <td class="">0</td>
+  </tr><tr>
+    <td>n100</td><td>500</td>
+    <td>3회</td>
+    <td>6242 ms (4097–8093)</td>
+    <td>40.0%</td>
+    <td>20.0 s (19–22s)</td>
+    <td>13524 ms</td>
+    <td class="">위반 0</td>
+    <td class="">0</td>
+  </tr><tr>
+    <td>n100</td><td>1000</td>
+    <td>3회 <span class="warn-inline">⚠︎도착률 미달 포함</span></td>
+    <td>10060 ms (10010–10152)</td>
+    <td>3.9%</td>
+    <td>36.0 s (34–40s)</td>
+    <td>16305 ms</td>
+    <td class="">위반 0</td>
+    <td class="">0</td>
+  </tr><tr>
+    <td>n200</td><td>500</td>
+    <td>3회 <span class="warn-inline">⚠︎도착률 미달 포함</span></td>
+    <td>7932 ms (4715–10048)</td>
+    <td>29.7%</td>
+    <td>23.8 s (18–32s)</td>
+    <td>16764 ms</td>
+    <td class="">위반 0</td>
+    <td class="">0</td>
+  </tr><tr>
+    <td>n200</td><td>1000</td>
+    <td>3회 <span class="warn-inline">⚠︎도착률 미달 포함</span></td>
+    <td>9653 ms (9300–10078)</td>
+    <td>1.0%</td>
+    <td>39.8 s (38–42s)</td>
+    <td>14823 ms</td>
+    <td class="">위반 0</td>
+    <td class="">0</td>
+  </tr>
+</tbody></table></section>
+<section><h2>4. 개별 실행 상세 및 정합성 검증</h2>
+<table><thead><tr><th>run</th><th>실제/누락 iteration(비율)</th><th>VU 사용(최대/설정)</th><th>접수 HTTP p50/p95/p99</th><th>2초 내 비율</th><th>최종 발급 완료</th><th>신청별 접수→확정 avg/p95</th><th>정합성(발급/재고, 중복, 잔여, PENDING)</th><th>선착순 위반(경계이후 ISSUED / 경계이내 미발급)</th></tr></thead><tbody>
+<tr>
+    <td><code>batch-n100-1000rps-001</code></td>
+    <td>7885 / 2083 (20.9%) ⚠︎</td>
+    <td>6210/6227 (99.7%)</td>
+    <td>9986 ms / 10018 ms / 10050 ms</td>
+    <td>3.3%</td>
+    <td>34.4 s</td>
+    <td>8848 ms / 15312 ms (n=22659)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n100-1000rps-002</code></td>
+    <td>7522 / 2480 (24.8%) ⚠︎</td>
+    <td>6313/6379 (99.0%)</td>
+    <td>9080 ms / 10010 ms / 10076 ms</td>
+    <td>5.3%</td>
+    <td>33.7 s</td>
+    <td>9216 ms / 15417 ms (n=30097)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n100-1000rps-003</code></td>
+    <td>7821 / 2168 (21.7%) ⚠︎</td>
+    <td>6188/6240 (99.2%)</td>
+    <td>9975 ms / 10152 ms / 10306 ms</td>
+    <td>3.0%</td>
+    <td>40.0 s</td>
+    <td>10104 ms / 18186 ms (n=37900)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n100-500rps-001</code></td>
+    <td>4961 / 40 (0.8%)</td>
+    <td>2917/3009 (96.9%)</td>
+    <td>6224 ms / 8093 ms / 9356 ms</td>
+    <td>23.7%</td>
+    <td>21.7 s</td>
+    <td>7758 ms / 13861 ms (n=4904)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n100-500rps-002</code></td>
+    <td>5001 / 0 (미측정)</td>
+    <td>926/3000 (30.9%)</td>
+    <td>1588 ms / 4097 ms / 5012 ms</td>
+    <td>69.1%</td>
+    <td>19.2 s</td>
+    <td>7999 ms / 13396 ms (n=9897)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n100-500rps-003</code></td>
+    <td>5007 / 0 (미측정)</td>
+    <td>2330/3000 (77.7%)</td>
+    <td>4290 ms / 6537 ms / 7814 ms</td>
+    <td>27.1%</td>
+    <td>19.1 s</td>
+    <td>7393 ms / 13315 ms (n=14873)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n200-1000rps-001</code></td>
+    <td>7708 / 2293 (22.9%) ⚠︎</td>
+    <td>6280/6308 (99.6%)</td>
+    <td>9978 ms / 10078 ms / 10185 ms</td>
+    <td>3.0%</td>
+    <td>38.4 s</td>
+    <td>7114 ms / 14946 ms (n=21762)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n200-1000rps-002</code></td>
+    <td>6673 / 3349 (33.4%) ⚠︎</td>
+    <td>6196/6211 (99.8%)</td>
+    <td>7646 ms / 9300 ms / 9993 ms</td>
+    <td>0.1%</td>
+    <td>39.2 s</td>
+    <td>7217 ms / 14273 ms (n=28281)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n200-1000rps-003</code></td>
+    <td>6598 / 3404 (34.0%) ⚠︎</td>
+    <td>6177/6208 (99.5%)</td>
+    <td>7586 ms / 9580 ms / 10051 ms</td>
+    <td>0.0%</td>
+    <td>41.9 s</td>
+    <td>8003 ms / 15249 ms (n=34791)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n200-500rps-001</code></td>
+    <td>4312 / 685 (13.7%) ⚠︎</td>
+    <td>3061/3082 (99.3%)</td>
+    <td>9886 ms / 10048 ms / 10094 ms</td>
+    <td>15.8%</td>
+    <td>32.1 s</td>
+    <td>8739 ms / 17938 ms (n=4199)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n200-500rps-002</code></td>
+    <td>5003 / 0 (미측정)</td>
+    <td>1905/3000 (63.5%)</td>
+    <td>2874 ms / 4715 ms / 6157 ms</td>
+    <td>20.1%</td>
+    <td>17.9 s</td>
+    <td>6563 ms / 16542 ms (n=9196)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n200-500rps-003</code></td>
+    <td>4999 / 0 (미측정)</td>
+    <td>2191/3000 (73.0%)</td>
+    <td>1374 ms / 9031 ms / 9999 ms</td>
+    <td>53.2%</td>
+    <td>21.4 s</td>
+    <td>5623 ms / 15811 ms (n=14188)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n50-1000rps-001</code></td>
+    <td>8332 / 1665 (16.7%) ⚠︎</td>
+    <td>6275/6279 (99.9%)</td>
+    <td>9986 ms / 10015 ms / 10040 ms</td>
+    <td>5.8%</td>
+    <td>40.8 s</td>
+    <td>14307 ms / 22685 ms (n=22445)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n50-1000rps-002</code></td>
+    <td>7017 / 2972 (29.8%) ⚠︎</td>
+    <td>6237/6280 (99.3%)</td>
+    <td>9894 ms / 10320 ms / 10921 ms</td>
+    <td>2.9%</td>
+    <td>40.6 s</td>
+    <td>14145 ms / 22288 ms (n=29394)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n50-1000rps-003</code></td>
+    <td>7539 / 2463 (24.6%) ⚠︎</td>
+    <td>6366/6367 (100.0%)</td>
+    <td>9163 ms / 10006 ms / 10067 ms</td>
+    <td>1.4%</td>
+    <td>41.9 s</td>
+    <td>14691 ms / 22310 ms (n=36779)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n50-500rps-001</code></td>
+    <td>4452 / 549 (11.0%) ⚠︎</td>
+    <td>3084/3110 (99.2%)</td>
+    <td>9952 ms / 10007 ms / 10039 ms</td>
+    <td>7.5%</td>
+    <td>36.8 s</td>
+    <td>15956 ms / 26503 ms (n=4353)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n50-500rps-002</code></td>
+    <td>5000 / 0 (미측정)</td>
+    <td>2947/3000 (98.2%)</td>
+    <td>7167 ms / 9211 ms / 9995 ms</td>
+    <td>18.0%</td>
+    <td>27.2 s</td>
+    <td>13136 ms / 24062 ms (n=9340)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-n50-500rps-003</code></td>
+    <td>4863 / 138 (2.8%) ⚠︎</td>
+    <td>3024/3024 (100.0%)</td>
+    <td>7495 ms / 10002 ms / 10013 ms</td>
+    <td>18.7%</td>
+    <td>30.3 s</td>
+    <td>13074 ms / 22615 ms (n=14165)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-sync-1000rps-001</code></td>
+    <td>7070 / 2930 (29.3%) ⚠︎</td>
+    <td>6389/6444 (99.1%)</td>
+    <td>9997 ms / 10003 ms / 10077 ms</td>
+    <td>1.3%</td>
+    <td>22.7 s</td>
+    <td>미측정 / 10003 ms (n=7070)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-sync-1000rps-002</code></td>
+    <td>7345 / 2656 (26.6%) ⚠︎</td>
+    <td>6616/6619 (100.0%)</td>
+    <td>9998 ms / 10005 ms / 10015 ms</td>
+    <td>1.7%</td>
+    <td>21.0 s</td>
+    <td>미측정 / 10005 ms (n=7345)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-sync-1000rps-003</code></td>
+    <td>6878 / 3124 (31.2%) ⚠︎</td>
+    <td>6011/6049 (99.4%)</td>
+    <td>9222 ms / 10180 ms / 10538 ms</td>
+    <td>0.5%</td>
+    <td>45.5 s</td>
+    <td>미측정 / 10180 ms (n=6878)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-sync-500rps-001</code></td>
+    <td>4345 / 655 (13.1%) ⚠︎</td>
+    <td>3444/3498 (98.5%)</td>
+    <td>9999 ms / 10001 ms / 10010 ms</td>
+    <td>2.0%</td>
+    <td>18.3 s</td>
+    <td>미측정 / 10001 ms (n=4345)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-sync-500rps-002</code></td>
+    <td>3944 / 1057 (21.1%) ⚠︎</td>
+    <td>3800/3865 (98.3%)</td>
+    <td>9999 ms / 10003 ms / 10011 ms</td>
+    <td>0.0%</td>
+    <td>24.6 s</td>
+    <td>미측정 / 10003 ms (n=3944)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr><tr>
+    <td><code>batch-sync-500rps-003</code></td>
+    <td>3851 / 1150 (23.0%) ⚠︎</td>
+    <td>3723/3852 (96.7%)</td>
+    <td>9999 ms / 10001 ms / 10005 ms</td>
+    <td>0.0%</td>
+    <td>24.9 s</td>
+    <td>미측정 / 10001 ms (n=3851)</td>
+    <td>1000/1000, 중복 0, 잔여 0, PENDING 0</td>
+    <td>위반(경계이후 ISSUED) 0 / (경계이내 미발급) 0</td>
+  </tr>
+</tbody></table>
+<p>무효 실행 없음.</p>
+</section>
+<section><h2>5. 정합성 검증 SQL</h2><p><code>scripts/loadtest/verify-batch-issuance.sql</code>을 각 run 종료 직후 <code>consistency.txt</code>로 저장한다. 핵심 확인 항목:</p>
+<ul>
+<li>발급 수 = 재고 총량, 회원별 중복 0, 재고 잔여 0, 처리 후 PENDING 0.</li>
+<li>선착순 위반 0: "접수번호 기준 앞 stock_total건"(boundary_request_id 이하)은 전부 ISSUED여야 하고, 그 밖은 ISSUED면 안 된다 - 두 방향 모두 COUNT가 0이어야 위반이 없다.</li>
+</ul>
+<pre style="white-space:pre-wrap;background:#f6f8fa;padding:12px;border-radius:6px;font-size:12px;overflow:auto">-- mysql --batch --skip-column-names --database=givemeticon_loadtest -e &quot;SET @stock_id=...; SET @stock_total=...; SOURCE ...&quot;
+-- verify-event.sql의 상위 호환: 같은 기본 지표에 &quot;접수/발급 분리 + 묶음 차감&quot; 전용 확인
+-- (SOLD_OUT 포함 처리 완료 여부, 선착순 경계 위반)을 더한다.
+
+-- 발급 수 = stock_total, 회원별 중복 0, 재고 잔여 0.
+SELECT &#39;stock&#39;, id, total, remain, total - remain AS decremented
+  FROM coupon_stock WHERE id = @stock_id;
+SELECT &#39;coupon_count&#39;, COUNT(*) FROM coupon WHERE stock_id = @stock_id;
+SELECT &#39;duplicate_coupon_users&#39;, COUNT(*) FROM (
+  SELECT user_id FROM coupon WHERE stock_id = @stock_id GROUP BY user_id HAVING COUNT(*) &gt; 1
+) duplicates;
+
+-- 상태 분포(ISSUED/SOLD_OUT/PENDING/REJECTED). 정상 종료라면 PENDING은 0이어야 한다.
+SELECT &#39;request_status&#39;, status, COUNT(*) FROM coupon_issue_request
+  WHERE stock_id = @stock_id GROUP BY status ORDER BY status;
+SELECT &#39;unresolved_pending&#39;, COUNT(*) FROM coupon_issue_request
+  WHERE stock_id = @stock_id AND status = &#39;PENDING&#39;;
+SELECT &#39;order_evidence&#39;, MIN(id), MAX(id), COUNT(*) FROM coupon_issue_request WHERE stock_id = @stock_id;
+
+-- 선착순 위반: &quot;발급된 신청 집합&quot;이 정확히 &quot;접수번호 기준 앞 stock_total건&quot;과 일치하는지.
+-- boundary_id = 그 재고에서 stock_total번째로 작은 접수 id(총 접수 건수가 stock_total
+-- 이상일 때만 의미가 있다 - 미만이면 전원이 ISSUED이어야 정상이므로 이 값 자체가 NULL이다).
+-- MySQL의 LIMIT/OFFSET은 리터럴만 받고 사용자 변수(@stock_total 등)를 허용하지 않으므로,
+-- ROW_NUMBER() 윈도우 함수로 &quot;stock_total번째로 작은 접수 id&quot;를 구한다.
+SET @boundary_id = (
+  SELECT id FROM (
+    SELECT id, ROW_NUMBER() OVER (ORDER BY id ASC) AS rn
+    FROM coupon_issue_request
+    WHERE stock_id = @stock_id
+  ) ranked
+  WHERE rn = @stock_total
+);
+SELECT &#39;boundary_request_id&#39;, @boundary_id;
+-- 위반 A: 경계보다 뒤(늦게 접수)인데 ISSUED된 건 - 있으면 안 됨.
+SELECT &#39;fcfs_violation_issued_after_boundary&#39;, COUNT(*) FROM coupon_issue_request
+  WHERE stock_id = @stock_id AND status = &#39;ISSUED&#39; AND id &gt; @boundary_id;
+-- 위반 B: 경계 이내(먼저 접수)인데 ISSUED가 아닌 건 - 있으면 안 됨(재고 소진 전에 밀렸다는 뜻).
+SELECT &#39;fcfs_violation_not_issued_within_boundary&#39;, COUNT(*) FROM coupon_issue_request
+  WHERE stock_id = @stock_id AND status != &#39;ISSUED&#39; AND id &lt;= @boundary_id;
+
+-- &quot;쿠폰 생성 시각&quot;의 근사치: 발급 트랜잭션이 markIssued까지 커밋한 시각(updated_date, 마이크로초
+-- 단위). coupon.created_date는 DATE(일 단위)라 정밀 측정에 쓸 수 없어 이 컬럼을 대신 쓴다.
+-- updated_date는 DB 세션 타임존(SYSTEM=KST)이라 run.env의 started_at_utc(UTC)와 그대로
+-- 뺄 수 없다 - db_utc_now를 같은 순간 함께 찍어 report 생성기가 오프셋을 보정하게 한다.
+SELECT &#39;last_issued_at&#39;, MAX(updated_date) FROM coupon_issue_request
+  WHERE stock_id = @stock_id AND status = &#39;ISSUED&#39;;
+SELECT &#39;last_sold_out_at&#39;, MAX(updated_date) FROM coupon_issue_request
+  WHERE stock_id = @stock_id AND status = &#39;SOLD_OUT&#39;;
+SELECT &#39;db_utc_now&#39;, UTC_TIMESTAMP(6);
+</pre>
+</section>
+<section><h2>6. 읽는 법</h2><ul>
+<li><strong>최종 발급 완료</strong>는 run.env의 <code>started_at_utc</code>(부하 시작, UTC)부터 <code>coupon_issue_request.updated_date</code>가 ISSUED/SOLD_OUT으로 바뀐 마지막 시각까지다. updated_date는 DB 세션 타임존(KST)이라, 같은 SELECT에서 함께 찍은 <code>UTC_TIMESTAMP(6)</code>로 오프셋을 보정해 뺐다.</li>
+<li><strong>신청별 접수→확정 p95</strong>는 <code>coupon.issue.duration</code>(outcome=issued/sold_out, path=batch 또는 immediate) Micrometer 히스토그램을 두 앱에서 합산해 버킷 선형보간으로 근사한 값이다 - 정확한 percentile이 아니라 근사치임을 밝힌다.</li>
+<li><strong>도착률 미달(⚠︎)</strong>은 dropped_iterations 비율이 1%를 넘는 실행이다 - 그 실행의 수치는 "목표 도착률에서 실제로 관찰된 결과"가 아니라 "서버가 그 요청률을 못 받아낸 상태에서의 결과"로 읽어야 한다.</li>
+</ul></section>
+<section><h2>7. 한계</h2><p>실제 발급 워커의 재고별 리더십은 "고정 리더 유지"가 아니라 매 배치 시도마다 waitTime=0 락으로 그 순간의 소유권을 가리는 방식이다(CreateCouponFacade#processBatchForStock 주석 참고) - 장시간 한쪽 JVM만 계속 이기는지, 두 JVM이 번갈아 처리하는지는 이 보고서에서 별도로 측정하지 않았다. 재시도·상태 조회(GET /requests/{id}) 자체의 부하는 이 실험 범위 밖이다.</p>
+<p>재현: <code>scripts/loadtest/setup-isolated-db.sh</code> → 두 앱을 해당 profile/env로 기동 → <code>RUN_ID=batch-&lt;sync|n&lt;N&gt;&gt;-&lt;rate&gt;rps-&lt;rep&gt; MODE=&lt;sync|accept&gt; VERIFY_SQL=scripts/loadtest/verify-batch-issuance.sql STOCK_TOTAL=1000 ISSUE_RATE=&lt;rate&gt; DURATION=10s scripts/loadtest/run-arrival-rate.sh</code> → <code>node scripts/loadtest/generate-batch-issuance-report.js</code>.</p></section>
+</main></body></html>

@@ -1,0 +1,13 @@
+stock	46	1000	0	1000
+coupon_count	1000
+duplicate_coupon_users	0
+request_status	ISSUED	1000
+request_status	SOLD_OUT	6385
+unresolved_pending	0
+order_evidence	151105	158489	7385
+boundary_request_id	152104
+fcfs_violation_issued_after_boundary	0
+fcfs_violation_not_issued_within_boundary	0
+last_issued_at	2026-09-20 15:52:47.668782
+last_sold_out_at	2026-09-20 15:52:58.901105
+db_utc_now	2026-09-20 06:53:02.344731

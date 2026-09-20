@@ -1,0 +1,110 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: /scripts/coupon-arrival-rate.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 6000 max VUs, 40s max duration (incl. graceful stop):
+              * unique_member_first_request: 500.00 iterations/s for 10s (maxVUs: 3000-6000, gracefulStop: 30s)
+
+
+running (00.4s), 0222/3000 VUs, 0 complete and 0 interrupted iterations
+unique_member_first_request   [   4% ] 0222/3000 VUs  00.4s/10s  500.00 iters/s
+
+running (01.5s), 0719/3000 VUs, 0 complete and 0 interrupted iterations
+unique_member_first_request   [  15% ] 0719/3000 VUs  01.5s/10s  500.00 iters/s
+
+running (02.4s), 1220/3000 VUs, 0 complete and 0 interrupted iterations
+unique_member_first_request   [  24% ] 1220/3000 VUs  02.4s/10s  500.00 iters/s
+
+running (03.4s), 1721/3000 VUs, 0 complete and 0 interrupted iterations
+unique_member_first_request   [  34% ] 1721/3000 VUs  03.4s/10s  500.00 iters/s
+
+running (04.4s), 2222/3000 VUs, 0 complete and 0 interrupted iterations
+unique_member_first_request   [  44% ] 2222/3000 VUs  04.4s/10s  500.00 iters/s
+
+running (05.4s), 2722/3000 VUs, 0 complete and 0 interrupted iterations
+unique_member_first_request   [  54% ] 2722/3000 VUs  05.4s/10s  500.00 iters/s
+
+running (06.4s), 3107/3107 VUs, 0 complete and 0 interrupted iterations
+unique_member_first_request   [  64% ] 3107/3107 VUs  06.4s/10s  500.00 iters/s
+
+running (07.4s), 3310/3310 VUs, 0 complete and 0 interrupted iterations
+unique_member_first_request   [  74% ] 3310/3310 VUs  07.4s/10s  500.00 iters/s
+
+running (08.4s), 3539/3539 VUs, 0 complete and 0 interrupted iterations
+unique_member_first_request   [  84% ] 3539/3539 VUs  08.4s/10s  500.00 iters/s
+
+running (09.4s), 3723/3724 VUs, 0 complete and 0 interrupted iterations
+unique_member_first_request   [  94% ] 3723/3724 VUs  09.4s/10s  500.00 iters/s
+
+running (10.4s), 3630/3852 VUs, 221 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 3851/3851 VUs  10s  500.00 iters/s
+
+running (11.4s), 3136/3852 VUs, 715 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 3851/3851 VUs  10s  500.00 iters/s
+
+running (12.4s), 2631/3852 VUs, 1220 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 3851/3851 VUs  10s  500.00 iters/s
+
+running (13.4s), 2131/3852 VUs, 1720 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 3851/3851 VUs  10s  500.00 iters/s
+
+running (14.4s), 1630/3852 VUs, 2221 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 3851/3851 VUs  10s  500.00 iters/s
+
+running (15.4s), 1130/3852 VUs, 2721 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 3851/3851 VUs  10s  500.00 iters/s
+
+running (16.4s), 0744/3852 VUs, 3107 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 3851/3851 VUs  10s  500.00 iters/s
+
+running (17.4s), 0541/3852 VUs, 3310 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 3851/3851 VUs  10s  500.00 iters/s
+
+running (18.4s), 0313/3852 VUs, 3538 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 3851/3851 VUs  10s  500.00 iters/s
+
+running (19.4s), 0128/3852 VUs, 3723 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 3851/3851 VUs  10s  500.00 iters/s
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 3851    192.106179/s
+    checks_succeeded...: 0.00%   0 out of 3851
+    checks_failed......: 100.00% 3851 out of 3851
+
+    ✗ business response or no server error
+      ↳  0% — ✓ 0 / ✗ 3851
+
+    CUSTOM
+    coupon_issue_business_response_under_2s...: 0.00%   0 out of 3851
+
+    HTTP
+    http_req_duration.........................: avg=9.99s min=9.84s med=9.99s max=10.02s p(90)=10s p(95)=10s p(99)=10s   
+    http_req_failed...........................: 100.00% 3851 out of 3851
+    http_reqs.................................: 3851    192.106179/s
+
+    EXECUTION
+    dropped_iterations........................: 1150    57.367464/s
+    iteration_duration........................: avg=10s   min=10s   med=10s   max=10.09s p(90)=10s p(95)=10s p(99)=10.01s
+    iterations................................: 3851    192.106179/s
+    vus.......................................: 129     min=129          max=3723
+    vus_max...................................: 3852    min=3000         max=3852
+
+    NETWORK
+    data_received.............................: 0 B     0 B/s
+    data_sent.................................: 1.2 MB  59 kB/s
+
+
+
+
+running (20.0s), 0000/3852 VUs, 3851 complete and 0 interrupted iterations
+unique_member_first_request ✓ [ 100% ] 0000/3852 VUs  10s  500.00 iters/s

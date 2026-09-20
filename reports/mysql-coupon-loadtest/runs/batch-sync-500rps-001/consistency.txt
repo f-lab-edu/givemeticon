@@ -1,0 +1,12 @@
+stock	32	1000	0	1000
+coupon_count	1000
+duplicate_coupon_users	0
+request_status	ISSUED	1000
+unresolved_pending	0
+order_evidence	88964	89963	1000
+boundary_request_id	89963
+fcfs_violation_issued_after_boundary	0
+fcfs_violation_not_issued_within_boundary	0
+last_issued_at	2026-09-20 15:40:21.338897
+last_sold_out_at	NULL
+db_utc_now	2026-09-20 06:40:28.421597

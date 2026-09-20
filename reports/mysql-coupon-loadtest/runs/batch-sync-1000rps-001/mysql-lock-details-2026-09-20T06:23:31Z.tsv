@@ -1,0 +1,28 @@
+2026-09-20 15:23:33.721606	540	541	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	555	544	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	555	540	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	555	541	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	555	538	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	555	548	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	555	542	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	555	549	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	NULL
+2026-09-20 15:23:33.721606	544	540	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	544	541	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	544	538	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	544	548	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	544	542	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	544	549	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	NULL
+2026-09-20 15:23:33.721606	542	549	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	NULL
+2026-09-20 15:23:33.721606	540	538	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	540	548	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	540	542	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	540	549	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	NULL
+2026-09-20 15:23:33.721606	541	538	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	541	548	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	541	542	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	541	549	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	NULL
+2026-09-20 15:23:33.721606	538	548	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	538	542	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	538	549	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	NULL
+2026-09-20 15:23:33.721606	548	542	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0
+2026-09-20 15:23:33.721606	548	549	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 23           AND remain > 0	NULL

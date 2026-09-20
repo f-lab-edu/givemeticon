@@ -13,5 +13,9 @@ public interface CouponStockMapper {
 
     int decreaseStockIfEnough(@Param("id") int id);
 
+    int decreaseStockByIfEnough(@Param("id") int id, @Param("amount") int amount);
+
+    Optional<CouponStock> findByIdForUpdate(@Param("id") int id);
+
     List<CouponStock> findActiveCouponStocks();
 }

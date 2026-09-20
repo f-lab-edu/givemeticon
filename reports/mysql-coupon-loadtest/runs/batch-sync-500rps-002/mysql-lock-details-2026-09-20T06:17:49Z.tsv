@@ -1,0 +1,3 @@
+2026-09-20 15:17:52.643267	543	550	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 18           AND remain > 0	NULL
+2026-09-20 15:17:52.643267	538	550	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 18           AND remain > 0	NULL
+2026-09-20 15:17:52.643267	538	543	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 18           AND remain > 0	UPDATE coupon_stock         SE ...  = 18           AND remain > 0

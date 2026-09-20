@@ -15,6 +15,7 @@ import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockExc
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponIssueRequestService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
+import com.jinddung2.givemeticon.domain.coupon.service.CouponStockService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -31,6 +34,7 @@ import java.util.Optional;
 public class CreateCouponFacade {
 
     private final CouponService couponService;
+    private final CouponStockService couponStockService;
     private final CouponIssueRequestService couponIssueRequestService;
     private final CouponMapper couponMapper;
     private final MeterRegistry meterRegistry;
@@ -128,6 +132,65 @@ public class CreateCouponFacade {
         }
         resolvePending(next.get().getId(), "async", "async_backfill");
         return true;
+    }
+
+    /**
+     * "접수/발급 분리 + 묶음 차감" 경로의 발급 단계. 이 재고(stockId)에서 접수번호 오름차순
+     * 으로 최대 batchSize건을 골라 한 트랜잭션에서: 재고 batchSize개 조건부 차감 →
+     * (부족하면 잔여만큼만) → 쿠폰 다건 INSERT → 신청 다건 ISSUED, 나머지는 SOLD_OUT
+     * 순서로 처리한다. 재고별 분산 락을 waitTime=0으로 시도해, 이미 다른 워커(다른 JVM
+     * 포함)가 이 재고를 처리 중이면 기다리지 않고 즉시 물러난다 - "행사당 동시에 하나의
+     * 작업자만 동작"을 그 순간순간의 락 소유권으로 만족시킨다(고정된 리더를 유지하는 것이
+     * 아니라, 매 라운드 락을 쥔 쪽이 곧 그 라운드의 리더다). 처리한 접수 건수를 반환한다 -
+     * batchSize보다 적게 반환되면 이 재고의 PENDING을 이번 라운드에 다 비웠다는 뜻이다.
+     */
+    @DistributedLock(key = "#stockId", waitTime = 0L, leaseTime = 10L)
+    public int processBatchForStock(int stockId, int batchSize) {
+        List<CouponIssueRequest> batch = couponIssueRequestService.findPendingBatch(stockId, batchSize);
+        if (batch.isEmpty()) {
+            return 0;
+        }
+
+        int n = batch.size();
+        int issuable = couponStockService.decreaseStockByIfEnough(stockId, n) ? n : decreaseExactRemain(stockId, n);
+
+        List<CouponIssueRequest> toIssue = batch.subList(0, issuable);
+        List<CouponIssueRequest> soldOut = batch.subList(issuable, n);
+
+        if (!toIssue.isEmpty()) {
+            issueBatch(stockId, toIssue);
+        }
+        if (!soldOut.isEmpty()) {
+            List<Long> ids = soldOut.stream().map(CouponIssueRequest::getId).toList();
+            couponIssueRequestService.markSoldOutBatch(ids, CouponErrorCode.NOT_ENOUGH_COUPON_STOCK.name());
+            for (CouponIssueRequest request : soldOut) {
+                recordIssueDuration(request.getCreatedDate(), "sold_out", "batch");
+            }
+        }
+        return n;
+    }
+
+    /** 재고 조건부 차감(remain &gt;= n)이 실패한 뒤에만 호출된다 - 행을 잠그고 정확한 잔여를 읽어 그만큼만 뺀다. */
+    private int decreaseExactRemain(int stockId, int n) {
+        int remain = couponStockService.getStockForUpdate(stockId).getRemain();
+        if (remain <= 0) {
+            return 0;
+        }
+        int issuable = Math.min(remain, n);
+        couponStockService.decreaseStockByIfEnough(stockId, issuable);
+        return issuable;
+    }
+
+    private void issueBatch(int stockId, List<CouponIssueRequest> toIssue) {
+        List<Coupon> coupons = couponService.issueCouponsBatch(stockId, toIssue);
+        List<CouponIssueRequestService.IssuedCoupon> issuedCoupons = new ArrayList<>(toIssue.size());
+        for (int i = 0; i < toIssue.size(); i++) {
+            issuedCoupons.add(new CouponIssueRequestService.IssuedCoupon(toIssue.get(i).getId(), coupons.get(i).getId()));
+        }
+        couponIssueRequestService.markIssuedBatch(issuedCoupons);
+        for (CouponIssueRequest request : toIssue) {
+            recordIssueDuration(request.getCreatedDate(), "issued", "batch");
+        }
     }
 
     /** 접수 ID로 상태를 조회한다. 본인 접수가 아니면(다른 회원의 requestId) 존재 자체를 알려주지 않는다. */

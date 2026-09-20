@@ -9,6 +9,12 @@ const rate = Number(__ENV.ISSUE_RATE || 100);
 const duration = __ENV.DURATION || '10s';
 const stockId = Number(__ENV.STOCK_ID);
 const userIdStart = Number(__ENV.USER_ID_START || 900000000);
+// sync(기본): 동기 발급 엔드포인트(/internal/loadtest/coupons)를 호출해 재고 차감까지 한
+// 요청 안에서 끝낸다. accept: "접수/발급 분리" 엔드포인트(/internal/loadtest/coupons/requests)를
+// 호출해 접수만 하고 즉시 응답을 받는다 - 실제 발급은 서버의 비동기 워커가 나중에 처리하므로,
+// 여기서는 접수 자체의 성공/실패(5xx)만 분류한다.
+const mode = __ENV.MODE || 'sync';
+const path = mode === 'accept' ? '/internal/loadtest/coupons/requests' : '/internal/loadtest/coupons';
 
 if (!Number.isInteger(stockId) || stockId <= 0) {
   throw new Error('STOCK_ID must be a positive integer');
@@ -47,7 +53,7 @@ export default function () {
   const sequence = exec.scenario.iterationInTest;
   const userId = userIdStart + sequence;
   const target = targetList[sequence % targetList.length];
-  const response = http.post(`${target}/internal/loadtest/coupons`, JSON.stringify({
+  const response = http.post(`${target}${path}`, JSON.stringify({
     stockId,
     couponName: 'loadtest-coupon',
     couponType: 'FREE_POINT',
@@ -62,7 +68,11 @@ export default function () {
     timeout: __ENV.HTTP_TIMEOUT || '10s',
   });
 
-  const businessResponse = response.status === 200 || response.status === 400 || response.status === 409;
+  // accept 모드는 재고를 건드리지 않으므로 항상 200이다 - 이 시점의 400/409는 없다.
+  // "업무 응답"은 5xx가 아니면 성립한다(접수 자체는 거절되지 않는다).
+  const businessResponse = mode === 'accept'
+    ? response.status === 200
+    : (response.status === 200 || response.status === 400 || response.status === 409);
   timelyBusinessResponse.add(businessResponse && response.timings.duration <= 2000);
   if (response.status === 200) issued.add(1);
   else if (response.status >= 400 && response.status < 500) rejected.add(1);

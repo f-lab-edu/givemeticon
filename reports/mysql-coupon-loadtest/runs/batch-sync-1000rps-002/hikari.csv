@@ -1,0 +1,3 @@
+timestamp_utc,app,active,idle,total,max,pending
+2026-09-20T06:44:23Z,app1,0,10,10,10,0
+2026-09-20T06:44:23Z,app2,0,10,10,10,0

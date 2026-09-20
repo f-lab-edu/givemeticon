@@ -1,0 +1,1050 @@
+# HELP disk_total_bytes Total space for path
+# TYPE disk_total_bytes gauge
+disk_total_bytes{application="givemeticon",path="/Users/jinhyuck/Desktop/projects/givemeticon/.",} 2.45107195904E11
+# HELP tomcat_sessions_active_max_sessions  
+# TYPE tomcat_sessions_active_max_sessions gauge
+tomcat_sessions_active_max_sessions{application="givemeticon",} 0.0
+# HELP jvm_info JVM version info
+# TYPE jvm_info gauge
+jvm_info{application="givemeticon",runtime="OpenJDK Runtime Environment",vendor="Eclipse Adoptium",version="21.0.5+11-LTS",} 1.0
+# HELP process_files_open_files The open file descriptor count
+# TYPE process_files_open_files gauge
+process_files_open_files{application="givemeticon",} 172.0
+# HELP jvm_gc_concurrent_phase_time_seconds Time spent in concurrent phase
+# TYPE jvm_gc_concurrent_phase_time_seconds summary
+jvm_gc_concurrent_phase_time_seconds_count{action="end of concurrent GC pause",application="givemeticon",cause="No GC",gc="G1 Concurrent GC",} 14.0
+jvm_gc_concurrent_phase_time_seconds_sum{action="end of concurrent GC pause",application="givemeticon",cause="No GC",gc="G1 Concurrent GC",} 0.21
+# HELP jvm_gc_concurrent_phase_time_seconds_max Time spent in concurrent phase
+# TYPE jvm_gc_concurrent_phase_time_seconds_max gauge
+jvm_gc_concurrent_phase_time_seconds_max{action="end of concurrent GC pause",application="givemeticon",cause="No GC",gc="G1 Concurrent GC",} 0.074
+# HELP hikaricp_connections_acquire_seconds Connection acquire time
+# TYPE hikaricp_connections_acquire_seconds summary
+hikaricp_connections_acquire_seconds_count{application="givemeticon",pool="HikariPool-1",} 13886.0
+hikaricp_connections_acquire_seconds_sum{application="givemeticon",pool="HikariPool-1",} 17113.421
+# HELP hikaricp_connections_acquire_seconds_max Connection acquire time
+# TYPE hikaricp_connections_acquire_seconds_max gauge
+hikaricp_connections_acquire_seconds_max{application="givemeticon",pool="HikariPool-1",} 22.116
+# HELP hikaricp_connections_pending Pending threads
+# TYPE hikaricp_connections_pending gauge
+hikaricp_connections_pending{application="givemeticon",pool="HikariPool-1",} 0.0
+# HELP jdbc_connections_active Current number of active connections that have been allocated from the data source.
+# TYPE jdbc_connections_active gauge
+jdbc_connections_active{application="givemeticon",name="dataSource",} 0.0
+# HELP tomcat_servlet_request_seconds  
+# TYPE tomcat_servlet_request_seconds summary
+tomcat_servlet_request_seconds_count{application="givemeticon",name="dispatcherServlet",} 11265.0
+tomcat_servlet_request_seconds_sum{application="givemeticon",name="dispatcherServlet",} 17872.23
+# HELP application_ready_time_seconds Time taken for the application to be ready to service requests
+# TYPE application_ready_time_seconds gauge
+application_ready_time_seconds{application="givemeticon",main_application_class="com.jinddung2.givemeticon.GivemeticonApplication",} 17.154
+# HELP jvm_threads_states_threads The current number of threads
+# TYPE jvm_threads_states_threads gauge
+jvm_threads_states_threads{application="givemeticon",state="waiting",} 10.0
+jvm_threads_states_threads{application="givemeticon",state="runnable",} 40.0
+jvm_threads_states_threads{application="givemeticon",state="timed-waiting",} 211.0
+jvm_threads_states_threads{application="givemeticon",state="terminated",} 0.0
+jvm_threads_states_threads{application="givemeticon",state="new",} 0.0
+jvm_threads_states_threads{application="givemeticon",state="blocked",} 0.0
+# HELP system_cpu_count The number of processors available to the Java virtual machine
+# TYPE system_cpu_count gauge
+system_cpu_count{application="givemeticon",} 8.0
+# HELP jvm_threads_peak_threads The peak live thread count since the Java virtual machine started or peak was reset
+# TYPE jvm_threads_peak_threads gauge
+jvm_threads_peak_threads{application="givemeticon",} 262.0
+# HELP system_cpu_usage The "recent cpu usage" of the system the application is running in
+# TYPE system_cpu_usage gauge
+system_cpu_usage{application="givemeticon",} 0.9254278728606357
+# HELP tomcat_sessions_alive_max_seconds  
+# TYPE tomcat_sessions_alive_max_seconds gauge
+tomcat_sessions_alive_max_seconds{application="givemeticon",} 0.0
+# HELP tomcat_sessions_expired_sessions_total  
+# TYPE tomcat_sessions_expired_sessions_total counter
+tomcat_sessions_expired_sessions_total{application="givemeticon",} 0.0
+# HELP jvm_classes_loaded_classes The number of classes that are currently loaded in the Java virtual machine
+# TYPE jvm_classes_loaded_classes gauge
+jvm_classes_loaded_classes{application="givemeticon",} 18090.0
+# HELP hikaricp_connections_max Max connections
+# TYPE hikaricp_connections_max gauge
+hikaricp_connections_max{application="givemeticon",pool="HikariPool-1",} 10.0
+# HELP application_started_time_seconds Time taken to start the application
+# TYPE application_started_time_seconds gauge
+application_started_time_seconds{application="givemeticon",main_application_class="com.jinddung2.givemeticon.GivemeticonApplication",} 17.123
+# HELP spring_kafka_template_seconds_max KafkaTemplate Timer
+# TYPE spring_kafka_template_seconds_max gauge
+spring_kafka_template_seconds_max{application="givemeticon",exception="none",name="notificationKafkaTemplate",result="success",} 0.0
+# HELP spring_kafka_template_seconds KafkaTemplate Timer
+# TYPE spring_kafka_template_seconds summary
+spring_kafka_template_seconds_count{application="givemeticon",exception="none",name="notificationKafkaTemplate",result="success",} 0.0
+spring_kafka_template_seconds_sum{application="givemeticon",exception="none",name="notificationKafkaTemplate",result="success",} 0.0
+# HELP jdbc_connections_min Minimum number of idle connections in the pool.
+# TYPE jdbc_connections_min gauge
+jdbc_connections_min{application="givemeticon",name="dataSource",} 10.0
+# HELP jvm_gc_pause_seconds Time spent in GC pause
+# TYPE jvm_gc_pause_seconds summary
+jvm_gc_pause_seconds_count{action="end of minor GC",application="givemeticon",cause="G1 Evacuation Pause",gc="G1 Young Generation",} 28.0
+jvm_gc_pause_seconds_sum{action="end of minor GC",application="givemeticon",cause="G1 Evacuation Pause",gc="G1 Young Generation",} 0.89
+# HELP jvm_gc_pause_seconds_max Time spent in GC pause
+# TYPE jvm_gc_pause_seconds_max gauge
+jvm_gc_pause_seconds_max{action="end of minor GC",application="givemeticon",cause="G1 Evacuation Pause",gc="G1 Young Generation",} 0.071
+# HELP jvm_gc_live_data_size_bytes Size of long-lived heap memory pool after reclamation
+# TYPE jvm_gc_live_data_size_bytes gauge
+jvm_gc_live_data_size_bytes{application="givemeticon",} 1.44792368E8
+# HELP tomcat_cache_hit_total  
+# TYPE tomcat_cache_hit_total counter
+tomcat_cache_hit_total{application="givemeticon",} 0.0
+# HELP jvm_classes_unloaded_classes_total The total number of classes unloaded since the Java virtual machine has started execution
+# TYPE jvm_classes_unloaded_classes_total counter
+jvm_classes_unloaded_classes_total{application="givemeticon",} 0.0
+# HELP jvm_gc_memory_allocated_bytes_total Incremented for an increase in the size of the (young) heap memory pool after one GC to before the next
+# TYPE jvm_gc_memory_allocated_bytes_total counter
+jvm_gc_memory_allocated_bytes_total{application="givemeticon",} 1.690304496E9
+# HELP tomcat_global_error_total  
+# TYPE tomcat_global_error_total counter
+tomcat_global_error_total{application="givemeticon",name="http-nio-8083",} 21.0
+# HELP jvm_threads_daemon_threads The current number of live daemon threads
+# TYPE jvm_threads_daemon_threads gauge
+jvm_threads_daemon_threads{application="givemeticon",} 213.0
+# HELP executor_queued_tasks The approximate number of tasks that are queued for execution
+# TYPE executor_queued_tasks gauge
+executor_queued_tasks{application="givemeticon",name="taskScheduler",} 2.0
+executor_queued_tasks{application="givemeticon",name="mailExecutor",} 0.0
+# HELP jvm_threads_started_threads_total The total number of application threads started in the JVM
+# TYPE jvm_threads_started_threads_total counter
+jvm_threads_started_threads_total{application="givemeticon",} 269.0
+# HELP hikaricp_connections Total connections
+# TYPE hikaricp_connections gauge
+hikaricp_connections{application="givemeticon",pool="HikariPool-1",} 10.0
+# HELP spring_kafka_listener_seconds_max Kafka Listener Timer
+# TYPE spring_kafka_listener_seconds_max gauge
+spring_kafka_listener_seconds_max{application="givemeticon",exception="none",name="org.springframework.kafka.KafkaListenerEndpointContainer#0-0",result="success",} 0.0
+# HELP spring_kafka_listener_seconds Kafka Listener Timer
+# TYPE spring_kafka_listener_seconds summary
+spring_kafka_listener_seconds_count{application="givemeticon",exception="none",name="org.springframework.kafka.KafkaListenerEndpointContainer#0-0",result="success",} 0.0
+spring_kafka_listener_seconds_sum{application="givemeticon",exception="none",name="org.springframework.kafka.KafkaListenerEndpointContainer#0-0",result="success",} 0.0
+# HELP executor_active_threads The approximate number of threads that are actively executing tasks
+# TYPE executor_active_threads gauge
+executor_active_threads{application="givemeticon",name="taskScheduler",} 0.0
+executor_active_threads{application="givemeticon",name="mailExecutor",} 0.0
+# HELP tomcat_global_sent_bytes_total  
+# TYPE tomcat_global_sent_bytes_total counter
+tomcat_global_sent_bytes_total{application="givemeticon",name="http-nio-8083",} 5446423.0
+# HELP disk_free_bytes Usable space for path
+# TYPE disk_free_bytes gauge
+disk_free_bytes{application="givemeticon",path="/Users/jinhyuck/Desktop/projects/givemeticon/.",} 7.2366850048E10
+# HELP tomcat_servlet_error_total  
+# TYPE tomcat_servlet_error_total counter
+tomcat_servlet_error_total{application="givemeticon",name="dispatcherServlet",} 21.0
+# HELP tomcat_sessions_created_sessions_total  
+# TYPE tomcat_sessions_created_sessions_total counter
+tomcat_sessions_created_sessions_total{application="givemeticon",} 0.0
+# HELP executor_pool_max_threads The maximum allowed number of threads in the pool
+# TYPE executor_pool_max_threads gauge
+executor_pool_max_threads{application="givemeticon",name="taskScheduler",} 2.147483647E9
+executor_pool_max_threads{application="givemeticon",name="mailExecutor",} 10.0
+# HELP hikaricp_connections_idle Idle connections
+# TYPE hikaricp_connections_idle gauge
+hikaricp_connections_idle{application="givemeticon",pool="HikariPool-1",} 10.0
+# HELP jdbc_connections_idle Number of established but idle connections.
+# TYPE jdbc_connections_idle gauge
+jdbc_connections_idle{application="givemeticon",name="dataSource",} 10.0
+# HELP executor_pool_size_threads The current number of threads in the pool
+# TYPE executor_pool_size_threads gauge
+executor_pool_size_threads{application="givemeticon",name="taskScheduler",} 1.0
+executor_pool_size_threads{application="givemeticon",name="mailExecutor",} 0.0
+# HELP jvm_buffer_memory_used_bytes An estimate of the memory that the Java virtual machine is using for this buffer pool
+# TYPE jvm_buffer_memory_used_bytes gauge
+jvm_buffer_memory_used_bytes{application="givemeticon",id="direct",} 6.877061E7
+jvm_buffer_memory_used_bytes{application="givemeticon",id="mapped",} 0.0
+jvm_buffer_memory_used_bytes{application="givemeticon",id="mapped - 'non-volatile memory'",} 0.0
+# HELP jvm_gc_memory_promoted_bytes_total Count of positive increases in the size of the old generation memory pool before GC to after GC
+# TYPE jvm_gc_memory_promoted_bytes_total counter
+jvm_gc_memory_promoted_bytes_total{application="givemeticon",} 1.15737608E8
+# HELP tomcat_servlet_request_max_seconds  
+# TYPE tomcat_servlet_request_max_seconds gauge
+tomcat_servlet_request_max_seconds{application="givemeticon",name="dispatcherServlet",} 22.198
+# HELP process_start_time_seconds Start time of the process since unix epoch.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds{application="givemeticon",} 1.78988685704E9
+# HELP tomcat_sessions_rejected_sessions_total  
+# TYPE tomcat_sessions_rejected_sessions_total counter
+tomcat_sessions_rejected_sessions_total{application="givemeticon",} 0.0
+# HELP jdbc_connections_max Maximum number of active connections that can be allocated at the same time.
+# TYPE jdbc_connections_max gauge
+jdbc_connections_max{application="givemeticon",name="dataSource",} 10.0
+# HELP coupon_redis_lock_hold_seconds_max Redis 락 획득부터 DB 트랜잭션 완료까지의 보유 시간
+# TYPE coupon_redis_lock_hold_seconds_max gauge
+coupon_redis_lock_hold_seconds_max{application="givemeticon",} 4.926759083
+# HELP coupon_redis_lock_hold_seconds Redis 락 획득부터 DB 트랜잭션 완료까지의 보유 시간
+# TYPE coupon_redis_lock_hold_seconds histogram
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.001",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.001048576",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.001398101",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.001747626",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.002097151",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.002446676",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.002796201",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.003145726",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.003495251",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.003844776",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.004194304",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.005592405",} 0.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.006990506",} 1.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.008388607",} 2.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.009786708",} 9.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.011184809",} 22.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.01258291",} 26.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.013981011",} 32.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.015379112",} 44.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.016777216",} 56.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.022369621",} 77.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.027962026",} 86.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.033554431",} 94.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.039146836",} 96.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.044739241",} 97.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.050331646",} 99.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.055924051",} 107.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.061516456",} 113.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.067108864",} 121.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.089478485",} 132.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.111848106",} 143.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.134217727",} 147.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.156587348",} 151.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.178956969",} 155.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.20132659",} 157.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.223696211",} 159.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.246065832",} 159.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.268435456",} 159.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.357913941",} 159.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.447392426",} 160.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.536870911",} 160.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.626349396",} 161.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.715827881",} 162.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.805306366",} 162.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.894784851",} 162.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="0.984263336",} 163.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="1.073741824",} 163.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="1.431655765",} 163.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="1.789569706",} 163.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="2.147483647",} 163.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="2.505397588",} 165.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="2.863311529",} 166.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="3.22122547",} 166.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="3.579139411",} 166.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="3.937053352",} 169.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="4.294967296",} 169.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="5.726623061",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="7.158278826",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="8.589934591",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="10.021590356",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="11.453246121",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="12.884901886",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="14.316557651",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="15.748213416",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="17.179869184",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="22.906492245",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="28.633115306",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="30.0",} 170.0
+coupon_redis_lock_hold_seconds_bucket{application="givemeticon",le="+Inf",} 170.0
+coupon_redis_lock_hold_seconds_count{application="givemeticon",} 170.0
+coupon_redis_lock_hold_seconds_sum{application="givemeticon",} 33.86523745
+# HELP executor_pool_core_threads The core number of threads for the pool
+# TYPE executor_pool_core_threads gauge
+executor_pool_core_threads{application="givemeticon",name="taskScheduler",} 1.0
+executor_pool_core_threads{application="givemeticon",name="mailExecutor",} 5.0
+# HELP system_load_average_1m The sum of the number of runnable entities queued to available processors and the number of runnable entities running on the available processors averaged over a period of time
+# TYPE system_load_average_1m gauge
+system_load_average_1m{application="givemeticon",} 18.5078125
+# HELP jvm_buffer_total_capacity_bytes An estimate of the total capacity of the buffers in this pool
+# TYPE jvm_buffer_total_capacity_bytes gauge
+jvm_buffer_total_capacity_bytes{application="givemeticon",id="direct",} 6.8770609E7
+jvm_buffer_total_capacity_bytes{application="givemeticon",id="mapped",} 0.0
+jvm_buffer_total_capacity_bytes{application="givemeticon",id="mapped - 'non-volatile memory'",} 0.0
+# HELP tomcat_connections_current_connections  
+# TYPE tomcat_connections_current_connections gauge
+tomcat_connections_current_connections{application="givemeticon",name="http-nio-8083",} 2.0
+# HELP jvm_memory_used_bytes The amount of used memory
+# TYPE jvm_memory_used_bytes gauge
+jvm_memory_used_bytes{application="givemeticon",area="heap",id="G1 Old Gen",} 1.44792368E8
+jvm_memory_used_bytes{application="givemeticon",area="nonheap",id="Metaspace",} 9.4669088E7
+jvm_memory_used_bytes{application="givemeticon",area="nonheap",id="CodeHeap 'profiled nmethods'",} 1.3085696E7
+jvm_memory_used_bytes{application="givemeticon",area="heap",id="G1 Survivor Space",} 3519304.0
+jvm_memory_used_bytes{application="givemeticon",area="nonheap",id="CodeHeap 'non-nmethods'",} 1719040.0
+jvm_memory_used_bytes{application="givemeticon",area="heap",id="G1 Eden Space",} 6.2914552E7
+jvm_memory_used_bytes{application="givemeticon",area="nonheap",id="Compressed Class Space",} 1.1279416E7
+jvm_memory_used_bytes{application="givemeticon",area="nonheap",id="CodeHeap 'non-profiled nmethods'",} 1.1043968E7
+# HELP tomcat_threads_busy_threads  
+# TYPE tomcat_threads_busy_threads gauge
+tomcat_threads_busy_threads{application="givemeticon",name="http-nio-8083",} 1.0
+# HELP hikaricp_connections_creation_seconds_max Connection creation time
+# TYPE hikaricp_connections_creation_seconds_max gauge
+hikaricp_connections_creation_seconds_max{application="givemeticon",pool="HikariPool-1",} 0.0
+# HELP hikaricp_connections_creation_seconds Connection creation time
+# TYPE hikaricp_connections_creation_seconds summary
+hikaricp_connections_creation_seconds_count{application="givemeticon",pool="HikariPool-1",} 9.0
+hikaricp_connections_creation_seconds_sum{application="givemeticon",pool="HikariPool-1",} 0.522
+# HELP coupon_redis_lock_acquire_seconds_max 쿠폰 재고 Redis 분산 락 획득 대기 시간
+# TYPE coupon_redis_lock_acquire_seconds_max gauge
+coupon_redis_lock_acquire_seconds_max{application="givemeticon",outcome="rejected",} 0.119382
+coupon_redis_lock_acquire_seconds_max{application="givemeticon",outcome="acquired",} 0.046357917
+# HELP coupon_redis_lock_acquire_seconds 쿠폰 재고 Redis 분산 락 획득 대기 시간
+# TYPE coupon_redis_lock_acquire_seconds histogram
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.001",} 1.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.001048576",} 2.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.001398101",} 17.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.001747626",} 26.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.002097151",} 41.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.002446676",} 46.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.002796201",} 51.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.003145726",} 55.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.003495251",} 62.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.003844776",} 67.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.004194304",} 69.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.005592405",} 78.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.006990506",} 85.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.008388607",} 92.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.009786708",} 93.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.011184809",} 96.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.01258291",} 100.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.013981011",} 106.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.015379112",} 108.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.016777216",} 112.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.022369621",} 114.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.027962026",} 119.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.033554431",} 120.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.039146836",} 120.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.044739241",} 121.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.050331646",} 121.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.055924051",} 121.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.061516456",} 124.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.067108864",} 124.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.089478485",} 124.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.111848106",} 124.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.134217727",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.156587348",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.178956969",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.20132659",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.223696211",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.246065832",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.268435456",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.357913941",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.447392426",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.536870911",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.626349396",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.715827881",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.805306366",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.894784851",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="0.984263336",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="1.073741824",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="1.431655765",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="1.789569706",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="2.147483647",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="2.505397588",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="2.863311529",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="3.22122547",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="3.579139411",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="3.937053352",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="4.294967296",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="5.726623061",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="7.158278826",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="8.589934591",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="10.021590356",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="11.453246121",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="12.884901886",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="14.316557651",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="15.748213416",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="17.179869184",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="22.906492245",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="28.633115306",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="30.0",} 125.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="rejected",le="+Inf",} 125.0
+coupon_redis_lock_acquire_seconds_count{application="givemeticon",outcome="rejected",} 125.0
+coupon_redis_lock_acquire_seconds_sum{application="givemeticon",outcome="rejected",} 1.075375916
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.001",} 61.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.001048576",} 68.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.001398101",} 100.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.001747626",} 119.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.002097151",} 128.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.002446676",} 134.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.002796201",} 138.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.003145726",} 141.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.003495251",} 144.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.003844776",} 145.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.004194304",} 147.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.005592405",} 155.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.006990506",} 159.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.008388607",} 160.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.009786708",} 161.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.011184809",} 163.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.01258291",} 163.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.013981011",} 165.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.015379112",} 166.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.016777216",} 167.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.022369621",} 168.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.027962026",} 168.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.033554431",} 168.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.039146836",} 169.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.044739241",} 169.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.050331646",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.055924051",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.061516456",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.067108864",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.089478485",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.111848106",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.134217727",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.156587348",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.178956969",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.20132659",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.223696211",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.246065832",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.268435456",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.357913941",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.447392426",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.536870911",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.626349396",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.715827881",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.805306366",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.894784851",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="0.984263336",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="1.073741824",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="1.431655765",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="1.789569706",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="2.147483647",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="2.505397588",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="2.863311529",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="3.22122547",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="3.579139411",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="3.937053352",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="4.294967296",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="5.726623061",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="7.158278826",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="8.589934591",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="10.021590356",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="11.453246121",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="12.884901886",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="14.316557651",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="15.748213416",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="17.179869184",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="22.906492245",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="28.633115306",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="30.0",} 170.0
+coupon_redis_lock_acquire_seconds_bucket{application="givemeticon",outcome="acquired",le="+Inf",} 170.0
+coupon_redis_lock_acquire_seconds_count{application="givemeticon",outcome="acquired",} 170.0
+coupon_redis_lock_acquire_seconds_sum{application="givemeticon",outcome="acquired",} 0.459497497
+# HELP jvm_memory_usage_after_gc_percent The percentage of long-lived heap pool used after the last GC event, in the range [0..1]
+# TYPE jvm_memory_usage_after_gc_percent gauge
+jvm_memory_usage_after_gc_percent{application="givemeticon",area="heap",pool="long-lived",} 0.033712100237607956
+# HELP jvm_compilation_time_ms_total The approximate accumulated elapsed time spent in compilation
+# TYPE jvm_compilation_time_ms_total counter
+jvm_compilation_time_ms_total{application="givemeticon",compiler="HotSpot 64-Bit Tiered Compilers",} 82833.0
+# HELP tomcat_global_received_bytes_total  
+# TYPE tomcat_global_received_bytes_total counter
+tomcat_global_received_bytes_total{application="givemeticon",name="http-nio-8083",} 941808.0
+# HELP my_coupon_stock_current 쿠폰별 남은 재고 모니터링
+# TYPE my_coupon_stock_current gauge
+my_coupon_stock_current{application="givemeticon",couponId="12",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="34",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="13",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="35",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="10",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="32",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="11",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="33",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="30",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="31",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="29",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="27",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="28",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="25",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="26",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="23",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="24",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="21",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="22",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="20",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="40",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="9",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="7",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="8",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="5",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="6",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="3",} 94.0
+my_coupon_stock_current{application="givemeticon",couponId="4",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="1",} 98.0
+my_coupon_stock_current{application="givemeticon",couponId="2",} 99.0
+my_coupon_stock_current{application="givemeticon",couponId="18",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="19",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="16",} 3.0
+my_coupon_stock_current{application="givemeticon",couponId="38",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="17",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="39",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="14",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="36",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="15",} 0.0
+my_coupon_stock_current{application="givemeticon",couponId="37",} 0.0
+# HELP tomcat_connections_keepalive_current_connections  
+# TYPE tomcat_connections_keepalive_current_connections gauge
+tomcat_connections_keepalive_current_connections{application="givemeticon",name="http-nio-8083",} 1.0
+# HELP jvm_memory_max_bytes The maximum amount of memory in bytes that can be used for memory management
+# TYPE jvm_memory_max_bytes gauge
+jvm_memory_max_bytes{application="givemeticon",area="heap",id="G1 Old Gen",} 4.294967296E9
+jvm_memory_max_bytes{application="givemeticon",area="nonheap",id="Metaspace",} -1.0
+jvm_memory_max_bytes{application="givemeticon",area="nonheap",id="CodeHeap 'profiled nmethods'",} 1.22896384E8
+jvm_memory_max_bytes{application="givemeticon",area="heap",id="G1 Survivor Space",} -1.0
+jvm_memory_max_bytes{application="givemeticon",area="nonheap",id="CodeHeap 'non-nmethods'",} 5849088.0
+jvm_memory_max_bytes{application="givemeticon",area="heap",id="G1 Eden Space",} -1.0
+jvm_memory_max_bytes{application="givemeticon",area="nonheap",id="Compressed Class Space",} 1.073741824E9
+jvm_memory_max_bytes{application="givemeticon",area="nonheap",id="CodeHeap 'non-profiled nmethods'",} 1.22912768E8
+# HELP hikaricp_connections_min Min connections
+# TYPE hikaricp_connections_min gauge
+hikaricp_connections_min{application="givemeticon",pool="HikariPool-1",} 10.0
+# HELP tomcat_cache_access_total  
+# TYPE tomcat_cache_access_total counter
+tomcat_cache_access_total{application="givemeticon",} 0.0
+# HELP process_files_max_files The maximum file descriptor count
+# TYPE process_files_max_files gauge
+process_files_max_files{application="givemeticon",} 2.147483647E9
+# HELP tomcat_connections_config_max_connections  
+# TYPE tomcat_connections_config_max_connections gauge
+tomcat_connections_config_max_connections{application="givemeticon",name="http-nio-8083",} 8192.0
+# HELP http_server_requests_seconds  
+# TYPE http_server_requests_seconds histogram
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.001",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.001048576",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.001398101",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.001747626",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.002097151",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.002446676",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.002796201",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.003145726",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.003495251",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.003844776",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.004194304",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.005592405",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.006990506",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.008388607",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.009786708",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.011184809",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.01258291",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.013981011",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.015379112",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.016777216",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.022369621",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.027962026",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.033554431",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.039146836",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.044739241",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.050331646",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.055924051",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.061516456",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.067108864",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.089478485",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.1",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.111848106",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.134217727",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.156587348",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.178956969",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.2",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.20132659",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.223696211",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.246065832",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.268435456",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.357913941",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.447392426",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.5",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.536870911",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.626349396",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.715827881",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.805306366",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.894784851",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.984263336",} 1.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="1.0",} 1.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="1.073741824",} 1.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="1.431655765",} 6.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="1.789569706",} 9.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="2.0",} 9.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="2.147483647",} 9.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="2.505397588",} 13.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="2.863311529",} 13.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="3.0",} 13.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="3.22122547",} 13.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="3.579139411",} 13.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="3.937053352",} 13.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="4.294967296",} 13.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="5.726623061",} 13.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="7.158278826",} 16.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="8.589934591",} 17.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="10.021590356",} 17.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="11.453246121",} 17.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="12.884901886",} 17.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="14.316557651",} 17.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="15.748213416",} 18.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="17.179869184",} 19.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="22.906492245",} 21.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="28.633115306",} 21.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="30.0",} 21.0
+http_server_requests_seconds_bucket{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="+Inf",} 21.0
+http_server_requests_seconds_count{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",} 21.0
+http_server_requests_seconds_sum{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",} 119.181365873
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.001",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.001048576",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.001398101",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.001747626",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.002097151",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.002446676",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.002796201",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.003145726",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.003495251",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.003844776",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.004194304",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.005592405",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.006990506",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.008388607",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.009786708",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.011184809",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.01258291",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.013981011",} 5.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.015379112",} 15.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.016777216",} 30.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.022369621",} 130.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.027962026",} 299.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.033554431",} 470.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.039146836",} 642.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.044739241",} 805.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.050331646",} 1019.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.055924051",} 1220.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.061516456",} 1421.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.067108864",} 1636.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.089478485",} 2217.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.1",} 2364.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.111848106",} 2504.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.134217727",} 2719.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.156587348",} 2813.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.178956969",} 2914.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.2",} 2951.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.20132659",} 2953.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.223696211",} 3006.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.246065832",} 3026.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.268435456",} 3048.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.357913941",} 3142.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.447392426",} 3289.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.5",} 3429.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.536870911",} 3580.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.626349396",} 3913.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.715827881",} 4265.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.805306366",} 4598.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.894784851",} 4789.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="0.984263336",} 5054.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="1.0",} 5131.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="1.073741824",} 5422.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="1.431655765",} 6685.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="1.789569706",} 7671.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="2.0",} 8228.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="2.147483647",} 8528.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="2.505397588",} 8995.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="2.863311529",} 9365.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="3.0",} 9477.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="3.22122547",} 9666.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="3.579139411",} 9911.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="3.937053352",} 10068.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="4.294967296",} 10307.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="5.726623061",} 10759.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="7.158278826",} 11010.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="8.589934591",} 11115.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="10.021590356",} 11170.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="11.453246121",} 11194.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="12.884901886",} 11206.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="14.316557651",} 11208.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="15.748213416",} 11208.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="17.179869184",} 11211.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="22.906492245",} 11212.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="28.633115306",} 11212.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="30.0",} 11212.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",le="+Inf",} 11212.0
+http_server_requests_seconds_count{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",} 11212.0
+http_server_requests_seconds_sum{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",} 17830.568291537
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.001",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.001048576",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.001398101",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.001747626",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.002097151",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.002446676",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.002796201",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.003145726",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.003495251",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.003844776",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.004194304",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.005592405",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.006990506",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.008388607",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.009786708",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.011184809",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.01258291",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.013981011",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.015379112",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.016777216",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.022369621",} 0.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.027962026",} 4.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.033554431",} 5.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.039146836",} 8.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.044739241",} 9.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.050331646",} 11.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.055924051",} 14.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.061516456",} 14.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.067108864",} 14.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.089478485",} 18.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.1",} 19.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.111848106",} 19.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.134217727",} 22.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.156587348",} 23.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.178956969",} 23.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.2",} 24.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.20132659",} 24.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.223696211",} 26.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.246065832",} 27.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.268435456",} 27.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.357913941",} 29.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.447392426",} 29.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.5",} 29.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.536870911",} 29.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.626349396",} 29.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.715827881",} 30.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.805306366",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.894784851",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="0.984263336",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="1.0",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="1.073741824",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="1.431655765",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="1.789569706",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="2.0",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="2.147483647",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="2.505397588",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="2.863311529",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="3.0",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="3.22122547",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="3.579139411",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="3.937053352",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="4.294967296",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="5.726623061",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="7.158278826",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="8.589934591",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="10.021590356",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="11.453246121",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="12.884901886",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="14.316557651",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="15.748213416",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="17.179869184",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="22.906492245",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="28.633115306",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="30.0",} 31.0
+http_server_requests_seconds_bucket{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",le="+Inf",} 31.0
+http_server_requests_seconds_count{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",} 31.0
+http_server_requests_seconds_sum{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",} 4.488205913
+# HELP http_server_requests_seconds_max  
+# TYPE http_server_requests_seconds_max gauge
+http_server_requests_seconds_max{application="givemeticon",error="IOException",exception="IOException",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",} 21.487692792
+http_server_requests_seconds_max{application="givemeticon",error="none",exception="none",method="POST",outcome="SUCCESS",status="200",uri="/internal/loadtest/coupons/requests",} 12.235760291
+http_server_requests_seconds_max{application="givemeticon",error="none",exception="none",method="GET",outcome="SUCCESS",status="200",uri="/actuator/prometheus",} 0.801041166
+# HELP process_cpu_usage The "recent cpu usage" for the Java Virtual Machine process
+# TYPE process_cpu_usage gauge
+process_cpu_usage{application="givemeticon",} 0.005604900637528814
+# HELP tomcat_global_request_max_seconds  
+# TYPE tomcat_global_request_max_seconds gauge
+tomcat_global_request_max_seconds{application="givemeticon",name="http-nio-8083",} 22.198
+# HELP process_uptime_seconds The uptime of the Java virtual machine
+# TYPE process_uptime_seconds gauge
+process_uptime_seconds{application="givemeticon",} 225.579
+# HELP logback_events_total Number of log events that were enabled by the effective log level
+# TYPE logback_events_total counter
+logback_events_total{application="givemeticon",level="trace",} 0.0
+logback_events_total{application="givemeticon",level="warn",} 42.0
+logback_events_total{application="givemeticon",level="error",} 0.0
+logback_events_total{application="givemeticon",level="info",} 24.0
+logback_events_total{application="givemeticon",level="debug",} 0.0
+# HELP hikaricp_connections_timeout_total Connection timeout total count
+# TYPE hikaricp_connections_timeout_total counter
+hikaricp_connections_timeout_total{application="givemeticon",pool="HikariPool-1",} 0.0
+# HELP tomcat_threads_config_max_threads  
+# TYPE tomcat_threads_config_max_threads gauge
+tomcat_threads_config_max_threads{application="givemeticon",name="http-nio-8083",} 200.0
+# HELP jvm_gc_max_data_size_bytes Max size of long-lived heap memory pool
+# TYPE jvm_gc_max_data_size_bytes gauge
+jvm_gc_max_data_size_bytes{application="givemeticon",} 4.294967296E9
+# HELP executor_completed_tasks_total The approximate total number of tasks that have completed execution
+# TYPE executor_completed_tasks_total counter
+executor_completed_tasks_total{application="givemeticon",name="taskScheduler",} 424.0
+executor_completed_tasks_total{application="givemeticon",name="mailExecutor",} 0.0
+# HELP jvm_buffer_count_buffers An estimate of the number of buffers in the pool
+# TYPE jvm_buffer_count_buffers gauge
+jvm_buffer_count_buffers{application="givemeticon",id="direct",} 223.0
+jvm_buffer_count_buffers{application="givemeticon",id="mapped",} 0.0
+jvm_buffer_count_buffers{application="givemeticon",id="mapped - 'non-volatile memory'",} 0.0
+# HELP hikaricp_connections_usage_seconds Connection usage time
+# TYPE hikaricp_connections_usage_seconds summary
+hikaricp_connections_usage_seconds_count{application="givemeticon",pool="HikariPool-1",} 13926.0
+hikaricp_connections_usage_seconds_sum{application="givemeticon",pool="HikariPool-1",} 946.453
+# HELP hikaricp_connections_usage_seconds_max Connection usage time
+# TYPE hikaricp_connections_usage_seconds_max gauge
+hikaricp_connections_usage_seconds_max{application="givemeticon",pool="HikariPool-1",} 0.815
+# HELP tomcat_sessions_active_current_sessions  
+# TYPE tomcat_sessions_active_current_sessions gauge
+tomcat_sessions_active_current_sessions{application="givemeticon",} 0.0
+# HELP jvm_gc_overhead_percent An approximation of the percent of CPU time used by GC activities over the last lookback period or since monitoring began, whichever is shorter, in the range [0..1]
+# TYPE jvm_gc_overhead_percent gauge
+jvm_gc_overhead_percent{application="givemeticon",} 0.0043764862342164125
+# HELP http_server_requests_active_seconds_max  
+# TYPE http_server_requests_active_seconds_max gauge
+http_server_requests_active_seconds_max{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",} 0.057589709
+http_server_requests_active_seconds_max{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",} 0.0
+# HELP http_server_requests_active_seconds  
+# TYPE http_server_requests_active_seconds histogram
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="120.0",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="137.438953471",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="160.345445716",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="183.251937961",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="206.158430206",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="229.064922451",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="251.971414696",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="274.877906944",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="366.503875925",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="458.129844906",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="549.755813887",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="641.381782868",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="733.007751849",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="824.63372083",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="916.259689811",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="1007.885658792",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="1099.511627776",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="1466.015503701",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="1832.519379626",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="2199.023255551",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="2565.527131476",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="2932.031007401",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="3298.534883326",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="3665.038759251",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="4031.542635176",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="4398.046511104",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="5864.062014805",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="7200.0",} 105.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",le="+Inf",} 1.0
+http_server_requests_active_seconds_active_count{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",} 1.0
+http_server_requests_active_seconds_duration_sum{application="givemeticon",exception="none",method="GET",outcome="SUCCESS",status="200",uri="UNKNOWN",} 0.05758475
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="120.0",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="137.438953471",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="160.345445716",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="183.251937961",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="206.158430206",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="229.064922451",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="251.971414696",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="274.877906944",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="366.503875925",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="458.129844906",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="549.755813887",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="641.381782868",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="733.007751849",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="824.63372083",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="916.259689811",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="1007.885658792",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="1099.511627776",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="1466.015503701",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="1832.519379626",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="2199.023255551",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="2565.527131476",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="2932.031007401",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="3298.534883326",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="3665.038759251",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="4031.542635176",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="4398.046511104",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="5864.062014805",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="7200.0",} 55.0
+http_server_requests_active_seconds_bucket{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",le="+Inf",} 0.0
+http_server_requests_active_seconds_active_count{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",} 0.0
+http_server_requests_active_seconds_duration_sum{application="givemeticon",exception="none",method="POST",outcome="SUCCESS",status="200",uri="UNKNOWN",} 0.0
+# HELP jvm_memory_committed_bytes The amount of memory in bytes that is committed for the Java virtual machine to use
+# TYPE jvm_memory_committed_bytes gauge
+jvm_memory_committed_bytes{application="givemeticon",area="heap",id="G1 Old Gen",} 1.59383552E8
+jvm_memory_committed_bytes{application="givemeticon",area="nonheap",id="Metaspace",} 9.568256E7
+jvm_memory_committed_bytes{application="givemeticon",area="nonheap",id="CodeHeap 'profiled nmethods'",} 2.9294592E7
+jvm_memory_committed_bytes{application="givemeticon",area="heap",id="G1 Survivor Space",} 4194304.0
+jvm_memory_committed_bytes{application="givemeticon",area="nonheap",id="CodeHeap 'non-nmethods'",} 2555904.0
+jvm_memory_committed_bytes{application="givemeticon",area="heap",id="G1 Eden Space",} 1.00663296E8
+jvm_memory_committed_bytes{application="givemeticon",area="nonheap",id="Compressed Class Space",} 1.179648E7
+jvm_memory_committed_bytes{application="givemeticon",area="nonheap",id="CodeHeap 'non-profiled nmethods'",} 1.212416E7
+# HELP executor_queue_remaining_tasks The number of additional elements that this queue can ideally accept without blocking
+# TYPE executor_queue_remaining_tasks gauge
+executor_queue_remaining_tasks{application="givemeticon",name="taskScheduler",} 2.147483647E9
+executor_queue_remaining_tasks{application="givemeticon",name="mailExecutor",} 15.0
+# HELP tomcat_global_request_seconds  
+# TYPE tomcat_global_request_seconds summary
+tomcat_global_request_seconds_count{application="givemeticon",name="http-nio-8083",} 11264.0
+tomcat_global_request_seconds_sum{application="givemeticon",name="http-nio-8083",} 17952.054
+# HELP coupon_issue_duration_seconds 쿠폰 접수부터 최종 결과 확정까지 걸린 시간
+# TYPE coupon_issue_duration_seconds histogram
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.001",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.001048576",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.001398101",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.001747626",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.002097151",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.002446676",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.002796201",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.003145726",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.003495251",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.003844776",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.004194304",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.005592405",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.006990506",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.008388607",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.009786708",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.011184809",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.01258291",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.013981011",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.015379112",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.016777216",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.022369621",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.027962026",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.033554431",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.039146836",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.044739241",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.050331646",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.055924051",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.061516456",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.067108864",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.089478485",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.111848106",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.134217727",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.156587348",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.178956969",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.20132659",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.223696211",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.246065832",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.268435456",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.357913941",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.447392426",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.5",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.536870911",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.626349396",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.715827881",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.805306366",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.894784851",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="0.984263336",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="1.0",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="1.073741824",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="1.431655765",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="1.789569706",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="2.0",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="2.147483647",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="2.505397588",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="2.863311529",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="3.22122547",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="3.579139411",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="3.937053352",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="4.294967296",} 61.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="5.0",} 100.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="5.726623061",} 100.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="7.158278826",} 100.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="8.589934591",} 100.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="10.021590356",} 150.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="11.453246121",} 200.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="12.884901886",} 200.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="14.316557651",} 250.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="15.748213416",} 250.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="17.179869184",} 283.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="22.906492245",} 415.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="28.633115306",} 1000.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="30.0",} 1000.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="60.0",} 1000.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="180.0",} 1000.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="300.0",} 1000.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="issued",path="batch",le="+Inf",} 1000.0
+coupon_issue_duration_seconds_count{application="givemeticon",outcome="issued",path="batch",} 1000.0
+coupon_issue_duration_seconds_sum{application="givemeticon",outcome="issued",path="batch",} 19185.077462
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.001",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.001048576",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.001398101",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.001747626",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.002097151",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.002446676",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.002796201",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.003145726",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.003495251",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.003844776",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.004194304",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.005592405",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.006990506",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.008388607",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.009786708",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.011184809",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.01258291",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.013981011",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.015379112",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.016777216",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.022369621",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.027962026",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.033554431",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.039146836",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.044739241",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.050331646",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.055924051",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.061516456",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.067108864",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.089478485",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.111848106",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.134217727",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.156587348",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.178956969",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.20132659",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.223696211",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.246065832",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.268435456",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.357913941",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.447392426",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.5",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.536870911",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.626349396",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.715827881",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.805306366",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.894784851",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="0.984263336",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="1.0",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="1.073741824",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="1.431655765",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="1.789569706",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="2.0",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="2.147483647",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="2.505397588",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="2.863311529",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="3.22122547",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="3.579139411",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="3.937053352",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="4.294967296",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="5.0",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="5.726623061",} 0.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="7.158278826",} 45.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="8.589934591",} 978.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="10.021590356",} 1288.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="11.453246121",} 1685.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="12.884901886",} 1932.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="14.316557651",} 3610.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="15.748213416",} 5034.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="17.179869184",} 6086.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="22.906492245",} 7408.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="28.633115306",} 7408.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="30.0",} 7408.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="60.0",} 7408.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="180.0",} 7408.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="300.0",} 7408.0
+coupon_issue_duration_seconds_bucket{application="givemeticon",outcome="sold_out",path="batch",le="+Inf",} 7408.0
+coupon_issue_duration_seconds_count{application="givemeticon",outcome="sold_out",path="batch",} 7408.0
+coupon_issue_duration_seconds_sum{application="givemeticon",outcome="sold_out",path="batch",} 104997.848833
+# HELP coupon_issue_duration_seconds_max 쿠폰 접수부터 최종 결과 확정까지 걸린 시간
+# TYPE coupon_issue_duration_seconds_max gauge
+coupon_issue_duration_seconds_max{application="givemeticon",outcome="issued",path="batch",} 24.046328
+coupon_issue_duration_seconds_max{application="givemeticon",outcome="sold_out",path="batch",} 22.688939
+# HELP jvm_threads_live_threads The current number of live threads including both daemon and non-daemon threads
+# TYPE jvm_threads_live_threads gauge
+jvm_threads_live_threads{application="givemeticon",} 261.0
+# HELP hikaricp_connections_active Active connections
+# TYPE hikaricp_connections_active gauge
+hikaricp_connections_active{application="givemeticon",pool="HikariPool-1",} 0.0
+# HELP tomcat_threads_current_threads  
+# TYPE tomcat_threads_current_threads gauge
+tomcat_threads_current_threads{application="givemeticon",name="http-nio-8083",} 200.0

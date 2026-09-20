@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -65,6 +66,11 @@ public class CouponIssueRequestService {
         return couponIssueRequestMapper.findDistinctPendingStockIds();
     }
 
+    /** 묶음 발급 워커가 이 재고에서 다음으로 처리할 접수를 접수번호 오름차순으로 최대 limit건 고른다. */
+    public List<CouponIssueRequest> findPendingBatch(int stockId, int limit) {
+        return couponIssueRequestMapper.findPendingBatch(stockId, limit);
+    }
+
     @Transactional
     public void markIssued(long requestId, int couponId) {
         couponIssueRequestMapper.markIssued(requestId, couponId);
@@ -75,6 +81,23 @@ public class CouponIssueRequestService {
         couponIssueRequestMapper.markRejected(requestId, reason);
     }
 
+    /** requestId -> couponId 매핑을 한 번의 UPDATE로 반영한다. */
+    @Transactional
+    public void markIssuedBatch(List<IssuedCoupon> issuedCoupons) {
+        List<Map<String, Object>> items = issuedCoupons.stream()
+                .map(issued -> Map.<String, Object>of("requestId", issued.requestId(), "couponId", issued.couponId()))
+                .toList();
+        couponIssueRequestMapper.markIssuedBatch(items);
+    }
+
+    @Transactional
+    public void markSoldOutBatch(List<Long> requestIds, String reason) {
+        couponIssueRequestMapper.markSoldOutBatch(requestIds, reason);
+    }
+
     public record AcceptResult(CouponIssueRequest request, boolean newlyAccepted) {
+    }
+
+    public record IssuedCoupon(long requestId, int couponId) {
     }
 }

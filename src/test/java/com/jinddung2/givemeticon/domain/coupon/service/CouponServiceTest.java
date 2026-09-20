@@ -2,6 +2,8 @@ package com.jinddung2.givemeticon.domain.coupon.service;
 
 import com.jinddung2.givemeticon.common.utils.CertificationGenerator;
 import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
+import com.jinddung2.givemeticon.domain.coupon.domain.CouponIssueRequest;
+import com.jinddung2.givemeticon.domain.coupon.domain.CouponRequestStatus;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyIssuedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyRedeemedCouponException;
@@ -18,6 +20,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -122,6 +126,45 @@ class CouponServiceTest {
                 () -> sut.issueCoupon(userId, stockId, couponName, CouponType.FREE_POINT, price));
 
         verify(couponMapper, never()).saveIfNotIssued(any(Coupon.class));
+    }
+
+    @Test
+    @DisplayName("issueCouponsBatch: 요청 목록만큼 쿠폰을 한 번에 만들어 반환한다.")
+    void issue_coupons_batch_success() {
+        int stockId = 1;
+        String couponName = "테스트 선착순 쿠폰";
+        int price = 10_000;
+
+        List<CouponIssueRequest> requests = List.of(
+                CouponIssueRequest.builder().userId(1).stockId(stockId).couponName(couponName)
+                        .couponType(CouponType.FREE_POINT).price(price).status(CouponRequestStatus.PENDING)
+                        .createdDate(LocalDateTime.now()).build(),
+                CouponIssueRequest.builder().userId(2).stockId(stockId).couponName(couponName)
+                        .couponType(CouponType.FREE_POINT).price(price).status(CouponRequestStatus.PENDING)
+                        .createdDate(LocalDateTime.now()).build());
+        when(certificationGenerator.createCouponNumber(16)).thenReturn("1234567812345678");
+        when(couponMapper.saveAll(anyList())).thenReturn(2);
+
+        List<Coupon> result = sut.issueCouponsBatch(stockId, requests);
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(Coupon::getUserId).containsExactly(1, 2);
+        verify(couponMapper).saveAll(result);
+        verify(couponStockMapper, never()).decreaseStockIfEnough(anyInt());
+    }
+
+    @Test
+    @DisplayName("issueCouponsBatch: 삽입된 행 수가 요청 건수와 다르면 예외를 던진다.")
+    void issue_coupons_batch_fail_row_count_mismatch() {
+        int stockId = 1;
+        List<CouponIssueRequest> requests = List.of(
+                CouponIssueRequest.builder().userId(1).stockId(stockId).couponName("쿠폰")
+                        .couponType(CouponType.FREE_POINT).price(1000).status(CouponRequestStatus.PENDING)
+                        .createdDate(LocalDateTime.now()).build());
+        when(certificationGenerator.createCouponNumber(16)).thenReturn("1234567812345678");
+        when(couponMapper.saveAll(anyList())).thenReturn(0);
+
+        assertThrows(IllegalStateException.class, () -> sut.issueCouponsBatch(stockId, requests));
     }
 
     @Test

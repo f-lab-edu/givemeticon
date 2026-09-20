@@ -67,4 +67,44 @@ class CouponStockServiceTest {
         Assertions.assertThrows(NotEnoughCouponStockException.class,
                 () -> couponStockService.decreaseStock(stockId));
     }
+
+    @Test
+    @DisplayName("[묶음 차감] amount만큼 재고가 있으면 true를 반환한다.")
+    void decreaseStockByIfEnough_Enough_ReturnsTrue() {
+        Mockito.when(couponStockMapper.decreaseStockByIfEnough(stockId, 50)).thenReturn(1);
+
+        boolean result = couponStockService.decreaseStockByIfEnough(stockId, 50);
+
+        Assertions.assertTrue(result);
+    }
+
+    @Test
+    @DisplayName("[묶음 차감] amount만큼 재고가 없으면 false를 반환하고 재고를 건드리지 않는다.")
+    void decreaseStockByIfEnough_NotEnough_ReturnsFalse() {
+        Mockito.when(couponStockMapper.decreaseStockByIfEnough(stockId, 50)).thenReturn(0);
+
+        boolean result = couponStockService.decreaseStockByIfEnough(stockId, 50);
+
+        Assertions.assertFalse(result);
+    }
+
+    @Test
+    @DisplayName("[행 잠금 조회] 존재하면 잠근 상태의 재고를 반환한다.")
+    void getStockForUpdate_ExistingStockId_ReturnsCouponStock() {
+        CouponStock expectedCouponStock = CouponStock.of(total);
+        Mockito.when(couponStockMapper.findByIdForUpdate(stockId)).thenReturn(Optional.of(expectedCouponStock));
+
+        CouponStock result = couponStockService.getStockForUpdate(stockId);
+
+        Assertions.assertSame(expectedCouponStock, result);
+    }
+
+    @Test
+    @DisplayName("[행 잠금 조회] 존재하지 않으면 예외를 던진다.")
+    void getStockForUpdate_NotFound_Throws() {
+        Mockito.when(couponStockMapper.findByIdForUpdate(stockId)).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(NotFoundCouponStock.class,
+                () -> couponStockService.getStockForUpdate(stockId));
+    }
 }

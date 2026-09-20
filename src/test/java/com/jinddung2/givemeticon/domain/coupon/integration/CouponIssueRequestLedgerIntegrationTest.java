@@ -13,6 +13,7 @@ import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponStockMapper;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponIssueRequestService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
+import com.jinddung2.givemeticon.domain.coupon.service.CouponStockService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.datasource.unpooled.UnpooledDataSource;
@@ -101,10 +102,12 @@ class CouponIssueRequestLedgerIntegrationTest {
         CouponIssueRequestMapper couponIssueRequestMapper = sqlSessionTemplate.getMapper(CouponIssueRequestMapper.class);
 
         couponService = new CouponService(couponMapper, couponStockMapper, new CertificationGenerator());
+        CouponStockService couponStockService = new CouponStockService(couponStockMapper);
         couponIssueRequestService = new CouponIssueRequestService(couponIssueRequestMapper);
         // @DistributedLock is inert without a Spring AOP proxy - fine here, we're testing the
         // recovery LOGIC, not lock behavior (that's covered by CouponIssuanceTransactionRegressionTest's pattern).
-        createCouponFacade = new CreateCouponFacade(couponService, couponIssueRequestService, couponMapper, new SimpleMeterRegistry());
+        createCouponFacade = new CreateCouponFacade(
+                couponService, couponStockService, couponIssueRequestService, couponMapper, new SimpleMeterRegistry());
     }
 
     private static void applySchema() throws Exception {

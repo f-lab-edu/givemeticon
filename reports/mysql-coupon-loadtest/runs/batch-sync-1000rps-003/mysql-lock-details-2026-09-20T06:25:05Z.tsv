@@ -1,0 +1,2 @@
+2026-09-20 15:25:07.762466	545	542	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 25           AND remain > 0	NULL
+2026-09-20 15:25:07.762466	556	542	`givemeticon_loadtest`.`coupon_stock`	PRIMARY	0	UPDATE coupon_stock         SE ...  = 25           AND remain > 0	NULL

@@ -63,6 +63,19 @@
         LIMIT 1
     </select>
 
+    <!-- 묶음 발급 워커가 이 재고(stock_id)에서 다음으로 처리할 접수를 접수번호 오름차순으로
+         최대 limit건 고른다. LIMIT 1을 LIMIT N으로 바꾼 것 외에 findOldestPendingByStockId와
+         동일한 인덱스(stock_id, status, id)를 그대로 탄다. -->
+    <select id="findPendingBatch" resultType="CouponIssueRequest">
+        SELECT
+        <include refid="columns"/>
+        FROM coupon_issue_request
+        WHERE stock_id = #{stockId}
+          AND status = 'PENDING'
+        ORDER BY id ASC
+        LIMIT #{limit}
+    </select>
+
     <select id="findDistinctPendingStockIds" resultType="int">
         SELECT DISTINCT stock_id
         FROM coupon_issue_request
@@ -85,5 +98,30 @@
             updated_date = NOW(6)
         WHERE id = #{id}
           AND status = 'PENDING'
+    </update>
+
+    <!-- items 원소는 requestId/couponId 키를 가진 Map이다. 한 번의 UPDATE로 다건을 ISSUED 처리한다. -->
+    <update id="markIssuedBatch">
+        UPDATE coupon_issue_request
+        SET status       = 'ISSUED',
+            coupon_id    = CASE id
+            <foreach collection="items" item="i">
+                WHEN #{i.requestId} THEN #{i.couponId}
+            </foreach>
+            END,
+            updated_date = NOW(6)
+        WHERE id IN
+        <foreach collection="items" item="i" open="(" separator="," close=")">#{i.requestId}</foreach>
+        AND status = 'PENDING'
+    </update>
+
+    <update id="markSoldOutBatch">
+        UPDATE coupon_issue_request
+        SET status       = 'SOLD_OUT',
+            reason       = #{reason},
+            updated_date = NOW(6)
+        WHERE id IN
+        <foreach collection="ids" item="requestId" open="(" separator="," close=")">#{requestId}</foreach>
+        AND status = 'PENDING'
     </update>
 </mapper>

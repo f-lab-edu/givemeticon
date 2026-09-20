@@ -1,0 +1,115 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: /scripts/coupon-arrival-rate.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 12000 max VUs, 40s max duration (incl. graceful stop):
+              * unique_member_first_request: 1000.00 iterations/s for 10s (maxVUs: 6000-12000, gracefulStop: 30s)
+
+
+Init                          [  91% ] 5451/6000 VUs initialized
+unique_member_first_request   [   0% ]
+
+running (00.9s), 00775/06000 VUs, 163 complete and 0 interrupted iterations
+unique_member_first_request   [   9% ] 00775/06000 VUs  00.9s/10s  1000.00 iters/s
+
+running (01.9s), 01566/06000 VUs, 374 complete and 0 interrupted iterations
+unique_member_first_request   [  19% ] 01566/06000 VUs  01.9s/10s  1000.00 iters/s
+
+running (03.0s), 02376/06000 VUs, 551 complete and 0 interrupted iterations
+unique_member_first_request   [  30% ] 02376/06000 VUs  03.0s/10s  1000.00 iters/s
+
+running (03.9s), 03216/06000 VUs, 668 complete and 0 interrupted iterations
+unique_member_first_request   [  39% ] 03216/06000 VUs  03.9s/10s  1000.00 iters/s
+
+running (05.0s), 04094/06000 VUs, 837 complete and 0 interrupted iterations
+unique_member_first_request   [  50% ] 04094/06000 VUs  05.0s/10s  1000.00 iters/s
+
+running (05.9s), 04953/06000 VUs, 986 complete and 0 interrupted iterations
+unique_member_first_request   [  59% ] 04953/06000 VUs  05.9s/10s  1000.00 iters/s
+
+running (06.9s), 05704/06000 VUs, 1234 complete and 0 interrupted iterations
+unique_member_first_request   [  69% ] 05704/06000 VUs  06.9s/10s  1000.00 iters/s
+
+running (07.9s), 06069/06069 VUs, 1420 complete and 0 interrupted iterations
+unique_member_first_request   [  79% ] 06069/06069 VUs  07.9s/10s  1000.00 iters/s
+
+running (08.9s), 06156/06157 VUs, 1689 complete and 0 interrupted iterations
+unique_member_first_request   [  89% ] 06156/06157 VUs  08.9s/10s  1000.00 iters/s
+
+running (09.9s), 06275/06275 VUs, 2044 complete and 0 interrupted iterations
+unique_member_first_request   [  99% ] 06275/06275 VUs  09.9s/10s  1000.00 iters/s
+
+running (10.9s), 06227/06279 VUs, 2105 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 06276/06278 VUs  10s  1000.00 iters/s
+
+running (11.9s), 06108/06279 VUs, 2224 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 06276/06278 VUs  10s  1000.00 iters/s
+
+running (12.9s), 05398/06279 VUs, 2934 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 06276/06278 VUs  10s  1000.00 iters/s
+
+running (13.9s), 04467/06279 VUs, 3865 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 06276/06278 VUs  10s  1000.00 iters/s
+
+running (14.9s), 03403/06279 VUs, 4929 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 06276/06278 VUs  10s  1000.00 iters/s
+
+running (15.9s), 02394/06279 VUs, 5938 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 06276/06278 VUs  10s  1000.00 iters/s
+
+running (16.9s), 01395/06279 VUs, 6937 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 06276/06278 VUs  10s  1000.00 iters/s
+
+running (17.9s), 00844/06279 VUs, 7488 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 06276/06278 VUs  10s  1000.00 iters/s
+
+running (18.9s), 00488/06279 VUs, 7844 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 06276/06278 VUs  10s  1000.00 iters/s
+
+running (19.9s), 00013/06279 VUs, 8319 complete and 0 interrupted iterations
+unique_member_first_request ↓ [ 100% ] 06276/06278 VUs  10s  1000.00 iters/s
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 8332   412.51713/s
+    checks_succeeded...: 25.86% 2155 out of 8332
+    checks_failed......: 74.13% 6177 out of 8332
+
+    ✗ business response or no server error
+      ↳  25% — ✓ 2155 / ✗ 6177
+
+    CUSTOM
+    coupon_issue_business_response_under_2s...: 5.83%  486 out of 8332
+    coupon_issue_issued.......................: 2155   106.694001/s
+
+    HTTP
+    http_req_duration.........................: avg=8.6s  min=0s      med=9.98s max=10.08s p(90)=10s    p(95)=10.01s p(99)=10.03s
+      { expected_response:true }..............: avg=4.88s min=66.58ms med=5.33s max=9.98s  p(90)=7.91s  p(95)=8.69s  p(99)=9.71s 
+    http_req_failed...........................: 74.13% 6177 out of 8332
+    http_reqs.................................: 8332   412.51713/s
+
+    EXECUTION
+    dropped_iterations........................: 1665   82.434112/s
+    iteration_duration........................: avg=8.64s min=8.53ms  med=10s   max=10.14s p(90)=10.02s p(95)=10.05s p(99)=10.09s
+    iterations................................: 8332   412.51713/s
+    vus.......................................: 13     min=0            max=6275
+    vus_max...................................: 6279   min=5437         max=6279
+
+    NETWORK
+    data_received.............................: 509 kB 25 kB/s
+    data_sent.................................: 2.6 MB 130 kB/s
+
+
+
+
+running (20.2s), 00000/06279 VUs, 8332 complete and 0 interrupted iterations
+unique_member_first_request ✓ [ 100% ] 00000/06279 VUs  10s  1000.00 iters/s
