@@ -103,7 +103,7 @@ class CouponIssueRequestLedgerIntegrationTest {
 
         couponService = new CouponService(couponMapper, couponStockMapper, new CertificationGenerator());
         CouponStockService couponStockService = new CouponStockService(couponStockMapper);
-        couponIssueRequestService = new CouponIssueRequestService(couponIssueRequestMapper);
+        couponIssueRequestService = new CouponIssueRequestService(couponIssueRequestMapper, new SimpleMeterRegistry());
         // @DistributedLock is inert without a Spring AOP proxy - fine here, we're testing the
         // recovery LOGIC, not lock behavior (that's covered by CouponIssuanceTransactionRegressionTest's pattern).
         createCouponFacade = new CreateCouponFacade(

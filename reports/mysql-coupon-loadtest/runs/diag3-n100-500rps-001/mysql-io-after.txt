@@ -1,0 +1,8 @@
+Innodb_os_log_fsyncs	511443
+Innodb_os_log_pending_fsyncs	0
+Innodb_log_writes	1038899
+redo_log_file_count_star	1553918
+redo_log_file_sum_timer_wait_ps	996370931141685
+ibdata_count_star	138977
+ibdata_sum_timer_wait_ps	216266858244180
+docker_block_io	185MB / 6.31GB

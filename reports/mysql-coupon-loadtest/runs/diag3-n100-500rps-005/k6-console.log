@@ -1,0 +1,80 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: /scripts/coupon-arrival-rate.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 6000 max VUs, 40s max duration (incl. graceful stop):
+              * unique_member_first_request: 500.00 iterations/s for 10s (maxVUs: 3000-6000, gracefulStop: 30s)
+
+
+running (00.2s), 0081/3000 VUs, 41 complete and 0 interrupted iterations
+unique_member_first_request   [   2% ] 0081/3000 VUs  00.2s/10s  500.00 iters/s
+
+running (01.2s), 0004/3000 VUs, 618 complete and 0 interrupted iterations
+unique_member_first_request   [  12% ] 0004/3000 VUs  01.2s/10s  500.00 iters/s
+
+running (02.2s), 0004/3000 VUs, 1118 complete and 0 interrupted iterations
+unique_member_first_request   [  22% ] 0004/3000 VUs  02.2s/10s  500.00 iters/s
+
+running (03.2s), 0003/3000 VUs, 1618 complete and 0 interrupted iterations
+unique_member_first_request   [  32% ] 0003/3000 VUs  03.2s/10s  500.00 iters/s
+
+running (04.2s), 0025/3000 VUs, 2097 complete and 0 interrupted iterations
+unique_member_first_request   [  42% ] 0025/3000 VUs  04.2s/10s  500.00 iters/s
+
+running (05.2s), 0002/3000 VUs, 2619 complete and 0 interrupted iterations
+unique_member_first_request   [  52% ] 0002/3000 VUs  05.2s/10s  500.00 iters/s
+
+running (06.2s), 0007/3000 VUs, 3116 complete and 0 interrupted iterations
+unique_member_first_request   [  62% ] 0007/3000 VUs  06.2s/10s  500.00 iters/s
+
+running (07.2s), 0002/3000 VUs, 3619 complete and 0 interrupted iterations
+unique_member_first_request   [  72% ] 0002/3000 VUs  07.2s/10s  500.00 iters/s
+
+running (08.2s), 0003/3000 VUs, 4119 complete and 0 interrupted iterations
+unique_member_first_request   [  82% ] 0003/3000 VUs  08.2s/10s  500.00 iters/s
+
+running (09.2s), 0004/3000 VUs, 4617 complete and 0 interrupted iterations
+unique_member_first_request   [  92% ] 0004/3000 VUs  09.2s/10s  500.00 iters/s
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 5000    498.639899/s
+    checks_succeeded...: 100.00% 5000 out of 5000
+    checks_failed......: 0.00%   0 out of 5000
+
+    ✓ business response or no server error
+
+    CUSTOM
+    coupon_issue_business_response_under_2s...: 100.00% 5000 out of 5000
+    coupon_issue_issued.......................: 5000    498.639899/s
+
+    HTTP
+    http_req_duration.........................: avg=13.78ms min=2.5ms  med=6.73ms max=191.8ms p(90)=30.46ms p(95)=55.62ms p(99)=121.82ms
+      { expected_response:true }..............: avg=13.78ms min=2.5ms  med=6.73ms max=191.8ms p(90)=30.46ms p(95)=55.62ms p(99)=121.82ms
+    http_req_failed...........................: 0.00%   0 out of 5000
+    http_reqs.................................: 5000    498.639899/s
+
+    EXECUTION
+    iteration_duration........................: avg=15.57ms min=2.59ms med=7.76ms max=204.9ms p(90)=34.48ms p(95)=67.44ms p(99)=134.29ms
+    iterations................................: 5000    498.639899/s
+    vus.......................................: 4       min=2            max=81  
+    vus_max...................................: 3000    min=3000         max=3000
+
+    NETWORK
+    data_received.............................: 1.2 MB  118 kB/s
+    data_sent.................................: 1.6 MB  158 kB/s
+
+
+
+
+running (10.0s), 0000/3000 VUs, 5000 complete and 0 interrupted iterations
+unique_member_first_request ✓ [ 100% ] 0000/3000 VUs  10s  500.00 iters/s
