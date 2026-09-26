@@ -1,0 +1,16 @@
+# 묶음 접수 경로를 켜는 프로필. coupon-admission 프로필과 함께 적용한다.
+# 초기값 선정 근거는 기록/coupon-admission-batch-loadtest 문서를 참고한다:
+# - size=50: 1,000 req/s(앱당 500 req/s)에서 max-wait-millis=15 동안 평균 7~8건이 모이므로,
+#   50은 정상 부하에서 대기시간이 상한을 채우는 안전판이며, 밀린 구간에서만 상한으로 작동한다.
+# - max-wait-millis=15: 접수 확인 목표(p95 2초)에 더하는 지연이 무시할 수 있는 수준이면서도,
+#   앱당 500 req/s에서 한 자릿수 이상의 요청을 묶기에 충분한 값으로 선택했다.
+# - queue-capacity=2000: 앱당 약 4초치(2,000/500rps) 유입을 완충하는 값으로, 이를 넘는 요청은
+#   메모리에 쌓아 접수 성공으로 안내하지 않고 즉시 503으로 거절한다.
+coupon:
+  admission:
+    batch:
+      enabled: true
+      size: 50
+      max-wait-millis: 15
+      queue-capacity: 2000
+      wait-timeout-millis: 5000

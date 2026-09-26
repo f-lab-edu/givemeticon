@@ -7,6 +7,7 @@ build/
 application-*.yml
 !src/main/resources/application-coupon-admission.yml
 !src/main/resources/application-coupon-admission-test.yml
+!src/main/resources/application-coupon-admission-batch.yml
 
 ### local working notes ###
 기록/
