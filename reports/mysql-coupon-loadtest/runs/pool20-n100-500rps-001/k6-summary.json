@@ -1,0 +1,145 @@
+{
+    "metrics": {
+        "iteration_duration": {
+            "p(90)": 1554.694209,
+            "p(95)": 2007.618001,
+            "p(99)": 2893.70021,
+            "avg": 627.9800444415146,
+            "min": 9.949875,
+            "med": 393.592917,
+            "max": 4349.225585
+        },
+        "http_req_connecting": {
+            "min": 0,
+            "med": 3.414292,
+            "max": 137.948958,
+            "p(90)": 29.339417,
+            "p(95)": 46.916667,
+            "p(99)": 89.296375,
+            "avg": 10.210129760047995
+        },
+        "checks": {
+            "passes": 5001,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(95)": 1991.537918,
+            "p(99)": 2869.310043,
+            "avg": 616.5798399590108,
+            "min": 8.916459,
+            "med": 385.541709,
+            "max": 4288.083752,
+            "p(90)": 1514.066917
+        },
+        "http_req_waiting": {
+            "med": 385.446792,
+            "max": 4280.757919,
+            "p(90)": 1513.727625,
+            "p(95)": 1991.163251,
+            "p(99)": 2864.499543,
+            "avg": 616.0045513749246,
+            "min": 8.762791
+        },
+        "coupon_issue_business_response_under_2s": {
+            "passes": 4754,
+            "fails": 247,
+            "value": 0.9506098780243951
+        },
+        "vus": {
+            "max": 772,
+            "value": 9,
+            "min": 9
+        },
+        "vus_max": {
+            "max": 3000,
+            "value": 3000,
+            "min": 3000
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "p(99)": 0
+        },
+        "http_req_blocked": {
+            "p(95)": 47.737958,
+            "p(99)": 89.531917,
+            "avg": 10.533176946610666,
+            "min": 0.001417,
+            "med": 3.657292,
+            "max": 145.874876,
+            "p(90)": 31.175333
+        },
+        "http_req_duration": {
+            "med": 385.541709,
+            "max": 4288.083752,
+            "p(90)": 1514.066917,
+            "p(95)": 1991.537918,
+            "p(99)": 2869.310043,
+            "avg": 616.5798399590108,
+            "min": 8.916459
+        },
+        "http_req_receiving": {
+            "avg": 0.20480896700659812,
+            "min": 0.006042,
+            "med": 0.031084,
+            "max": 95.784125,
+            "p(90)": 0.156083,
+            "p(95)": 0.452709,
+            "p(99)": 3.468334
+        },
+        "coupon_issue_issued": {
+            "count": 5001,
+            "rate": 496.6122204169014
+        },
+        "http_reqs": {
+            "count": 5001,
+            "rate": 496.6122204169014
+        },
+        "http_req_failed": {
+            "fails": 5001,
+            "passes": 0,
+            "value": 0
+        },
+        "data_received": {
+            "count": 1180236,
+            "rate": 117200.48401838873
+        },
+        "data_sent": {
+            "count": 1585317,
+            "rate": 157426.07387215775
+        },
+        "iterations": {
+            "count": 5001,
+            "rate": 496.6122204169014
+        },
+        "http_req_sending": {
+            "p(90)": 0.416667,
+            "p(95)": 1.199167,
+            "p(99)": 6.494916,
+            "avg": 0.37047961707658394,
+            "min": 0.006083,
+            "med": 0.058083,
+            "max": 111.451958
+        }
+    },
+    "root_group": {
+        "groups": {},
+        "checks": {
+                "business response or no server error": {
+                    "name": "business response or no server error",
+                    "path": "::business response or no server error",
+                    "id": "3040b42634dd809cbd2dedfb0ea7679c",
+                    "passes": 5001,
+                    "fails": 0
+                }
+            },
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+}
