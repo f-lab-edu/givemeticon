@@ -20,4 +20,17 @@
             #{applicationId}, #{eventId}, #{memberId}, #{tier}, #{points}, #{status}, UTC_TIMESTAMP(6)
         )
     </insert>
+
+    <select id="findByEventIdAndMemberId" resultType="CouponAward">
+        SELECT <include refid="columns"/>
+        FROM coupon_award
+        WHERE event_id = #{eventId}
+          AND member_id = #{memberId}
+    </select>
+
+    <update id="markRedeemed">
+        UPDATE coupon_award
+        SET status = 'REDEEMED', redeemed_at = #{redeemedAt}
+        WHERE id = #{id} AND status = 'ISSUED'
+    </update>
 </mapper>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponAwardEarnHistoryMapper">
+    <sql id="columns">
+        id, member_id, coupon_award_id, amount, earned_at, expired_at
+    </sql>
+
+    <insert id="insertIgnore" parameterType="CouponAwardEarnHistory" useGeneratedKeys="true" keyProperty="id">
+        INSERT IGNORE INTO coupon_award_earn_history (
+            member_id, coupon_award_id, amount, earned_at, expired_at
+        ) VALUES (
+            #{memberId}, #{couponAwardId}, #{amount}, #{earnedAt}, #{expiredAt}
+        )
+    </insert>
+
+    <select id="findByCouponAwardId" resultType="CouponAwardEarnHistory">
+        SELECT <include refid="columns"/>
+        FROM coupon_award_earn_history
+        WHERE coupon_award_id = #{couponAwardId}
+    </select>
+</mapper>
