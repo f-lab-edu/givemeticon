@@ -21,6 +21,10 @@ import java.util.Optional;
  * 쿠폰 사용(redeem) + 사용에 따른 포인트 적립을 하나의 트랜잭션으로 처리한다. 발급(coupon_award
  * insert)과는 완전히 별개의 업무 트랜잭션이다 - 발급 시에는 포인트를 적립하지 않는다.
  *
+ * 적립액은 클라이언트 입력이 아니라 서버에 저장된 coupon_award.points(고액 10,000/일반
+ * 5,000)를 그대로 쓴다 - 시간 창이나 별도 고정 보상 같은, 이번에 합의되지 않은 규칙은 두지
+ * 않았다(docs/coupon/08-redemption-validation.md §0 참고).
+ *
  * 발급/접수와 달리 이 트랜잭션은 coupon_event 행을 잠그지 않는다 - 여러 신청이 공유하는 순번
  * 카운터(coupon_event.next_acceptance_sequence/issued_quantity) 같은 공유 자원을 갱신하지
  * 않고, 회원 한 명의 쿠폰 한 장(coupon_award 한 행)만 갱신하기 때문이다. 동시성 방어는 그
@@ -30,11 +34,6 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class CouponAwardRedemptionService {
-
-    /** CLAUDE.md 불변 규칙: 발급 후 7일 이내 사용 시 1만 포인트를 한 번만 적립한다. */
-    private static final int EARN_POINT_AMOUNT = 10_000;
-    private static final long EARN_WINDOW_DAYS = 7;
-    private static final long POINT_VALID_MONTHS = 1;
 
     private final CouponAwardMapper couponAwardMapper;
     private final CouponAwardEarnHistoryMapper couponAwardEarnHistoryMapper;
@@ -68,21 +67,19 @@ public class CouponAwardRedemptionService {
             return findAward(eventId, memberId);
         }
 
-        if (!redeemedAt.isAfter(award.getIssuedAt().plusDays(EARN_WINDOW_DAYS))) {
-            earnPoints(memberId, award.getId(), redeemedAt);
-        }
+        earnPoints(memberId, award, redeemedAt);
         return findAward(eventId, memberId);
     }
 
-    private void earnPoints(int memberId, long couponAwardId, LocalDateTime redeemedAt) {
+    private void earnPoints(int memberId, CouponAward award, LocalDateTime redeemedAt) {
         CouponAwardEarnHistory history = CouponAwardEarnHistory.earn(
-                memberId, couponAwardId, EARN_POINT_AMOUNT, redeemedAt, redeemedAt.plusMonths(POINT_VALID_MONTHS));
+                memberId, award.getId(), award.getPoints(), redeemedAt);
         if (couponAwardEarnHistoryMapper.insertIgnore(history) != 1) {
             // UNIQUE(coupon_award_id)에 걸렸다 - markRedeemed를 우리가 방금 원자적으로 따냈으므로
             // 이론상 도달하지 않지만, 유니크 제약을 최종 방어선으로 두고 조용히 건너뛴다.
             return;
         }
-        memberPointBalanceMapper.incrementBalance(memberId, EARN_POINT_AMOUNT);
+        memberPointBalanceMapper.incrementBalance(memberId, award.getPoints());
     }
 
     private CouponAward findAward(long eventId, int memberId) {

@@ -14,13 +14,14 @@ CREATE TABLE member_point_balance (
     CONSTRAINT chk_member_point_balance_nonnegative CHECK (balance >= 0)
 );
 
+-- amount는 coupon_award.points(고액 10,000/일반 5,000)를 그대로 옮겨 적은 값이다 - 별도
+-- 고정 보상이나 적립 유효기간은 이번에 합의된 규칙이 아니라 두지 않았다(expired_at 없음).
 CREATE TABLE coupon_award_earn_history (
     id              BIGINT PRIMARY KEY AUTO_INCREMENT,
     member_id       INT         NOT NULL,
     coupon_award_id BIGINT      NOT NULL,
     amount          INT         NOT NULL,
     earned_at       DATETIME(6) NOT NULL,
-    expired_at      DATETIME(6) NOT NULL,
     CONSTRAINT uk_coupon_award_earn_history_award UNIQUE (coupon_award_id),
     CONSTRAINT fk_coupon_award_earn_history_award FOREIGN KEY (coupon_award_id) REFERENCES coupon_award(id),
     KEY idx_coupon_award_earn_history_member (member_id, earned_at)

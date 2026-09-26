@@ -24,6 +24,12 @@ app_a_pid=''
 app_b_pid=''
 
 cleanup() {
+  # gradlew bootRun forks the actual JVM as a child process - killing only the wrapper PID
+  # leaves that JVM (and the port) alive, so a later run can hit a stale, unpatched app
+  # instance instead of freshly built code. Kill by listening port instead.
+  for port in "$port_a" "$port_b"; do
+    lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+  done
   [[ -n "$app_a_pid" ]] && kill -9 "$app_a_pid" 2>/dev/null || true
   [[ -n "$app_b_pid" ]] && kill -9 "$app_b_pid" 2>/dev/null || true
 }
@@ -60,6 +66,12 @@ wait_for_app() {
   return 1
 }
 
+# 이전 실행이 비정상 종료해 포트를 여전히 붙잡고 있으면(§cleanup 참고) 새로 띄우는 앱이 아니라
+# 그 낡은 프로세스가 요청에 응답해 오탐을 낼 수 있다 - 시작 전에 선제적으로 정리한다.
+for port in "$port_a" "$port_b"; do
+  lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+done
+
 app_a_pid=$(start_app "$port_a" "$log_dir/app-$port_a.log")
 app_b_pid=$(start_app "$port_b" "$log_dir/app-$port_b.log")
 wait_for_app "$port_a" "$log_dir/app-$port_a.log"
@@ -71,7 +83,8 @@ create_event() {
 }
 
 # 접수·발급은 7단계에서 이미 검증했으므로, 여기서는 이미 ISSUED로 확정된 신청·쿠폰 픽스처를
-# SQL로 직접 만든다. issued_at_expr는 7일 창 안/밖을 시험하기 위한 발급 시각 식이다.
+# SQL로 직접 만든다. issued_at_expr는 "적립에 시간 창 조건이 없다"는 것을 증명하기 위해 발급
+# 시각을 임의로 과거로 앞당기는 데 쓴다(시나리오 4).
 seed_issued_award() {
   local event_id=$1 member_id=$2 sequence=$3 tier=$4 points=$5 issued_at_expr=$6
   local application_id
@@ -116,7 +129,7 @@ require_field() {
   return 0
 }
 
-# 1. 발급 후 7일 이내 사용 -> REDEEMED, 1만 포인트 1회 적립, 잔액 반영.
+# 1. 발급 직후 사용 -> REDEEMED, 쿠폰의 액면가(coupon_award.points, 고액=10000)만큼 1회 적립, 잔액 반영.
 event1=$(create_event "redeem-within-window" | tail -1)
 seed_issued_award "$event1" 1001 1 HIGH 10000 "UTC_TIMESTAMP(6)"
 resp1=$(post_redeem "$port_a" "$event1" 1001)
@@ -170,18 +183,21 @@ check "3 exactly one earn-history row exists despite two concurrent requests" \
 check "3 member 2001's balance was incremented exactly once (10000, not 20000)" \
   "$([[ "$(mysql_exec "SELECT balance FROM member_point_balance WHERE member_id=2001")" == "10000" ]] && echo 0 || echo 1)"
 
-# 4. 발급 후 7일이 지나 사용 -> 사용(REDEEMED)은 되지만 적립은 하지 않는다.
-event4=$(create_event "redeem-outside-window" | tail -1)
-seed_issued_award "$event4" 3001 1 HIGH 10000 "UTC_TIMESTAMP(6) - INTERVAL 8 DAY"
+# 4. 발급 후 8일이 지나 사용해도 적립에는 시간 창이 없다 - 그대로 REDEEMED + 적립되고, 적립액은
+#    고정값이 아니라 이 쿠폰(일반 tier) 자신의 액면가(5000)다.
+event4=$(create_event "redeem-long-after-issuance" | tail -1)
+seed_issued_award "$event4" 3001 1 NORMAL 5000 "UTC_TIMESTAMP(6) - INTERVAL 8 DAY"
 resp4=$(post_redeem "$port_a" "$event4" 3001)
-check "4 redeem outside the 7-day window still succeeds (status REDEEMED)" \
+check "4 redeem 8 days after issuance still succeeds (status REDEEMED, no time window)" \
   "$([[ "$(printf '%s' "$resp4" | status_field)" == "REDEEMED" ]] && echo 0 || echo 1)"
-check "4 redeem outside the 7-day window reports pointsEarned=false" \
-  "$([[ "$(printf '%s' "$resp4" | points_earned_field)" == "false" ]] && echo 0 || echo 1)"
-check "4 no earn-history row is created for a late redemption" \
-  "$([[ "$(mysql_exec "SELECT COUNT(*) FROM coupon_award_earn_history h JOIN coupon_award a ON a.id=h.coupon_award_id WHERE a.event_id=$event4 AND a.member_id=3001")" == "0" ]] && echo 0 || echo 1)"
-check "4 member 3001 has no balance row (never earned anything)" \
-  "$([[ "$(mysql_exec "SELECT COUNT(*) FROM member_point_balance WHERE member_id=3001")" == "0" ]] && echo 0 || echo 1)"
+check "4 redeem 8 days after issuance still earns points (pointsEarned=true)" \
+  "$([[ "$(printf '%s' "$resp4" | points_earned_field)" == "true" ]] && echo 0 || echo 1)"
+check "4 earned amount is this coupon's own face value (5000 for NORMAL tier, not a flat amount)" \
+  "$([[ "$(printf '%s' "$resp4" | earned_amount_field)" == "5000" ]] && echo 0 || echo 1)"
+check "4 exactly one earn-history row of amount 5000 exists" \
+  "$([[ "$(mysql_exec "SELECT amount FROM coupon_award_earn_history h JOIN coupon_award a ON a.id=h.coupon_award_id WHERE a.event_id=$event4 AND a.member_id=3001")" == "5000" ]] && echo 0 || echo 1)"
+check "4 member 3001's balance is exactly 5000" \
+  "$([[ "$(mysql_exec "SELECT balance FROM member_point_balance WHERE member_id=3001")" == "5000" ]] && echo 0 || echo 1)"
 
 # 5. 원자성: 마지막 쓰기(member_point_balance)를 강제로 실패시켜, 이미 쓴 앞의 두 변경
 #    (coupon_award 상태, 적립 내역)까지 함께 롤백되는지 확인한다.
@@ -209,8 +225,9 @@ event6=$(create_event "redeem-not-found" | tail -1)
 not_found_code=$(post_redeem_code "$port_a" "$event6" 9999)
 check "6 redeeming a never-issued coupon returns 404" "$([[ "$not_found_code" == "404" ]] && echo 0 || echo 1)"
 
-# 7. 같은 회원이 서로 다른 행사의 쿠폰 두 장을 동시에 사용 -> 잔액에 두 적립액이 정확히 합산된다
-#    (member_point_balance의 UPSERT `balance = balance + ?`가 손실 갱신 없이 직렬화되는지 확인).
+# 7. 같은 회원이 서로 다른 행사의 쿠폰(고액 10000 + 일반 5000) 두 장을 동시에 사용 -> 잔액에
+#    각 쿠폰의 액면가가 정확히 합산된다(10000+5000=15000, member_point_balance의 UPSERT
+#    `balance = balance + ?`가 손실 갱신 없이 직렬화되는지 확인).
 event7a=$(create_event "redeem-concurrent-member-a" | tail -1)
 event7b=$(create_event "redeem-concurrent-member-b" | tail -1)
 seed_issued_award "$event7a" 5001 1 HIGH 10000 "UTC_TIMESTAMP(6)"
@@ -222,8 +239,8 @@ check "7 both cross-event concurrent responses report REDEEMED" \
   "$([[ "$(status_field < "$log_dir/concurrent-cross-event-a.json")" == "REDEEMED" && "$(status_field < "$log_dir/concurrent-cross-event-b.json")" == "REDEEMED" ]] && echo 0 || echo 1)"
 check "7 both coupons each recorded their own earn-history row (2 total)" \
   "$([[ "$(mysql_exec "SELECT COUNT(*) FROM coupon_award_earn_history h JOIN coupon_award a ON a.id=h.coupon_award_id WHERE a.member_id=5001")" == "2" ]] && echo 0 || echo 1)"
-check "7 member 5001's balance is the exact sum of both earn amounts (20000, no lost update)" \
-  "$([[ "$(mysql_exec "SELECT balance FROM member_point_balance WHERE member_id=5001")" == "20000" ]] && echo 0 || echo 1)"
+check "7 member 5001's balance is the exact sum of both coupons' face values (15000 = 10000+5000, no lost update)" \
+  "$([[ "$(mysql_exec "SELECT balance FROM member_point_balance WHERE member_id=5001")" == "15000" ]] && echo 0 || echo 1)"
 
 # 8. 다른 회원의 쿠폰 사용은 거절되고 데이터가 변경되지 않는다. event8의 쿠폰은 member 6001에게
 #    발급돼 있다 - member 6002(session 대역)로 같은 event를 사용 요청하면 본인 쿠폰이 아니므로
@@ -247,8 +264,15 @@ check "8 no balance row exists for either member (6001 untouched, 6002 never had
 #    요청" 자체를 실제로 재현한다).
 event9=$(create_event "redeem-response-lost" | tail -1)
 seed_issued_award "$event9" 7001 1 HIGH 10000 "UTC_TIMESTAMP(6)"
+set +e
 curl --silent --max-time 0.001 -X POST -H "X-Coupon-Admission-Test-Member: 7001" \
-  "http://localhost:$port_a/test-support/coupon-events/$event9/coupon/redeem" >/dev/null 2>&1 || true
+  "http://localhost:$port_a/test-support/coupon-events/$event9/coupon/redeem" >/dev/null 2>&1
+lost_request_curl_exit=$?
+set -e
+# curl 28 = "Operation timeout" - 서버가 응답을 쓰기 전에 클라이언트가 실제로 연결을 끊었다는
+# 증거다. 다른 코드가 나오면 "응답 유실을 재현했다"는 전제 자체가 깨진 것이므로 실패로 잡는다.
+check "9 the first request actually timed out client-side (curl exit 28), proving a lost response" \
+  "$([[ "$lost_request_curl_exit" == "28" ]] && echo 0 || echo 1)"
 for _ in $(seq 1 50); do
   redeemed_status=$(mysql_exec "SELECT status FROM coupon_award WHERE event_id=$event9 AND member_id=7001")
   [[ "$redeemed_status" == "REDEEMED" ]] && break

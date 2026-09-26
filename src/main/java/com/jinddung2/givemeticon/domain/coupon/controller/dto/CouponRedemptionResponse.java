@@ -6,9 +6,9 @@ import com.jinddung2.givemeticon.domain.coupon.service.CouponRedemptionResult;
 import java.time.LocalDateTime;
 
 /**
- * earnedPointsAmount는 쿠폰의 액면가(couponPoints, 10000/5000)와 다른 값이다 - "쿠폰 사용"에
- * 대한 고정 적립 보상(항상 10000, 발급 후 7일 이내 사용했을 때만)이다. pointsEarned=false면
- * 사용은 됐지만 적립 창을 넘겼다는 뜻이다.
+ * earnedPointsAmount는 이 쿠폰의 액면가(coupon_award.points, 고액 10000/일반 5000)를 그대로
+ * 옮겨 적은 값이다 - 사용에 성공하면 항상 적립되므로 pointsEarned는 사용 성공 여부와 사실상
+ * 같은 뜻이다(null/false는 아직 사용되지 않은 상태에서만 나온다).
  */
 public record CouponRedemptionResponse(
         long eventId,

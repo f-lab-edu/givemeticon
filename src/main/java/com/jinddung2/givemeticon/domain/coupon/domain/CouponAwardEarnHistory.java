@@ -18,26 +18,22 @@ public class CouponAwardEarnHistory {
     private long couponAwardId;
     private int amount;
     private LocalDateTime earnedAt;
-    private LocalDateTime expiredAt;
 
     @Builder
-    private CouponAwardEarnHistory(int memberId, long couponAwardId, int amount, LocalDateTime earnedAt,
-                                   LocalDateTime expiredAt) {
+    private CouponAwardEarnHistory(int memberId, long couponAwardId, int amount, LocalDateTime earnedAt) {
         this.memberId = memberId;
         this.couponAwardId = couponAwardId;
         this.amount = amount;
         this.earnedAt = earnedAt;
-        this.expiredAt = expiredAt;
     }
 
     public static CouponAwardEarnHistory earn(int memberId, long couponAwardId, int amount,
-                                               LocalDateTime earnedAt, LocalDateTime expiredAt) {
+                                               LocalDateTime earnedAt) {
         return CouponAwardEarnHistory.builder()
                 .memberId(memberId)
                 .couponAwardId(couponAwardId)
                 .amount(amount)
                 .earnedAt(earnedAt)
-                .expiredAt(expiredAt)
                 .build();
     }
 }
