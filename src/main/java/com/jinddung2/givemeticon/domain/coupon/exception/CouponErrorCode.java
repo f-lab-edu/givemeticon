@@ -18,6 +18,9 @@ public enum CouponErrorCode implements ErrorCode {
     COUPON_EXPIRED_DATE(HttpStatus.GONE, "쿠폰 유효기간이 이미 지났습니다."),
     ALREADY_REDEEMED_COUPON(HttpStatus.CONFLICT, "이미 사용한 쿠폰입니다."),
     COUPON_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "쿠폰 접수 내역을 찾을 수 없습니다."),
+    COUPON_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "쿠폰 행사를 찾을 수 없습니다."),
+    COUPON_EVENT_NOT_OPEN(HttpStatus.CONFLICT, "현재 쿠폰 행사에 접수할 수 없습니다."),
+    COUPON_APPLICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "쿠폰 행사 신청 내역을 찾을 수 없습니다."),
     ;
 
     private final HttpStatus httpStatus;

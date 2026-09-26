@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponApplicationMapper">
+    <sql id="columns">
+        id, public_request_id, event_id, member_id, acceptance_sequence, status,
+        accepted_at, finalized_at, failure_reason
+    </sql>
+
+    <select id="findByEventIdAndMemberId" resultType="CouponApplication">
+        SELECT <include refid="columns"/>
+        FROM coupon_application
+        WHERE event_id = #{eventId}
+          AND member_id = #{memberId}
+    </select>
+
+    <select id="findByPublicRequestIdAndMemberId" resultType="CouponApplication">
+        SELECT <include refid="columns"/>
+        FROM coupon_application
+        WHERE public_request_id = #{publicRequestId}
+          AND member_id = #{memberId}
+    </select>
+
+    <insert id="insert" parameterType="CouponApplication" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO coupon_application (
+            public_request_id, event_id, member_id, acceptance_sequence, status, accepted_at
+        ) VALUES (
+            #{publicRequestId}, #{eventId}, #{memberId}, #{acceptanceSequence}, #{status}, UTC_TIMESTAMP(6)
+        )
+    </insert>
+
+    <select id="findByEventIdAndMemberIds" resultType="CouponApplication">
+        SELECT <include refid="columns"/>
+        FROM coupon_application
+        WHERE event_id = #{eventId}
+          AND member_id IN
+        <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+    </select>
+
+    <!-- 묶음 크기만큼의 회원을 한 INSERT문의 다중 VALUES로 저장한다. affected row 수로 실제 다건 저장을 검증한다. -->
+    <insert id="insertBatch" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO coupon_application (
+            public_request_id, event_id, member_id, acceptance_sequence, status, accepted_at
+        ) VALUES
+        <foreach collection="applications" item="application" separator=",">
+            (#{application.publicRequestId}, #{application.eventId}, #{application.memberId},
+             #{application.acceptanceSequence}, #{application.status}, UTC_TIMESTAMP(6))
+        </foreach>
+    </insert>
+
+    <select id="findFirstPendingForUpdate" resultType="CouponApplication">
+        SELECT <include refid="columns"/>
+        FROM coupon_application
+        WHERE event_id = #{eventId}
+          AND status = 'PENDING'
+        ORDER BY acceptance_sequence ASC
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <select id="findDistinctPendingEventIds" resultType="long">
+        SELECT DISTINCT event_id FROM coupon_application WHERE status = 'PENDING'
+    </select>
+
+    <update id="markIssued">
+        UPDATE coupon_application
+        SET status = 'ISSUED', finalized_at = UTC_TIMESTAMP(6)
+        WHERE id = #{applicationId} AND status = 'PENDING'
+    </update>
+
+    <update id="markSoldOut">
+        UPDATE coupon_application
+        SET status = 'SOLD_OUT', finalized_at = UTC_TIMESTAMP(6), failure_reason = #{failureReason}
+        WHERE id = #{applicationId} AND status = 'PENDING'
+    </update>
+</mapper>

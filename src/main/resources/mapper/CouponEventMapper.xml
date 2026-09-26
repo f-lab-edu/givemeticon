@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponEventMapper">
+    <select id="findByIdForUpdate" resultType="CouponEvent">
+        SELECT id, public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points,
+               next_acceptance_sequence, issued_quantity, settings_locked_at, created_at, updated_at, closed_at,
+               UTC_TIMESTAMP(6) AS db_now
+        FROM coupon_event
+        WHERE id = #{eventId}
+        FOR UPDATE
+    </select>
+
+    <update id="markOpen">
+        UPDATE coupon_event
+        SET status = 'OPEN', updated_at = UTC_TIMESTAMP(6)
+        WHERE id = #{eventId}
+          AND status = 'SCHEDULED'
+    </update>
+
+    <update id="updateNextAcceptanceSequence">
+        UPDATE coupon_event
+        SET next_acceptance_sequence = #{nextAcceptanceSequence},
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE id = #{eventId}
+    </update>
+
+    <!-- WHERE의 issued_quantity &lt; total_quantity가 재고 조건부 차감이다. 이 UPDATE만으로 증가와
+         준비 수량 도달 시 CLOSED 전환을 원자적으로 확정한다. -->
+    <update id="incrementIssuedQuantityAndMaybeClose">
+        UPDATE coupon_event
+        SET issued_quantity = issued_quantity + 1,
+            status = CASE WHEN issued_quantity + 1 >= total_quantity THEN 'CLOSED' ELSE status END,
+            closed_at = CASE WHEN issued_quantity + 1 >= total_quantity THEN UTC_TIMESTAMP(6) ELSE closed_at END,
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE id = #{eventId}
+          AND issued_quantity &lt; total_quantity
+    </update>
+</mapper>

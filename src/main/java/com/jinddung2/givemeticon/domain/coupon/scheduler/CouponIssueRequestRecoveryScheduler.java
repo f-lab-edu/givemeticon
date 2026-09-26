@@ -5,6 +5,7 @@ import com.jinddung2.givemeticon.domain.coupon.facade.CreateCouponFacade;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponIssueRequestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,7 @@ import java.util.List;
  * 보다 충분히 길게 잡아, 아직 처리 중인 정상 요청을 장애로 오판하지 않도록 한다.
  */
 @Component
+@ConditionalOnProperty(prefix = "coupon.issue-worker", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 @Slf4j
 public class CouponIssueRequestRecoveryScheduler {

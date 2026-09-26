@@ -1,0 +1,5 @@
+# 두 JVM + 실제 MySQL 검증에서만 명시적으로 켜는 테스트 인증 대역이다.
+coupon:
+  admission:
+    test-auth:
+      enabled: true

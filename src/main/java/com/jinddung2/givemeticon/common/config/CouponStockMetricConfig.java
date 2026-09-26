@@ -5,12 +5,14 @@ import com.jinddung2.givemeticon.domain.coupon.service.CouponStockService;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.binder.MeterBinder;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
 @Configuration
+@ConditionalOnProperty(prefix = "coupon.stock-metrics", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class CouponStockMetricConfig {
 
