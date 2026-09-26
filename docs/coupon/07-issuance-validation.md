@@ -1,9 +1,26 @@
 # 7단계: 접수 순서에 따른 쿠폰 발급 최소 구현
 
-> 실행일: 2026-09-23 (KST)
+> 실행일: 2026-09-23 (KST), **재고 소진 마감 버그 수정: 2026-09-26 (KST)**
 > 선행 문서: [01-requirements.md](01-requirements.md), [02-design.md](02-design.md)(§5 발급 트랜잭션 경계), [03-admission-validation.md](03-admission-validation.md), [06-batch-admission-hypothesis-and-loadtest.md](06-batch-admission-hypothesis-and-loadtest.md)
 > 범위: 발급 정합성까지다. 포인트 사용·적립, Redis 도입, 성능 튜닝, 대규모 부하테스트는 이번 범위가 아니며 하지 않았다.
 > 기준 경로: 접수는 **기존 단건 경로**를 기준으로 검증했다. 묶음 접수(6단계)는 실험 경로로 그대로 보존했고, 이번 검증에서 발급 워커와 함께 실행하지 않았다(§6 한계 참고). **접수 성능 목표(p95 2초 등) 달성을 이 문서에서 주장하지 않는다.**
+
+## 0. 정정: 재고 마지막 1장이 영영 발급되지 않던 버그
+
+[09-end-to-end-validation.md](09-end-to-end-validation.md)에서 접수→발급→조회→사용을 실제 API로 처음 연결해 보다가, `total_quantity`가 작은 행사에서 **재고가 아직 남았는데도 행사가 한 장 이르게 `CLOSED`로 전환**되는 현상을 발견했다. 원인은 `CouponEventMapper.xml`의 `incrementIssuedQuantityAndMaybeClose`였다:
+
+```sql
+UPDATE coupon_event
+SET issued_quantity = issued_quantity + 1,
+    status = CASE WHEN issued_quantity + 1 >= total_quantity THEN 'CLOSED' ELSE status END, -- 버그
+    ...
+```
+
+MySQL은 단일 테이블 UPDATE의 SET 목록을 왼쪽에서 오른쪽으로 평가하며, 뒤의 대입식은 앞에서 이미 갱신된 컬럼의 **새 값**을 본다(공식 매뉴얼 "Assignments are evaluated left to right"). 여기서는 `issued_quantity`가 첫 SET절에서 이미 `+1`된 값으로 바뀐 뒤, `status`의 CASE에서 그 값에 다시 `+1`을 더해 비교했다 - 실질적으로 **두 번 더한 값**으로 마감 여부를 판단한 셈이다. `(issued_quantity=0, total_quantity=2)`로 직접 재현하면 한 번의 증가만으로 `(1, CLOSED)`가 되는 것을 SQL로 바로 확인할 수 있었다(정상이라면 `(1, OPEN)`이어야 한다).
+
+이 버그의 실질적 피해는 **과소 발급**이다: 행사가 실제 한도보다 하나 이른 시점에 CLOSED로 바뀌면, `canOpenAtDatabaseTime()`이 CLOSED 상태의 신규 접수를 막으므로 그 마지막 한 장은 접수 자체가 거부돼 영영 발급되지 못한다(CLAUDE.md의 "발급 한도 준수"에 어긋난다). 이번 검증(§3)이 이 버그를 못 잡았던 이유는, 150명을 **미리 한꺼번에** 접수시킨 뒤 워커를 돌렸기 때문이다 - 접수가 이미 다 끝난 뒤에는 CLOSED 여부가 "새 접수를 막는" 효과를 낼 일이 없었다. 실제 서비스에서는 접수가 시간에 걸쳐 들어오므로, 이 버그가 있었다면 마지막 한 장이 계속 발급되지 않았을 것이다.
+
+**수정**: CASE 조건의 `issued_quantity + 1`을 `issued_quantity`로 고쳤다(이미 SET절에서 갱신된 값이므로 다시 더할 필요가 없다). 같은 방식으로 SQL을 직접 재현해 `(0,2)→(1,OPEN)→(2,CLOSED)`로 정확히 마감됨을 확인했다. 이 문서의 §3 검증(총수량 100/150명 접수, 총수량 100/400명 접수+강제종료 등)은 모두 "접수를 먼저 다 끝낸 뒤" 방식이라 이 버그로도 우연히 최종 수치가 맞았을 것이다 - 수정 후 같은 스크립트를 2회 재실행해 동일하게 29/29 PASS임을 재확인했고(회귀 없음), 실제로 "접수 하나 → 발급 확인 → 접수 하나 더"처럼 단계 사이에 실제 시간차를 둔 시나리오는 09번 문서에서 새로 검증했다.
 
 ## 결론
 

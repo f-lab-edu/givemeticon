@@ -27,12 +27,21 @@
     </update>
 
     <!-- WHERE의 issued_quantity &lt; total_quantity가 재고 조건부 차감이다. 이 UPDATE만으로 증가와
-         준비 수량 도달 시 CLOSED 전환을 원자적으로 확정한다. -->
+         준비 수량 도달 시 CLOSED 전환을 원자적으로 확정한다.
+
+         주의: MySQL은 단일 테이블 UPDATE의 SET 목록을 왼쪽에서 오른쪽으로 평가하며, 뒤의 대입식이
+         앞에서 이미 갱신된 컬럼의 새 값을 그대로 본다(공식 매뉴얼 "Assignments are evaluated left
+         to right"). 즉 status/closed_at의 CASE에 쓰인 issued_quantity는 이미 +1이 반영된 값이다 -
+         여기서 다시 +1을 더하면(예: "issued_quantity + 1 >= total_quantity") 실제로는 두 번
+         더한 값으로 비교하게 되어, 한 개가 남았는데도 CLOSED로 전환되고 그 마지막 한 개는 새
+         접수(canOpenAtDatabaseTime이 CLOSED를 막음) 자체가 막혀 영영 발급되지 못한다 - 총 발급
+         수량이 total_quantity보다 하나 적게 마감되는 실제 버그였다(scripts/coupon-e2e에서 실제
+         접수->발급 체인을 연결해 재현). -->
     <update id="incrementIssuedQuantityAndMaybeClose">
         UPDATE coupon_event
         SET issued_quantity = issued_quantity + 1,
-            status = CASE WHEN issued_quantity + 1 >= total_quantity THEN 'CLOSED' ELSE status END,
-            closed_at = CASE WHEN issued_quantity + 1 >= total_quantity THEN UTC_TIMESTAMP(6) ELSE closed_at END,
+            status = CASE WHEN issued_quantity >= total_quantity THEN 'CLOSED' ELSE status END,
+            closed_at = CASE WHEN issued_quantity >= total_quantity THEN UTC_TIMESTAMP(6) ELSE closed_at END,
             updated_at = UTC_TIMESTAMP(6)
         WHERE id = #{eventId}
           AND issued_quantity &lt; total_quantity
