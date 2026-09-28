@@ -95,6 +95,23 @@ post() {
 # 감싼다. jq 경로를 .data.* 로 맞추지 않으면 항상 null을 비교하게 되어 거짓 통과를 만든다.
 request_id() { jq -r '.data.requestId'; }
 sequence() { jq -r '.data.acceptanceSequence'; }
+status_field() { jq -r '.data.status'; }
+
+close_event() {
+  local event_id=$1
+  mysql_exec "UPDATE coupon_event SET status='CLOSED', closed_at=UTC_TIMESTAMP(6) WHERE id=$event_id"
+}
+
+# 종료 빠른 응답은 프로세스-로컬 캐시(CouponEventClosureCache)로 동작한다 - 그 앱이 잠금
+# 트랜잭션으로 CLOSED를 실제로 관측한 적이 있어야 그 뒤부터 ENDED를 즉시 돌려준다. 실제 운영에서는
+# 발급 워커가 종료시킨 뒤 들어오는 접수 트래픽이 자연스럽게 이 발견을 트리거하지만, 여기서는 그
+# 첫 발견을 흉내내는 워밍업 요청을 보낸다(신규 신청이라 아직 캐시가 없으면 409로 거절되는 게
+# 정상이므로 --fail을 쓰지 않는다 - 응답 자체는 검증 대상이 아니다).
+warm_up_closure_discovery() {
+  local port=$1 event_id=$2 member_id=$3
+  curl --silent --output /dev/null -X POST -H "X-Coupon-Admission-Test-Member: $member_id" \
+    "http://localhost:$port/test-support/coupon-events/$event_id/applications" || true
+}
 
 fail_count=0
 check() {
@@ -202,8 +219,127 @@ if require_field "7 retry response has a non-null requestId" "$recovered_id" \
   check "7 retry after lost response returns the committed requestId" "$([[ "$recovered_id" == "$stored" ]] && echo 0 || echo 1)"
 fi
 
+# 8. 종료 직전 동시 신청: 이 행사는 아직 어느 앱에서도 종료가 발견된 적이 없으므로(캐시 비어
+#    있음) 신규 신청은 항상 기존 잠금 트랜잭션 경로로 들어간다. 다른 트랜잭션이 행사 행을 잠근 채
+#    CLOSED로 전환하려는 동안(아직 커밋 전) 들어온 신청이 잠금 해제를 기다렸다가, 실제로 커밋된
+#    CLOSED를 다시 검증해 거절하는지 확인한다(빠른 경로 도입이 진행 중인 행사의 잠금 재검증을
+#    건너뛰게 만들지 않았다는 확인).
+event_close_race=$(create_event close-race "UTC_TIMESTAMP(6)" | tail -1)
+(
+  docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" <<SQL
+START TRANSACTION;
+SELECT id FROM coupon_event WHERE id=$event_close_race FOR UPDATE;
+UPDATE coupon_event SET status='OPEN', next_acceptance_sequence=1 WHERE id=$event_close_race;
+DO SLEEP(1);
+UPDATE coupon_event SET status='CLOSED', closed_at=UTC_TIMESTAMP(6) WHERE id=$event_close_race;
+COMMIT;
+SQL
+) >"$log_dir/close-race-tx.log" 2>&1 & close_tx_pid=$!
+sleep 0.3
+http_code=$(curl --silent --output "$log_dir/close-race-during.json" --write-out '%{http_code}' -X POST -H 'X-Coupon-Admission-Test-Member: 61' "http://localhost:$port_a/test-support/coupon-events/$event_close_race/applications")
+wait "$close_tx_pid"
+check "8 request racing a not-yet-committed close still gets rejected once close commits (409)" \
+  "$([[ "$http_code" == "409" ]] && echo 0 || echo 1)"
+check "8 no application row is created for the rejected racing member" \
+  "$([[ "$(mysql_exec "SELECT COUNT(*) FROM coupon_application WHERE event_id=$event_close_race AND member_id=61")" == "0" ]] && echo 0 || echo 1)"
+
+# 9. 종료 후 재신청: 기존 신청자는 종료 후에도 기존 접수번호·상태를 그대로 돌려받고, 신청한 적
+#    없는 회원은(각 앱이 종료를 한 번 발견한 뒤부터는) 접수 큐/잠금 없이 즉시 ENDED로 응답하며
+#    원장에 어떤 행도 만들지 않는다.
+event_ended=$(create_event ended-repeat "UTC_TIMESTAMP(6)" | tail -1)
+existing_before_close=$(post "$port_a" "$event_ended" 62)
+existing_id=$(printf '%s' "$existing_before_close" | request_id)
+close_event "$event_ended"
+# 두 앱 모두 아직 이 행사의 종료를 발견한 적이 없다 - 각 앱에 한 번씩 워밍업을 보내 캐시를 채운다.
+warm_up_closure_discovery "$port_a" "$event_ended" 6601
+warm_up_closure_discovery "$port_b" "$event_ended" 6602
+existing_after_close=$(post "$port_b" "$event_ended" 62)
+existing_after_id=$(printf '%s' "$existing_after_close" | request_id)
+existing_after_status=$(printf '%s' "$existing_after_close" | status_field)
+if require_field "9 pre-existing member still gets a requestId after close" "$existing_after_id"; then
+  check "9 pre-existing member's requestId is unchanged after close" \
+    "$([[ "$existing_after_id" == "$existing_id" ]] && echo 0 || echo 1)"
+fi
+check "9 pre-existing member's status after close is not ENDED (real ledger status)" \
+  "$([[ "$existing_after_status" != "ENDED" ]] && echo 0 || echo 1)"
+
+new_after_close=$(post "$port_a" "$event_ended" 63)
+new_after_status=$(printf '%s' "$new_after_close" | status_field)
+new_after_id=$(printf '%s' "$new_after_close" | request_id)
+check "9 member with no prior application gets ENDED after close" \
+  "$([[ "$new_after_status" == "ENDED" ]] && echo 0 || echo 1)"
+check "9 ENDED response has a null requestId" \
+  "$([[ "$new_after_id" == "null" ]] && echo 0 || echo 1)"
+check "9 ENDED response creates no application row" \
+  "$([[ "$(mysql_exec "SELECT COUNT(*) FROM coupon_application WHERE event_id=$event_ended AND member_id=63")" == "0" ]] && echo 0 || echo 1)"
+
+# 두 앱에서 동시에 신규 회원이 종료 후 신청해도 둘 다 ENDED로 응답하고 행을 만들지 않는다(빠른
+# 경로가 큐를 거치지 않으므로 동시 요청끼리 서로 영향을 주지 않는다).
+post "$port_a" "$event_ended" 64 >"$log_dir/ended-concurrent-a.json" & pid_a=$!
+post "$port_b" "$event_ended" 65 >"$log_dir/ended-concurrent-b.json" & pid_b=$!
+wait "$pid_a" "$pid_b"
+concurrent_a_status=$(status_field < "$log_dir/ended-concurrent-a.json")
+concurrent_b_status=$(status_field < "$log_dir/ended-concurrent-b.json")
+check "9 concurrent post-close requests from both apps both get ENDED" \
+  "$([[ "$concurrent_a_status" == "ENDED" && "$concurrent_b_status" == "ENDED" ]] && echo 0 || echo 1)"
+check "9 concurrent post-close requests create no application rows" \
+  "$([[ "$(mysql_exec "SELECT COUNT(*) FROM coupon_application WHERE event_id=$event_ended AND member_id IN (64,65)")" == "0" ]] && echo 0 || echo 1)"
+
+# 10. 커밋 후 응답 유실: 신청이 커밋된 뒤 클라이언트가 응답을 못 받고, 그 사이 행사가 종료되고,
+#     다른 앱으로 재요청해도 ENDED가 아니라 이미 커밋된 접수를 그대로 돌려받는다.
+event_lost_then_closed=$(create_event lost-then-closed "UTC_TIMESTAMP(6)" | tail -1)
+post "$port_a" "$event_lost_then_closed" 71 >/dev/null
+stored_before_close=$(mysql_exec "SELECT public_request_id FROM coupon_application WHERE event_id=$event_lost_then_closed AND member_id=71")
+close_event "$event_lost_then_closed"
+retried_after_close=$(post "$port_b" "$event_lost_then_closed" 71)
+retried_id=$(printf '%s' "$retried_after_close" | request_id)
+retried_status=$(printf '%s' "$retried_after_close" | status_field)
+if require_field "10 retry after lost response + since-closed event still has a requestId" "$retried_id" \
+  && require_field "10 DB has the originally committed requestId" "$stored_before_close"; then
+  check "10 retry returns the committed requestId, not a new one" \
+    "$([[ "$retried_id" == "$stored_before_close" ]] && echo 0 || echo 1)"
+fi
+check "10 retry status is not ENDED (existing application takes priority over the fast path)" \
+  "$([[ "$retried_status" != "ENDED" ]] && echo 0 || echo 1)"
+check "10 no second row was created for the same member" \
+  "$([[ "$(mysql_exec "SELECT COUNT(*) FROM coupon_application WHERE event_id=$event_lost_then_closed AND member_id=71")" == "1" ]] && echo 0 || echo 1)"
+
+# 11. 순서를 제어한 경쟁 조건: "기존 신청 조회에서 없음 -> 다른 앱이 같은 회원의 접수를 커밋 ->
+#     행사 종료 및 캐시 반영 -> 앞선 요청이 ENDED 반환"을 막는지 확인한다. CouponAdmissionService
+#     가 캐시부터 확인하고 기존 접수 조회를 그다음에 하도록 순서를 고정했으므로(순서를 반대로
+#     하면 이 정합성이 깨진다), 아래 순서로 실행해도 회원 81의 기존 접수가 항상 이긴다:
+#       (a) 회원 81의 접수가 아직 없음을 확인(GET .../me)
+#       (b) 앱 B로 회원 81의 접수를 커밋(행사는 아직 OPEN)
+#       (c) 행사 종료
+#       (d) 앱 A의 캐시를 "다른 회원"(82)으로 워밍업 - 회원 81의 요청과 무관하게 캐시가 채워진다
+#       (e) 이제 앱 A로 회원 81이 다시 신청 -> ENDED가 아니라 (b)에서 커밋된 접수를 그대로 받아야 한다
+event_race=$(create_event closure-race-existing "UTC_TIMESTAMP(6)" | tail -1)
+no_application_before=$(curl --silent -H 'X-Coupon-Admission-Test-Member: 81' \
+  "http://localhost:$port_a/test-support/coupon-events/$event_race/applications/me" | status_field)
+check "11 (a) member 81 has no application yet (status is CHECKING)" \
+  "$([[ "$no_application_before" == "CHECKING" ]] && echo 0 || echo 1)"
+
+committed_via_app_b=$(post "$port_b" "$event_race" 81)
+committed_id=$(printf '%s' "$committed_via_app_b" | request_id)
+require_field "11 (b) app B commits member 81's application while the event is OPEN" "$committed_id" || true
+
+close_event "$event_race"
+warm_up_closure_discovery "$port_a" "$event_race" 82
+
+reapplied_via_app_a=$(post "$port_a" "$event_race" 81)
+reapplied_id=$(printf '%s' "$reapplied_via_app_a" | request_id)
+reapplied_status=$(printf '%s' "$reapplied_via_app_a" | status_field)
+if require_field "11 (e) app A's response has a non-null requestId" "$reapplied_id"; then
+  check "11 (e) app A returns member 81's already-committed requestId, not a new one" \
+    "$([[ "$reapplied_id" == "$committed_id" ]] && echo 0 || echo 1)"
+fi
+check "11 (e) app A's response is not ENDED (existing application must win over the closure cache)" \
+  "$([[ "$reapplied_status" != "ENDED" ]] && echo 0 || echo 1)"
+check "11 only one application row exists for member 81 (no duplicate from the retry)" \
+  "$([[ "$(mysql_exec "SELECT COUNT(*) FROM coupon_application WHERE event_id=$event_race AND member_id=81")" == "1" ]] && echo 0 || echo 1)"
+
 if [[ "$fail_count" -eq 0 ]]; then
-  echo "PASS: 7 admission validations completed against two Spring Boot processes and one MySQL database."
+  echo "PASS: all admission validations (1-11) completed against two Spring Boot processes and one MySQL database."
 else
   echo "FAIL: $fail_count admission validation(s) failed." >&2
 fi
