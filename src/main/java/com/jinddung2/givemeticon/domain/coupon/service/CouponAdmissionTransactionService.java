@@ -27,6 +27,7 @@ public class CouponAdmissionTransactionService implements CouponAdmissionAccepto
     private final CouponEventMapper couponEventMapper;
     private final CouponApplicationMapper couponApplicationMapper;
     private final CouponAdmissionTransactionTimers timers;
+    private final CouponEventClosureCache closureCache;
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -44,6 +45,11 @@ public class CouponAdmissionTransactionService implements CouponAdmissionAccepto
 
     private CouponApplication createPendingApplication(CouponEvent event, int memberId) {
         if (!event.canOpenAtDatabaseTime()) {
+            // 진짜 종료(CLOSED)만 캐시에 남긴다 - "아직 시작 전"(SCHEDULED, dbNow<startsAtUtc)은
+            // 나중에 canOpenAtDatabaseTime()이 true가 될 일시적 상태라 여기 넣으면 안 된다.
+            if (event.getStatus() == CouponEventStatus.CLOSED) {
+                closureCache.markClosed(event.getId());
+            }
             throw new CouponEventNotOpenException();
         }
 

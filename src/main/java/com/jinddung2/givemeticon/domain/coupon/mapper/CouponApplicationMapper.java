@@ -27,6 +27,9 @@ public interface CouponApplicationMapper {
     /** 발급 워커 전용: 행사 안에서 순번이 가장 앞선 미처리(PENDING) 신청을 잠근다. */
     Optional<CouponApplication> findFirstPendingForUpdate(@Param("eventId") long eventId);
 
+    /** 묶음 발급 워커 전용: 순번이 가장 앞선 미처리(PENDING) 신청을 최대 limit건 잠근다. */
+    List<CouponApplication> findPendingForUpdate(@Param("eventId") long eventId, @Param("limit") int limit);
+
     /** 발급 워커가 폴링할 행사 목록: 처리할 PENDING이 남아있는 행사 ID다. */
     List<Long> findDistinctPendingEventIds();
 
@@ -34,4 +37,9 @@ public interface CouponApplicationMapper {
     int markIssued(@Param("applicationId") long applicationId);
 
     int markSoldOut(@Param("applicationId") long applicationId, @Param("failureReason") String failureReason);
+
+    /** 묶음 발급 워커 전용: 조건부 갱신(WHERE status='PENDING')을 여러 신청에 한 번에 적용한다. */
+    int markIssuedBatch(@Param("applicationIds") List<Long> applicationIds);
+
+    int markSoldOutBatch(@Param("applicationIds") List<Long> applicationIds, @Param("failureReason") String failureReason);
 }

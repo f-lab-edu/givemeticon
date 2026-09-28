@@ -61,6 +61,16 @@
         FOR UPDATE
     </select>
 
+    <select id="findPendingForUpdate" resultType="CouponApplication">
+        SELECT <include refid="columns"/>
+        FROM coupon_application
+        WHERE event_id = #{eventId}
+          AND status = 'PENDING'
+        ORDER BY acceptance_sequence ASC
+        LIMIT #{limit}
+        FOR UPDATE
+    </select>
+
     <select id="findDistinctPendingEventIds" resultType="long">
         SELECT DISTINCT event_id FROM coupon_application WHERE status = 'PENDING'
     </select>
@@ -75,5 +85,25 @@
         UPDATE coupon_application
         SET status = 'SOLD_OUT', finalized_at = UTC_TIMESTAMP(6), failure_reason = #{failureReason}
         WHERE id = #{applicationId} AND status = 'PENDING'
+    </update>
+
+    <update id="markIssuedBatch">
+        UPDATE coupon_application
+        SET status = 'ISSUED', finalized_at = UTC_TIMESTAMP(6)
+        WHERE status = 'PENDING'
+          AND id IN
+        <foreach collection="applicationIds" item="applicationId" open="(" separator="," close=")">
+            #{applicationId}
+        </foreach>
+    </update>
+
+    <update id="markSoldOutBatch">
+        UPDATE coupon_application
+        SET status = 'SOLD_OUT', finalized_at = UTC_TIMESTAMP(6), failure_reason = #{failureReason}
+        WHERE status = 'PENDING'
+          AND id IN
+        <foreach collection="applicationIds" item="applicationId" open="(" separator="," close=")">
+            #{applicationId}
+        </foreach>
     </update>
 </mapper>

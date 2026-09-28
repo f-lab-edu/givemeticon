@@ -46,4 +46,19 @@
         WHERE id = #{eventId}
           AND issued_quantity &lt; total_quantity
     </update>
+
+    <!-- 묶음 발급 버전. MySQL은 한 UPDATE의 SET 목록을 왼쪽에서 오른쪽으로 평가하며 뒤의 식은
+         앞에서 이미 갱신된 값을 본다(위 단건 버전과 같은 규칙) - 그래서 두 번째·세 번째 SET의
+         CASE 조건은 issued_quantity에 delta를 또 더하지 않는다(첫 SET에서 이미 반영된 값이기
+         때문이다). WHERE절의 issued_quantity는 이 UPDATE가 적용되기 전 원본 행 값이므로 "증가
+         후에도 total_quantity를 넘지 않는지"를 정확히 delta와 함께 검사한다. -->
+    <update id="incrementIssuedQuantityByAndMaybeClose">
+        UPDATE coupon_event
+        SET issued_quantity = issued_quantity + #{delta},
+            status = CASE WHEN issued_quantity >= total_quantity THEN 'CLOSED' ELSE status END,
+            closed_at = CASE WHEN issued_quantity >= total_quantity THEN UTC_TIMESTAMP(6) ELSE closed_at END,
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE id = #{eventId}
+          AND issued_quantity + #{delta} &lt;= total_quantity
+    </update>
 </mapper>

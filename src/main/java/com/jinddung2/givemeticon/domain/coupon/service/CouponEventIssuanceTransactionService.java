@@ -9,6 +9,7 @@ import com.jinddung2.givemeticon.domain.coupon.mapper.CouponApplicationMapper;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponAwardMapper;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponEventMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +32,9 @@ import java.util.Optional;
  * </pre>
  */
 @Service
+@ConditionalOnProperty(prefix = "coupon.event-issuance.batch", name = "enabled", havingValue = "false", matchIfMissing = true)
 @RequiredArgsConstructor
-public class CouponEventIssuanceTransactionService {
+public class CouponEventIssuanceTransactionService implements CouponIssuanceProcessor {
 
     private static final String SOLD_OUT_REASON = "SOLD_OUT_SEQUENCE_EXCEEDS_TOTAL_QUANTITY";
 
@@ -40,10 +42,7 @@ public class CouponEventIssuanceTransactionService {
     private final CouponApplicationMapper couponApplicationMapper;
     private final CouponAwardMapper couponAwardMapper;
 
-    /**
-     * @return true면 이번 호출에서 신청 1건을 처리했다(발급 또는 소진 확정). false면 처리할 PENDING이
-     *         없었다 - 워커는 false를 받으면 이 행사의 드레인을 멈춘다.
-     */
+    @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public boolean processNext(long eventId) {
         CouponEvent event = couponEventMapper.findByIdForUpdate(eventId)

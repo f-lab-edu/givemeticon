@@ -34,6 +34,7 @@ public class CouponBatchAdmissionTransactionService {
     private final CouponEventMapper couponEventMapper;
     private final CouponApplicationMapper couponApplicationMapper;
     private final CouponAdmissionTransactionTimers timers;
+    private final CouponEventClosureCache closureCache;
 
     /**
      * @param distinctMemberIdsInOrder 이번 묶음에서 중복이 제거된 회원 ID 목록이다. 순서는 각 회원이
@@ -64,6 +65,11 @@ public class CouponBatchAdmissionTransactionService {
         Map<Integer, RuntimeException> failures = new HashMap<>();
         if (!newMemberIds.isEmpty()) {
             if (!event.canOpenAtDatabaseTime()) {
+                // 진짜 종료(CLOSED)만 캐시에 남긴다 - "아직 시작 전"은 나중에 열릴 수 있는 일시적
+                // 상태라 여기 넣으면 안 된다.
+                if (event.getStatus() == CouponEventStatus.CLOSED) {
+                    closureCache.markClosed(event.getId());
+                }
                 CouponEventNotOpenException notOpen = new CouponEventNotOpenException();
                 for (Integer memberId : newMemberIds) {
                     failures.put(memberId, notOpen);

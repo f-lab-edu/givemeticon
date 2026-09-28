@@ -1,7 +1,7 @@
 package com.jinddung2.givemeticon.domain.coupon.scheduler;
 
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponApplicationMapper;
-import com.jinddung2.givemeticon.domain.coupon.service.CouponEventIssuanceTransactionService;
+import com.jinddung2.givemeticon.domain.coupon.service.CouponIssuanceProcessor;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +23,7 @@ import java.util.concurrent.Executors;
  *
  * 재고 단위(행사)마다 별도 스레드에서 PENDING이 없어질 때까지 드레인한다 - 한 행사의 대기열이
  * 길다고 다른 행사의 처리가 밀리지 않게 하기 위함이다. draining 집합은 같은 행사를 동시에 두 번
- * 드레인하지 않게 막는 최적화일 뿐이다 - 정합성의 근거는 CouponEventIssuanceTransactionService의
+ * 드레인하지 않게 막는 최적화일 뿐이다 - 정합성의 근거는 CouponIssuanceProcessor 구현(단건/묶음)의
  * 행사 행 잠금과 순번 순서 처리이며, 두 앱(JVM)의 워커가 동시에 폴링해도 이 잠금으로 직렬화된다.
  */
 @Component
@@ -35,7 +35,7 @@ public class CouponEventIssuanceWorker {
     private static final int WORKER_THREADS = 8;
 
     private final CouponApplicationMapper couponApplicationMapper;
-    private final CouponEventIssuanceTransactionService transactionService;
+    private final CouponIssuanceProcessor transactionService;
     private final ExecutorService executor = Executors.newFixedThreadPool(WORKER_THREADS);
     private final Set<Long> draining = ConcurrentHashMap.newKeySet();
 

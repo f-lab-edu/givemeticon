@@ -20,4 +20,10 @@ public interface CouponEventMapper {
      * 그 증가로 준비 수량에 도달하면 같은 UPDATE에서 CLOSED로 전환한다("재고 조건부 차감").
      */
     int incrementIssuedQuantityAndMaybeClose(@Param("eventId") long eventId);
+
+    /**
+     * 묶음 발급 워커 전용: {@code delta}건을 한 번에 증가시킨다. WHERE 조건이 증가 후에도
+     * total_quantity를 넘지 않는지 원본 행 값으로 확인한다(재고 조건부 차감의 묶음 버전).
+     */
+    int incrementIssuedQuantityByAndMaybeClose(@Param("eventId") long eventId, @Param("delta") int delta);
 }

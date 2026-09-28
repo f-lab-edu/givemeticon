@@ -8,9 +8,10 @@ import com.jinddung2.givemeticon.domain.coupon.domain.CouponTier;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponAdmissionOutcome;
 
 /**
- * requestId/acceptanceSequence는 CHECKING일 때 null이다 - 아직 원장에 확정된 행이 없다는 뜻이지,
- * 값이 0이거나 비어 있는 정상 접수가 아니다. status==CHECKING이면 반드시 두 필드 모두 null이어야 하고,
- * 그 외 상태면 반드시 둘 다 값이 있어야 한다(검증 스크립트가 이 계약을 그대로 확인한다).
+ * requestId/acceptanceSequence는 CHECKING·ENDED일 때 null이다 - 아직 원장에 확정된 행이 없다는
+ * 뜻이지, 값이 0이거나 비어 있는 정상 접수가 아니다. status가 CHECKING 또는 ENDED면 반드시 두 필드
+ * 모두 null이어야 하고, 그 외 상태(PENDING/ISSUED/SOLD_OUT)면 반드시 둘 다 값이 있어야 한다(검증
+ * 스크립트가 이 계약을 그대로 확인한다).
  *
  * couponTier/couponPoints/couponStatus는 status==ISSUED이고 발급 원장(coupon_award)이 이미
  * 커밋된 경우에만 채운다. 접수 자체(POST)는 발급을 만들지 않으므로 항상 null이다 - 조회(GET)
@@ -57,6 +58,18 @@ public record CouponAdmissionResponse(
                 null);
     }
 
+    public static CouponAdmissionResponse ended(long eventId) {
+        return new CouponAdmissionResponse(
+                null,
+                eventId,
+                null,
+                CouponApplicationStatus.ENDED,
+                "이미 종료된 행사입니다. 접수 내역이 없습니다.",
+                null,
+                null,
+                null);
+    }
+
     public static CouponAdmissionResponse of(CouponAdmissionOutcome outcome) {
         // 프로젝트 sourceCompatibility가 17이라 sealed 타입의 switch 패턴 매칭(21+)을 쓸 수 없다.
         if (outcome instanceof CouponAdmissionOutcome.Resolved resolved) {
@@ -64,6 +77,9 @@ public record CouponAdmissionResponse(
         }
         if (outcome instanceof CouponAdmissionOutcome.Checking checking) {
             return checking(checking.eventId());
+        }
+        if (outcome instanceof CouponAdmissionOutcome.Ended ended) {
+            return ended(ended.eventId());
         }
         throw new IllegalStateException("unknown CouponAdmissionOutcome: " + outcome);
     }

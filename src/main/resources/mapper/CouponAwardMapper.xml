@@ -21,6 +21,16 @@
         )
     </insert>
 
+    <insert id="insertBatch" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO coupon_award (
+            application_id, event_id, member_id, tier, points, status, issued_at
+        ) VALUES
+        <foreach collection="awards" item="award" separator=",">
+            (#{award.applicationId}, #{award.eventId}, #{award.memberId}, #{award.tier},
+             #{award.points}, #{award.status}, UTC_TIMESTAMP(6))
+        </foreach>
+    </insert>
+
     <select id="findByEventIdAndMemberId" resultType="CouponAward">
         SELECT <include refid="columns"/>
         FROM coupon_award
