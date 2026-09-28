@@ -3,3 +3,14 @@ coupon:
   admission:
     test-auth:
       enabled: true
+
+spring:
+  datasource:
+    hikari:
+      # 최종 후보 구성 검증(재고 1,000/고액 500, 1,000req/s)에서 확인된 병목에 대한 조정이다:
+      # 종료된 행사 빠른 응답(ENDED, 큐/락 없이 조회 1회)이 인스턴스당 기본 풀 10개를 배치
+      # 접수/발급 플러시 트랜잭션과 나눠 쓰면서 2초 내 확인 목표(95%)를 크게 밑돌았다. 기본값
+      # (HikariCP 기본 10)에서 배로만 올린다 - 테스트 전용 프로필에만 적용되며 운영 프로필에는
+      # 영향이 없다.
+      maximum-pool-size: ${LOADTEST_HIKARI_MAX:20}
+      minimum-idle: ${LOADTEST_HIKARI_MAX:20}
