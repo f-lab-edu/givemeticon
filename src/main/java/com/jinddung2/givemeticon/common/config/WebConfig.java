@@ -19,6 +19,8 @@ public class WebConfig implements WebMvcConfigurer {
             "/actuator/**",
             // 이 경로의 Controller는 mysql-loadtest 프로필에서만 등록된다.
             "/internal/loadtest/**",
+            // 두 JVM 접수 검증 프로필에서만 등록되는 헤더 기반 테스트 인증 경로다.
+            "/test-support/**",
             "/api/v1/users/sign-up",
             "/api/v1/users/login",
             "/api/v1/mails/send-certification",

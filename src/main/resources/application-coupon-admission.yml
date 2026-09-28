@@ -1,0 +1,7 @@
+# 행사 접수 검증 전용 프로필. 기존 coupon_issue_request 워커와 Redis 경로를 건드리지 않는다.
+coupon:
+  issue-worker:
+    mode: disabled
+    enabled: false
+  stock-metrics:
+    enabled: false

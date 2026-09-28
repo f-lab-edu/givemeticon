@@ -2,6 +2,7 @@ package com.jinddung2.givemeticon.domain.coupon.service;
 
 import com.jinddung2.givemeticon.common.utils.CertificationGenerator;
 import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
+import com.jinddung2.givemeticon.domain.coupon.domain.CouponIssueRequest;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyIssuedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyRedeemedCouponException;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +42,25 @@ public class CouponService {
             throw new AlreadyIssuedCouponException();
         }
         return coupon.getId();
+    }
+
+    /**
+     * 묶음 발급 배치 전용. 재고 차감은 호출자(CreateCouponFacade)가 이미 대상 건수만큼
+     * 끝냈다는 전제로, 여기서는 쿠폰 생성만 한 번의 다건 INSERT로 처리한다. 삽입된 행 수가
+     * 요청 건수와 다르면(유니크 제약 위반 등) 배치 로직의 전제가 깨진 것이므로 예외로
+     * 트랜잭션을 롤백시킨다 - 일부만 발급된 채로 조용히 넘어가지 않는다.
+     */
+    @Transactional
+    public List<Coupon> issueCouponsBatch(int stockId, List<CouponIssueRequest> requests) {
+        List<Coupon> coupons = requests.stream()
+                .map(r -> buildCoupon(r.getUserId(), stockId, r.getCouponName(), r.getCouponType(), r.getPrice()))
+                .toList();
+        int insertedRows = couponMapper.saveAll(coupons);
+        if (insertedRows != coupons.size()) {
+            throw new IllegalStateException(
+                    "Bulk coupon insert affected " + insertedRows + " rows, expected " + coupons.size());
+        }
+        return coupons;
     }
 
     @Transactional

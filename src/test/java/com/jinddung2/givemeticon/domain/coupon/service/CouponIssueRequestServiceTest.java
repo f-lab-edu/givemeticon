@@ -4,12 +4,14 @@ import com.jinddung2.givemeticon.domain.coupon.domain.CouponIssueRequest;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponRequestStatus;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponIssueRequestMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
@@ -29,6 +31,9 @@ class CouponIssueRequestServiceTest {
 
     @Mock
     CouponIssueRequestMapper couponIssueRequestMapper;
+
+    @Spy
+    SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     int userId = 1;
     int stockId = 100;

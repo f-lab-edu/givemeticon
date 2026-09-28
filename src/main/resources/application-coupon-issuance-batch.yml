@@ -1,0 +1,9 @@
+# 발급 워커를 묶음 처리로 전환하는 프로필. coupon-issuance 프로필과 함께 적용한다.
+# size=50: 접수 묶음 경로(coupon.admission.batch.size)와 같은 값으로 시작했다. 발급도 같은
+# coupon_event 행 잠금을 공유하므로 굳이 새 값을 골라 재튜닝하지 않았다 - 이 값 자체를 바꿔보는
+# 실험은 이번 범위가 아니다.
+coupon:
+  event-issuance:
+    batch:
+      enabled: true
+      size: 50

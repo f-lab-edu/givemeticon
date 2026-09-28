@@ -29,6 +29,14 @@ coupon:
   # 운영 기본값은 true이며 DistributedLockAop가 그대로 유지된다.
   distributed-lock:
     enabled: false
+  issue-worker:
+    # off: 두 비동기 워커 모두 끔(동기 발급 기준선 실험용).
+    # single: 접수당 1건씩 처리하는 기존 워커(CouponIssueAsyncWorker) - 값을 안 주면 기본값.
+    # batch: 묶음 차감 워커(CouponBatchIssueWorker).
+    mode: ${COUPON_ISSUE_WORKER_MODE:single}
+  batch-issue:
+    # mode=batch일 때만 쓰인다. 한 트랜잭션에서 한 번에 처리할 접수 건수(N).
+    size: ${COUPON_BATCH_ISSUE_SIZE:100}
 
 # NotificationConsumerConfig의 필수 값. 쿠폰 부하에는 메시지를 발행하지 않는다.
 bootstrap:

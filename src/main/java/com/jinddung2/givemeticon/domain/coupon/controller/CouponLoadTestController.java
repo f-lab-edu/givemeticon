@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.coupon.controller;
 
+import com.jinddung2.givemeticon.domain.coupon.controller.dto.CouponIssueRequestResponse;
 import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponRequestDto;
 import com.jinddung2.givemeticon.domain.coupon.facade.CreateCouponFacade;
 import lombok.RequiredArgsConstructor;
@@ -30,5 +31,12 @@ public class CouponLoadTestController {
                                @RequestBody CreateCouponRequestDto requestDto) {
         createCouponFacade.createCouponAndDecreaseStock(userId, requestDto);
         return "Successfully create coupon";
+    }
+
+    /** "접수/발급 분리 + 묶음 차감" 실험용: 접수만 하고 즉시 응답한다. 실제 발급은 활성화된 워커(단건/묶음)가 별도로 처리한다. */
+    @PostMapping("/requests")
+    public CouponIssueRequestResponse acceptCoupon(@RequestHeader("X-Loadtest-User-Id") int userId,
+                                                    @RequestBody CreateCouponRequestDto requestDto) {
+        return CouponIssueRequestResponse.of(createCouponFacade.acceptOnly(userId, requestDto));
     }
 }

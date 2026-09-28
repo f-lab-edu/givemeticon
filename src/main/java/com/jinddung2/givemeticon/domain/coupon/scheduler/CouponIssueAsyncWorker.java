@@ -7,6 +7,7 @@ import com.jinddung2.givemeticon.domain.coupon.service.CouponIssueRequestService
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -32,8 +33,14 @@ import java.util.concurrent.Executors;
  * 그대로 둔다: 이 워커가 이미 훨씬 짧은 주기로 같은 테이블을 훑으므로 서로 충돌하지
  * 않고, 어느 한쪽이 먼저 처리하면 resolvePending의 상태 재확인(PENDING이 아니면 스킵)이
  * 중복 처리를 막는다.
+ *
+ * coupon.issue-worker.mode 속성으로 CouponBatchIssueWorker(묶음 차감 방식)와 서로
+ * 배타적으로 켜고 끌 수 있다 - 값을 지정하지 않으면(기본값) 이 한 건씩 처리하는 방식이
+ * 그대로 켜진다. 두 워커를 동시에 켜면 같은 PENDING을 서로 다른 단위(1건 vs N건)로
+ * 경합하게 되므로 허용하지 않는다.
  */
 @Component
+@ConditionalOnProperty(prefix = "coupon.issue-worker", name = "mode", havingValue = "single", matchIfMissing = true)
 @RequiredArgsConstructor
 @Slf4j
 public class CouponIssueAsyncWorker {

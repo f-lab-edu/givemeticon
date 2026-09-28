@@ -31,6 +31,19 @@ public class CouponStockService {
         }
     }
 
+    /** amount만큼 재고가 남아있을 때만 한 번에 amount를 뺀다. 성공하면 true. */
+    @Transactional
+    public boolean decreaseStockByIfEnough(int stockId, int amount) {
+        return couponStockMapper.decreaseStockByIfEnough(stockId, amount) == 1;
+    }
+
+    /** 정확한 잔여 수량이 필요할 때(조건부 차감이 실패한 직후) 행을 잠그고 읽는다. */
+    @Transactional
+    public CouponStock getStockForUpdate(int stockId) {
+        return couponStockMapper.findByIdForUpdate(stockId)
+                .orElseThrow(NotFoundCouponStock::new);
+    }
+
     public List<CouponStock> getActiveCouponStocks() {
         return couponStockMapper.findActiveCouponStocks();
     }

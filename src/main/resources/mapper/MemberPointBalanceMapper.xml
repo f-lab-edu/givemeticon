@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.MemberPointBalanceMapper">
+    <insert id="incrementBalance">
+        INSERT INTO member_point_balance (member_id, balance, updated_at)
+        VALUES (#{memberId}, #{amount}, UTC_TIMESTAMP(6))
+        ON DUPLICATE KEY UPDATE balance = balance + #{amount}, updated_at = UTC_TIMESTAMP(6)
+    </insert>
+
+    <select id="findByMemberId" resultType="MemberPointBalance">
+        SELECT member_id, balance, updated_at
+        FROM member_point_balance
+        WHERE member_id = #{memberId}
+    </select>
+</mapper>

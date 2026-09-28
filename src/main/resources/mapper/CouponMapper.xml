@@ -48,6 +48,14 @@
                 #{expiredDate})
     </insert>
 
+    <insert id="saveAll" useGeneratedKeys="true" keyProperty="coupons.id">
+        INSERT INTO coupon (user_id, stock_id, name, coupon_type, coupon_number, price, is_used, created_date, expired_date)
+        VALUES
+        <foreach collection="coupons" item="c" separator=",">
+            (#{c.userId}, #{c.stockId}, #{c.name}, #{c.couponType}, #{c.couponNumber}, #{c.price}, #{c.isUsed}, #{c.createdDate}, #{c.expiredDate})
+        </foreach>
+    </insert>
+
     <update id="merge" parameterType="Coupon">
         UPDATE coupon
         SET user_id       = #{userId},

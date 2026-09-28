@@ -1,0 +1,7 @@
+# 접수 순서에 따른 쿠폰 발급 워커를 켜는 프로필. coupon-admission 프로필과 함께 적용한다.
+# 기존 실험용 발급 워커(coupon.issue-worker.*)는 coupon-admission 프로필이 이미 비활성화하므로,
+# 이 프로필을 얹어도 두 워커가 동시에 도는 상황은 만들어지지 않는다.
+coupon:
+  event-issuance:
+    worker:
+      enabled: true

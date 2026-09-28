@@ -5,6 +5,7 @@ import com.jinddung2.givemeticon.domain.coupon.controller.dto.CreateCouponReques
 import com.jinddung2.givemeticon.domain.coupon.domain.Coupon;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponIssueRequest;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponRequestStatus;
+import com.jinddung2.givemeticon.domain.coupon.domain.CouponStock;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponType;
 import com.jinddung2.givemeticon.domain.coupon.exception.AlreadyIssuedCouponException;
 import com.jinddung2.givemeticon.domain.coupon.exception.CouponErrorCode;
@@ -12,6 +13,7 @@ import com.jinddung2.givemeticon.domain.coupon.exception.NotEnoughCouponStockExc
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponMapper;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponIssueRequestService;
 import com.jinddung2.givemeticon.domain.coupon.service.CouponService;
+import com.jinddung2.givemeticon.domain.coupon.service.CouponStockService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +24,10 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -41,6 +46,9 @@ class CreateCouponFacadeTest {
 
     @Mock
     CouponService couponService;
+
+    @Mock
+    CouponStockService couponStockService;
 
     @Mock
     CouponIssueRequestService couponIssueRequestService;
@@ -326,6 +334,110 @@ class CreateCouponFacadeTest {
 
         assertThatThrownBy(() -> createCouponFacade.getOwnRequest(userId, othersRequest.getId()))
                 .isInstanceOf(com.jinddung2.givemeticon.domain.coupon.exception.CouponUserMismatchException.class);
+    }
+
+    // --- processBatchForStock (접수/발급 분리 + 묶음 차감) ---
+
+    private CouponIssueRequest pendingRequestWithId(long id, int forUserId) {
+        CouponIssueRequest request = CouponIssueRequest.builder()
+                .userId(forUserId).stockId(stockId).couponName(couponName).couponType(CouponType.FREE_POINT)
+                .price(price).status(CouponRequestStatus.PENDING).createdDate(java.time.LocalDateTime.now()).build();
+        setRequestId(request, id);
+        return request;
+    }
+
+    private Coupon couponWithId(int id, int forUserId) {
+        Coupon coupon = Coupon.builder()
+                .userId(forUserId).stockId(stockId).name(couponName).couponType(CouponType.FREE_POINT)
+                .couponNumber("C" + id).price(price).build();
+        setCouponId(coupon, id);
+        return coupon;
+    }
+
+    @Test
+    @DisplayName("[묶음 발급] 처리할 PENDING이 없으면 0을 반환하고 재고를 건드리지 않는다.")
+    void processBatchForStock_NoPending_ReturnsZero() {
+        when(couponIssueRequestService.findPendingBatch(stockId, 5)).thenReturn(List.of());
+
+        int processed = createCouponFacade.processBatchForStock(stockId, 5);
+
+        assertThat(processed).isZero();
+        verify(couponStockService, never()).decreaseStockByIfEnough(anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("[묶음 발급] 재고가 충분하면 batchSize 전체를 한 번에 ISSUED로 발급한다.")
+    void processBatchForStock_EnoughStock_IssuesWholeBatch() {
+        List<CouponIssueRequest> batch = IntStream.range(0, 3)
+                .mapToObj(i -> pendingRequestWithId(100 + i, userId + i))
+                .collect(Collectors.toList());
+        when(couponIssueRequestService.findPendingBatch(stockId, 3)).thenReturn(batch);
+        when(couponStockService.decreaseStockByIfEnough(stockId, 3)).thenReturn(true);
+        List<Coupon> coupons = List.of(couponWithId(900, userId), couponWithId(901, userId + 1), couponWithId(902, userId + 2));
+        when(couponService.issueCouponsBatch(stockId, batch)).thenReturn(coupons);
+
+        int processed = createCouponFacade.processBatchForStock(stockId, 3);
+
+        assertThat(processed).isEqualTo(3);
+        verify(couponStockService, never()).getStockForUpdate(anyInt());
+        verify(couponIssueRequestService, never()).markSoldOutBatch(any(), anyString());
+        verify(couponIssueRequestService).markIssuedBatch(List.of(
+                new CouponIssueRequestService.IssuedCoupon(100, 900),
+                new CouponIssueRequestService.IssuedCoupon(101, 901),
+                new CouponIssueRequestService.IssuedCoupon(102, 902)));
+    }
+
+    @Test
+    @DisplayName("[묶음 발급] 재고가 batchSize보다 적으면 접수번호 앞쪽부터 잔여만큼만 ISSUED, 나머지는 SOLD_OUT이다.")
+    void processBatchForStock_PartialStock_SplitsIssuedAndSoldOut() {
+        List<CouponIssueRequest> batch = IntStream.range(0, 5)
+                .mapToObj(i -> pendingRequestWithId(200 + i, userId + i))
+                .collect(Collectors.toList());
+        when(couponIssueRequestService.findPendingBatch(stockId, 5)).thenReturn(batch);
+        when(couponStockService.decreaseStockByIfEnough(stockId, 5)).thenReturn(false);
+        when(couponStockService.getStockForUpdate(stockId)).thenReturn(CouponStock.of(2));
+        when(couponStockService.decreaseStockByIfEnough(stockId, 2)).thenReturn(true);
+        List<CouponIssueRequest> toIssue = batch.subList(0, 2);
+        List<Coupon> coupons = List.of(couponWithId(910, userId), couponWithId(911, userId + 1));
+        when(couponService.issueCouponsBatch(stockId, toIssue)).thenReturn(coupons);
+
+        int processed = createCouponFacade.processBatchForStock(stockId, 5);
+
+        assertThat(processed).isEqualTo(5);
+        verify(couponIssueRequestService).markIssuedBatch(List.of(
+                new CouponIssueRequestService.IssuedCoupon(200, 910),
+                new CouponIssueRequestService.IssuedCoupon(201, 911)));
+        verify(couponIssueRequestService).markSoldOutBatch(
+                List.of(202L, 203L, 204L), CouponErrorCode.NOT_ENOUGH_COUPON_STOCK.name());
+    }
+
+    @Test
+    @DisplayName("[묶음 발급] 재고가 이미 0이면 이번 배치 전체를 SOLD_OUT으로 정리하고 쿠폰은 만들지 않는다.")
+    void processBatchForStock_NoStockLeft_AllSoldOut() {
+        List<CouponIssueRequest> batch = IntStream.range(0, 3)
+                .mapToObj(i -> pendingRequestWithId(300 + i, userId + i))
+                .collect(Collectors.toList());
+        when(couponIssueRequestService.findPendingBatch(stockId, 3)).thenReturn(batch);
+        when(couponStockService.decreaseStockByIfEnough(stockId, 3)).thenReturn(false);
+        when(couponStockService.getStockForUpdate(stockId)).thenReturn(CouponStock.of(0));
+
+        int processed = createCouponFacade.processBatchForStock(stockId, 3);
+
+        assertThat(processed).isEqualTo(3);
+        verify(couponService, never()).issueCouponsBatch(anyInt(), any());
+        verify(couponIssueRequestService, never()).markIssuedBatch(any());
+        verify(couponIssueRequestService).markSoldOutBatch(
+                List.of(300L, 301L, 302L), CouponErrorCode.NOT_ENOUGH_COUPON_STOCK.name());
+    }
+
+    private void setRequestId(CouponIssueRequest request, long id) {
+        try {
+            java.lang.reflect.Field field = CouponIssueRequest.class.getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(request, id);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private void setCouponId(Coupon coupon, int id) {

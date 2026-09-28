@@ -27,4 +27,22 @@
         WHERE id = #{id}
           AND remain > 0
     </update>
+
+    <!-- 묶음 발급용 조건부 차감: 재고가 amount 이상일 때만 한 번에 amount만큼 뺀다. -->
+    <update id="decreaseStockByIfEnough">
+        UPDATE coupon_stock
+        SET remain = remain - #{amount}
+        WHERE id = #{id}
+          AND remain >= #{amount}
+    </update>
+
+    <!-- amount 조건부 차감이 실패했을 때(재고 &lt; amount) 정확한 잔여를 알아내기 위해 행을
+         잠근다. 이 시점부터 트랜잭션이 끝날 때까지 다른 차감이 이 행을 기다리게 해, 잔여를
+         읽은 뒤 다시 깎는 사이에 값이 바뀌는 경합을 막는다. -->
+    <select id="findByIdForUpdate" resultType="CouponStock">
+        SELECT id, total, remain
+        FROM coupon_stock
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
 </mapper>
