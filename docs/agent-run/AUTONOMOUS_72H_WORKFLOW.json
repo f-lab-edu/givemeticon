@@ -1,0 +1,16 @@
+{
+  "name": "Coupon autonomous progress — until 2026-10-10T06:28:11Z",
+  "enabled": true,
+  "trigger": {
+    "on": "schedule",
+    "interval": "1h"
+  },
+  "steps": [
+    {
+      "id": "architect_continuation",
+      "action": "send_message",
+      "channel": "9020e1ba-9443-44ad-b661-9e436525618a",
+      "text": "@Architect AUTONOMOUS_CONTINUATION: 사용자 요청 1095536a361c3d925ffc1c81847a65a8c1b0da5d09e361c54d864b8d7b9713b5의 72시간 작업을 이어가세요. 기한 2026-10-10T06:28:11Z. docs/agent-run/STATUS.md(현재 /Users/jinhyuck/.buzz/REPOS/givemeticon-architect-quota)와 GitHub Issue/PR을 읽고 동일 작업 중복 실행 없이 다음 실행 가능한 작업을 지시/수행하세요. quota reset 전 재시도 금지, 해소된 quota 예약은 별도 비활성 유지. 완료 또는 기한 도달 시 이 예약을 비활성화하고 사용자에게 13항목 보고; 완료만 ✅, 기한 도달 미완료는 ⏸️. Kafka 제외, 자동 merge 금지. ordinary reply는 이 요청 thread root 1095536a361c3d925ffc1c81847a65a8c1b0da5d09e361c54d864b8d7b9713b5로 보냅니다."
+    }
+  ]
+}
