@@ -82,11 +82,17 @@ done
 
 # lsof 가 없는 Linux: ss 로 포트 사용 여부를 판단한다(사용 중이면 거부, 비었으면 통과)
 mv "$tmp/bin/lsof" "$tmp/bin/lsof.off"
+# Hermetic fallback PATH: Linux /usr/bin may contain a real lsof, unlike macOS.
+# Keep required tools, excluding lsof, so this test actually exercises ss.
+mkdir -p "$tmp/fallback-bin"
+for tool in bash cat awk tail grep dirname mkdir seq sleep tr head uname id; do
+  resolved=$(command -v "$tool"); ln -s "$resolved" "$tmp/fallback-bin/$tool"
+done
 printf '#!/usr/bin/env bash\necho "State Recv-Q Send-Q Local Address:Port"\n' > "$tmp/bin/ss"; chmod +x "$tmp/bin/ss"
-reset; rc=$(PATH="$tmp/bin:/usr/bin:/bin" runit run-capped-v1.sh up)
+reset; rc=$(PATH="$tmp/bin:$tmp/fallback-bin" runit run-capped-v1.sh up)
 [[ $rc -eq 0 ]] && ok "no lsof + ss(empty): ports considered free" || bad "ss-free rc=$rc"
 printf '#!/usr/bin/env bash\necho "State Recv-Q Send-Q Local Address:Port"; echo "LISTEN 0 4096 0.0.0.0:3307 0.0.0.0:*"\n' > "$tmp/bin/ss"
-reset; rc=$(PATH="$tmp/bin:/usr/bin:/bin" runit run-capped-v1.sh up)
+reset; rc=$(PATH="$tmp/bin:$tmp/fallback-bin" runit run-capped-v1.sh up)
 [[ $rc -eq 2 ]] && ! grep -q '^docker run' "$tmp/docker.log" && ok "no lsof + ss(busy): port in use refused" || bad "ss-busy rc=$rc"
 rm -f "$tmp/bin/ss"; mv "$tmp/bin/lsof.off" "$tmp/bin/lsof"
 reset; runit run-capped-stock.sh up >/dev/null
