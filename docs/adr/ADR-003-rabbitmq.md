@@ -85,3 +85,23 @@ queue 후보의 일시 오류 backoff는 해당 메시지를 ack/nack하지 않�
 
 ### Ledger update
 R1/R2/r1 설계 수정 기록 완료, 구현 증거 없음. N2/n1의 일관성은 Reviewer가 확인했다. B2/M3/M4/M5는 계속 열려 있다. 신규 검토 결과가 없으면 종결 판정을 추정하지 않는다.
+
+
+## R4 — observable attempt outcome
+Source: Reviewer 87211869c1ca6f0836f680ecd73245d2bfc2d2cd55562c0ce53aa0e0e1f651d9. R1/R2/R3/r1/r2는 설계 기준 종결이며 구현 PASS는 아니다.
+
+ACCEPTED 또는 불확실 응답의 시도는 원장 존재 여부와 별개로 끝까지 조회할 수 있어야 한다. event/member 기반 /me는 유효 신청 조회로 유지하고, 인증된 시도 조회 계약을 추가한다. 시도 조회는 해당 시도의 거절 감사 기록에서 API 최종값 REJECTED와 reason을 반환한다. REJECTED는 신청 원장 enum을 바꾸는 결정이 아니다. 유효 시도는 기존 논리 신청과 연결하여 ISSUED/SOLD_OUT을 반환한다. DB 미접근/조회 실패는 CHECKING 또는 명시적 일시 오류이며 거절/기록 없음으로 단정하지 않는다.
+
+시도 식별 계약: 클라이언트가 업무 시도 전에 불투명한 attempt_id를 만들고 동일 전송 재시도에서 유지한다. 서버는 형식·길이를 검증하고 인증 member_id/event_id에 묶는다. OPEN 후 새 업무 시도는 새 attempt_id를 사용한다. ACCEPTED 응답은 attempt_id를 돌려주며 confirm 불확실 시에도 같은 값으로 조회/재시도한다. 내부 publish correlation ID는 별도로 시도별 전송을 추적한다. 유효 신청의 UNIQUE(event_id, member_id)는 그대로이며 attempt_id를 바꿔도 쿠폰을 중복 발급하지 않는다. 다른 회원은 이 ID만 알아도 결과를 읽을 수 없어야 한다.
+
+앞선 N2의 '논리 키만으로 재시도'는 신청 멱등성에 한정하며, 무효 시도 추적에는 위 attempt_id가 추가로 필요하다는 결정을 기록한다. 별도 확인 토큰 대신 클라이언트 보유 attempt_id를 조회 핸들로 사용한다. 정확한 API path, 감사 스키마·보존기간, payload 변경을 동반한 동일 attempt_id 재사용의 오류 계약은 M3에서 검토 후 구현한다.
+
+AC:
+- ACCEPTED 뒤 무효로 판정된 시도는 정상 환경에서 최초 POST 후 180초 이내 REJECTED/reason 조회 가능.
+- 거절 후 새 유효 시도가 생성되어도 과거 attempt_id는 과거 REJECTED를 반환; 새 attempt는 자기 결과를 반환.
+- 응답 유실/confirm 불확실 재시도는 같은 attempt_id로 대조; 유효 시도의 중복 전송은 동일 신청 결과에 수렴.
+- 감사 기록 지연/실패·권한 없는 조회·동일 ID payload 충돌을 검증. 근거 없이 무기한 CHECKING으로 완료 처리하지 않음.
+
+### r3 — OPEN boundary comparison
+행사별 destination의 OPEN 제어 메시지 + API의 OPEN 전 publish 차단을 B2/M3 비교 후보에 추가한다. 이 방식은 위치/OPEN 판단을 재전달 뒤에도 재현할 수 있어야 한다. queue에서 재전달 순서가 바뀌면 마커를 한 번 읽었다는 사실만으로 과거 메시지를 유효 처리해서는 안 된다. stream도 선택 버전의 offset/replay/retention 동작 확인 전 채택하지 않는다.
+hold-and-pause 검증은 선택 버전/queue 유형의 consumer timeout 실제 설정값과 그 경계 전후의 channel 종료·재전달을 포함한다. Reviewer의 '기본 30분'은 버전 미고정 참고값이므로 테스트 전 실제 설정과 공식 문서로 확인하고 manifest에 기록한다.
