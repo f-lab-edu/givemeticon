@@ -107,13 +107,13 @@ pool 확대 비교는 다른 변수를 고정하고 두 앱을 재시작한 별�
 
 ### B. 보조: event HTTP 폴링 포함 통합 실험
 
-**미merge [#176 고정 SHA e9e52745291cfb51c944d5a725a7420494e22823](https://github.com/f-lab-edu/givemeticon/tree/e9e52745291cfb51c944d5a725a7420494e22823) runner 전용 예시다.** 이 문서 branch 또는 b941a04/develop에서 그대로 실행하지 않는다. 별도 #176 checkout의 SHA를 먼저 확인한다. MYSQL_HOST_PORT/BASE_PROFILE/추가 config 처리·공유 givemeticon-mysql 거부 가드가 포함된 runner다. #176 runbook의 owner label로 준비한 전용 MySQL/Redis와 포트·dummy Kafka 설정을 smoke 확인한다. 독립 검증 전이며 실행 PASS 명령이 아니다.
+**미merge [#176 고정 SHA d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6](https://github.com/f-lab-edu/givemeticon/tree/d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6) runner 전용 예시다.** 이 문서 branch 또는 b941a04/develop에서 그대로 실행하지 않는다. 별도 #176 checkout의 SHA를 먼저 확인한다. MYSQL_HOST_PORT/BASE_PROFILE/추가 config 처리·공유 givemeticon-mysql 거부 가드가 포함된 runner다. #176 runbook의 owner label로 준비한 전용 MySQL/Redis와 포트·dummy Kafka 설정을 smoke 확인한다. 독립 검증 전이며 실행 PASS 명령이 아니다.
 
-50k/100k는 과거 같은 호스트 발생기 미달 위험을 반영한 후속 후보다. [고정 과거 진단](https://github.com/f-lab-edu/givemeticon/blob/e9e52745291cfb51c944d5a725a7420494e22823/docs/experiments/baseline-10k-diagnostic.md)의 full-20000 run은 목표10k 대비 최초9,874·dropped128이었다. 이 자료에서 50k/100k 실제 전송은 미검증이다. 새 SHA 성능 증거나 영구 불가능 판정이 아니다. #166 환경/자원 개선·생성기 용량 검증 후 각 단계의 실제 전송량·송신 시간분포·RPS·drop을 재검증한다.
+50k/100k는 과거 같은 호스트 발생기 미달 위험을 반영한 후속 후보다. [고정 과거 진단](https://github.com/f-lab-edu/givemeticon/blob/d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6/docs/experiments/baseline-10k-diagnostic.md)의 full-20000 run은 목표10k 대비 최초9,874·dropped128이었다. 이 자료에서 50k/100k 실제 전송은 미검증이다. 새 SHA 성능 증거나 영구 불가능 판정이 아니다. #166 환경/자원 개선·생성기 용량 검증 후 각 단계의 실제 전송량·송신 시간분포·RPS·drop을 재검증한다.
 
 ```bash
 # 별도 #176 checkout에서 실행; SHA 불일치면 종료
-test "$(git rev-parse HEAD)" = e9e52745291cfb51c944d5a725a7420494e22823 || exit 2
+test "$(git rev-parse HEAD)" = d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6 || exit 2
 export MYSQL_CONTAINER='<dedicated-test-mysql-container>'
 export MYSQL_HOST_PORT='<dedicated-mysql-host-port>'
 export BASE_PROFILE=verifier-loadtest
