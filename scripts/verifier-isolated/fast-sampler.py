@@ -40,9 +40,11 @@ def prom_loop():
     f.close()
 
 def db_loop():
-    pw = subprocess.run(["docker", "exec", container, "printenv", "MYSQL_ROOT_PASSWORD"], capture_output=True, text=True).stdout.strip()
-    p = subprocess.Popen(["docker", "exec", "-i", "-e", f"MYSQL_PWD={pw}", container, "mysql", "-uroot", "--unbuffered", "--batch",
-                          "--skip-column-names", database], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
+    # Resolve the password only inside the container, never in host argv/stdout.
+    p = subprocess.Popen(["docker", "exec", "-i", container, "sh", "-c",
+                          'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot --unbuffered --batch --skip-column-names "$1"',
+                          "sh", database], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.DEVNULL, text=True, bufsize=1)
     q = (f"SELECT CAST(UNIX_TIMESTAMP(NOW(6))*1000 AS UNSIGNED), IFNULL(SUM(status IN ('ISSUED','SOLD_OUT')),0), "
          f"IFNULL(SUM(status IN ('PENDING','CHECKING')),0), COUNT(*) FROM coupon_application WHERE event_id={int(event_id)};\n")
     f = open(f"{run_dir}/fast-db.csv", "w", newline=""); w = csv.writer(f)

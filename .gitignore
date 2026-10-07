@@ -49,4 +49,3 @@ out/
 __pycache__/
 *.py[cod]
 /scripts/verifier-isolated/results/
-/reports/

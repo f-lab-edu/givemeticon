@@ -12,6 +12,6 @@ out=$1
   echo "--- container limits (cpus/memory; 0 = unlimited)"
   for c in $(docker ps --format '{{.Names}}'); do docker inspect "$c" --format '{{.Name}} nano_cpus={{.HostConfig.NanoCpus}} memory={{.HostConfig.Memory}}'; done
   echo "--- top host processes by CPU"; ps -Ao pcpu,rss,pid,comm -r | head -12
-  echo "--- other java/gradle processes"; pgrep -fl 'java|gradle' | cut -c1-160
+  echo "--- other java/gradle processes"; ps -Ao pid,pcpu,rss,comm | awk 'NR == 1 || $4 ~ /(^|\/)(java|gradle)$/ {print}'
   echo "--- listening ports of interest"; lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E ':(3306|3307|6379|6380|16379|16380|9092|1808[01]|1810[01])\b' | awk '{print $1,$2,$9}'
 } > "$out" 2>&1

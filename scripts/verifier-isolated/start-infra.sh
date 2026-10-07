@@ -1,27 +1,61 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# 이번 검증 소유의 격리 인프라(MySQL 3307, redis 16379/16380). 기존 givemeticon-* 컨테이너는 건드리지 않는다.
-# 사용: start-infra.sh up|down. 비밀번호는 VERIFIER_MYSQL_PASSWORD env(없으면 거부).
+# A caller-generated owner token must be retained for this experiment's lifetime.
 prefix=${VERIFIER_PREFIX:-verifier-iso}
 mysql_port=${VERIFIER_MYSQL_PORT:-3307}
+: "${VERIFIER_OWNER_ID:?set a unique VERIFIER_OWNER_ID and retain it for stop/remove}"
+[[ "$prefix" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || { echo "invalid prefix" >&2; exit 2; }
+containers=("$prefix-mysql" "$prefix-redis-mail" "$prefix-redis-coupon")
+owner_label=xyz.buzz.verifier.owner
+managed_label=xyz.buzz.verifier.managed
+verify_owned() {
+  # Check every target before performing any mutation.
+  for name in "${containers[@]}"; do
+    actual=$(docker inspect --format '{{ index .Config.Labels "xyz.buzz.verifier.owner" }}' "$name")
+    managed=$(docker inspect --format '{{ index .Config.Labels "xyz.buzz.verifier.managed" }}' "$name")
+    [[ "$actual" == "$VERIFIER_OWNER_ID" && "$managed" == "isolated-harness" ]] ||
+      { echo "ownership mismatch: $name" >&2; exit 2; }
+  done
+}
 case "${1:-}" in
   up)
     : "${VERIFIER_MYSQL_PASSWORD:?set VERIFIER_MYSQL_PASSWORD}"
+    for name in "${containers[@]}"; do
+      if docker inspect "$name" >/dev/null 2>&1; then
+        echo "container already exists: $name" >&2; exit 2
+      fi
+    done
     for p in "$mysql_port" 16379 16380; do
       ! lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1 || { echo "port $p in use" >&2; exit 2; }
     done
-    docker run -d --name "$prefix-mysql" -e MYSQL_ROOT_PASSWORD="$VERIFIER_MYSQL_PASSWORD" -p "$mysql_port:3306" \
+    # Docker inherits the value from env; the argument contains only its name.
+    MYSQL_ROOT_PASSWORD="$VERIFIER_MYSQL_PASSWORD" docker run -d --name "$prefix-mysql" \
+      --label "$owner_label=$VERIFIER_OWNER_ID" --label "$managed_label=isolated-harness" \
+      -e MYSQL_ROOT_PASSWORD -p "$mysql_port:3306" \
       mysql:8.0 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci >/dev/null
-    docker run -d --name "$prefix-redis-mail" -p 16379:6379 redis:7-alpine >/dev/null
-    docker run -d --name "$prefix-redis-coupon" -p 16380:6379 redis:7-alpine >/dev/null
+    docker run -d --name "$prefix-redis-mail" \
+      --label "$owner_label=$VERIFIER_OWNER_ID" --label "$managed_label=isolated-harness" \
+      -p 16379:6379 redis:7-alpine >/dev/null
+    docker run -d --name "$prefix-redis-coupon" \
+      --label "$owner_label=$VERIFIER_OWNER_ID" --label "$managed_label=isolated-harness" \
+      -p 16380:6379 redis:7-alpine >/dev/null
     for _ in $(seq 1 60); do
-      # 이미지 초기화 중의 임시 서버(port: 0)와 최종 서버(port: 3306)를 구분한다.
-      docker logs "$prefix-mysql" 2>&1 | grep -q "ready for connections.*port: 3306  MySQL" && \
-        docker exec "$prefix-mysql" mysqladmin ping -uroot -p"$VERIFIER_MYSQL_PASSWORD" --silent >/dev/null 2>&1 && { echo ready; exit 0; }
+      docker logs "$prefix-mysql" 2>&1 | grep -q "ready for connections.*port: 3306  MySQL" &&
+        docker exec "$prefix-mysql" sh -c \
+          'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysqladmin ping -uroot --silent' \
+          >/dev/null 2>&1 && { echo ready; exit 0; }
       sleep 2
     done
     echo "mysql not ready" >&2; exit 1 ;;
   down)
-    docker rm -f "$prefix-mysql" "$prefix-redis-mail" "$prefix-redis-coupon" >/dev/null ;;
-  *) echo "usage: $0 up|down" >&2; exit 1 ;;
+    verify_owned
+    docker stop "${containers[@]}" >/dev/null ;;
+  remove)
+    verify_owned
+    for name in "${containers[@]}"; do
+      [[ "$(docker inspect --format '{{.State.Running}}' "$name")" == "false" ]] ||
+        { echo "stop container before removal: $name" >&2; exit 2; }
+    done
+    docker rm "${containers[@]}" >/dev/null ;;
+  *) echo "usage: $0 up|down|remove" >&2; exit 1 ;;
 esac
