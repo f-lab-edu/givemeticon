@@ -4,7 +4,7 @@
 
 ## 확정된 주 baseline 계약 (ADR-001 반영)
 
-Architect의 2026-10-07 지시 `6358d8b7a0292f3087b8cd181825a723adec0aaf64e9e8483ce659f45018982f` 및 `/Users/jinhyuck/.buzz/REPOS/givemeticon-architect-quota/docs/adr/ADR-001-baseline.md`의 당시 미커밋 내용을 읽기 전용으로 반영했다. ADR 원본은 Architect가 관리하며 이 PR에서 수정하거나 복사하지 않는다. ADR 커밋 시 최종 reference SHA를 manifest에 추가한다.
+Architect의 확정 [ADR-001 (#169, ca25ccafe30b75d52a82e950d9b34e4eb8282d7c)](https://github.com/f-lab-edu/givemeticon/blob/ca25ccafe30b75d52a82e950d9b34e4eb8282d7c/docs/adr/ADR-001-baseline.md)을 반영한다. ADR 원본은 Architect가 관리한다. admission size=50, max-wait=15ms, queue capacity=2000, wait timeout=5000ms를 고정하고 503도 분모에 포함한다. 서비스 전체 CPU/RAM 상한과 별도 생성기 예산을 manifest에 고정하며 미강제 진단을 동일 예산 비교로 쓰지 않는다.
 
 - 주 대상: 조사 SHA b941a04의 **V1 묶음 접수+묶음 발급**. 실제 API는 POST `/api/v1/coupon-events/{id}/applications`; 부하 도구는 같은 서비스에 연결되는 `/test-support/coupon-events/{id}/applications`와 테스트 헤더를 사용한다. 실제 로그인/세션 경로 성능은 측정하지 않는다.
 - profiles: `local,coupon-admission,coupon-admission-batch,coupon-issuance,coupon-issuance-batch,coupon-admission-test`. `local`은 격리된 테스트 설정을 준비해야 한다. 접수/발급 batch 기본 50과 실제 적용값, 최대 대기·큐 크기 등도 manifest에 저장한다.
@@ -55,7 +55,7 @@ stock 경로의 서비스 `@Transactional`은 기존 AOP 트랜잭션에 참여�
 ## 3. 실행 전 환경 계약
 
 1. Verifier가 검증할 정확한 branch/SHA와 dirty diff, JDK/Gradle/k6/Docker/MySQL/Redis 버전, host CPU/RAM, 컨테이너 자원 제한, 두 앱 수, Tomcat threads, Hikari per-app/합계, 타임아웃, DB isolation·내구성 설정을 기록한다. 같은 DB·생성기에서 다른 작업/빌드를 동시에 실행하지 않는다.
-2. 개인/공유/운영 DB를 쓰지 않는다. 검증용 Docker 컨텍스트와 별도 MySQL/Redis/Kafka 인스턴스, 로컬 포트만 사용한다. 기존 `docker-compose.infra.yml`은 고정 container_name과 3306/6379/6380/9092를 사용하므로 기존 인프라가 있으면 무조건 up/down하지 않는다. Verifier가 격리 인스턴스와 포트 충돌 없음을 확인해야 한다. 컨테이너만 전용 이름으로 바꿔도 event runner의 JDBC는 localhost:3306 고정이므로 별도 환경에서 맞춰야 한다.
+2. 개인/공유/운영 DB를 쓰지 않는다. 검증용 Docker 컨텍스트와 별도 MySQL/Redis/Kafka 인스턴스, 로컬 포트만 사용한다. 기존 `docker-compose.infra.yml`은 고정 container_name과 3306/6379/6380/9092를 사용하므로 기존 인프라가 있으면 무조건 up/down하지 않는다. Verifier가 격리 인스턴스와 포트 충돌 없음을 확인해야 한다. MYSQL_CONTAINER는 docker SQL 대상만 바꾸며 JDBC/Redis/Kafka endpoint를 바꾸지 않는다. b941a04 event runner는 JDBC localhost:3306 고정이다. B는 미merge #176의 수정 SHA 전용이며 develop runner로 실행하지 않는다.
 3. worktree의 `givemeticon-config` submodule은 초기 상태에서 비어 있다 (`7db8a835...` gitlink). event runner는 `local` 프로필을 쓰므로 승인된 로컬 테스트 설정을 준비하거나 pinned submodule을 가져와 외부/공유 endpoint가 없는지 확인한다. 비밀값을 run 로그/Git에 저장하지 않는다. stock용 mysql-loadtest 프로필에는 필요한 dummy 설정이 있으므로 `local` 없이 명시 활성화한다.
 4. `./gradlew bootJar`를 해당 worktree에서 만들고 jar와 SHA를 기록한다. readiness health뿐 아니라 test endpoint의 소규모 요청·DB 반영·prometheus 메트릭을 확인한다. `coupon-admission-test`/`mysql-loadtest` 인증 우회 endpoint는 격리 환경에서만 사용한다.
 5. stock: 전용 DDL은 user FK 없는 숫자 ID fixture를 쓴다. k6의 scenario 전체 iteration 번호로 회원 ID를 생성하고 run마다 새 stock을 만든다. event: `create_event`가 SCHEDULED와 DB UTC 시작시각·재고·등급을 넣고 숫자 member fixture를 사용한다. 실제 회원/session 인증 비용을 측정한 결과는 아니다.
@@ -69,10 +69,14 @@ repo/worktree root에서 실행한다. 아래 `<...>`는 실행 환경에 맞게
 
 ### A. 보조: stock 동기 분산락+MySQL 비교
 
+**b941a04에서 아래 절차는 현재 실행 불가이며 준비 참고용이다.** JDBC 기본3306, Redis mail6379/coupon6380, Kafka9092를 모두 전용 인스턴스로 덮어쓴 설정의 smoke가 필요하다. LOADTEST_DB_URL로 JDBC만 바꾸면 나머지 의존은 격리되지 않는다. MYSQL_CONTAINER만 바꿔도 JDBC는 바뀌지 않는다. stock runner 출력은 reports/로 하드코딩되어 REPORT_ROOT로 바뀌지 않는다. 출력 경로 수정·검증 전에는 실행하지 않는다. 아래 JVM 준비도 전체 격리 설정이 검증된 후에만 실행한다.
+
 ```bash
 export MYSQL_CONTAINER='<dedicated-test-mysql-container>'
 export LOADTEST_DB_NAME='givemeticon_loadtest_issue164'
-export LOADTEST_DB_URL="jdbc:mysql://localhost:3306/$LOADTEST_DB_NAME"
+export LOADTEST_DB_URL="jdbc:mysql://127.0.0.1:<isolated-mysql-port>/$LOADTEST_DB_NAME"
+# Redis 두 endpoint와 bootstrap.server를 덮어쓴 검증된 추가 설정 파일 필수
+export SPRING_CONFIG_ADDITIONAL_LOCATION="file:<verified-stock-isolation-config-file>"
 export LOADTEST_DB_USER=root
 # LOADTEST_DB_PASSWORD는 로컬 비밀 관리 경로에서 설정; 출력/commit 금지
 export LOADTEST_HIKARI_MAX=20
@@ -80,27 +84,21 @@ export LOADTEST_HIKARI_MIN_IDLE=20
 export COUPON_ISSUE_WORKER_MODE=off
 bash scripts/loadtest/setup-isolated-db.sh
 ./gradlew bootJar
-mkdir -p reports/issue164-environment
+mkdir -p scripts/verifier-isolated/results/issue164-environment
 java -jar build/libs/givemeticon-0.0.1-SNAPSHOT.jar --server.port=8082 \
   --spring.profiles.active=mysql-loadtest,redis-lock-loadtest \
   --coupon.issue-worker.enabled=false --coupon.event-issuance.worker.enabled=false \
-  > reports/issue164-environment/app-8082.log 2>&1 &
+  > scripts/verifier-isolated/results/issue164-environment/app-8082.log 2>&1 &
 APP_A_PID=$!
 java -jar build/libs/givemeticon-0.0.1-SNAPSHOT.jar --server.port=8083 \
   --spring.profiles.active=mysql-loadtest,redis-lock-loadtest \
   --coupon.issue-worker.enabled=false --coupon.event-issuance.worker.enabled=false \
-  > reports/issue164-environment/app-8083.log 2>&1 &
+  > scripts/verifier-isolated/results/issue164-environment/app-8083.log 2>&1 &
 APP_B_PID=$!
 # readiness/소규모 DB 확인 후 별도 예열 run; VU 설정은 생성기 용량 확인 후 export
 export PRE_ALLOCATED_VUS='<calibrated-integer>' MAX_VUS='<calibrated-integer>'
-MODE=sync LOCK_MODE=redis-before-db WORKER_MODE=off STOCK_TOTAL=1000 \
-  RUN_ID=issue164-sync-warmup ISSUE_RATE=1000 DURATION=10s bash scripts/loadtest/run-arrival-rate.sh
-MODE=sync LOCK_MODE=redis-before-db WORKER_MODE=off STOCK_TOTAL=1000 \
-  RUN_ID=issue164-sync-10k-r1 ISSUE_RATE=1000 DURATION=10s bash scripts/loadtest/run-arrival-rate.sh
-MODE=sync LOCK_MODE=redis-before-db WORKER_MODE=off STOCK_TOTAL=1000 \
-  RUN_ID=issue164-sync-50k-r1 ISSUE_RATE=5000 DURATION=10s bash scripts/loadtest/run-arrival-rate.sh
-MODE=sync LOCK_MODE=redis-before-db WORKER_MODE=off STOCK_TOTAL=1000 \
-  RUN_ID=issue164-sync-100k-r1 ISSUE_RATE=10000 DURATION=10s bash scripts/loadtest/run-arrival-rate.sh
+# stock runner는 reports/ 고정 출력이므로 실행하지 않는다.
+# 출력 경로 격리 지원 후 별도 예열과 1000/5000/10000 RPS × 10초를 순차 검증한다.
 # 모든 outstanding HTTP/DB 상태 확인·SQL export 후 이번 실행의 두 PID만 종료
 kill "$APP_A_PID" "$APP_B_PID"
 ```
@@ -109,27 +107,38 @@ pool 확대 비교는 다른 변수를 고정하고 두 앱을 재시작한 별�
 
 ### B. 보조: event HTTP 폴링 포함 통합 실험
 
+**미merge [#176 고정 SHA e9e52745291cfb51c944d5a725a7420494e22823](https://github.com/f-lab-edu/givemeticon/tree/e9e52745291cfb51c944d5a725a7420494e22823) runner 전용 예시다.** 이 문서 branch 또는 b941a04/develop에서 그대로 실행하지 않는다. 별도 #176 checkout의 SHA를 먼저 확인한다. MYSQL_HOST_PORT/BASE_PROFILE/추가 config 처리·공유 givemeticon-mysql 거부 가드가 포함된 runner다. #176 runbook의 owner label로 준비한 전용 MySQL/Redis와 포트·dummy Kafka 설정을 smoke 확인한다. 독립 검증 전이며 실행 PASS 명령이 아니다.
+
+50k/100k는 과거 같은 호스트 발생기 미달 위험을 반영한 후속 후보다. [고정 과거 진단](https://github.com/f-lab-edu/givemeticon/blob/e9e52745291cfb51c944d5a725a7420494e22823/docs/experiments/baseline-10k-diagnostic.md)의 full-20000 run은 목표10k 대비 최초9,874·dropped128이었다. 이 자료에서 50k/100k 실제 전송은 미검증이다. 새 SHA 성능 증거나 영구 불가능 판정이 아니다. #166 환경/자원 개선·생성기 용량 검증 후 각 단계의 실제 전송량·송신 시간분포·RPS·drop을 재검증한다.
+
 ```bash
+# 별도 #176 checkout에서 실행; SHA 불일치면 종료
+test "$(git rev-parse HEAD)" = e9e52745291cfb51c944d5a725a7420494e22823 || exit 2
 export MYSQL_CONTAINER='<dedicated-test-mysql-container>'
+export MYSQL_HOST_PORT='<dedicated-mysql-host-port>'
+export BASE_PROFILE=verifier-loadtest
+export SPRING_CONFIG_ADDITIONAL_LOCATION="file:$PWD/scripts/verifier-isolated/verifier-loadtest-config.yml"
+# Redis host/port도 전용 인프라와 일치하는지 smoke 확인
 export COUPON_ADMISSION_LOADTEST_DB='givemeticon_coupon_admission_loadtest_issue164'
-export REPORT_ROOT="$PWD/reports/issue164-event-10k-r1"
+export REPORT_ROOT="$PWD/scripts/verifier-isolated/results/issue164-event-10k-r1"
 export LOADTEST_HIKARI_MAX=20
 export PRE_ALLOCATED_VUS='<calibrated-integer>' MAX_VUS='<calibrated-integer>'
 RATE=1000 DURATION=10s RUN_COUNT=1 RUN_LABEL=issue164-event-10k \
   DUPLICATE_RATE=0.10 STOCK_TOTAL=1000 STOCK_HIGH=500 WARMUP_ENABLED=true \
   ISSUANCE_BATCH_ENABLED=true bash scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh
-# 이전 DB/export와 생성기 상태 확인 후 새 report 경로로 실행
-REPORT_ROOT="$PWD/reports/issue164-event-50k-r1" RATE=5000 DURATION=10s \
+# 개선 환경·생성기 용량·이전 DB/export 확인 후 실제 50k 전송량 재검증
+REPORT_ROOT="$PWD/scripts/verifier-isolated/results/issue164-event-50k-r1" RATE=5000 DURATION=10s \
   RUN_COUNT=1 RUN_LABEL=issue164-event-50k DUPLICATE_RATE=0.10 \
   STOCK_TOTAL=1000 STOCK_HIGH=500 WARMUP_ENABLED=true ISSUANCE_BATCH_ENABLED=true \
   bash scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh
-REPORT_ROOT="$PWD/reports/issue164-event-100k-r1" RATE=10000 DURATION=10s \
+# 50k 실제 전송량 확인 후 100k 실제 전송량·drop 재검증
+REPORT_ROOT="$PWD/scripts/verifier-isolated/results/issue164-event-100k-r1" RATE=10000 DURATION=10s \
   RUN_COUNT=1 RUN_LABEL=issue164-event-100k DUPLICATE_RATE=0.10 \
   STOCK_TOTAL=1000 STOCK_HIGH=500 WARMUP_ENABLED=true ISSUANCE_BATCH_ENABLED=true \
   bash scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh
 ```
 
-B는 고유 최초 신청 iteration 목표 10k/50k/100k다. polling GET은 추가 HTTP 요청이며 admission_attempts와 분리한다. B는 최초 고유 신청에 중복 10%를 추가하고 최초 신청·중복·조회 총량을 분리 집계한다. 중복 0%는 별도 `DUPLICATE_RATE=0` 보조 run으로 구분한다. B도 주 계약과 맞춰 묶음 발급을 켠다. 단건 발급 비교는 별도 `ISSUANCE_BATCH_ENABLED=false` run으로 분리한다. B의 HTTP polling 결과를 C의 주 baseline으로 대체하지 않는다. pure 접수 진단은 `RATE=1000 DURATION=10s RUN_COUNT=1 ADMISSION_MODE=single bash scripts/coupon-admission/run-admission-loadtest.sh`로 가능하지만 worker OFF 결과를 통합 baseline과 섞지 않는다.
+B는 고유 최초 신청 iteration 목표 10k/50k/100k다. polling GET은 추가 HTTP 요청이며 admission_attempts와 분리한다. B는 최초 고유 신청에 중복 10%를 추가하고 최초 신청·중복·조회 총량을 분리 집계한다. 중복 0%는 별도 `DUPLICATE_RATE=0` 보조 run으로 구분한다. B도 주 계약과 맞춰 묶음 발급을 켠다. 단건 발급 비교는 별도 `ISSUANCE_BATCH_ENABLED=false` run으로 분리한다. B의 HTTP polling 결과를 C의 주 baseline으로 대체하지 않는다. 접수 단독 runner도 별도 격리 점검 전에는 실행 예시로 제공하지 않는다. worker OFF 결과를 통합 baseline과 섞지 않는다.
 
 반복은 최소 3회 후보로 하되 Architect의 baseline 조건에 맞춘다. 여러 단계/후보를 같은 컨테이너에서 병렬 실행하지 않는다. RabbitMQ 신규 경로는 아직 없어 비교 실행 명령을 지어내지 않는다.
 
