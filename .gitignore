@@ -44,3 +44,8 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### verifier harness generated artifacts ###
+__pycache__/
+*.py[cod]
+/scripts/verifier-isolated/results/
