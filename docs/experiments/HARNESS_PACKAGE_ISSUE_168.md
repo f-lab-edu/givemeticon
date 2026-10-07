@@ -11,7 +11,7 @@ Verifier가 원 harness를 작성했고 Builder는 snapshot 패키징·ignore·�
 ## 소유 경계
 
 - 원 Verifier worktree와 #166의 후속 작업은 읽기 전용으로 취급했다. source가 이동해도 이 패키지는 위 고정 SHA의 스냅샷이다.
-- production (`src/main`, build dependencies)에는 변경이 없다. 기존 통합 runner에는 원 Verifier의 MySQL port/base profile/추가 config/공유 container 보호/fast sampler hook만 포함했다.
+- production (`src/main`, build dependencies)에는 변경이 없다. `VerifierHarnessConfigurationTest`는 추적된 config 파일을 Spring config loader로 읽고 host/port env 치환을 확인하는 network 없는 smoke다. 기존 통합 runner에는 원 Verifier의 MySQL port/base profile/추가 config/공유 container 보호/fast sampler hook만 포함했다.
 - `baseline-10k-diagnostic.md`는 **과거 진단**이며 새 패키지 SHA의 부하 PASS가 아니다. `736c01e`의 248-test 결과를 재사용하지 않는다. 자원 상한 미강제, dropped/ENDED 분모, finalized_at과 commit/client 관찰의 차이, strict 180초 미검증 제한을 보존했다.
 - #167 gate 이전 RabbitMQ production 구현·기존 발급 코드 제거는 수행하지 않는다. #165는 별도 Draft PR이며 수정하지 않는다.
 
@@ -57,7 +57,7 @@ python3 -B scripts/verifier-isolated/test-analyze-separated-v2.py
 ./gradlew test
 ```
 
-추가 sanity는 Python AST parse와 기존/신규 shell의 `bash -n`이다. synthetic sanity는 Docker 대체 stub으로 missing/duplicate/parse error가 분모 무결성을 깨뜨리는지, DB-final timeout 회원이 client-confirmed로 바뀌지 않는지를 검사한다. 실제 DB/fast sampler/부하/장애 검증은 대체하지 않는다. Gradle `test`는 integration 태그를 제외하므로 통과해도 실제 DB integration PASS를 주장하지 않는다.
+추가 sanity는 Python AST parse와 기존/신규 shell의 `bash -n`이다. synthetic sanity는 Docker 대체 stub으로 missing/duplicate/parse error가 분모 무결성을 깨뜨리는지, DB-final timeout 회원이 client-confirmed로 바뀌지 않는지를 검사한다. 실제 DB/fast sampler/부하/장애 검증은 대체하지 않는다. 재현 확인은 패키지 commit의 새 checkout(사전 ignored/untracked 파일 0)에서 수행하며 git ls-tree로 config 입력이 commit에 있음을 확인한다. Gradle `test`는 integration 태그를 제외하므로 통과해도 실제 DB integration PASS를 주장하지 않는다.
 
 원본 진단 3개 run의 로컬 경로·파일 크기·SHA-256을 source manifest에 기록했다. raw 파일은 로컬 `/Users/jinhyuck/.buzz/RESEARCH/verifier-runs/`에 남아 있으며 Git에 복제하지 않았다. manifest는 실행 당시 생성한 증거가 아닌 패키징 시점의 파일 해시 목록이다. 원본 데이터 무결성 확인 및 파일 찾기에 사용하고 결과 판정에는 해당 run의 기록된 SHA·dirty state·환경 한계를 함께 읽는다. local raw 없이 다른 환경에서는 새 run을 생성해야 한다.
 
