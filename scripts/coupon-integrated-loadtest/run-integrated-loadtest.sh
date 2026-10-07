@@ -8,6 +8,9 @@ set -euo pipefail
 
 repo_dir=$(cd "$(dirname "$0")/../.." && pwd)
 container=${MYSQL_CONTAINER:-givemeticon-mysql}
+mysql_host_port=${MYSQL_HOST_PORT:-3306}
+base_profile=${BASE_PROFILE:-local}
+extra_config_location=${SPRING_CONFIG_ADDITIONAL_LOCATION:-}
 database=${COUPON_ADMISSION_LOADTEST_DB:-givemeticon_coupon_admission_loadtest_integrated}
 report_root=${REPORT_ROOT:-"$repo_dir/기록/coupon-integrated-loadtest"}
 run_root="$report_root/runs"
@@ -34,11 +37,12 @@ warmup_enabled=${WARMUP_ENABLED:-true}
 warmup_rate=${WARMUP_RATE:-1000}
 warmup_duration=${WARMUP_DURATION:-10s}
 issuance_batch_enabled=${ISSUANCE_BATCH_ENABLED:-false}
-active_profiles="local,coupon-admission,coupon-admission-test,coupon-admission-batch,coupon-issuance"
+active_profiles="$base_profile,coupon-admission,coupon-admission-test,coupon-admission-batch,coupon-issuance"
 [[ "$issuance_batch_enabled" == true ]] && active_profiles="$active_profiles,coupon-issuance-batch"
 [[ -n "${EXTRA_PROFILES:-}" ]] && active_profiles="$active_profiles,$EXTRA_PROFILES"
 
 [[ "$database" == givemeticon_coupon_admission_loadtest* ]] || { echo "refusing non-dedicated DB: $database" >&2; exit 2; }
+[[ "${ALLOW_SHARED_MYSQL:-false}" == true || "$container" != givemeticon-mysql ]] || { echo "refusing shared givemeticon-mysql; set MYSQL_CONTAINER/MYSQL_HOST_PORT to an isolated instance" >&2; exit 2; }
 docker ps --format '{{.Names}}' | grep -qx "$container" || { echo "MySQL container is not running: $container" >&2; exit 2; }
 command -v k6 >/dev/null || { echo 'k6 is required' >&2; exit 2; }
 mkdir -p "$run_root"
@@ -67,13 +71,14 @@ jar_path=$(find "$repo_dir/build/libs" -maxdepth 1 -name '*.jar' ! -name '*plain
 
 start_app() {
   local port=$1 log=$2
-  SPRING_DATASOURCE_URL="jdbc:mysql://localhost:3306/$database" \
+  SPRING_DATASOURCE_URL="jdbc:mysql://localhost:$mysql_host_port/$database" \
   SPRING_DATASOURCE_USERNAME=root \
   SPRING_DATASOURCE_PASSWORD="$mysql_password" \
   java -jar "$jar_path" \
     --server.port="$port" \
     --spring.profiles.active="$active_profiles" \
     --coupon.admission.diagnostics.enabled="$diagnostics_enabled" \
+    ${extra_config_location:+--spring.config.additional-location="$extra_config_location"} \
     --spring.flyway.enabled=false >"$log" 2>&1 &
   echo $!
 }
@@ -194,6 +199,11 @@ run_one() {
   k6_pid=$!
   bash "$repo_dir/scripts/coupon-admission/monitor-admission.sh" "$run_dir" "$event_id" "$app_a_pid" "$app_b_pid" "$k6_pid" &
   monitor_pid=$!
+  fast_sampler_pid=''
+  if [[ "$kind" == measurement && "${FAST_SAMPLER:-false}" == true ]]; then
+    python3 "$repo_dir/scripts/verifier-isolated/fast-sampler.py" "$run_dir" "$container" "$database" "$event_id" "$port_a" "$port_b" "${FAST_SAMPLER_INTERVAL:-0.2}" &
+    fast_sampler_pid=$!
+  fi
   bash "$repo_dir/scripts/coupon-integrated-loadtest/monitor-generator.sh" "$run_dir" "$k6_pid" 0.5 &
   generator_monitor_pid=$!
   wait "$k6_pid"
@@ -210,6 +220,7 @@ run_one() {
 
   if [[ "$kind" == measurement ]]; then
     wait_for_issuance_quiescence "$event_id" "$run_dir" 300 || true
+    if [[ -n "$fast_sampler_pid" ]]; then kill "$fast_sampler_pid" 2>/dev/null || true; wait "$fast_sampler_pid" 2>/dev/null || true; fi
     scrape_snapshot_with_retry "$run_dir" app1 "http://127.0.0.1:$port_a/actuator/prometheus" "$run_dir/app1-quiescent.prom" || true
     scrape_snapshot_with_retry "$run_dir" app2 "http://127.0.0.1:$port_b/actuator/prometheus" "$run_dir/app2-quiescent.prom" || true
 
