@@ -13,7 +13,7 @@ cleanup_failed_up() {
   status=$?
   trap - EXIT
   if [[ "$status" != 0 ]]; then
-    for id in "${created[@]}"; do
+    for id in ${created[@]+"${created[@]}"}; do
       actual=$(docker inspect --format '{{ index .Config.Labels "xyz.buzz.verifier.owner" }}' "$id") || { echo "cleanup inspect failed: $id" >&2; continue; }
       managed=$(docker inspect --format '{{ index .Config.Labels "xyz.buzz.verifier.managed" }}' "$id") || { echo "cleanup inspect failed: $id" >&2; continue; }
       if [[ "$actual" == "$VERIFIER_OWNER_ID" && "$managed" == isolated-harness ]]; then

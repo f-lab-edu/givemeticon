@@ -21,6 +21,7 @@ if a[0]=="inspect":
  elif "managed" in fmt: print("isolated-harness")
  else: print(os.environ.get("RUNNING","false"))
 elif a[0]=="run":
+ if os.environ.get("FAIL_FIRST"): sys.exit(125)
  if os.environ.get("FAIL_SECOND") and a[a.index("--name")+1].endswith("redis-mail"): sys.exit(23)
  print(a[a.index("--name")+1])
 elif a[0]=="stop" and os.environ.get("STOP_FAIL"): sys.exit(25)
@@ -84,6 +85,13 @@ class SecurityTests(unittest.TestCase):
         removes = [c for c in self.calls() if c[0] == "rm"]
         self.assertEqual(len(removes), 1)
         self.assertNotIn("-f", removes[0])
+
+    def test_first_run_failure_preserves_exit_in_system_bash(self):
+        result = subprocess.run(["/bin/bash", str(ROOT / "start-infra.sh"), "up"],
+                                env=dict(self.env, FAIL_FIRST="1"), capture_output=True, text=True)
+        self.assertEqual(result.returncode, 125)
+        self.assertNotIn("unbound variable", result.stderr)
+        self.assertFalse(any(c[0] in ("stop", "rm") for c in self.calls()))
 
     def test_partial_up_failure_stops_only_created_owned_container(self):
         result = self.run_infra("up", FAIL_SECOND="1")
