@@ -69,3 +69,12 @@ Last test evidence: Verifier reported248 pass at736c01e only. Last diagnostic cl
 Next: remote-publish Architect docs; decide minimal RabbitMQ protocol from official documentation and Reviewer evidence; issue producer/consumer slices after baseline evidence and design gate resolution.
 Blockers: no valid equal-budget10k/50k/100k or strict per-member final observation; original enqueue-order design unproven; none justify halting independent tasks.
 Automation: autonomous hourly continuation workflow saved as AUTONOMOUS_72H_WORKFLOW.json. Disable on completion/deadline. Initial registration is not proof of actual hourly firing. No automated merge. Final report must cover architecture, bottleneck, selection, before/after metrics, consistency, recovery, issues, PR approval, ADRs, deletions, debt, portfolio story, unverified items.
+
+## Active checkpoint — 2026-10-07T06:38Z
+- Phase: improved baseline #166, queue contract #167, harness packaging #168.
+- Architect PR #169 docs/provider-quota-recovery; ADR-004 decision62f267e selects quorum+SAC+DB processing rank, replaces strict original enqueue promise. Reviewer reviewing closed-backlog/attempt and two-stage ACK details.
+- Builder PR #176 test/issue-168-harness-package at6c26b57f2e764e33b9b65f16ab4624f8fd529dd8: reported249 tests at exact SHA/fresh checkout; independent review pending. Architect found host password argv exposure and destructive name-only down; requested fixes. Do not approve yet.
+- Verifier #166 worktree givemeticon-verifier-166, verifier/issue-166-capped-env. Missing ignored config from old90d2e12 discovered; tracked replacement at880aaef supplied to Builder. This supersedes assumption the old snapshot alone was reproducible.
+- Remaining sequence: #170 producer, #171 consumer, #172 fault recovery, #173 batch/load comparison, #174 validated obsolete cleanup, #175 final portfolio. All created with AC/dependencies; production implementation not yet authorized until #167 details and baseline gate reviewed.
+- Autonomous workflow id10ac18a5-ed1e-4cc9-9004-8822c458d846; deadline2026-10-10T06:28:11Z. Quota-only workflow6ef7ef12-3c0e-489e-9e9d-dcfc5607e061 remains disabled.
+- RabbitMQ4.3.0-management registry manifest exists; linux/arm64 digest sha256:53ed9ea0eff352b8888a2dd644fcd068e6a806ee7c1cc937b25440635d8e1187. Container/client compatibility not executed by Architect; digest availability is not runtime PASS.

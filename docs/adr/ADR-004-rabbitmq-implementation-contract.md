@@ -39,3 +39,5 @@ Baseline measurements under #166 precede production rollout. #170 producer slice
 
 ## Trade-offs and revisit
 Admission decoupling adds broker disk/network/ops and a second recovery boundary, while DB total writes may increase from attempt audit. Parking can change winners for unranked requests. Single event SAC may bottleneck; settings require measured tuning. If users require original arrival/enqueue rank under all recovery cases, revisit queue choice and immutable ordered-log design. If measured benefit fails to offset cost, portfolio must say so rather than manufacture a win.
+
+Registry check: docker manifest inspect rabbitmq:4.3.0-management succeeded; linux/arm64/v8 digest sha256:53ed9ea0eff352b8888a2dd644fcd068e6a806ee7c1cc937b25440635d8e1187. Pin this architecture digest for current arm64 tests; compatibility smoke remains required.
