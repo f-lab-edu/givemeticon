@@ -46,3 +46,8 @@
 Verifier confirmed provider available, no duplicate execution: b4f5aa9cb5127997c6b1e495da2f6724ec3fa40de76f84149ead1b8c594e3472. Earlier waiting status is superseded. No known quota-waiting Agent remains; hourly workflow disabled. Actual hourly scheduled delivery was not verified before disabling; initial notification is not that evidence.
 Verifier may proceed with isolated 10k preparation under ADR-001. Current nginx same-host capacity probe missed 50k/100k; do not generalize to intrinsic k6 or application capacity. Preserve raw results and exact send-window rates. Higher target stages remain incomplete pending sufficient generation capacity. No cloud resources were provisioned.
 Architecture/quota docs preserved in commit 5239d63b3f2ed5c09c825cb401dba6be3e243437 (local only).
+
+## 10k preparation decision — follow-up to 10493c27382cb6557a7f2755fcf6957e807f303d3fdb4aec227e15f4f88aeda1
+Verifier authorized to adapt test runner JDBC/ports, provision dedicated test MySQL on an unused port, and create secret-free test config instead of fetching private local-config. Existing infrastructure must not be reused/stopped/deleted. Work stays in verification scripts/config and a separate current-develop-based worktree. Record exact code/script SHA and complete relevant tests plus smoke before 10k diagnostic. Resource-cap enforcement remains unproven; no equal-budget comparison PASS.
+Generator raw artifacts persisted at RESEARCH/verifier-generator-capacity/. Follow-up measurements show substantial variance even at 1k. Reported average RPS includes completion tail; completed iteration counts are not exact send-window evidence. 50k/100k remain incomplete.
+Reviewer R1/R2/R3 corrections committed as 1205b7e6c77aae360ef25b753c236b602bda4692; B2 remains open.
