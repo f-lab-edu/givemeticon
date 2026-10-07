@@ -2,6 +2,17 @@
 
 조사 기준: `b941a04efa9d547a845cd5df05c055eab756e9bc` (2026-10-07 fetch한 origin/develop). 이 문서는 코드 조사와 실행 준비 기록이다. 이 SHA에서 부하를 실행하지 않았으며 성능 PASS를 주장하지 않는다. [Issue #164](https://github.com/f-lab-edu/givemeticon/issues/164)의 독립 실행·판정은 Verifier가 수행한다.
 
+## 확정된 주 baseline 계약 (ADR-001 반영)
+
+Architect의 2026-10-07 지시 `6358d8b7a0292f3087b8cd181825a723adec0aaf64e9e8483ce659f45018982f` 및 `/Users/jinhyuck/.buzz/REPOS/givemeticon-architect-quota/docs/adr/ADR-001-baseline.md`의 당시 미커밋 내용을 읽기 전용으로 반영했다. ADR 원본은 Architect가 관리하며 이 PR에서 수정하거나 복사하지 않는다. ADR 커밋 시 최종 reference SHA를 manifest에 추가한다.
+
+- 주 대상: 조사 SHA b941a04의 **V1 묶음 접수+묶음 발급**. 실제 API는 POST `/api/v1/coupon-events/{id}/applications`; 부하 도구는 같은 서비스에 연결되는 `/test-support/coupon-events/{id}/applications`와 테스트 헤더를 사용한다. 실제 로그인/세션 경로 성능은 측정하지 않는다.
+- profiles: `local,coupon-admission,coupon-admission-batch,coupon-issuance,coupon-issuance-batch,coupon-admission-test`. `local`은 격리된 테스트 설정을 준비해야 한다. 접수/발급 batch 기본 50과 실제 적용값, 최대 대기·큐 크기 등도 manifest에 저장한다.
+- 앱 2개, Hikari 20/앱(총 40), 재고 1000·고액 500. 100/50은 별도 경계 실험이다.
+- 10초 내 최초 고유 신청 10k → 50k → 100k. 추가 중복 10%는 최초 고유 신청과 별도 계수/분모로 기록한다. **접수 생성과 결과 관찰을 분리**한다. 아래 A(레거시 stock), B(HTTP 폴링 통합)는 보조 실험이고, C에 주 baseline 준비 미완료 항목을 명시한다.
+- 정상 최종 목표: 최초 POST부터 180초 내 고유 신청자의 ISSUED/SOLD_OUT 확인 100%. CHECKING/503/timeout을 분모에서 제외하지 않는다. 명시적 거절·미확정은 별도 계수하고 목표 미달로 기록한다. ENDED는 빠른 업무 응답일 수 있으나 이 계약의 ISSUED/SOLD_OUT 완료로 대신 세지 않는다.
+- 서버 commit 시각과 클라이언트 관찰 지연을 분리한다. 장애 실험은 복구 후 수렴 시간과 최초 요청 이후 총시간을 모두 기록한다. manifest에 SHA/profile·CPU/RAM 제한·DB/broker 버전·fixture·예열·시계 동기화·생성기 자원과 raw 산출물 경로를 저장한다. RabbitMQ와 같은 자원 예산을 사용한다.
+
 ## 1. 서로 다른 기존 경로
 
 아래 파일/라인은 모두 위 조사 SHA 기준이다. README의 서비스 소개나 `tasks/current-task.md`의 과거 Redis ZSet 흐름을 현재 호출 경로로 간주하지 않는다.
@@ -56,7 +67,7 @@ stock 경로의 서비스 `@Transactional`은 기존 AOP 트랜잭션에 참여�
 
 repo/worktree root에서 실행한다. 아래 `<...>`는 실행 환경에 맞게 먼저 설정할 값이다. 출력 디렉터리는 매번 새로운 이름을 쓰고 반복 사이 raw SQL export를 보존한다. 각 단계를 자동으로 연속 실행하지 않고 생성기/DB 상태를 확인한 뒤 다음 명령을 수행한다.
 
-### A. stock 동기 분산락+MySQL baseline
+### A. 보조: stock 동기 분산락+MySQL 비교
 
 ```bash
 export MYSQL_CONTAINER='<dedicated-test-mysql-container>'
@@ -96,7 +107,7 @@ kill "$APP_A_PID" "$APP_B_PID"
 
 pool 확대 비교는 다른 변수를 고정하고 두 앱을 재시작한 별도 run으로 한다. `LOCK_MODE`를 바꾸는 것만으로 락이 꺼지지 않는다. MySQL-only 후보는 redis-lock-loadtest 프로필 제외 및 실제 property 확인이 필요하다. 기본 stock runner는 container k6이므로 host `monitor-generator.sh`를 docker CLI PID에 붙여 k6 CPU로 보고하지 않는다. 별도 `docker stats`로 해당 k6 컨테이너 CPU/RAM과 host 자원을 수집한다. A에서 별도 터미널로 유일한 k6 컨테이너 ID를 확인한 뒤 `docker stats --format '{{json .}}' <k6-container-id> > <new-run-dir>/generator-container-stats.jsonl`을 수집하고 종료 후 수집 프로세스만 중단한다. 현재 stock runner는 summary만 export하여 초당 최초 요청 분포·개별 timeout 회원의 요청/DB 대조가 부족하다. raw k6 출력·회원별 최초 요청 시각/응답/ID 수집은 Verifier의 검증 script 보강 대상으로 남긴다. 보강 전에는 요청 유실 0 또는 실제 10초 전송 목표 충족을 확정하지 않는다. stock runner는 `HTTP_TIMEOUT`/`USER_ID_START`를 docker env에 전달하지 않으므로 JS 기본값(10s/900000000)이 적용됨을 기록한다.
 
-### B. 현재 event DB 폴링 통합 baseline (A와 분리)
+### B. 보조: event HTTP 폴링 포함 통합 실험
 
 ```bash
 export MYSQL_CONTAINER='<dedicated-test-mysql-container>'
@@ -105,22 +116,30 @@ export REPORT_ROOT="$PWD/reports/issue164-event-10k-r1"
 export LOADTEST_HIKARI_MAX=20
 export PRE_ALLOCATED_VUS='<calibrated-integer>' MAX_VUS='<calibrated-integer>'
 RATE=1000 DURATION=10s RUN_COUNT=1 RUN_LABEL=issue164-event-10k \
-  DUPLICATE_RATE=0 STOCK_TOTAL=1000 STOCK_HIGH=500 WARMUP_ENABLED=true \
-  ISSUANCE_BATCH_ENABLED=false bash scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh
+  DUPLICATE_RATE=0.10 STOCK_TOTAL=1000 STOCK_HIGH=500 WARMUP_ENABLED=true \
+  ISSUANCE_BATCH_ENABLED=true bash scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh
 # 이전 DB/export와 생성기 상태 확인 후 새 report 경로로 실행
 REPORT_ROOT="$PWD/reports/issue164-event-50k-r1" RATE=5000 DURATION=10s \
-  RUN_COUNT=1 RUN_LABEL=issue164-event-50k DUPLICATE_RATE=0 \
-  STOCK_TOTAL=1000 STOCK_HIGH=500 WARMUP_ENABLED=true ISSUANCE_BATCH_ENABLED=false \
+  RUN_COUNT=1 RUN_LABEL=issue164-event-50k DUPLICATE_RATE=0.10 \
+  STOCK_TOTAL=1000 STOCK_HIGH=500 WARMUP_ENABLED=true ISSUANCE_BATCH_ENABLED=true \
   bash scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh
 REPORT_ROOT="$PWD/reports/issue164-event-100k-r1" RATE=10000 DURATION=10s \
-  RUN_COUNT=1 RUN_LABEL=issue164-event-100k DUPLICATE_RATE=0 \
-  STOCK_TOTAL=1000 STOCK_HIGH=500 WARMUP_ENABLED=true ISSUANCE_BATCH_ENABLED=false \
+  RUN_COUNT=1 RUN_LABEL=issue164-event-100k DUPLICATE_RATE=0.10 \
+  STOCK_TOTAL=1000 STOCK_HIGH=500 WARMUP_ENABLED=true ISSUANCE_BATCH_ENABLED=true \
   bash scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh
 ```
 
-B는 고유 최초 신청 iteration 목표 10k/50k/100k다. polling GET은 추가 HTTP 요청이며 admission_attempts와 분리한다. 중복 검증은 동일 단계의 별도 `DUPLICATE_RATE=0.10` run으로 수행하고 POST 총량 증가를 기록한다. `ISSUANCE_BATCH_ENABLED=true`는 단건 발급과 다른 비교 후보이며 재실행 메타데이터로 구분한다. pure 접수 진단은 `RATE=1000 DURATION=10s RUN_COUNT=1 ADMISSION_MODE=single bash scripts/coupon-admission/run-admission-loadtest.sh`로 가능하지만 worker OFF 결과를 통합 baseline과 섞지 않는다.
+B는 고유 최초 신청 iteration 목표 10k/50k/100k다. polling GET은 추가 HTTP 요청이며 admission_attempts와 분리한다. B는 최초 고유 신청에 중복 10%를 추가하고 최초 신청·중복·조회 총량을 분리 집계한다. 중복 0%는 별도 `DUPLICATE_RATE=0` 보조 run으로 구분한다. B도 주 계약과 맞춰 묶음 발급을 켠다. 단건 발급 비교는 별도 `ISSUANCE_BATCH_ENABLED=false` run으로 분리한다. B의 HTTP polling 결과를 C의 주 baseline으로 대체하지 않는다. pure 접수 진단은 `RATE=1000 DURATION=10s RUN_COUNT=1 ADMISSION_MODE=single bash scripts/coupon-admission/run-admission-loadtest.sh`로 가능하지만 worker OFF 결과를 통합 baseline과 섞지 않는다.
 
 반복은 최소 3회 후보로 하되 Architect의 baseline 조건에 맞춘다. 여러 단계/후보를 같은 컨테이너에서 병렬 실행하지 않는다. RabbitMQ 신규 경로는 아직 없어 비교 실행 명령을 지어내지 않는다.
+
+### C. 주 baseline 준비 상태: 생성/관찰 분리 미완료
+
+ADR-001의 주 baseline은 V1 묶음 접수+묶음 발급이다. B의 runner는 같은 프로필·재고·풀 조건을 준비하는 **polling 포함 진단용**이며 주 baseline의 생성/관찰 분리 요건을 만족하지 않는다. 이 문서에 새 주 baseline 실행 명령을 추가하지 않는다.
+
+기존 `scripts/coupon-admission/admission-arrival-rate.js`는 POST만 발생시키므로 생성 부하 분리의 재사용 후보다. 다만 전체 회원의 최초 송신 시각·성공 응답 body를 저장하지 않고 실패만 console에 남긴다. raw k6 JSON만으로 전체 회원의 최초 POST 기준 180초/응답·DB 대조를 완결할 수 없다. 접수 전용 runner는 worker를 끄므로 그대로 주 baseline으로 사용하지 않는다.
+
+Verifier가 복구 후 준비해야 할 항목은 전체 회원 최초 POST ID/time/status 기록, 별도 결과 observer와 시계 offset, 추가 중복 10%의 별도 집계, 실제 송신량·drop·생성기 자원 확인이다. 서버 accepted_at/finalized_at/issued_at 시간과 클라이언트 최종 관찰 지연을 분리하고, CHECKING/503/timeout을 포함한 전체 고유 신청 분모를 보존한다. 이 준비 전에는 B 진단 결과만으로 ADR 주 baseline PASS를 선언할 수 없다. Verifier의 복구 요청은 Architect가 이미 수행했으며 Builder는 중복 호출하지 않는다.
 
 ## 5. 지표와 아직 부족한 수집 경로
 
@@ -144,4 +163,4 @@ baseline 비교 시 앱/DB/생성기 예산, 연결 합계, 재고/회원/중복
 - DB commit 전 중단은 해당 트랜잭션 rollback, 기존 DB PENDING은 worker 재시작 후 같은 프로필에서 다시 drain한다. DB snapshot과 event/stock ID를 먼저 export하고, 재개 전에 runner를 재실행해 DB를 DROP하지 않는다. 재개 worker는 동일 jar/SHA·datasource·설정으로 직접 시작한다.
 - stock sync worker OFF에서 PENDING이 남으면 곧바로 PASS로 처리하지 않는다. 상태를 저장하고 recovery 활성화 여부·락·worker 모드와 재개 계획을 Verifier/Architect가 결정한다.
 - runner shell exit 0은 AC PASS가 아니다. k6 exit, metric 누락, DB 대조, 목표 실제 전송량, 수렴 상태를 확인한다. B는 여러 오류를 무시해 실행을 계속하므로 각 산출물과 completion-status를 검사한다.
-- Builder 변경은 이 문서만이다. production behavior·기존 scripts·사용자 checkout을 변경하지 않았다. runtime/Agent cwd 설정도 변경하지 않았다. Verifier 복구 후 정확한 문서 commit에서 위 준비 조건을 재확인하고 baseline을 독립 실행한다. Architect는 A/B 중 비교 대상 API와 순서 계약을 ADR에서 확정한다.
+- Builder 변경은 이 문서만이다. production behavior·기존 scripts·사용자 checkout을 변경하지 않았다. runtime/Agent cwd 설정도 변경하지 않았다. Verifier 복구 후 정확한 문서 commit에서 위 준비 조건을 재확인하고 baseline을 독립 실행한다. 주 baseline은 ADR-001의 C 조건으로 확정되었으며, RabbitMQ 상세 구현은 순서 복원 등 승인 gate 해소 전 착수하지 않는다.
