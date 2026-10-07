@@ -20,3 +20,6 @@ Builder 코드 조사 보고만 있으며 독립 부하 결과는 아직 없다.
 
 ## Revisit Condition
 신규 경로의 독립 PASS와 최종 승인 후 실제 미사용 경로를 확인하여 제거 범위를 다시 결정한다.
+
+## Reference update
+PR #165의 최신 준비 문서 기준은 1e5cd56f27df02f3a2e69209f85f2a3c7dcaab6e이다. 앞선 5be076e는 최초 조사 시점 이력이며 현재 head를 뜻하지 않는다. 이 문서의 보존 결정은 동일하다.

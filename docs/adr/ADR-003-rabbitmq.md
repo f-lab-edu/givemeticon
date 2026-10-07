@@ -64,3 +64,24 @@ Reviewer가 제시한 아래 후보를 비교에 추가한다. broker 버전의 
 - N1/N2/n1/N3: Architect 결정 기록 완료, 재검토 전 자동 종결 아님.
 - B2, M3, M4, M5, batch/prefetch·중복 batch 검증은 열려 있음.
 - n2: 이번 문서 commit으로 로컬 보존; remote 배포와 merge는 별도이다.
+
+
+## 2026-10-07 third review — authoritative corrections
+Source: Reviewer c66457abdd232c06f8da8f86ad7443571ec61724995e32ddb55199d325a2af36. 이 절은 위 N1의 포괄적 REJECTED 기록과 정지 범위 표현을 대체한다. 이전 기록은 결정 이력으로 보존한다.
+
+### R1: invalid attempts do not occupy an application
+미개시 등 결정적으로 무효인 시도는 신청 원장의 행을 만들거나 유효 순번을 소비하지 않는다. 현 CouponApplicationStatus에 REJECTED를 추가한다는 결정도 하지 않는다. 거절 증거는 신청과 분리된 시도 단위 감사 기록에 남긴다. 그 기록의 키는 event/member가 아니라 동일 시도 재전달을 식별할 안정적인 message ID(또는 선택된 stream 위치)이며, 정확한 스키마는 B2/M3 상세 설계에서 확정한다. 전송 재시도와 새 업무 시도를 구분한다.
+OPEN 전 시도의 재전달은 OPEN 후에도 동일 무효 시도로 판단해야 한다. 현재 시각으로 과거 시도의 유효성을 다시 판단하지 않는다. 이를 위한 신뢰 가능한 OPEN 경계/시도 증거가 없으면 유효 처리하지 않고 gate로 남긴다. OPEN 후 사용자의 새 요청은 새 시도이며 첫 유효 신청으로 원장 UNIQUE를 점유할 수 있다. 일단 유효 신청이 존재하면 같은 event/member의 이후 유효 시도는 기존 결과로 합친다.
+감사 기록 실패는 성공 처리/ACK하지 않는다. 해당 전송 메커니즘에서 거절 기록의 내구성 확인 후 진행한다. 상세 ACK/checkpoint 계약은 B2에서 확정한다.
+AC: 같은 회원 OPEN 전 거절 → OPEN 후 새 유효 신청 성공; 과거 거절 메시지의 늦은 재전달은 순번/재고 미소비; 유효 신청 이후 중복은 쿠폰 하나; 거절 기록 실패는 유실 없이 재처리.
+
+### R2: topology and failure scope
+행사별 전용 queue 또는 stream을 사용한다. 둘 중 타입은 B2에서 선택한다. 공유 queue에 여러 행사를 섞는 구성은 이번 설계에서 제외한다. broker destination과 event/config 버전의 매핑은 신뢰된 제어 설정에 고정하며 payload의 event_id로 처리 범위를 정하지 않는다.
+OPEN 전 제어 흐름에서 destination 생성, 내구성/정책/권한/바인딩과 행사 매핑 검증, consumer 준비 확인을 마친다. 미준비 또는 매핑 불일치이면 OPEN하지 않는다. payload가 해석 불가여도 destination 매핑으로 행사 정지 범위를 알 수 있어야 한다. 매핑 자체를 신뢰할 수 없으면 해당 consumer/destination 전체를 중지하고 운영 판단 전 재개하지 않는다.
+CLOSED 직후 자동 삭제하지 않는다. outstanding/unacked/backlog와 미확정 감사/신청 결과가 모두 해소되고 보존기간·복구 증거 export를 확인한 뒤 명시적 정리 작업으로 삭제한다. 숫자로 된 보존기간, 최대 동시 행사 수와 lifecycle 구현은 M3 승인 gate에 추가한다. 준비/삭제 실패, 잘못된 routing, 한 행사 poison 중 다른 행사의 진행을 검증한다.
+
+### r1: queue retry constraint
+queue 후보의 일시 오류 backoff는 해당 메시지를 ack/nack하지 않은 채 후순위 commit을 막고 수행한다. nack+requeue나 retry queue를 backoff 구현으로 사용하지 않는다. 연결 상실/consumer timeout의 자동 재전달 문제는 이 제약으로 해결되지 않으며 B2 검증 대상이다.
+
+### Ledger update
+R1/R2/r1 설계 수정 기록 완료, 구현 증거 없음. N2/n1의 일관성은 Reviewer가 확인했다. B2/M3/M4/M5는 계속 열려 있다. 신규 검토 결과가 없으면 종결 판정을 추정하지 않는다.
