@@ -52,9 +52,11 @@ bash scripts/verifier-isolated/start-infra.sh remove
 
 Runner는 전용 이름 DB를 DROP/CREATE한다. 재실행 전에 export하며 장애 재개는 같은 DB/event/jar/SHA의 worker 재시작으로 수행한다. `POLL_BUDGET_MS=0`은 회원별 HTTP 관찰을 끄며 strict 최초 POST→클라이언트 ISSUED/SOLD_OUT 확인을 증명하지 않는다. fast sampler는 집계 commit 가시성 관찰이고 회원별 클라이언트 확인이 아니다. v1 분석기는 과거 재현용이며 오류 탐지/명칭 한계가 있으므로 새 판정에는 v2를 사용한다.
 
-원본 snapshot 이후 Builder 보안 수정으로 sampler와 readiness 명령은 컨테이너 내부 환경에서 비밀번호를 해석하고, docker run은 값 없는 환경 변수 이름만 argv에 전달한다. 호스트로 password를 읽어 오지 않는다. 원본 manifest의 해시는 변경 전 source 증거이며 수정된 파일의 해시는 아니다. 소유 label/stop/remove와 password 전달 수정도 원 snapshot과 구분되는 후속 변경이다.
+원본 snapshot 이후 Builder 보안 수정으로 sampler와 readiness 명령은 컨테이너 내부 환경에서 비밀번호를 해석하고, docker run은 값 없는 환경 변수 이름만 argv에 전달한다. sampler는 호스트로 password를 읽어 오지 않는다. 통합 runner는 JDBC 환경변수용 값을 호스트로 읽지만 mysql 명령에는 이를 전달하지 않으며 컨테이너 내부 MYSQL_PWD를 사용한다. monitor-admission.sh:54/60의 비밀번호는 원래부터 컨테이너 셸 안에서 확장되므로 호스트 argv 값 노출 경로는 아니다. 이 파일은 이번에 수정하지 않는다. 원본 manifest의 해시는 변경 전 source 증거이며 수정된 파일의 해시는 아니다. 소유 label/stop/remove와 password 전달 수정도 원 snapshot과 구분되는 후속 변경이다.
 
 capture-manifest.sh는 host process의 PID·실행파일명·CPU·RSS만 수집하며 args/env를 수집하지 않는다. 컨테이너는 이름·자원 수치·상한만 수집한다. 원본 과거 raw에는 전체 command line이 있을 수 있으므로 공개하지 않고, 과거 자료를 문서로 옮길 때 타 프로젝트 행과 password/token/secret·인증 URL 값을 제거한 요약만 공유한다.
+
+부분 up 실패 시 자동 삭제하지 않는다. 일반 down/remove는 누락 대상 때문에 거부하므로, 생성된 각 이름에 대해 docker inspect의 xyz.buzz.verifier.owner가 보존한 VERIFIER_OWNER_ID와 같고 xyz.buzz.verifier.managed가 isolated-harness인지 먼저 확인한다. 둘 다 일치한 대상만 docker stop으로 정상 정지한다. 증거 export 후 같은 label을 재확인하고 stopped인 대상만 docker rm으로 명시 삭제한다. 누락/불일치 대상은 건드리지 않으며 docker rm -f는 사용하지 않는다.
 
 ## 검증·증거 보존
 

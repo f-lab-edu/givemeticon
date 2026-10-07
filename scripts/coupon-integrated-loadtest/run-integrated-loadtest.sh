@@ -47,6 +47,7 @@ docker ps --format '{{.Names}}' | grep -qx "$container" || { echo "MySQL contain
 command -v k6 >/dev/null || { echo 'k6 is required' >&2; exit 2; }
 mkdir -p "$run_root"
 
+# JDBC requires a host environment value; never pass it in host argv or logs.
 mysql_password=$(docker exec "$container" printenv MYSQL_ROOT_PASSWORD)
 app_a_pid=''
 app_b_pid=''
@@ -56,14 +57,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
+docker_mysql() {
+  docker exec -i "$container" sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot "$@"' sh "$@"
+}
 mysql_exec() {
-  docker exec -i "$container" mysql -uroot -p"$mysql_password" "$database" --batch --skip-column-names -e "$1"
+  docker_mysql "$database" --batch --skip-column-names -e "$1"
 }
 
-docker exec "$container" mysql -uroot -p"$mysql_password" -e "DROP DATABASE IF EXISTS \`$database\`; CREATE DATABASE \`$database\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-docker exec -i "$container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql"
-docker exec -i "$container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260923__add_coupon_award.sql"
-docker exec -i "$container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260923_2__add_coupon_award_redemption.sql"
+docker_mysql -e "DROP DATABASE IF EXISTS \`$database\`; CREATE DATABASE \`$database\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+docker_mysql "$database" < "$repo_dir/src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql"
+docker_mysql "$database" < "$repo_dir/src/main/resources/db/migration/V20260923__add_coupon_award.sql"
+docker_mysql "$database" < "$repo_dir/src/main/resources/db/migration/V20260923_2__add_coupon_award_redemption.sql"
 
 ./gradlew bootJar >/dev/null
 jar_path=$(find "$repo_dir/build/libs" -maxdepth 1 -name '*.jar' ! -name '*plain*' | head -1)

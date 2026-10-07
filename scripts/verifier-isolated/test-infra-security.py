@@ -79,6 +79,20 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(len(removes), 1)
         self.assertNotIn("-f", removes[0])
 
+    def test_integrated_mysql_function_keeps_password_out_of_argv(self):
+        source = (ROOT.parent / "coupon-integrated-loadtest/run-integrated-loadtest.sh").read_text()
+        start = source.index("docker_mysql() {")
+        end = source.index("\\n}", start) + 2
+        function = source[start:end]
+        subprocess.run(["bash", "-c", function + '\\ncontainer=test-mysql; docker_mysql testdb --batch -e "SELECT 1"'],
+                       env=self.env, check=True, capture_output=True)
+        calls = self.calls()
+        self.assertEqual(len(calls), 1)
+        self.assertIn('export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"', " ".join(calls[0]))
+        self.assertIn("SELECT 1", calls[0])
+        self.assertNotIn("sensitive-test-value", json.dumps(calls))
+        self.assertNotIn("-psensitive-test-value", calls[0])
+
     def test_manifest_collects_process_fields_without_args(self):
         # A command-line collector would return the sentinel; allowlisted ps does not.
         for name, body in {
