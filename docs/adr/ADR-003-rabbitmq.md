@@ -70,7 +70,7 @@ Reviewer가 제시한 아래 후보를 비교에 추가한다. broker 버전의 
 Source: Reviewer c66457abdd232c06f8da8f86ad7443571ec61724995e32ddb55199d325a2af36. 이 절은 위 N1의 포괄적 REJECTED 기록과 정지 범위 표현을 대체한다. 이전 기록은 결정 이력으로 보존한다.
 
 ### R1: invalid attempts do not occupy an application
-미개시 등 결정적으로 무효인 시도는 신청 원장의 행을 만들거나 유효 순번을 소비하지 않는다. 현 CouponApplicationStatus에 REJECTED를 추가한다는 결정도 하지 않는다. 거절 증거는 신청과 분리된 시도 단위 감사 기록에 남긴다. 그 기록의 키는 event/member가 아니라 동일 시도 재전달을 식별할 안정적인 message ID(또는 선택된 stream 위치)이며, 정확한 스키마는 B2/M3 상세 설계에서 확정한다. 전송 재시도와 새 업무 시도를 구분한다.
+미개시 등 결정적으로 무효인 시도는 신청 원장의 행을 만들거나 유효 순번을 소비하지 않는다. 현 CouponApplicationStatus에 REJECTED를 추가한다는 결정도 하지 않는다. 거절 증거는 신청과 분리된 시도 단위 감사 기록에 남긴다. 감사 기록의 논리 키는 UNIQUE(event_id, member_id, attempt_id)이다. message ID와 stream 위치는 진단 정보이며 논리 중복 제거 키가 아니다. 물리 스키마는 B2/M3 상세 설계에서 확정한다. 전송 재시도와 새 업무 시도를 구분한다.
 OPEN 전 시도의 재전달은 OPEN 후에도 동일 무효 시도로 판단해야 한다. 현재 시각으로 과거 시도의 유효성을 다시 판단하지 않는다. 이를 위한 신뢰 가능한 OPEN 경계/시도 증거가 없으면 유효 처리하지 않고 gate로 남긴다. OPEN 후 사용자의 새 요청은 새 시도이며 첫 유효 신청으로 원장 UNIQUE를 점유할 수 있다. 일단 유효 신청이 존재하면 같은 event/member의 이후 유효 시도는 기존 결과로 합친다.
 감사 기록 실패는 성공 처리/ACK하지 않는다. 해당 전송 메커니즘에서 거절 기록의 내구성 확인 후 진행한다. 상세 ACK/checkpoint 계약은 B2에서 확정한다.
 AC: 같은 회원 OPEN 전 거절 → OPEN 후 새 유효 신청 성공; 과거 거절 메시지의 늦은 재전달은 순번/재고 미소비; 유효 신청 이후 중복은 쿠폰 하나; 거절 기록 실패는 유실 없이 재처리.
@@ -105,3 +105,10 @@ AC:
 ### r3 — OPEN boundary comparison
 행사별 destination의 OPEN 제어 메시지 + API의 OPEN 전 publish 차단을 B2/M3 비교 후보에 추가한다. 이 방식은 위치/OPEN 판단을 재전달 뒤에도 재현할 수 있어야 한다. queue에서 재전달 순서가 바뀌면 마커를 한 번 읽었다는 사실만으로 과거 메시지를 유효 처리해서는 안 된다. stream도 선택 버전의 offset/replay/retention 동작 확인 전 채택하지 않는다.
 hold-and-pause 검증은 선택 버전/queue 유형의 consumer timeout 실제 설정값과 그 경계 전후의 channel 종료·재전달을 포함한다. Reviewer의 '기본 30분'은 버전 미고정 참고값이므로 테스트 전 실제 설정과 공식 문서로 확인하고 manifest에 기록한다.
+
+
+## r4 — audit identity reconciliation
+Source: Reviewer 97050cc18f0fac9e25e3d1eda597da37cd1107a7174175f19309805c12c59292.
+R1의 message ID/stream 위치 키 제안을 위 본문에서 교체했다. 전송마다 달라질 수 있는 식별자를 논리 시도 키로 사용하면 R4 조회가 모호해지기 때문이다. 감사 결과의 UNIQUE(event_id, member_id, attempt_id)와 조회 권한 범위를 일치시킨다. 같은 시도의 재전송은 하나의 논리 결과로 합치며 이전 최종 결과를 덮어쓰지 않는다. 개별 전송 진단 기록은 여러 개일 수 있지만 결과 건수로 집계하지 않는다.
+동일 논리 키에 다른 payload가 오는 충돌 계약은 이 키 기준으로 M3에서 정의한다. AC에 message ID가 다른 동일 시도 반복 전송 → 논리 감사 결과 1개·동일 조회 응답을 추가한다. V1에는 attempt_id가 없다는 API 차이를 비교 manifest에 기록한다.
+Reviewer는 R4/r3를 설계 기준 종결했다. r4 키 보정은 이번 결정이며 구현 검증 없음. B2/M3/M4/M5는 계속 열려 있다.
