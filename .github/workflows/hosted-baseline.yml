@@ -38,6 +38,7 @@ jobs:
           mkdir -p build/hosted-evidence/tests
           cp build/test-results/test/TEST-*.xml build/hosted-evidence/tests/ 2>/dev/null || true
           git rev-parse HEAD > build/hosted-evidence/checked-sha.txt
+          (cd build/hosted-evidence && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
