@@ -8,6 +8,23 @@ mysql_port=${VERIFIER_MYSQL_PORT:-3307}
 containers=("$prefix-mysql" "$prefix-redis-mail" "$prefix-redis-coupon")
 owner_label=xyz.buzz.verifier.owner
 managed_label=xyz.buzz.verifier.managed
+created=()
+cleanup_failed_up() {
+  status=$?
+  trap - EXIT
+  if [[ "$status" != 0 ]]; then
+    for id in "${created[@]}"; do
+      actual=$(docker inspect --format '{{ index .Config.Labels "xyz.buzz.verifier.owner" }}' "$id") || { echo "cleanup inspect failed: $id" >&2; continue; }
+      managed=$(docker inspect --format '{{ index .Config.Labels "xyz.buzz.verifier.managed" }}' "$id") || { echo "cleanup inspect failed: $id" >&2; continue; }
+      if [[ "$actual" == "$VERIFIER_OWNER_ID" && "$managed" == isolated-harness ]]; then
+        docker stop "$id" >/dev/null || echo "cleanup stop failed: $id" >&2
+      else
+        echo "cleanup ownership mismatch: $id" >&2
+      fi
+    done
+  fi
+  exit "$status"
+}
 verify_owned() {
   # Check every target before performing any mutation.
   for name in "${containers[@]}"; do
@@ -28,17 +45,21 @@ case "${1:-}" in
     for p in "$mysql_port" 16379 16380; do
       ! lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1 || { echo "port $p in use" >&2; exit 2; }
     done
+    trap cleanup_failed_up EXIT
     # Docker inherits the value from env; the argument contains only its name.
-    MYSQL_ROOT_PASSWORD="$VERIFIER_MYSQL_PASSWORD" docker run -d --name "$prefix-mysql" \
+    id=$(MYSQL_ROOT_PASSWORD="$VERIFIER_MYSQL_PASSWORD" docker run -d --name "$prefix-mysql" \
       --label "$owner_label=$VERIFIER_OWNER_ID" --label "$managed_label=isolated-harness" \
       -e MYSQL_ROOT_PASSWORD -p "$mysql_port:3306" \
-      mysql:8.0 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci >/dev/null
-    docker run -d --name "$prefix-redis-mail" \
+      mysql:8.0 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci)
+    created+=("$id")
+    id=$(docker run -d --name "$prefix-redis-mail" \
       --label "$owner_label=$VERIFIER_OWNER_ID" --label "$managed_label=isolated-harness" \
-      -p 16379:6379 redis:7-alpine >/dev/null
-    docker run -d --name "$prefix-redis-coupon" \
+      -p 16379:6379 redis:7-alpine)
+    created+=("$id")
+    id=$(docker run -d --name "$prefix-redis-coupon" \
       --label "$owner_label=$VERIFIER_OWNER_ID" --label "$managed_label=isolated-harness" \
-      -p 16380:6379 redis:7-alpine >/dev/null
+      -p 16380:6379 redis:7-alpine)
+    created+=("$id")
     for _ in $(seq 1 60); do
       docker logs "$prefix-mysql" 2>&1 | grep -q "ready for connections.*port: 3306  MySQL" &&
         docker exec "$prefix-mysql" sh -c \

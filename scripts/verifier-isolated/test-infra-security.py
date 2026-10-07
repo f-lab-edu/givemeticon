@@ -20,6 +20,12 @@ if a[0]=="inspect":
  if "owner" in fmt: print("other" if a[-1].endswith("redis-coupon") and os.environ.get("MISMATCH") else "test-owner")
  elif "managed" in fmt: print("isolated-harness")
  else: print(os.environ.get("RUNNING","false"))
+elif a[0]=="run":
+ if os.environ.get("FAIL_SECOND") and a[a.index("--name")+1].endswith("redis-mail"): sys.exit(23)
+ print(a[a.index("--name")+1])
+elif a[0]=="stop" and os.environ.get("STOP_FAIL"): sys.exit(25)
+elif a[0]=="ps": print("test-mysql")
+elif a[0]=="exec" and "printenv" in a: print("sensitive-test-value")
 elif a[0]=="logs": print("ready for connections port: 3306  MySQL")
 elif a[0]=="exec" and "-i" in a:
  for line in sys.stdin:
@@ -79,12 +85,61 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(len(removes), 1)
         self.assertNotIn("-f", removes[0])
 
+    def test_partial_up_failure_stops_only_created_owned_container(self):
+        result = self.run_infra("up", FAIL_SECOND="1")
+        self.assertEqual(result.returncode, 23)
+        self.assertEqual([c for c in self.calls() if c[0] == "stop"], [["stop", "test-prefix-mysql"]])
+        self.assertFalse(any(c[0] == "rm" for c in self.calls()))
+
+    def test_cleanup_failure_keeps_original_exit_and_reports(self):
+        result = self.run_infra("up", FAIL_SECOND="1", STOP_FAIL="1")
+        self.assertEqual(result.returncode, 23)
+        self.assertIn("cleanup stop failed", result.stderr)
+
+    def test_cleanup_does_not_stop_changed_owner(self):
+        # Substitute a changed label only for the successfully created MySQL.
+        docker = self.path / "docker"
+        docker.write_text(DOCKER.replace('else "test-owner")', 'else "changed-owner")'))
+        result = self.run_infra("up", FAIL_SECOND="1")
+        self.assertEqual(result.returncode, 23)
+        self.assertIn("cleanup ownership mismatch", result.stderr)
+        self.assertFalse(any(c[0] == "stop" for c in self.calls()))
+
+    def test_runner_entrypoint_database_commands_hide_secret(self):
+        import shutil
+        repo = self.path / "repo"
+        runner = repo / "scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh"
+        runner.parent.mkdir(parents=True)
+        shutil.copyfile(ROOT.parent / "coupon-integrated-loadtest/run-integrated-loadtest.sh", runner)
+        migrations = repo / "src/main/resources/db/migration"
+        migrations.mkdir(parents=True)
+        for name in ("V20260920__add_coupon_event_admission_ledger.sql",
+                     "V20260923__add_coupon_award.sql", "V20260923_2__add_coupon_award_redemption.sql"):
+            (migrations / name).write_text("SELECT 1;")
+        for name, body in (("k6", "#!/bin/sh\nexit 0\n"),):
+            f = self.path / name
+            f.write_text(body)
+            f.chmod(0o755)
+        gradle = repo / "gradlew"
+        gradle.write_text("#!/bin/sh\nexit 17\n")
+        gradle.chmod(0o755)
+        result = subprocess.run(["bash", str(runner)], cwd=repo,
+                                env=dict(self.env, MYSQL_CONTAINER="test-mysql",
+                                         REPORT_ROOT=str(self.path / "results")),
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 17, result.stderr)
+        self.assertNotIn("sensitive-test-value", json.dumps(self.calls()))
+        sql_calls = [c for c in self.calls() if c[0] == "exec" and "sh" in c]
+        self.assertEqual(len(sql_calls), 4)
+        for call in sql_calls:
+            self.assertIn('export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"', " ".join(call))
+
     def test_integrated_mysql_function_keeps_password_out_of_argv(self):
         source = (ROOT.parent / "coupon-integrated-loadtest/run-integrated-loadtest.sh").read_text()
         start = source.index("docker_mysql() {")
-        end = source.index("\\n}", start) + 2
+        end = source.index("\n}", start) + 2
         function = source[start:end]
-        subprocess.run(["bash", "-c", function + '\\ncontainer=test-mysql; docker_mysql testdb --batch -e "SELECT 1"'],
+        subprocess.run(["bash", "-c", function + '\ncontainer=test-mysql; docker_mysql testdb --batch -e "SELECT 1"'],
                        env=self.env, check=True, capture_output=True)
         calls = self.calls()
         self.assertEqual(len(calls), 1)
