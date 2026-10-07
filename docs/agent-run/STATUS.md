@@ -41,3 +41,8 @@
 - Architect read preparation document; example B uses single issuance and zero duplicates, so must align primary example to ADR-001 before baseline execution. Existing integrated runner remains a polling diagnostic until load/observation separation exists.
 - Verifier availability request sent once: e89026f86784005753e412a48913cebff2ace28d21208300e28740ee17316562. Await response; do not send another recovery invocation for this same tick.
 - ADR rereview request: 6358d8b7a0292f3087b8cd181825a723adec0aaf64e9e8483ce659f45018982f.
+
+## Recovery resolved — 2026-10-07 05:59 UTC
+Verifier confirmed provider available, no duplicate execution: b4f5aa9cb5127997c6b1e495da2f6724ec3fa40de76f84149ead1b8c594e3472. Earlier waiting status is superseded. No known quota-waiting Agent remains; hourly workflow disabled. Actual hourly scheduled delivery was not verified before disabling; initial notification is not that evidence.
+Verifier may proceed with isolated 10k preparation under ADR-001. Current nginx same-host capacity probe missed 50k/100k; do not generalize to intrinsic k6 or application capacity. Preserve raw results and exact send-window rates. Higher target stages remain incomplete pending sufficient generation capacity. No cloud resources were provisioned.
+Architecture/quota docs preserved in commit 5239d63b3f2ed5c09c825cb401dba6be3e243437 (local only).

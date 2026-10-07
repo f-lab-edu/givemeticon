@@ -1,7 +1,7 @@
 {
   "name": "Coupon Provider Quota Recovery — Hourly",
   "description": "Hourly Architect wake for pending provider-limit continuations; disable after all quota waits resolve.",
-  "enabled": true,
+  "enabled": false,
   "trigger": {
     "on": "schedule",
     "interval": "1h"

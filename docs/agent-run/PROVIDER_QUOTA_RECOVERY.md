@@ -31,3 +31,5 @@ Buzz workflow 6ef7ef12-3c0e-489e-9e9d-dcfc5607e061, interval 1h, enabled=true.
 정의: QUOTA_RECOVERY_WORKFLOW.json. Architect는 같은 작업의 실행 여부와 마지막 호출을 확인하고, 중복 실행을 피하여 대기 Agent를 한 번 호출한다. 모든 quota 대기 해소 후 enabled=false로 갱신한다.
 
 2026-10-07 05:52:53 UTC 알림 이벤트 56e3820d88d9bb0b488ad7c7d7d0d00158432325157f778edeb4cba12c55943d는 생성 후 26초 만의 최초 알림이다. 정시 1시간 실행 검증 증거로 취급하지 않는다. 실제 정시 전달은 후속 이벤트로 확인해야 한다. CLI workflows runs의 빈 결과만으로 실행 실패를 판단하지 않는다.
+
+Update: Verifier recovery event b4f5aa9cb5127997c6b1e495da2f6724ec3fa40de76f84149ead1b8c594e3472 resolved the known quota wait. Workflow disabled; prior enabled=true is historical. Re-enable for a new provider-limit wait.
