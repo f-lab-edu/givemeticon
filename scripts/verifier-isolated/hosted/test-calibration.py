@@ -66,7 +66,7 @@ class T(unittest.TestCase):
   for mode in ('owned','mismatch','existing','gone'):
    with tempfile.TemporaryDirectory() as d:
     p=Path(d);(p/'uname').write_text('#!/bin/sh\necho x86_64\n');(p/'uname').chmod(0o755)
-    script="""#!/usr/bin/env python3
+    script=r"""#!/usr/bin/env python3
 import json,os,sys
 from pathlib import Path
 root=Path(os.environ['RECORD_ROOT']);args=sys.argv[1:]
