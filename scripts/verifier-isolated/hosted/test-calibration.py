@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import importlib.util,json,subprocess,tempfile,unittest,http.server,threading
+import importlib.util,json,subprocess,tempfile,unittest,http.server,threading,os,sys
 from pathlib import Path
 HERE=Path(__file__).parent
 def load(name):
@@ -62,6 +62,28 @@ class T(unittest.TestCase):
  def test_no_escalation_or_current_branch_trigger(self):
   s=(HERE/'run-calibration.sh').read_text();self.assertIn('RATE=100 DURATION=2s',s);self.assertIn('VUS=201 MAX_VUS=201',s);self.assertNotIn('RATE=1000',s)
   workflow=(HERE.parents[2]/'.github/workflows/hosted-calibration.yml').read_text();self.assertIn('branches: [test/issue-177-profile-b-calibration-approved]',workflow);self.assertIn('timeout-minutes: 30',workflow);self.assertIn('if: always()',workflow)
+ def test_scope_recording_preserves_failure_and_checks_owner_before_stop(self):
+  for mode in ('owned','mismatch','existing','gone'):
+   with tempfile.TemporaryDirectory() as d:
+    p=Path(d);(p/'uname').write_text('#!/bin/sh\necho x86_64\n');(p/'uname').chmod(0o755)
+    script="""#!/usr/bin/env python3
+import json,os,sys
+from pathlib import Path
+root=Path(os.environ['RECORD_ROOT']);args=sys.argv[1:]
+with (root/'calls').open('a') as f:f.write(json.dumps(args)+'\n')
+if 'systemd-run' in args:
+ (root/'created').touch();sys.exit(7)
+mode=os.environ['RECORD_MODE']
+if '--property=LoadState' in args:print('loaded' if mode=='existing' or ((root/'created').exists() and mode!='gone') else 'not-found')
+elif '--property=Description' in args:print('other-owner' if mode=='mismatch' else 'coupon-calibration-owner-123-1')
+"""
+    (p/'sudo').write_text(script);(p/'sudo').chmod(0o755)
+    env=dict(os.environ,PATH=str(p)+':'+os.environ['PATH'],GITHUB_ACTIONS='true',RUNNER_OS='Linux',GITHUB_RUN_ID='123',GITHUB_RUN_ATTEMPT='1',RUNNER_TEMP=d,GITHUB_WORKSPACE=d,RECORD_ROOT=d,RECORD_MODE=mode)
+    r=subprocess.run(['bash',str(HERE/'observer-scope.sh')],env=env,capture_output=True,text=True)
+    calls=[json.loads(line) for line in (p/'calls').read_text().splitlines()]
+    self.assertEqual(r.returncode,2 if mode=='existing' else 7,r.stderr)
+    stops=[call for call in calls if 'stop' in call];self.assertEqual(bool(stops),mode=='owned')
+    if mode=='existing':self.assertFalse(any('systemd-run' in call for call in calls))
  def test_scope_launcher_has_aggregate_limits_and_metadata_only(self):
   s=(HERE/'observer-scope.sh').read_text();self.assertIn('CPUQuota=25%',s);self.assertIn('MemoryMax=512M',s);self.assertIn('MemorySwapMax=0',s);self.assertNotIn('PASSWORD',s);self.assertNotIn('sudo -E',s)
 unittest.main()
