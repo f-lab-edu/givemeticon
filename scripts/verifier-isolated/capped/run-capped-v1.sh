@@ -199,7 +199,16 @@ run() {
   python3 "$repo_dir/scripts/verifier-isolated/fast-sampler.py" "$rd" "$P-mysql" "$DB_NAME" "$ev" "$PORT_A" "$PORT_B" "${PROM_INTERVAL_S:-0.2}" & local sp=$!
   ( while :; do t=$(python3 -c 'import time;print(int(time.time()*1000))'); docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}},{{.PIDs}}' | sed "s/^/$t,/"; sleep 1; done ) > "$rd/docker-stats.csv" 2>/dev/null & local ds=$!
   python3 -c 'import time;print(int(time.time()*1000))' > "$rd/k6-started-host-ms.txt"
+  local get_pid=''
+  if [[ "${CALIBRATION_GET_DURING:-false}" == true ]]; then
+    python3 "$repo_dir/scripts/verifier-isolated/hosted/get-smoke.py" "$root" "http://127.0.0.1:$PORT_A,http://127.0.0.1:$PORT_B" --mode during & get_pid=$!
+  fi
   k6_run "$ev" 700200000 "$RATE" "$dur" "$dup" "$rd" "${VUS:-6500}"
+  python3 -c 'import time;print(int(time.time()*1000))' > "$rd/k6-finished-host-ms.txt"
+  if [[ -n "$get_pid" ]]; then
+    local get_exit=0; wait "$get_pid" || get_exit=$?
+    printf '%s\n' "$get_exit" > "$root/get-during-exit.txt"
+  fi
   # 수렴 대기(최대 300s): PENDING/CHECKING 0 이 3회 연속 같은 행 수
   local prev="" stable=0 deadline=$((SECONDS+300)) row
   while [[ $SECONDS -lt $deadline ]]; do

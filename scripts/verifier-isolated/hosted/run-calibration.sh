@@ -43,13 +43,16 @@ for path in stock v1; do
   export RUN_LABEL="b-$path-smoke" REPORT_ROOT="$REPORT_BASE/$path-smoke"
   "$runner" up
   python3 scripts/verifier-isolated/hosted/verify-calibration-caps.py "$VERIFIER_PREFIX" "$VERIFIER_OWNER_ID" "$REPORT_BASE/caps-$path.json"
+  export CALIBRATION_GET_DURING=false
+  [[ $path != v1 ]] || export CALIBRATION_GET_DURING=true
   "$runner" run
   python3 scripts/verifier-isolated/hosted/verify-calibration-caps.py generator "$REPORT_ROOT/run/k6-cgroup.jsonl" "$VERIFIER_OWNER_ID" "$REPORT_ROOT/generator-limits.json"
   python3 scripts/verifier-isolated/hosted/check-stage.py "$REPORT_ROOT" 200 --diagnostic
   python3 scripts/verifier-isolated/hosted/final-generation-gate.py "$REPORT_ROOT" > "$REPORT_ROOT/generation-gate.json"
   if [[ $path == v1 ]]; then
+    [[ $(cat "$REPORT_ROOT/get-during-exit.txt") == 0 ]] || { echo "concurrent GET smoke failed; evidence retained" >&2; exit 3; }
     python3 scripts/verifier-isolated/hosted/verify-observer-scope.py "$REPORT_BASE/observer-before-get.json"
-    python3 scripts/verifier-isolated/hosted/get-smoke.py "$REPORT_ROOT" 'http://127.0.0.1:18080,http://127.0.0.1:18081'
+    python3 scripts/verifier-isolated/hosted/get-smoke.py "$REPORT_ROOT" 'http://127.0.0.1:18080,http://127.0.0.1:18081' --mode idle
     python3 scripts/verifier-isolated/hosted/verify-observer-scope.py "$REPORT_BASE/observer-after-get.json"
   fi
   "$runner" down

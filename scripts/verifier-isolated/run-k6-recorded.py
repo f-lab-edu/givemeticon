@@ -17,7 +17,7 @@ def owned(name,owner):
 
 def capture(name,owner,stream):
     if not owned(name,owner):return False
-    state=docker('inspect','--format','{"running":{{.State.Running}},"exit":{{.State.ExitCode}},"oom":{{.State.OOMKilled}},"cpu_nano":{{.HostConfig.NanoCpus}},"memory":{{.HostConfig.Memory}},"memswap":{{.HostConfig.MemorySwap}}}',name)
+    state=docker('inspect','--format','{"started_at":{{json .State.StartedAt}},"finished_at":{{json .State.FinishedAt}},"running":{{.State.Running}},"exit":{{.State.ExitCode}},"oom":{{.State.OOMKilled}},"cpu_nano":{{.HostConfig.NanoCpus}},"memory":{{.HostConfig.Memory}},"memswap":{{.HostConfig.MemorySwap}}}',name)
     record={'host_ms':int(time.time()*1000),'state':state.stdout.strip(),'state_status':state.returncode}
     cg=docker('exec',name,'sh','-c','for f in cpu.max memory.max memory.swap.max cpu.stat memory.current memory.peak memory.events; do echo "[$f]"; cat "/sys/fs/cgroup/$f" || exit 1; done')
     record.update(cgroup=cg.stdout,cgroup_status=cg.returncode)

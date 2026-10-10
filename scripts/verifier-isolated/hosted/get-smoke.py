@@ -28,20 +28,41 @@ def summarize(rows):
             'usable_get_success_n':sum(r['http_status']==200 and r['error'] is None and r['application_status'] in ('ISSUED','SOLD_OUT','PENDING','CHECKING','ENDED') for r in rows),
             'note':'state-dependent low-load p95 does not guarantee GET latency under burst; raw errors and missing states retained'}
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('stage');p.add_argument('targets');a=p.parse_args();stage=Path(a.stage)
+    p=argparse.ArgumentParser();p.add_argument('stage');p.add_argument('targets');p.add_argument('--mode',choices=['idle','during'],default='idle');a=p.parse_args();stage=Path(a.stage)
     meta=dict(line.split('=',1) for line in (stage/'run-meta.txt').read_text().splitlines() if line.startswith('event_id='))
     event=int(meta['event_id'].split()[0]);targets=a.targets.split(',')
-    records=[r for r in ledger.parse(stage/'run/k6-failures.log') if r.get('kind')=='admission']
-    if not records or len(records)>201:raise SystemExit('unexpected calibration fixture size; GET smoke refused')
+    records=[r for r in ledger.parse(stage/'run/k6-failures.log') if r.get('kind')=='admission'] if (stage/'run/k6-failures.log').exists() else []
+    if a.mode=='idle' and (not records or len(records)>201):raise SystemExit('unexpected calibration fixture size; GET smoke refused')
     seen=set();tasks=[];rows=[];started=time.time();cpu_start=time.process_time()
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        for r in records:
-            if r['memberId'] in seen:continue
-            seen.add(r['memberId']);delay=started+len(tasks)/20-time.time()
-            if delay>0:time.sleep(delay)
-            tasks.append(pool.submit(sample,targets[(r['target']-1)%len(targets)],event,r['memberId']))
+        deadline=time.monotonic()+60
+        while True:
+            if a.mode=='during':
+                log=stage/'run/k6-failures.log'
+                records=[r for r in ledger.parse(log) if r.get('kind')=='admission'] if log.exists() else []
+            if len(records)>201:raise SystemExit('fixture exceeds declared bounds')
+            for r in records:
+                if r['memberId'] in seen:continue
+                if a.mode=='during' and len(tasks)>=40:break
+                seen.add(r['memberId']);tasks.append(pool.submit(sample,targets[(r['target']-1)%len(targets)],event,r['memberId']))
+            if a.mode=='idle' or len(tasks)>=40 or (stage/'run/k6-finished-host-ms.txt').exists() or time.monotonic()>=deadline:break
+            time.sleep(.1)
         rows=[t.result() for t in tasks]
-    (stage/'get-smoke.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
-    report=summarize(rows);report.update(started_ms=int(started*1000),ended_ms=int(time.time()*1000),process_cpu_seconds=time.process_time()-cpu_start,max_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,actual_sent_span_ms=max(r['sent_ms'] for r in rows)-min(r['sent_ms'] for r in rows))
-    (stage/'get-smoke-summary.json').write_text(json.dumps(report,indent=2)+'\n')
-    raise SystemExit(0 if report['usable_get_success_n'] else 3)
+    prefix='get-smoke-'+a.mode
+    (stage/(prefix+'.jsonl')).write_text(''.join(json.dumps(r)+'\n' for r in rows))
+    report=summarize(rows);report['mode']=a.mode;report['condition']=report['condition'].replace('after POST completion and DB-quiescence','after POST completion and DB-quiescence' if a.mode=='idle' else 'concurrent with POST generator; target comes from completed POST records; actual overlap separately counted');report.update(started_ms=int(started*1000),ended_ms=int(time.time()*1000),process_cpu_seconds=time.process_time()-cpu_start,max_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,actual_sent_span_ms=max(r['sent_ms'] for r in rows)-min(r['sent_ms'] for r in rows) if rows else None)
+    def stamp(name):
+        try:return int((stage/'run'/name).read_text())
+        except (OSError,ValueError):return None
+    begin=stamp('k6-started-host-ms.txt');end=stamp('k6-finished-host-ms.txt')
+    report.update(post_generator_start_ms=begin,post_generator_end_ms=end,
+                  observed_get_post_overlap_n=sum(begin<=r['sent_ms']<=end for r in rows) if begin is not None and end is not None else None,
+                  overlap_note='generator process window includes initialization/graceful tail; also reconcile with actual first POST sent/response timestamps before claiming active POST overlap')
+    completed_post=ledger.parse(stage/'run/k6-failures.log')
+    post_intervals=[(r.get('sentAtMs'),r.get('respondedAtMs')) for r in completed_post if r.get('kind') in ('admission','duplicate') and isinstance(r.get('sentAtMs'),(int,float)) and isinstance(r.get('respondedAtMs'),(int,float))]
+    actual_overlap=sum(any(begin<=r['sent_ms']<=end for begin,end in post_intervals) for r in rows)
+    report.update(observed_get_active_post_overlap_n=actual_overlap,active_post_overlap_status='OBSERVED' if actual_overlap else 'NOT_OBSERVED',
+                  expected_low_post_rate=100,expected_low_post_duration_s=2,
+                  note='no active POST overlap means concurrent condition unverified, not measured low-load latency guarantee')
+    (stage/(prefix+'-summary.json')).write_text(json.dumps(report,indent=2)+'\n')
+    raise SystemExit(3 if not report['usable_get_success_n'] else 4 if a.mode=='during' and not actual_overlap else 0)

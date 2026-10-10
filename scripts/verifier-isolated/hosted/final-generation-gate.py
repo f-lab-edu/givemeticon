@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Target achievement and independent observations; no automatic causal verdict."""
-import importlib.util,json,sys
+import importlib.util,json,sys,datetime
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('workload',Path(__file__).parents[1]/'compare-workload.py');workload=importlib.util.module_from_spec(spec);spec.loader.exec_module(workload)
 
@@ -48,7 +48,17 @@ def generator_evidence(root):
                 try:configured[key]=int(value)
                 except ValueError:pass
     observed=maximum('vus');limit=configured.get('k6_max_vus')
-    return {'sample_rows':len(rows),'parse_errors':bad,'live_samples':len(stats),
+    live_times=[r['host_ms'] for r in rows if r.get('cgroup_status')==0 and isinstance(r.get('host_ms'),int)]
+    def epoch(key):
+        values=[]
+        for state in states:
+            try:
+                dt=datetime.datetime.fromisoformat(state[key].replace('Z','+00:00'))
+                if dt.year>1970:values.append(int(dt.timestamp()*1000))
+            except (KeyError,ValueError,TypeError):pass
+        return max(values) if values else None
+    started=epoch('started_at');finished=epoch('finished_at');first=min(live_times) if live_times else None;last=max(live_times) if live_times else None
+    return {'sample_rows':len(rows),'sample_coverage':{'container_started_ms':started,'container_finished_ms':finished,'first_live_ms':first,'last_live_ms':last,'startup_before_first_sample_ms':max(0,first-started) if first is not None and started is not None else None,'tail_after_last_sample_ms':max(0,finished-last) if last is not None and finished is not None else None},'parse_errors':bad,'live_samples':len(stats),
             'oom_state':any(s.get('oom') is True for s in states) if states else None,
             'nr_throttled_delta':delta(stats,'nr_throttled'),'nr_periods_delta':delta(stats,'nr_periods'),
             'throttled_usec_delta':delta(stats,'throttled_usec'),'usage_usec_delta':delta(stats,'usage_usec'),

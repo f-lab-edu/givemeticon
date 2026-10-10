@@ -36,6 +36,21 @@ class T(unittest.TestCase):
   try:
    r=get.sample('http://127.0.0.1:'+str(server.server_port),7,91);self.assertEqual(r['application_status'],'SOLD_OUT');self.assertEqual(seen,[('/test-support/coupon-events/7/applications/me','91')]);self.assertIsNone(r['error'])
   finally:server.shutdown();thread.join();server.server_close()
+ def test_cli_during_get_marks_real_post_interval_overlap(self):
+  import time,sys
+  class H(http.server.BaseHTTPRequestHandler):
+   def do_GET(self):
+    body=b'{"data":{"status":"PENDING"}}';self.send_response(200);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
+   def log_message(self,*args):pass
+  server=http.server.HTTPServer(('127.0.0.1',0),H);thread=threading.Thread(target=server.serve_forever);thread.start()
+  try:
+   with tempfile.TemporaryDirectory() as d:
+    p=Path(d);(p/'run').mkdir();now=int(time.time()*1000);(p/'run-meta.txt').write_text('event_id=7 member_start=91\n')
+    (p/'run/k6-failures.log').write_text(json.dumps({'kind':'admission','memberId':91,'target':1,'sentAtMs':now-100,'respondedAtMs':now+5000}))
+    (p/'run/k6-started-host-ms.txt').write_text(str(now-100));(p/'run/k6-finished-host-ms.txt').write_text(str(now+5000))
+    r=subprocess.run([sys.executable,str(HERE/'get-smoke.py'),str(p),'http://127.0.0.1:'+str(server.server_port),'--mode','during'],capture_output=True,text=True,timeout=10)
+    self.assertEqual(r.returncode,0,r.stderr);s=json.loads((p/'get-smoke-during-summary.json').read_text());self.assertEqual(s['observed_get_active_post_overlap_n'],1);self.assertEqual(s['mode'],'during');self.assertEqual(s['usable_get_success_n'],1)
+  finally:server.shutdown();thread.join();server.server_close()
  def test_guard_refuses_local_before_sudo_or_docker(self):
   r=subprocess.run(['bash',str(HERE/'observer-scope.sh')],env={'PATH':'/usr/bin:/bin','GITHUB_ACTIONS':'false'},capture_output=True,text=True);self.assertEqual(r.returncode,2)
  def test_no_escalation_or_current_branch_trigger(self):
