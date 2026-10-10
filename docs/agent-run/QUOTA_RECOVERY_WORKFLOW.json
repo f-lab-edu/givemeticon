@@ -1,0 +1,17 @@
+{
+  "name": "Coupon Provider Quota Recovery — Hourly",
+  "description": "Hourly Architect wake for pending provider-limit continuations; disable after all quota waits resolve.",
+  "enabled": false,
+  "trigger": {
+    "on": "schedule",
+    "interval": "1h"
+  },
+  "steps": [
+    {
+      "id": "notify_architect",
+      "action": "send_message",
+      "text": "@Architect PROVIDER_RECOVERY_HOURLY: Coupon 팀의 quota 대기 작업을 확인하세요. 사용자 승인 근거는 cb93cba52c74d0f1487fbd38ecd29148bad8385ec875207beebcb93f475a9b9e입니다. docs/agent-run/STATUS.md 기준 경로는 /Users/jinhyuck/.buzz/REPOS/givemeticon-architect-quota 이며 이후 기록된 후속 경로를 따릅니다. 대기 Agent가 있으면 현재 실행 중인 동일 작업이 없는지 확인하고, Verifier를 이 채널에서 1회 멘션하여 provider 사용 가능 여부 확인→STATUS와 GitHub Issue/PR 재조회→정확한 checkpoint 재개를 요청하세요. 제한 중이면 reset/retry 정보를 갱신하고 ⏸️로 종료합니다. reset 시각 전에는 실행 재시도 대신 상태만 확인합니다. 사용자 재승인·Git rollback·역할 대체 PASS는 금지합니다. 다른 Issue는 계속 진행합니다. quota 대기 작업이 모두 해소되면 이 예약을 비활성화하세요. 수동 트리거와 실제 정시 실행 증거를 구분하세요.",
+      "channel": "9020e1ba-9443-44ad-b661-9e436525618a"
+    }
+  ]
+}
