@@ -1,0 +1,51 @@
+name: Issue 177 profile B small calibration (approval branch only)
+on:
+  push:
+    branches: [test/issue-177-profile-b-calibration-approved]
+    paths: ['.github/workflows/hosted-calibration.yml', 'scripts/verifier-isolated/**', 'src/test/**', 'docs/experiments/HOSTED_BASELINE_ISSUE_177.md']
+permissions:
+  contents: read
+concurrency:
+  group: givemeticon-issue177-baseline
+  cancel-in-progress: false
+jobs:
+  capability-and-small-fixtures:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          submodules: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Capability before build
+        run: python3 scripts/verifier-isolated/hosted/linux-capability.py build/calibration-evidence/capability-initial.json --profile B
+      - name: Secret-free config and full package tests
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx512m cleanTest test bootJar
+          for test in scripts/verifier-isolated/test-*.py scripts/verifier-isolated/hosted/test-*.py; do python3 -B "$test"; done
+          bash scripts/verifier-isolated/capped/test-memory-guard.sh
+          bash scripts/verifier-isolated/capped/test-capped-runners.sh
+          find scripts/verifier-isolated -name '*.sh' -exec bash -n {} \;
+      - name: Capped controller and observers, stock/V1 100rps x2s and GET smoke only
+        run: bash scripts/verifier-isolated/hosted/observer-scope.sh
+      - name: Rescue owned cleanup and evidence
+        if: always()
+        run: bash scripts/verifier-isolated/hosted/cleanup-calibration.sh
+      - name: Preserve test evidence
+        if: always()
+        run: |
+          mkdir -p build/calibration-evidence/tests
+          cp build/test-results/test/TEST-*.xml build/calibration-evidence/tests/ 2>/dev/null || true
+          git rev-parse HEAD > build/calibration-evidence/checked-sha.txt
+          (cd build/calibration-evidence && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: issue177-b-calibration-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/calibration-evidence/
+          retention-days: 7
+          if-no-files-found: error

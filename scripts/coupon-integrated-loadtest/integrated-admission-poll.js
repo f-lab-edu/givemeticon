@@ -139,10 +139,12 @@ export default function () {
   if (category === 'event_closed') admissionEventClosed.add(1);
   if (category === 'response_validation_failure') admissionResponseValidationFailures.add(1);
 
+  const scenarioStartMs = exec.scenario.startTime;
+  const windowMs = Number(duration.replace(/s$/, '')) * 1000;
   console.log(JSON.stringify({
     kind: 'admission', memberId, target: primaryTargetIndex + 1, category,
     requestId: firstData ? firstData.requestId : null, status: firstResponse.status,
-    durationMs: firstResponse.timings.duration, sentAtMs, respondedAtMs,
+    durationMs: firstResponse.timings.duration, sentAtMs, respondedAtMs, scenarioStartMs, inWindow: sentAtMs <= scenarioStartMs + windowMs,
   }));
 
   let duplicateRequestId = null;
@@ -153,6 +155,7 @@ export default function () {
     duplicateAttempts.add(1);
     const otherTargetIndex = (primaryTargetIndex + 1) % targets.length;
     const otherTarget = targets[otherTargetIndex];
+    const duplicateSentAtMs = Date.now();
     const dupResponse = post(otherTarget, memberId);
     const dupData = parseBody(dupResponse);
     duplicateCategory = classify(dupResponse, dupData);
@@ -160,7 +163,7 @@ export default function () {
     console.log(JSON.stringify({
       kind: 'duplicate', memberId, target: otherTargetIndex + 1, category: duplicateCategory,
       requestId: duplicateRequestId, primaryRequestId: firstData ? firstData.requestId : null,
-      status: dupResponse.status, durationMs: dupResponse.timings.duration,
+      status: dupResponse.status, durationMs: dupResponse.timings.duration, sentAtMs: duplicateSentAtMs, respondedAtMs: Date.now(), scenarioStartMs, inWindow: duplicateSentAtMs <= scenarioStartMs + windowMs,
     }));
   }
 
