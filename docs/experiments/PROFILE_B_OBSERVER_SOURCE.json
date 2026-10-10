@@ -1,0 +1,9 @@
+{
+  "source": "dbe7ffc3cbf903fd6eb209995800b3704dad959e",
+  "status": "final source packaged under Architect7373b5 integration authorization; pending independent package validation; no live SLO PASS",
+  "files": {
+    "scripts/verifier-isolated/v1-observer.py": "f79cda9d90d6007a94c44b86a9d563a9d6e4d61926fb51a5c9da113fff7530b5",
+    "scripts/verifier-isolated/test-v1-observer.py": "5c7430a7672348cd30c0718f5df2b2cb0935cff569c51a495da52edd79b45b62",
+    "docs/experiments/v1-observer-166.md": "71249dd9357c88da72952d1d10887d134e8d8d992969b716d6e5d25ad400c7cc"
+  }
+}

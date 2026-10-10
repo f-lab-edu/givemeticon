@@ -1,0 +1,47 @@
+# Verifier 격리 부하테스트 전용 설정. 비밀값 없음(더미/로컬 전용 인스턴스 포트).
+# 비공개 local 프로필(givemeticon-config) 대신 --spring.config.additional-location=file:<이 파일 경로> 로 로드한다.
+# 주의: 저장소 .gitignore 가 application-*.yml 을 제외하므로 application-<profile>.yml 이름을 쓰지 않는다.
+# 데이터소스 URL/계정은 runner가 SPRING_DATASOURCE_* 환경변수로 주입한다.
+server:
+  tomcat:
+    threads:
+      max: ${LOADTEST_TOMCAT_THREADS:200}
+
+spring:
+  flyway:
+    enabled: false
+  data:
+    redis:
+      mail:
+        host: ${VERIFIER_REDIS_MAIL_HOST:localhost}
+        port: ${VERIFIER_REDIS_MAIL_PORT:16379}
+      coupon:
+        host: ${VERIFIER_REDIS_COUPON_HOST:localhost}
+        port: ${VERIFIER_REDIS_COUPON_PORT:16380}
+
+bootstrap:
+  server: ${VERIFIER_KAFKA_DUMMY_HOST:localhost}:${VERIFIER_KAFKA_DUMMY_PORT:19092}
+
+mail:
+  title:
+    certification: loadtest
+  domain:
+    name: http://localhost
+oauth:
+  kakao:
+    client-id: loadtest
+    url:
+      auth: http://localhost
+      api: http://localhost
+  naver:
+    client-id: loadtest
+    client-secret: loadtest
+    url:
+      auth: http://localhost
+      api: http://localhost
+
+management:
+  health:
+    # 메일 서버 자격 증명이 없는 테스트 환경에서 readiness(DOWN)가 되는 것을 막는다. DB/Redis 헬스는 유지한다.
+    mail:
+      enabled: false
