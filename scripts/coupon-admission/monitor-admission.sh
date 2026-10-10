@@ -51,13 +51,13 @@ while true; do
   sample_app app1 "$app1" "$timestamp"
   sample_app app2 "$app2" "$timestamp"
 
-  docker exec "$container" sh -lc "mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -Nse \"SELECT COUNT(*), SUM(status='PENDING') FROM $database.coupon_application WHERE event_id=$event_id; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_waits'; SELECT COUNT(*) FROM performance_schema.data_lock_waits; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_os_log_written'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_written'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_reads'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_writes';\"" \
+  docker exec "$container" sh -lc "export MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\"; exec mysql -uroot -Nse \"SELECT COUNT(*), SUM(status='PENDING') FROM $database.coupon_application WHERE event_id=$event_id; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_waits'; SELECT COUNT(*) FROM performance_schema.data_lock_waits; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_os_log_written'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_written'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_reads'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_writes';\"" \
     > "$run_dir/.mysql-sample" 2>>"$run_dir/monitor-errors.log" || true
   if [[ -s "$run_dir/.mysql-sample" ]]; then
     values=($(cat "$run_dir/.mysql-sample"))
     printf '%s,%s,%s,%s,%s,%s,%s,%s,%s\n' "$timestamp" "${values[0]:-}" "${values[1]:-}" "${values[2]:-}" "${values[3]:-}" "${values[4]:-}" "${values[5]:-}" "${values[6]:-}" "${values[7]:-}" >> "$run_dir/mysql.csv"
   fi
-  docker exec "$container" sh -lc 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --batch --skip-column-names -e "SELECT NOW(6), waiting_pid, blocking_pid, locked_table, locked_index, wait_age_secs, waiting_query, blocking_query FROM sys.innodb_lock_waits;"' \
+  docker exec "$container" sh -lc 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot --batch --skip-column-names -e "SELECT NOW(6), waiting_pid, blocking_pid, locked_table, locked_index, wait_age_secs, waiting_query, blocking_query FROM sys.innodb_lock_waits;"' \
     > "$run_dir/locks/${timestamp}.tsv" 2>>"$run_dir/monitor-errors.log" || true
 
   stats=$(docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}}' "$container" 2>/dev/null || true)

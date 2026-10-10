@@ -1,0 +1,153 @@
+{
+  "base": "b941a04efa9d547a845cd5df05c055eab756e9bc",
+  "harness_source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+  "files": [
+    {
+      "path": ".gitignore",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "2be04137bd9b54cc03bad1a6dbcaa4b51582a16925741e6c0a67ae4069caf7ed"
+    },
+    {
+      "path": "docs/experiments/HARNESS_PACKAGE_ISSUE_168.md",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "6e58929b0b5beefbc4f83f7f268d8d520427178c95acc6fc51e607da5939c822"
+    },
+    {
+      "path": "docs/experiments/HARNESS_SOURCE_MANIFEST_ISSUE_168.json",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "c8a290d08c36ae6be4ffd3cb2cb9e6bdde500bacb730ddc10973393bfcd2f514"
+    },
+    {
+      "path": "docs/experiments/baseline-10k-diagnostic.md",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "1f919ab2d3567e5989d0dd41a4246a506d0f36fde97874c3547fda82f89dadb2"
+    },
+    {
+      "path": "scripts/coupon-admission/monitor-admission.sh",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "50cd4bcd5bb54412987f6bc6cc4127e7c7cd2d43917f7283299ef58a2c7ed512"
+    },
+    {
+      "path": "scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "13d93e4b2ab51b4773468372c22c93d48154951449c2a0de62253a0d73185d04"
+    },
+    {
+      "path": "scripts/verifier-isolated/analyze-separated-v2.py",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "fa289850a8d99b26c9252c3c241f22fdfa44283ecacc88d09e84120cd1fb740f"
+    },
+    {
+      "path": "scripts/verifier-isolated/analyze-separated.py",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "c371ab2554208bee90e526d62a71d5edc84f62f14f3d95f8cb7c4de1e069a691"
+    },
+    {
+      "path": "scripts/verifier-isolated/capture-manifest.sh",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "6d9bf0e911bc19ab50bbb589e0d2a83f17268230c62b386d5add0e1e1dc3319e"
+    },
+    {
+      "path": "scripts/verifier-isolated/fast-sampler.py",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "27beefe4c91d0338754a25b9a2a0f8941f907c3bf4dc8601d8472eaadd8e723a"
+    },
+    {
+      "path": "scripts/verifier-isolated/start-infra.sh",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "26d32b505599ce3ebb2795a56951d5d24aad2f1813b30d06272c320059c898f2"
+    },
+    {
+      "path": "scripts/verifier-isolated/test-analyze-separated-v2.py",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "50e967896011d8744baa84f150394fb81913337e0340ceb92ec48f8ae31c8d45"
+    },
+    {
+      "path": "scripts/verifier-isolated/test-infra-security.py",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "605cd4178d775bf9710363c021253d2a188dccc4a952a2d56e09fe98ed679229"
+    },
+    {
+      "path": "scripts/verifier-isolated/verifier-loadtest-config.yml",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "981c5e7e7d225d7886b0385ce280d1e340b47993e6f4cfc484dd0dfc60ba5f7a"
+    },
+    {
+      "path": "src/test/java/com/jinddung2/givemeticon/harness/VerifierHarnessConfigurationTest.java",
+      "source": "d4855a5bd3b65dc90ebc0cc9e0650c3dd4fae7d6",
+      "sha256": "fef3abc524f3beb361f77a6ba1f7c610ef1b7de133126a37ebac6726291cee9e"
+    },
+    {
+      "path": "docs/experiments/capped-env-preparation-166.md",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "f32ba479651c737e6a097f05dc36a6a7cc6c81537d5f0d8543af66c808551916"
+    },
+    {
+      "path": "scripts/verifier-isolated/analyze-lock-metrics.py",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "e41a62ddec71f44649f952c86695c45a577c8d79f813f45a11c45520a14b4e33"
+    },
+    {
+      "path": "scripts/verifier-isolated/analyze-stock.py",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "2ac4fb1d418f117bf86a9ab4c5639d1e2c02dd7f69be4122d2e81e3ba97f1b35"
+    },
+    {
+      "path": "scripts/verifier-isolated/capped/memory-guard.sh",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "dc308656b7d45776748cf873e1cc5b46dad1c74b691e122bd1be3c8e2b5df457"
+    },
+    {
+      "path": "scripts/verifier-isolated/capped/run-capped-stock.sh",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "20ec8607442c1fe3e11dbe9fa830c3146d453ba8c70ddfef6b9e9d9db8dd9154"
+    },
+    {
+      "path": "scripts/verifier-isolated/capped/run-capped-v1.sh",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "e991eab22198f68aa52bc0feaae952d22aa4d04edc3449ad95b1b27e4090edf2"
+    },
+    {
+      "path": "scripts/verifier-isolated/capped/test-capped-runners.sh",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "3ac26201a83db3d1e67b64b5fc08a5bb12abdfd9204afc1419a79b0f120ddb91"
+    },
+    {
+      "path": "scripts/verifier-isolated/capped/test-memory-guard.sh",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "effaf1542e37a5e30fca51dac3e6a209151d7b5369aa9e5816ca269c8ced827b"
+    },
+    {
+      "path": "scripts/verifier-isolated/compare-workload.py",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "d84f8ff54323db9afc76af93cd8f973debb943ea7f2dc443906e0d55bd511a3c"
+    },
+    {
+      "path": "scripts/verifier-isolated/stock-arrival-record.js",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "70eb13f1c32e98791adc266fb8472345d9ac41aecaaf8b13f3787b77c36075e4"
+    },
+    {
+      "path": "scripts/verifier-isolated/test-analyze-lock-metrics.py",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "3b172b45cf5012af263a7e30509c031b74c56904448d8a081633c64695c95f56"
+    },
+    {
+      "path": "scripts/verifier-isolated/test-analyze-stock.py",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "4f3a4d63c0dbbf7e8b568c4c0af634c732ff8f80adafe1e836b95453cc0ba7df"
+    },
+    {
+      "path": "scripts/verifier-isolated/test-compare-workload.py",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "a28febe1c7de137a34e71c58c400b8220298b8a9f6dca4c754366c4b32743317"
+    },
+    {
+      "path": "src/test/java/com/jinddung2/givemeticon/harness/VerifierStockConfigurationTest.java",
+      "source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+      "sha256": "77323063eb38d49f2ac579ec89643159a04b6b45babb2b1384b907c9f2ee8625"
+    }
+  ],
+  "capped_source": "f0752f02578007d4587c7f4c5dc7459ee61433b4",
+  "note": "Source input hashes, not adapted output hashes; final artifact checksums are emitted by collector."
+}
