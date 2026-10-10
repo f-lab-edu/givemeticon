@@ -1,3 +1,4 @@
+# Registration recovery: a fresh commit reaches the approval branch first; execution contract unchanged.
 name: Issue 177 profile B small calibration (approval branch only)
 on:
   push:
