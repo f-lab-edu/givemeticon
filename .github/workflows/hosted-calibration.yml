@@ -35,6 +35,9 @@ jobs:
       - name: Rescue owned cleanup and evidence
         if: always()
         run: bash scripts/verifier-isolated/hosted/cleanup-calibration.sh
+      - name: Remove ephemeral credential after both evidence collections
+        if: always()
+        run: rm -f "$RUNNER_TEMP/issue177-b-password"
       - name: Preserve test evidence
         if: always()
         run: |

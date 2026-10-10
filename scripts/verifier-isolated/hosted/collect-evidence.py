@@ -6,6 +6,8 @@ ALLOWED={'.json','.jsonl','.txt','.tsv','.csv','.prom','.log'}
 LIMIT=16*1024*1024;TOTAL=128*1024*1024
 
 def collect(src,dst,secret):
+    if not secret: raise ValueError('redaction input missing or empty; evidence destination unchanged')
+    if not src.is_dir(): raise ValueError('evidence source missing; destination unchanged')
     dst.mkdir(parents=True,exist_ok=True); entries=[];total=0
     for p in sorted(src.rglob('*')):
         if not p.is_file() or p.is_symlink() or p.suffix not in ALLOWED or 'dump' in p.name: continue
@@ -18,7 +20,11 @@ def collect(src,dst,secret):
         if secret: data=data.replace(secret,b'[REDACTED]')
         target=dst/rel;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
         total+=len(data);entries.append({'path':str(rel),'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
-    (dst/'artifact-manifest.json').write_text(json.dumps({'scope':'synthetic isolated run; omissions prohibit completeness claims','files':entries},indent=2)+'\n')
+    (dst/'artifact-manifest.json').write_text(json.dumps({'scope':'synthetic isolated run; omissions prohibit completeness claims','redaction_applied':True,'files':entries},indent=2)+'\n')
 if __name__=='__main__':
-    secret=Path(sys.argv[3]).read_bytes().strip() if Path(sys.argv[3]).exists() else b''
-    collect(Path(sys.argv[1]),Path(sys.argv[2]),secret)
+    try:
+        secret=Path(sys.argv[3]).read_bytes().strip()
+        collect(Path(sys.argv[1]),Path(sys.argv[2]),secret)
+    except (OSError,ValueError):
+        print('evidence collection refused: redaction input unavailable or collection failed',file=sys.stderr)
+        sys.exit(3)

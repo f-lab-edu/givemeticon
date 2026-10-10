@@ -16,6 +16,17 @@ for action in down remove; do
   printf '%s\n' "$rc" > "$source_dir/cleanup-$action-exit.txt"
   [[ $rc == 0 ]] || status=3
 done
-python3 scripts/verifier-isolated/hosted/collect-evidence.py "$source_dir" "$repo/build/calibration-evidence" "$pw" || status=3
-rm -f "$pw"
+collection_rc=0
+python3 scripts/verifier-isolated/hosted/collect-evidence.py "$source_dir" "$repo/build/calibration-evidence" "$pw" || collection_rc=$?
+[[ $collection_rc == 0 ]] || status=3
+# Safe metadata is independent of raw collection; initial capability/test evidence
+# already lives in this destination and does not need a missing secret to be copied.
+python3 - "$repo/build/calibration-evidence/collection-status.json" "$collection_rc" <<'PY_STATUS'
+import json,sys
+from pathlib import Path
+p=Path(sys.argv[1]);p.parent.mkdir(parents=True,exist_ok=True)
+p.write_text(json.dumps({'raw_collection':'COLLECTED_REDACTED' if sys.argv[2]=='0' else 'REFUSED','exit_code':int(sys.argv[2]),'note':'missing/empty redaction input forbids raw copy; secret-free capability/test evidence is preserved separately'},indent=2)+'\n')
+PY_STATUS
+# Keep redaction input through EXIT-trap and always-rescue collections.
+# The workflow removes it in the final always credential-cleanup step.
 exit "$status"
