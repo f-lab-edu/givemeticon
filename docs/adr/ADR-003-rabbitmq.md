@@ -1,6 +1,6 @@
 # ADR-003 — RabbitMQ direction and approval gates
 
-Status: 부분 결정 / 상세 설계 제안; production 구현 승인 아님 (2026-10-07).
+Status: Superseded in part by [ADR-004](ADR-004-rabbitmq-implementation-contract.md): 엄격한 enqueue 순서와 무조건 stop-the-line poison 정책은 역사적 제안이다. 현재 순서/복구/consumer 계약은 ADR-004를 적용한다. Production 구현 승인 아님.
 
 ## Context / Problem / Constraints
 사용자의 최신 RabbitMQ 학습·burst 측정 요청이 이번 작업의 기술 제약이다. 과거 로컬 docs/coupon-v2.md의 Kafka 선택 및 30k 목표/100k 선택 범위는 이번 작업에 한해 superseded한다. 원문은 변경하거나 무단으로 추적에 추가하지 않는다. 기존 DB 장애 30초 목표는 자동으로 새 요구에 추가하지 않고 장애 실험 후보로 보존한다.

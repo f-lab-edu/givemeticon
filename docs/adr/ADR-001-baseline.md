@@ -1,6 +1,6 @@
 # ADR-001 — Baseline comparison contract
 
-Status: 측정 계약 결정, 실행 준비 검토 대기 (2026-10-07).
+Status: 측정 계약. 현재 최종성 규칙은 아래 Terminal outcome and workload comparability clarification 절(78ca3f4)이며 이전 단일 100% 발급 목표를 대체한다. 실행 PASS 아님.
 
 ## Context / Problem
 사용자 요구는 RabbitMQ burst 비교이다. 현재 V1과 레거시 Redisson 경로를 혼동하면 비교가 무효이다. 근거: b941a04의 src/main/resources/application-coupon-*.yml 및 Reviewer 보고 84ba06b4790ddd7e5ca82e82086c0e460b84dde1b6f4f7e235f2b4b8f96ed806.
@@ -19,7 +19,7 @@ Status: 측정 계약 결정, 실행 준비 검토 대기 (2026-10-07).
 - 모든 실행은 SHA, profile, CPU/메모리 제한, DB/broker 버전, fixture, 예열, 시계 동기화, 생성기 자원을 manifest에 기록. 신규 구조와 같은 자원 예산 사용
 - 레거시 Redisson 비교와 V1 단건/묶음 조합, pool 확대는 분리 실험. API와 업무 차이를 숨기지 않는다
 
-접수 p95 목표 2초는 각 구조의 응답 계약과 함께 표기한다. 정상 실험의 최종 목표는 최초 POST부터 180초 내 고유 신청자의 ISSUED/SOLD_OUT 확인 100%이다. CHECKING/503/timeout을 분모에서 제외하지 않는다. 명시적 거절과 미확정은 별도 계수하고 목표 미달로 보고한다. 서버 commit 시간과 클라이언트 관찰 지연을 구분한다. 장애 실험은 복구 후 수렴 시간과 최초 요청 후 총시간을 둘 다 기록한다.
+접수 p95 목표 2초는 각 구조의 응답 계약과 함께 표기한다. [역사적 목표: 아래 Terminal outcome 절(78ca3f4)로 대체됨] 정상 실험의 최종 목표는 최초 POST부터 180초 내 고유 신청자의 ISSUED/SOLD_OUT 확인 100%이다. CHECKING/503/timeout을 분모에서 제외하지 않는다. 명시적 거절과 미확정은 별도 계수하고 목표 미달로 보고한다. 서버 commit 시간과 클라이언트 관찰 지연을 구분한다. 장애 실험은 복구 후 수렴 시간과 최초 요청 후 총시간을 둘 다 기록한다.
 
 ## Trade-offs / Consequences
 발생기 용량 검증을 먼저 수행한다. 불가능 여부는 실제 전송량/CPU/dropped_iterations로 판단하며 VU 추정만으로 단정하지 않는다. 빠른 ENDED/SOLD_OUT 응답은 결과별 latency로 분리한다. 누락된 DB wait 등은 누락으로 기록하며 숫자를 만들지 않는다.
@@ -51,7 +51,7 @@ Manifest: 서비스별 설정/실제 CPU·RAM 제한, host/VM 전체 한도, 생
 
 ## R4 — terminal rejection metrics
 Source: Reviewer 87211869c1ca6f0836f680ecd73245d2bfc2d2cd55562c0ce53aa0e0e1f651d9; ADR-003 R4.
-정상 유효 fixture 실험의 목표는 여전히 고유 신청자 100%가 180초 내 ISSUED/SOLD_OUT이다. ACCEPTED 후 REJECTED는 별도 계수하며 원래 고유 신청자 분모에서 제외하지 않는다. 이 실험에 REJECTED가 있으면 해당 목표 미달이며, 최종 결과가 알려졌다는 이유로 발급 목표 성공으로 합치지 않는다.
+[역사적 R4 해석: 아래 Terminal outcome 절(78ca3f4)로 대체됨] 정상 유효 fixture 실험의 당시 목표는 고유 신청자 100%가 180초 내 ISSUED/SOLD_OUT이다. ACCEPTED 후 REJECTED는 별도 계수하며 원래 고유 신청자 분모에서 제외하지 않는다. 이 실험에 REJECTED가 있으면 해당 목표 미달이며, 최종 결과가 알려졌다는 이유로 발급 목표 성공으로 합치지 않는다.
 의도적 무효 시도 시험은 별도 시나리오이다. 시도 단위로 180초 내 REJECTED/reason 관찰 여부를 검증하고, ISSUED/SOLD_OUT/REJECTED/미확정과 ACCEPTED 후 거절 수를 별도 기록한다. '거절 결과 확정'과 '미확정'은 다르다. 고유 신청자 성공률과 시도 결과 수렴률을 다른 지표로 보고하여 거절 후 재신청으로 분모가 부풀지 않게 한다.
 
 

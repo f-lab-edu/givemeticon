@@ -1,5 +1,14 @@
 # Agent checkpoints
 
+## Latest checkpoint — 2026-10-10T14:30Z (read first)
+Human ca0a8c52c3fbb572363812d11dc3a8879a019b69b0bc67c5d21507be3fb5e285 resumed the existing project from its checkpoint. Original72h deadline expired incomplete; this instruction authorizes continuation, but specifies no new72h timer. Completion or subsequent human stop/change ends the resumed scope. Expired workflow10ac18a5-ed1e-4cc9-9004-8822c458d846 disabled and remotely rechecked enabled=false. No automatic merge; local infrastructure/load ban remains.
+- Phase: hosted baseline evidence audit and measurement repair. Architect docs/provider-quota-recovery, PR169; Builder test/issue-177-hosted-baseline PR178 head1e268d9ec5771c6f8dc60d118e35c40ae232a0d3.
+- Run37586432949 completed failure2026-10-07T07:23:50Z. Artifact166 checksums verified. Exact-head package tests251 pass per artifact/Verifier; load generation gate failed, not baseline PASS. Stock first2029/dropped7972; V1 first4843/dropped5158. Different actual populations prevent matched latency comparison. No OOM. Observed app throttling, missing generator cgroup and Hikari gaps prevent sole-cause attribution.
+- Verifier provider recovered; independent audit event6dec9c58. Continues interrupted per-member HTTP observer in separate worktree without local app/DB startup. Reviewer resumed PR169/178; document supersession corrections applied, CPU-cap causal assertion not accepted as proven.
+- Builder assigned generator cgroup retention, stock pool metrics, failure-gate evidence and prospective profile B resource/VU contract. Include broker slot in service budget; leave idle baseline slot, disclose allocations/utilization. No rerun until prospective contract/measurement review; lower-rate probes are auxiliary and do not replace required10k/50k/100k.
+- Completed scopes: #164/#168 and approved PR16589a5df1/176d4855a5 only. Remaining #166/#177 valid baseline, #170/#171 implementation, #172 faults, #173 comparison, #174 cleanup, #175 final report. No RabbitMQ implementation or performance advantage established; no legacy code deleted.
+- Next: Builder repair/proposal; Verifier observer + independent measurements; Reviewer verify doc corrections and proposed budget. Architect decides next hosted experiment from these artifacts, without requesting renewed approval.
+
 기록일: 2026-10-07. 공통 규칙: PROVIDER_QUOTA_RECOVERY.md.
 
 ## Verifier — provider availability 확인 대기
