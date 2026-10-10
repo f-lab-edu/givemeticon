@@ -39,14 +39,24 @@ def generator_evidence(root):
     def maximum(name):
         metric=summary.get('metrics',{}).get(name,{})
         return metric.get('max',metric.get('values',{}).get('max'))
+    configured={}
+    meta=root/'run-meta.txt'
+    if meta.exists():
+        for line in meta.read_text().splitlines():
+            if line.startswith(('k6_max_vus=','k6_pre_allocated_vus=')):
+                key,value=line.split('=',1)
+                try:configured[key]=int(value)
+                except ValueError:pass
+    observed=maximum('vus');limit=configured.get('k6_max_vus')
     return {'sample_rows':len(rows),'parse_errors':bad,'live_samples':len(stats),
             'oom_state':any(s.get('oom') is True for s in states) if states else None,
             'nr_throttled_delta':delta(stats,'nr_throttled'),'nr_periods_delta':delta(stats,'nr_periods'),
             'throttled_usec_delta':delta(stats,'throttled_usec'),'usage_usec_delta':delta(stats,'usage_usec'),
             'memory_peak_bytes':peak,'memory_cap_bytes':cap,'memory_peak_cap_ratio':peak/cap if peak is not None and cap else None,
             'memory_events_delta':{key:delta(events,key) for key in ('high','max','oom','oom_kill')},
-            'vus_observed_max':maximum('vus'),'vus_configured_max':maximum('vus_max'),
-            'note':'null is MISSING. Sampling covers only observed intervals; throttling/pressure/VU ceiling do not establish causality or invalidate the entire run.'}
+            'vus_observed_max':observed,'vus_allocated_max':maximum('vus_max'),'vus_configured_max':limit,
+            'vus_pre_allocated_configured':configured.get('k6_pre_allocated_vus'),'vus_ceiling_observed':observed>=limit if isinstance(observed,(int,float)) and limit is not None else None,
+            'note':'null is MISSING. memory_peak_bytes is a sampled lower bound: final cgroup can vanish before sampling. Counter deltas start at first live sample, not container creation. Throttling/pressure/VU ceiling do not establish causality or invalidate the entire run.'}
 
 def assess(root):
     stage=json.loads((root/'stage-check.json').read_text());records=workload.parse(root/'run/k6-failures.log')

@@ -35,4 +35,10 @@ class T(unittest.TestCase):
    code,result=m.evaluate([p]);self.assertEqual(code,0)
    self.assertIsNone(result['stages'][0]['generator_resource_observation']['nr_throttled_delta'])
    self.assertIsNone(result['stages'][0]['generator_resource_observation']['oom_state'])
+ def test_allocated_vus_are_not_the_configured_ceiling(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);(p/'run').mkdir();(p/'run/k6-summary.json').write_text(json.dumps({'metrics':{'vus_max':{'max':100},'vus':{'max':80}}}))
+   (p/'run-meta.txt').write_text('k6_pre_allocated_vus=100\nk6_max_vus=201\n')
+   e=m.generator_evidence(p);self.assertEqual(e['vus_allocated_max'],100);self.assertEqual(e['vus_configured_max'],201);self.assertFalse(e['vus_ceiling_observed'])
+   (p/'run-meta.txt').unlink();self.assertIsNone(m.generator_evidence(p)['vus_configured_max']);self.assertIsNone(m.generator_evidence(p)['vus_ceiling_observed'])
 unittest.main()

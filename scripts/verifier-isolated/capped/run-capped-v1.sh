@@ -186,6 +186,7 @@ run() {
     echo "caps: app cpus=$APP_CPUS mem=$APP_MEM xmx=$APP_XMX | db cpus=$DB_CPUS mem=$DB_MEM pool=$DB_POOL | redis cpus=$REDIS_CPUS mem=$REDIS_MEM | k6 container cpus=$K6_CPUS mem=$K6_MEM host gomaxprocs=$K6_GOMAXPROCS gomemlimit=$K6_GOMEMLIMIT"
     echo "jre_image=$JRE_IMAGE docker_image_ids: $(docker inspect "$P-app1" --format '{{.Image}}')"
   } > "$root/run-meta.txt"
+  printf "k6_pre_allocated_vus=%s\nk6_max_vus=%s\n" "${VUS:-6500}" "${MAX_VUS:-$(( ${VUS:-6500} + 1500 ))}" >> "$root/run-meta.txt"
   if [[ "${WARMUP:-true}" == true ]]; then
     local wev; wev=$(create_event "warmup-$(date -u +%s)" 100000 50000); mkdir -p "$root/warmup"
     k6_run "$wev" 600000000 "${WARMUP_RATE:-1000}" "${WARMUP_DURATION:-10s}" 0 "$root/warmup" 2000

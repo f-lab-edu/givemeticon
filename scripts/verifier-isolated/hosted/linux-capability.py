@@ -9,7 +9,7 @@ import shutil
 import subprocess
 
 
-def assess(cpu_count, available_mib, disk_mib):
+def assess(cpu_count, available_mib, disk_mib, profile="A"):
     # Both paths use these caps. Observers/build/OS have explicit reserve.
     caps = {"apps": {"count": 2, "cpu_each": 0.5, "memory_mib_each": 512},
             "mysql": {"cpu": 1, "memory_mib": 1024},
@@ -19,7 +19,13 @@ def assess(cpu_count, available_mib, disk_mib):
             "host_reserve": {"cpu_budget": 0.25, "memory_budget_mib": 2048}}
     required_cpu = 3.95
     required_mib = 6272
-    return {"caps": caps, "required_cpu": required_cpu, "required_memory_mib": required_mib,
+    if profile == "B":
+        caps = {"apps":{"count":2,"cpu_each":.55,"memory_mib_each":768},"mysql":{"cpu":1,"memory_mib":1024},
+                "redis":{"count":2,"cpu_each":.05,"memory_mib_each":64},"broker_empty_slot":{"cpu":.5,"memory_mib":768},
+                "generator":{"cpu":.75,"memory_mib":3072},"observers":{"cpu_budget":.25,"memory_budget_mib":512},
+                "host_reserve":{"cpu_budget":.25,"memory_budget_mib":2048}}
+        required_mib=9088
+    return {"profile":profile,"caps": caps, "required_cpu": required_cpu, "required_memory_mib": required_mib,
             "available_cpu": cpu_count, "available_memory_mib": available_mib,
             "available_disk_mib": disk_mib,
             "pass": cpu_count >= required_cpu and available_mib >= required_mib and disk_mib >= 6144}
@@ -28,6 +34,7 @@ def assess(cpu_count, available_mib, disk_mib):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("out")
+    parser.add_argument("--profile", choices=["A","B"], default="A")
     args = parser.parse_args()
     if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
         raise SystemExit("requires Linux x64 hosted runner; local capability execution refused")
@@ -36,7 +43,7 @@ def main():
         fields = line.split()
         mem[fields[0].rstrip(":")] = int(fields[1])
     result = assess(len(os.sched_getaffinity(0)), mem["MemAvailable"] // 1024,
-                    shutil.disk_usage(".").free // 1024**2)
+                    shutil.disk_usage(".").free // 1024**2, args.profile)
     result.update({"platform": platform.platform(), "memory_total_mib": mem["MemTotal"] // 1024,
                    "sha": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                    "image_os": os.environ.get("ImageOS", "unknown"),

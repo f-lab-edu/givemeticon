@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+import importlib.util,json,subprocess,tempfile,unittest,http.server,threading
+from pathlib import Path
+HERE=Path(__file__).parent
+def load(name):
+ spec=importlib.util.spec_from_file_location(name,HERE/(name+'.py'));mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod);return mod
+scope=load('verify-observer-scope');caps=load('verify-calibration-caps');get=load('get-smoke');capacity=load('linux-capability')
+class T(unittest.TestCase):
+ def test_scope_limit_evidence_fail_closed(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d)
+   for f,v in {'cpu.max':'25000 100000','memory.max':'536870912','memory.swap.max':'0','cpu.stat':'usage_usec 30','memory.current':'1','memory.peak':'2','memory.events':'oom 0'}.items():(p/f).write_text(v)
+   self.assertTrue(scope.assess(p)['pass']);(p/'cpu.max').write_text('max 100000');self.assertFalse(scope.assess(p)['pass'])
+   (p/'memory.max').unlink()
+   with self.assertRaises(OSError):scope.assess(p)
+ def test_caps_owner_and_budget(self):
+  state={'labels':{'xyz.buzz.verifier.owner':'job','xyz.buzz.verifier.managed':'capped-harness'},'cpu':550000000,'memory':768*1024**2,'memswap':768*1024**2,'running':True}
+  self.assertTrue(caps.check(state,.55,768*1024**2,'job'));self.assertFalse(caps.check(state,.55,768*1024**2,'other'));self.assertFalse(caps.check(state,1,768*1024**2,'job'))
+ def test_generator_actual_limits_and_missing_live_snapshot(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d)/'k6.jsonl';p.write_text(json.dumps({'state_status':0,'cgroup_status':0,'state':json.dumps({'cpu_nano':750000000,'memory':3072*1024**2,'memswap':3072*1024**2}),'cgroup':'[cpu.max]\n75000 100000\n[memory.max]\n3221225472\n[memory.swap.max]\n0\n'})+'\n')
+   self.assertTrue(caps.check_generator(p,'job')['pass']);p.write_text('');self.assertFalse(caps.check_generator(p,'job')['pass'])
+ def test_b_capacity_is_distinct_and_fixed(self):
+  b=capacity.assess(4,15000,10000,'B');self.assertEqual(b['required_memory_mib'],9088);self.assertEqual(b['caps']['mysql']['cpu'],1);self.assertEqual(b['caps']['apps']['cpu_each'],.55);self.assertIn('broker_empty_slot',b['caps']);self.assertFalse(capacity.assess(4,8000,10000,'B')['pass'])
+ def test_get_grouped_by_recorded_target_state_and_errors(self):
+  rows=[{'target':'a','http_status':200,'application_status':'ISSUED','error':None,'latency_ms':10},{'target':'b','http_status':503,'application_status':None,'error':None,'latency_ms':30}]
+  s=get.summarize(rows);self.assertEqual(s['sample_n'],2);self.assertEqual(s['usable_get_success_n'],1);self.assertEqual(len(s['by_target_and_status']),2)
+ def test_get_uses_recorded_member_endpoint_and_captures_state(self):
+  seen=[]
+  class H(http.server.BaseHTTPRequestHandler):
+   def do_GET(self):
+    seen.append((self.path,self.headers.get('X-Coupon-Admission-Test-Member')))
+    body=b'{"data":{"status":"SOLD_OUT"}}';self.send_response(200);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
+   def log_message(self,*args):pass
+  server=http.server.HTTPServer(('127.0.0.1',0),H);thread=threading.Thread(target=server.serve_forever);thread.start()
+  try:
+   r=get.sample('http://127.0.0.1:'+str(server.server_port),7,91);self.assertEqual(r['application_status'],'SOLD_OUT');self.assertEqual(seen,[('/test-support/coupon-events/7/applications/me','91')]);self.assertIsNone(r['error'])
+  finally:server.shutdown();thread.join();server.server_close()
+ def test_guard_refuses_local_before_sudo_or_docker(self):
+  r=subprocess.run(['bash',str(HERE/'observer-scope.sh')],env={'PATH':'/usr/bin:/bin','GITHUB_ACTIONS':'false'},capture_output=True,text=True);self.assertEqual(r.returncode,2)
+ def test_no_escalation_or_current_branch_trigger(self):
+  s=(HERE/'run-calibration.sh').read_text();self.assertIn('RATE=100 DURATION=2s',s);self.assertIn('VUS=201 MAX_VUS=201',s);self.assertNotIn('RATE=1000',s)
+  workflow=(HERE.parents[2]/'.github/workflows/hosted-calibration.yml').read_text();self.assertIn('branches: [test/issue-177-profile-b-calibration-approved]',workflow);self.assertIn('timeout-minutes: 30',workflow);self.assertIn('if: always()',workflow)
+ def test_scope_launcher_has_aggregate_limits_and_metadata_only(self):
+  s=(HERE/'observer-scope.sh').read_text();self.assertIn('CPUQuota=25%',s);self.assertIn('MemoryMax=512M',s);self.assertIn('MemorySwapMax=0',s);self.assertNotIn('PASSWORD',s);self.assertNotIn('sudo -E',s)
+unittest.main()

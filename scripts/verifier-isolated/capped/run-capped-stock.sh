@@ -87,6 +87,7 @@ run_stock() {
     echo "rate=$RATE duration=$dur stock_total=$total hikari_max=$HIKARI_MAX k6_mode=$K6_MODE"
     echo "caps: app cpus=$APP_CPUS mem=$APP_MEM xmx=$APP_XMX | db cpus=$DB_CPUS mem=$DB_MEM pool=$DB_POOL | redis cpus=$REDIS_CPUS mem=$REDIS_MEM"
   } > "$root/run-meta.txt"
+  printf "k6_pre_allocated_vus=%s\nk6_max_vus=%s\n" "${VUS:-2000}" "${MAX_VUS:-8000}" >> "$root/run-meta.txt"
   local sid; sid=$(dbx "$DB_NAME" --batch --skip-column-names -e "INSERT INTO coupon_stock(total, remain) VALUES ($total, $total); SELECT LAST_INSERT_ID();" | tail -1)
   echo "stock_id=$sid user_id_start=$ustart" >> "$root/run-meta.txt"
   for port in "$PORT_A" "$PORT_B"; do curl -sf "http://127.0.0.1:$port/actuator/prometheus" > "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-before.prom" || true; done
