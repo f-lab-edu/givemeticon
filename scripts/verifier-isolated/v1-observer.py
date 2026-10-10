@@ -3,7 +3,7 @@
 '최초 송신 시각 -> 실제 ISSUED/SOLD_OUT 관찰 시각'을 기록하고, 관측 간격/누락/503/timeout을 전체 최초 요청 분모와 대조한다.
 사용: v1-observer.py --post-log <k6-failures.log> --targets http://h1:p,http://h2:p --event-id N --out-dir D
       [--budget-ms 180000] [--grace-ms 0] [--max-rps 200] [--concurrency 32] [--interval-ms 1000] [--timeout-ms 3000]
-      [--start-delay-ms 0] [--assumed-latency-ms 50] [--require-budget] [--record-poll-windows]
+      [--start-delay-ms 0] --assumed-latency-ms <ms> --assumed-latency-source measured-get-smoke|conservative-assumption [--require-budget] [--record-poll-windows]
 원칙:
  - 분모 = POST 로그의 모든 최초 admission 회원. 회원의 '최초 요청'은 유효한 sentAtMs 가 가장 이른 admission 기록(파일 순서는 신뢰하지 않음).
  - 요청 결과(firstRequestResult, 예: event_closed=ENDED)와 이후 application 결과(terminalStatus)는 별도 필드이며 서로를 덮지 않는다.
@@ -23,9 +23,16 @@ p.add_argument("--post-log", required=True); p.add_argument("--targets", require
 p.add_argument("--out-dir", required=True); p.add_argument("--budget-ms", type=int, default=180000); p.add_argument("--grace-ms", type=int, default=0)
 p.add_argument("--max-rps", type=float, default=200.0); p.add_argument("--concurrency", type=int, default=32)
 p.add_argument("--interval-ms", type=int, default=1000); p.add_argument("--timeout-ms", type=int, default=3000); p.add_argument("--start-delay-ms", type=int, default=0)
-p.add_argument("--jitter-ms", type=int, default=0); p.add_argument("--assumed-latency-ms", type=int, default=50)
+p.add_argument("--jitter-ms", type=int, default=0)
+p.add_argument("--assumed-latency-ms", type=int, required=True, help="GET 응답 지연 가정(ms, 양수). POST p95 를 대입하지 말 것")
+p.add_argument("--assumed-latency-source", required=True, choices=["measured-get-smoke", "conservative-assumption"],
+               help="measured-get-smoke: 실제 GET smoke 의 p95 (--assumed-latency-sample-n/--assumed-latency-condition 필요). conservative-assumption: 예) GET timeout 값, provisional 로 표시")
+p.add_argument("--assumed-latency-sample-n", type=int, default=0); p.add_argument("--assumed-latency-condition", default="")
 p.add_argument("--require-budget", action="store_true"); p.add_argument("--record-poll-windows", action="store_true")
 a = p.parse_args()
+if a.assumed_latency_ms <= 0: p.error("--assumed-latency-ms must be a positive integer")
+if a.assumed_latency_source == "measured-get-smoke" and (a.assumed_latency_sample_n <= 0 or not a.assumed_latency_condition):
+    p.error("--assumed-latency-source measured-get-smoke requires --assumed-latency-sample-n > 0 and --assumed-latency-condition (smoke 조건 설명)")
 targets = [t.strip() for t in a.targets.split(",") if t.strip()]
 MSG = re.compile(r'msg="(.*)"\s*$')
 now_ms = lambda: int(time.time() * 1000)
@@ -45,9 +52,9 @@ def valid_ms(v):   # 유효한 epoch ms 만 허용(문자열/음수/0/비현실�
 
 recs, parse_errors = parse(a.post_log)
 adm = [r for r in recs if r.get("kind") == "admission" and "memberId" in r]
-dup_cats = collections.defaultdict(list)
+dup_cats = collections.defaultdict(list); dup_recs = collections.defaultdict(list)
 for r in recs:
-    if r.get("kind") == "duplicate" and "memberId" in r: dup_cats[r["memberId"]].append(r.get("category"))
+    if r.get("kind") == "duplicate" and "memberId" in r: dup_cats[r["memberId"]].append(r.get("category")); dup_recs[r["memberId"]].append(r)
 by_member = collections.defaultdict(list)
 for idx, r in enumerate(adm): by_member[r["memberId"]].append((idx, r))
 
@@ -58,11 +65,15 @@ for m, lst in by_member.items():
     chosen = min(timed, key=lambda x: (x[0], x[1]))[2] if timed else lst[0][1]
     if len(lst) > 1 and lst[0][1] is not chosen: order_conflicts.append(m)
     adm_cats = [x.get("category") for _, x in lst]; all_cats = adm_cats + dup_cats.get(m, [])
+    # business_ended 를 '180초 수렴'으로 세려면 모든 시도의 ENDED 응답 시각(respondedAtMs)이 유효해야 한다(시각 누락은 성공으로 합치지 않음)
+    all_recs = [x for _, x in lst] + dup_recs.get(m, [])
+    resp_times = [x.get("respondedAtMs") for x in all_recs]
+    ended_confirmed_at = max(resp_times) if resp_times and all(valid_ms(t) for t in resp_times) else None
     polled = not all(c == "event_closed" for c in all_cats)
     state[m] = {"memberId": m, "firstSentAtMs": chosen.get("sentAtMs") if valid_ms(chosen.get("sentAtMs")) else None,
                 "firstRequestResult": chosen.get("category"), "admissionCategories": adm_cats, "duplicateCategories": dup_cats.get(m, []),
                 "postTarget": chosen.get("target"), "sloIndeterminate": bad_t > 0 or not timed, "invalidOrMissingSentAtRecords": bad_t,
-                "polled": polled, "classification": None if polled else "business_ended", "polls": 0, "ok_polls": 0,
+                "polled": polled, "classification": None if polled else "business_ended", "endedConfirmedAtMs": ended_confirmed_at if not polled else None, "polls": 0, "ok_polls": 0,
                 "http": collections.Counter(), "errors": collections.Counter(), "lastStatus": None, "firstPollAtMs": None, "lastOkPollAtMs": None,
                 "maxGapMs": 0, "terminalStatus": None, "terminalObservedAtMs": None, "firstPollAlreadyTerminal": False, "endedResponses": 0,
                 "skippedPastDeadline": 0, "pollWindows": []}
@@ -80,7 +91,10 @@ rotation_s = len(polled_members) / eff_rps if eff_rps > 0 else float("inf")
 tightest = min((deadline(st) for st in polled_members), default=None)
 window_s = (tightest - t_start) / 1000.0 if tightest else None
 earliest_sent = min((st["firstSentAtMs"] for st in state.values() if st["firstSentAtMs"]), default=None)
-budget = {"polled_members": len(polled_members), "effective_rps_bound": round(eff_rps, 1), "one_rotation_s": round(rotation_s, 1),
+budget = {"assumed_latency": {"ms": a.assumed_latency_ms, "source": a.assumed_latency_source, "provisional": a.assumed_latency_source != "measured-get-smoke",
+                              "sample_n": a.assumed_latency_sample_n or None, "condition": a.assumed_latency_condition or None,
+                              "note": "feasibility estimate only: smoke GET latency does not guarantee latency under load; never substitute POST p95"},
+          "polled_members": len(polled_members), "effective_rps_bound": round(eff_rps, 1), "one_rotation_s": round(rotation_s, 1),
           "time_to_tightest_deadline_s": round(window_s, 1) if window_s is not None else None,
           "observer_start_delay_after_first_post_ms": (t_start - earliest_sent) if earliest_sent else None,
           "observation_budget_insufficient": bool(polled_members) and (window_s is None or window_s <= 0 or rotation_s > window_s),
@@ -224,6 +238,38 @@ for s in state.values(): errs.update(s["errors"]); httpc.update(s["http"])
 total_polls = sum(s["polls"] for s in state.values())
 span = (last_poll_t[0] - first_poll_t[0]) if first_poll_t[0] else None
 first_ended_dup_nonended = sum(1 for s in state.values() if s["firstRequestResult"] == "event_closed" and any(c != "event_closed" for c in s["duplicateCategories"] + s["admissionCategories"]))
+achieved = (total_polls / span) if span and span > 0 else None
+polled_n = len(polled_members)
+rotation_post_s = (polled_n / achieved) if achieved else None
+never_polled_n = sum(1 for st in polled_members if st["polls"] == 0)
+skipped_total = sum(st["skippedPastDeadline"] for st in state.values())
+# 직접 증거 기반: 한 번도 못 폴링한 회원 / deadline 때문에 건너뛴 폴링 / 끝내 미확정인데 관측 간격이 budget 보다 길었던 회원
+unfinished_gap = sum(1 for st in polled_members if st["terminalObservedAtMs"] is None and st["maxGapMs"] > a.budget_ms)
+post_insufficient = bool(polled_n) and (never_polled_n > 0 or skipped_total > 0 or unfinished_gap > 0)
+budget_post = {"achieved_rps_average_over_poll_span": round(achieved, 1) if achieved else None,
+               "one_rotation_s_at_average_rps": round(rotation_post_s, 1) if rotation_post_s else None,
+               "average_rps_caveat": "average includes periods with less work after members converged; it alone does NOT invalidate terminals already observed within budget",
+               "per_member_budget_s": a.budget_ms / 1000.0, "members_never_polled": never_polled_n, "polls_skipped_past_deadline": skipped_total,
+               "unfinished_members_with_gap_over_budget": unfinished_gap,
+               "post_run_observation_budget_insufficient": post_insufficient,
+               "differs_from_pre_run_verdict": post_insufficient != budget["observation_budget_insufficient"],
+               "overrides_pre_run_verdict": post_insufficient and not budget["observation_budget_insufficient"],
+               "authoritative_verdict": "insufficient" if (post_insufficient or budget["observation_budget_insufficient"]) else "sufficient_by_both_checks(not a success guarantee)",
+               "note": "post-run verdict (direct evidence) takes precedence over the pre-run estimate; observed terminals stay counted regardless"}
+n_den = max(1, len(state))
+ended_all = [st for st in state.values() if st["classification"] == "business_ended"]
+ended_timed_in = [st for st in ended_all if st["endedConfirmedAtMs"] and st["firstSentAtMs"] and not st["sloIndeterminate"]
+                  and st["endedConfirmedAtMs"] - st["firstSentAtMs"] <= a.budget_ms]
+ended_untimed = [st for st in ended_all if not st["endedConfirmedAtMs"] or not st["firstSentAtMs"] or st["sloIndeterminate"]]
+_ids_in = {id(x) for x in ended_timed_in}; _ids_un = {id(x) for x in ended_untimed}
+ended_late = [st for st in ended_all if id(st) not in _ids_in and id(st) not in _ids_un]
+adr001 = {"issuance_result_coverage": {"definition": "ISSUED/SOLD_OUT observed via GET within budget", "count": cls["terminal_within_budget"], "of": len(state),
+                                       "rate": round(cls["terminal_within_budget"] / n_den, 4)},
+          "business_outcome_convergence": {"definition": "issuance_result_coverage numerator + business_ended whose ENDED response times (all attempts) are valid and within budget",
+              "count": cls["terminal_within_budget"] + len(ended_timed_in), "of": len(state),
+              "rate": round((cls["terminal_within_budget"] + len(ended_timed_in)) / n_den, 4),
+              "business_ended_counted": len(ended_timed_in), "business_ended_untimed_not_counted": len(ended_untimed), "business_ended_late_not_counted": len(ended_late),
+              "note": "uncertain earlier attempts, slo_indeterminate, untimed ENDED and late ENDED are never merged into success"}}
 summary = {
     "input": {"post_log_parse_errors": parse_errors, "admission_records": len(adm), "unique_first_post_members": len(state),
               "members_with_multiple_admission_records": sum(1 for l in by_member.values() if len(l) > 1),
@@ -231,7 +277,7 @@ summary = {
               "admission_records_missing_or_invalid_sentAtMs": missing_sent,
               "members_with_conflicting_categories": sum(1 for s_ in state.values() if len(set(s_["admissionCategories"] + s_["duplicateCategories"])) > 1),
               "members_first_request_ended_but_other_attempt_not_ended(polled)": first_ended_dup_nonended},
-    "observation_budget": budget,
+    "observation_budget": budget, "observation_budget_post_run": budget_post, "adr001_metrics": adr001,
     "denominator_first_posts": len(state), "classification": dict(cls),
     "slo": {"success_terminal_within_budget": cls["terminal_within_budget"], "denominator": len(state), "budget_ms": a.budget_ms,
             "success_rate_of_full_denominator": round(cls["terminal_within_budget"] / max(1, len(state)), 4),

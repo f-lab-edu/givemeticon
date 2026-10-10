@@ -8,7 +8,7 @@ polls = collections.Counter()
 inflight = collections.Counter(); max_inflight = collections.Counter(); ilock = threading.Lock()
 def behavior(m):   # offset -> (kind, param)
     return {0: ("immediate", None), 1: ("after", 0.6), 2: ("after", 2.6), 3: ("never", None), 4: ("always503", None), 5: ("timeout", None),
-            6: ("flaky", 2), 7: ("ended_get", None), 8: ("immediate", None), 10: ("never", None), 11: ("slow", 0.4), 12: ("timeout_once", 0.5), 13: ("immediate", None), 14: ("immediate", None)}.get(m - BASE, ("never", None) if 30 <= m - BASE < 60 else ("immediate", None))
+            6: ("flaky", 2), 7: ("ended_get", None), 8: ("immediate", None), 10: ("never", None), 11: ("slow", 0.4), 12: ("timeout_once", 0.5), 13: ("immediate", None), 14: ("immediate", None)}.get(m - BASE, ("never", None) if 30 <= m - BASE < 60 else ("slow", 0.3) if 60 <= m - BASE < 90 else ("immediate", None))
 class H(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     def do_GET(self):
@@ -37,8 +37,10 @@ class H(http.server.BaseHTTPRequestHandler):
         return send(200, "ISSUED")
     def log_message(self, *a): pass
 
-def post_line(m, cat, sent, kind="admission", target=1):
-    return json.dumps({"kind": kind, "memberId": m, "target": target, "category": cat, "sentAtMs": sent})
+def post_line(m, cat, sent, kind="admission", target=1, responded=None):
+    d = {"kind": kind, "memberId": m, "target": target, "category": cat, "sentAtMs": sent}
+    if responded is not None: d["respondedAtMs"] = responded
+    return json.dumps(d)
 
 class T(unittest.TestCase):
     @classmethod
@@ -55,7 +57,7 @@ class T(unittest.TestCase):
             t = pathlib.Path(t); (t / "k6-failures.log").write_text("\n".join(lines))
             r = subprocess.run([sys.executable, "-B", str(HERE / "v1-observer.py"), "--post-log", str(t / "k6-failures.log"), "--targets", f"http://127.0.0.1:{self.port}",
                                 "--event-id", "2", "--out-dir", str(t / "o"), "--budget-ms", str(budget), "--grace-ms", str(grace), "--interval-ms", "100",
-                                "--timeout-ms", "300", "--max-rps", "500", "--concurrency", "16", "--record-poll-windows", *extra_args], capture_output=True, text=True, timeout=60)
+                                "--timeout-ms", "300", "--max-rps", "500", "--concurrency", "16", "--assumed-latency-ms", "50", "--assumed-latency-source", "conservative-assumption", "--record-poll-windows", *extra_args], capture_output=True, text=True, timeout=60)
             self.assertEqual(r.returncode, 0, r.stderr)
             recs = {json.loads(l)["memberId"]: json.loads(l) for l in (t / "o/observer-records.jsonl").read_text().splitlines()}
             return json.loads((t / "o/observer-summary.json").read_text()), recs
@@ -169,7 +171,66 @@ class T(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             t = pathlib.Path(t); (t / "l.log").write_text("\n".join(post_line(BASE + 30 + i, "success", old) for i in range(5)))
             rr = subprocess.run([sys.executable, "-B", str(HERE / "v1-observer.py"), "--post-log", str(t / "l.log"), "--targets", f"http://127.0.0.1:{self.port}", "--event-id", "2",
-                                 "--out-dir", str(t / "o"), "--budget-ms", "1000", "--require-budget"], capture_output=True, text=True, timeout=30)
+                                 "--out-dir", str(t / "o"), "--budget-ms", "1000", "--assumed-latency-ms", "50", "--assumed-latency-source", "conservative-assumption", "--require-budget"], capture_output=True, text=True, timeout=30)
             self.assertEqual(rr.returncode, 4); out = json.loads((t / "o/observer-summary.json").read_text())
             self.assertTrue(out["not_run"]); self.assertEqual(sum(polls.values()), 0)
+    def test_assumed_latency_is_required(self):
+        with tempfile.TemporaryDirectory() as t:
+            t = pathlib.Path(t); (t / "l.log").write_text(post_line(BASE, "success", int(time.time() * 1000)))
+            rr = subprocess.run([sys.executable, "-B", str(HERE / "v1-observer.py"), "--post-log", str(t / "l.log"), "--targets", f"http://127.0.0.1:{self.port}",
+                                 "--event-id", "2", "--out-dir", str(t / "o"), "--assumed-latency-source", "conservative-assumption"], capture_output=True, text=True, timeout=30)
+            self.assertEqual(rr.returncode, 2); self.assertIn("assumed-latency-ms", rr.stderr)
+    def test_post_run_verdict_overrides_optimistic_pre_run_estimate(self):
+        def lines(sent): return [post_line(BASE + 60 + i, "success", sent) for i in range(30)]       # GET 이 0.3s 걸리는 30명
+        s, r = self.run_observer(base_lines=lines, budget=1500, grace=0, extra_args=("--concurrency", "2", "--assumed-latency-ms", "1", "--timeout-ms", "1500"))
+        self.assertFalse(s["observation_budget"]["observation_budget_insufficient"])                    # 낙관적 가정(1ms)으로는 '충분'
+        post = s["observation_budget_post_run"]
+        self.assertTrue(post["post_run_observation_budget_insufficient"]); self.assertTrue(post["overrides_pre_run_verdict"])
+        self.assertEqual(post["authoritative_verdict"], "insufficient")
+        self.assertLess(post["achieved_rps_average_over_poll_span"], 10)                                                       # 실제 달성 rps 로 재계산
+    def test_adr001_metrics_reported_side_by_side(self):
+        s, r = self.run_observer()
+        m = s["adr001_metrics"]
+        self.assertEqual(m["issuance_result_coverage"]["count"], 4)
+        # 기본 합성 로그의 ENDED 회원은 respondedAtMs 가 없다 -> business_ended 는 있지만 시각 누락이라 수렴 분자에 합치지 않는다
+        self.assertEqual(m["business_outcome_convergence"]["count"], 4)
+        self.assertEqual(m["business_outcome_convergence"]["business_ended_untimed_not_counted"], 1)
+        self.assertEqual(m["business_outcome_convergence"]["of"], 10)
+    def run_cli(self, *extra, lines=None):
+        with tempfile.TemporaryDirectory() as t:
+            t = pathlib.Path(t); (t / "l.log").write_text("\n".join(lines or [post_line(BASE, "success", int(time.time() * 1000))]))
+            rr = subprocess.run([sys.executable, "-B", str(HERE / "v1-observer.py"), "--post-log", str(t / "l.log"), "--targets", f"http://127.0.0.1:{self.port}",
+                                 "--event-id", "2", "--out-dir", str(t / "o"), "--budget-ms", "1000", *extra], capture_output=True, text=True, timeout=30)
+            summ = (t / "o/observer-summary.json")
+            return rr, (json.loads(summ.read_text()) if summ.exists() else None)
+    def test_assumed_latency_must_be_positive_and_source_documented(self):
+        rr, _ = self.run_cli("--assumed-latency-ms", "0", "--assumed-latency-source", "conservative-assumption"); self.assertEqual(rr.returncode, 2)
+        rr, _ = self.run_cli("--assumed-latency-ms", "100", "--assumed-latency-source", "measured-get-smoke"); self.assertEqual(rr.returncode, 2)       # sample-n/조건 없음
+        rr, _ = self.run_cli("--assumed-latency-ms", "100", "--assumed-latency-source", "post-p95"); self.assertEqual(rr.returncode, 2)                   # POST p95 출처 거부
+    def test_assumed_latency_source_is_recorded_in_summary(self):
+        rr, s = self.run_cli("--assumed-latency-ms", "250", "--assumed-latency-source", "measured-get-smoke", "--assumed-latency-sample-n", "200",
+                             "--assumed-latency-condition", "idle apps, 50rps GET smoke")
+        self.assertEqual(rr.returncode, 0, rr.stderr)
+        al = s["observation_budget"]["assumed_latency"]
+        self.assertEqual((al["ms"], al["source"], al["provisional"], al["sample_n"]), (250, "measured-get-smoke", False, 200)); self.assertIn("idle apps", al["condition"])
+        rr, s = self.run_cli("--assumed-latency-ms", "3000", "--assumed-latency-source", "conservative-assumption")
+        al = s["observation_budget"]["assumed_latency"]; self.assertTrue(al["provisional"]); self.assertEqual(al["ms"], 3000)
+    def test_business_outcome_convergence_requires_valid_ended_times(self):
+        now = int(time.time() * 1000)
+        lines = [post_line(BASE + 70, "event_closed", now, responded=now + 100),                                                     # 시각 유효 + budget 내 -> 카운트
+                 post_line(BASE + 71, "event_closed", now),                                                                           # respondedAtMs 누락 -> untimed
+                 post_line(BASE + 72, "event_closed", now, responded=now + 5000),                                                      # budget 초과 -> late
+                 post_line(BASE + 73, "event_closed", now, responded=now + 100), post_line(BASE + 73, "event_closed", now, kind="duplicate"),   # duplicate ENDED 시각 누락 -> untimed
+                 post_line(BASE + 74, "client_timeout", now, responded=now + 100)]                                                    # 이전 uncertain -> 폴링 대상, ENDED 아님
+        rr, s = self.run_cli("--assumed-latency-ms", "50", "--assumed-latency-source", "conservative-assumption", "--grace-ms", "0", "--timeout-ms", "300", lines=lines)
+        self.assertEqual(rr.returncode, 0, rr.stderr)
+        c = s["adr001_metrics"]["business_outcome_convergence"]
+        self.assertEqual((c["business_ended_counted"], c["business_ended_untimed_not_counted"], c["business_ended_late_not_counted"]), (1, 2, 1))
+        self.assertEqual(s["adr001_metrics"]["issuance_result_coverage"]["count"] + c["business_ended_counted"], c["count"])
+        self.assertEqual(s["denominator_first_posts"], 5)
+    def test_post_run_flag_false_when_everything_observed_early(self):
+        def lines(sent): return [post_line(BASE + i, "success", sent) for i in (0, 8)]       # 즉시 terminal -> 평균 rps 는 낮아도 관찰 부족 아님
+        s, r = self.run_observer(base_lines=lines, budget=3000, grace=0)
+        self.assertFalse(s["observation_budget_post_run"]["post_run_observation_budget_insufficient"])
+        self.assertFalse(s["observation_budget_post_run"]["differs_from_pre_run_verdict"]); self.assertEqual(s["slo"]["success_terminal_within_budget"], 2)
 if __name__ == "__main__": unittest.main()
