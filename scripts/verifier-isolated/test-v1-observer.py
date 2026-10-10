@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""v1-observer.py 대체 실행 테스트: 합성 HTTP 서버(로컬 앱/DB/컨테이너 없음)로 terminal/late/never/error/timeout/ENDED/중복 회원을 검증한다."""
+import collections, http.server, json, pathlib, subprocess, sys, tempfile, threading, time, unittest
+HERE = pathlib.Path(__file__).parent
+BASE = 700200000
+T0 = [0.0]
+polls = collections.Counter()
+inflight = collections.Counter(); max_inflight = collections.Counter(); ilock = threading.Lock()
+def behavior(m):   # offset -> (kind, param)
+    return {0: ("immediate", None), 1: ("after", 0.6), 2: ("after", 2.6), 3: ("never", None), 4: ("always503", None), 5: ("timeout", None),
+            6: ("flaky", 2), 7: ("ended_get", None), 8: ("immediate", None), 10: ("never", None), 11: ("slow", 0.4)}.get(m - BASE, ("immediate", None))
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        m = int(self.headers["X-Coupon-Admission-Test-Member"]); polls[m] += 1
+        kind, prm = behavior(m); el = time.time() - T0[0]
+        with ilock:
+            inflight[m] += 1; max_inflight[m] = max(max_inflight[m], inflight[m])
+        try: self._serve(m, kind, prm, el)
+        finally:
+            with ilock: inflight[m] -= 1
+    def _serve(self, m, kind, prm, el):
+        def send(code, status=None):
+            self.send_response(code); self.send_header("content-type", "application/json"); self.end_headers()
+            self.wfile.write(json.dumps({"data": {"status": status}} if status else {}).encode())
+        if kind == "timeout": time.sleep(1.0); return send(200, "CHECKING")
+        if kind == "slow": time.sleep(prm); return send(200, "CHECKING")
+        if kind == "always503": return send(503)
+        if kind == "flaky": return send(503) if polls[m] <= prm else send(200, "ISSUED")
+        if kind == "ended_get": return send(200, "ENDED")
+        if kind == "never": return send(200, "CHECKING")
+        if kind == "after": return send(200, "SOLD_OUT" if el >= prm else "PENDING")
+        return send(200, "ISSUED")
+    def log_message(self, *a): pass
+
+def post_line(m, cat, sent, kind="admission", target=1):
+    return json.dumps({"kind": kind, "memberId": m, "target": target, "category": cat, "sentAtMs": sent})
+
+class T(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H); cls.srv.handle_error = lambda *a: None; cls.port = cls.srv.server_address[1]
+        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+    @classmethod
+    def tearDownClass(cls): cls.srv.shutdown()
+    def run_observer(self, extra_lines=(), budget=1500, grace=3500, base_lines=None, extra_args=()):
+        polls.clear(); max_inflight.clear(); T0[0] = time.time(); sent = int(T0[0] * 1000)
+        lines = base_lines(sent) if base_lines else [post_line(BASE + i, "success", sent) for i in range(9)] + [post_line(BASE + 9, "event_closed", sent)]
+        lines = lines + list(extra_lines)
+        with tempfile.TemporaryDirectory() as t:
+            t = pathlib.Path(t); (t / "k6-failures.log").write_text("\n".join(lines))
+            r = subprocess.run([sys.executable, "-B", str(HERE / "v1-observer.py"), "--post-log", str(t / "k6-failures.log"), "--targets", f"http://127.0.0.1:{self.port}",
+                                "--event-id", "2", "--out-dir", str(t / "o"), "--budget-ms", str(budget), "--grace-ms", str(grace), "--interval-ms", "100",
+                                "--timeout-ms", "300", "--max-rps", "500", "--concurrency", "16", "--record-poll-windows", *extra_args], capture_output=True, text=True, timeout=60)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            recs = {json.loads(l)["memberId"]: json.loads(l) for l in (t / "o/observer-records.jsonl").read_text().splitlines()}
+            return json.loads((t / "o/observer-summary.json").read_text()), recs
+    def test_all_states(self):
+        s, r = self.run_observer()
+        c = lambda i: r[BASE + i]["classification"]
+        self.assertEqual(c(0), "terminal_within_budget"); self.assertTrue(r[BASE]["firstPollAlreadyTerminal"])
+        self.assertEqual(c(1), "terminal_within_budget"); self.assertFalse(r[BASE + 1]["firstPollAlreadyTerminal"])
+        self.assertGreaterEqual(r[BASE + 1]["firstPostToTerminalObservedMs"], 550)
+        self.assertEqual(c(2), "terminal_late_after_budget"); self.assertGreater(r[BASE + 2]["firstPostToTerminalObservedMs"], 1500)
+        self.assertEqual(c(3), "never_terminal_observed"); self.assertGreater(r[BASE + 3]["polls"], 5)
+        self.assertEqual(c(4), "unreachable_all_polls_failed"); self.assertIn("http_503", r[BASE + 4]["errors"]); self.assertEqual(r[BASE + 4]["ok_polls"], 0)
+        self.assertEqual(c(5), "unreachable_all_polls_failed"); self.assertIn("timeout", r[BASE + 5]["errors"])
+        self.assertEqual(c(6), "terminal_within_budget"); self.assertEqual(r[BASE + 6]["errors"].get("http_503"), 2)   # 일시 오류 후 확정, 오류는 계수에 남는다
+        self.assertEqual(c(7), "never_terminal_observed"); self.assertGreater(r[BASE + 7]["endedResponses"], 0)       # GET 의 ENDED 는 최종이 아니다
+        self.assertEqual(c(9), "business_ended"); self.assertEqual(polls[BASE + 9], 0)                               # ENDED POST 회원은 폴링하지 않는다
+        self.assertEqual(s["denominator_first_posts"], 10); self.assertEqual(sum(s["classification"].values()), 10)
+        self.assertEqual(s["terminal_within_budget"]["count"], 4)   # 0,1,6,8
+        self.assertEqual(s["never_observed_terminal"], 4)           # 3,4,5,7
+        self.assertGreater(s["polls"]["total"], 20); self.assertLessEqual(s["polls"]["configured_max_rps"], 500)
+    def test_duplicate_member_counted_once_in_denominator(self):
+        sent = int(time.time() * 1000)
+        s, r = self.run_observer(extra_lines=[post_line(BASE, "success", sent)])   # 같은 회원의 두 번째 admission 기록
+        self.assertEqual(s["denominator_first_posts"], 10); self.assertEqual(s["input"]["members_with_multiple_admission_records"], 1)
+    def test_unparseable_lines_reported_not_hidden(self):
+        s, r = self.run_observer(extra_lines=['{"kind": "admission", broken'])
+        self.assertEqual(s["input"]["post_log_parse_errors"], 1)
+    def test_first_request_chosen_by_sentAt_not_file_order(self):
+        # 로그는 응답 완료 순서: 늦게 끝난 앞선 timeout 기록이 뒤에, 후속 ENDED 가 앞에 있다
+        def lines(sent):
+            return [post_line(BASE + 10, "event_closed", sent + 800), post_line(BASE + 10, "client_timeout", sent)]
+        s, r = self.run_observer(base_lines=lines, budget=1200, grace=800)
+        rec = r[BASE + 10]
+        self.assertEqual(rec["postCategory"], "client_timeout")        # sentAtMs 가 이른 기록이 '최초'
+        self.assertNotEqual(rec["classification"], "business_ended")   # 후속 ENDED 가 이전 uncertain 을 해결하지 않는다 -> 폴링됨
+        self.assertGreater(rec["polls"], 0)
+        self.assertEqual(s["input"]["members_where_file_order_first_differs_from_earliest_sentAtMs"], 1)
+        self.assertEqual(s["input"]["members_with_conflicting_categories"], 1)
+        self.assertEqual(s["denominator_first_posts"], 1)
+    def test_only_ended_records_are_not_polled(self):
+        def lines(sent): return [post_line(BASE + 10, "event_closed", sent), post_line(BASE + 10, "event_closed", sent + 5)]
+        s, r = self.run_observer(base_lines=lines, budget=600, grace=0)
+        self.assertEqual(r[BASE + 10]["classification"], "business_ended"); self.assertEqual(polls[BASE + 10], 0)
+    def test_missing_sentAt_is_reported(self):
+        def lines(sent): return [json.dumps({"kind": "admission", "memberId": BASE, "target": 1, "category": "success"})]
+        s, r = self.run_observer(base_lines=lines, budget=600, grace=0)
+        self.assertEqual(s["input"]["admission_records_missing_sentAtMs"], 1); self.assertEqual(r[BASE]["classification"], "no_sent_time_in_log")
+    def test_single_inflight_per_member_with_slow_responses(self):
+        # 응답(0.4s) > interval(0.1s): 회원당 동시 polling 이 생기면 안 되고, 발송 창이 겹치면 안 된다
+        def lines(sent): return [post_line(BASE + 11, "success", sent)]
+        s, r = self.run_observer(base_lines=lines, budget=2000, grace=0, extra_args=("--timeout-ms", "1500"))   # timeout > 응답시간: 클라이언트가 포기한 요청이 서버에 남는 경우와 구분
+        self.assertEqual(max_inflight[BASE + 11], 1)
+        w = r[BASE + 11]["pollWindows"]; self.assertGreaterEqual(len(w), 3)
+        for (s0, e0), (s1, e1) in zip(w, w[1:]): self.assertGreaterEqual(s1, e0)    # 이전 완료 후에만 다음 발송
+    def test_deadline_rechecked_right_before_send(self):
+        # concurrency 1 + 낮은 max-rps 로 대기열을 만들어, 대기 후 deadline 이 지난 요청은 발송되지 않아야 한다
+        def lines(sent): return [post_line(BASE + 20 + i, "success", sent) for i in range(8)]
+        s, r = self.run_observer(base_lines=lines, budget=400, grace=0, extra_args=("--max-rps", "5", "--concurrency", "1"))
+        sent_ok = True
+        for m, rec in r.items():
+            for s0, e0 in rec["pollWindows"]: sent_ok &= s0 <= rec["firstSentAtMs"] + 400 + 60   # 발송 시각이 deadline 을 넘지 않음(시계 허용 60ms)
+        self.assertTrue(sent_ok)
+        self.assertGreater(s["polls_skipped_past_deadline"], 0)
+if __name__ == "__main__": unittest.main()

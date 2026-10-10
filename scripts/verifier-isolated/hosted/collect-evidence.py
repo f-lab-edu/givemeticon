@@ -2,7 +2,7 @@
 """Allowlisted, bounded synthetic evidence. Never copies raw dumps or credentials."""
 import hashlib,json,sys
 from pathlib import Path
-ALLOWED={'.json','.txt','.tsv','.csv','.prom','.log'}
+ALLOWED={'.json','.jsonl','.txt','.tsv','.csv','.prom','.log'}
 LIMIT=16*1024*1024;TOTAL=128*1024*1024
 
 def collect(src,dst,secret):

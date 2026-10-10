@@ -61,7 +61,7 @@ k6_stock() { # $1=stock_id $2=user_start $3=rate $4=duration $5=out_dir
   local script="$repo_dir/scripts/verifier-isolated/stock-arrival-record.js"
   if [[ "$K6_MODE" == container ]]; then
     local e=(); for kv in "${envs[@]}"; do e+=(-e "$kv"); done
-    docker run --rm --name "$P-k6" "${common[@]}" --cpus "$K6_CPUS" --memory "$K6_MEM" --memory-swap "$K6_MEM" \
+    k6_docker "$5" "${common[@]}" --cpus "$K6_CPUS" --memory "$K6_MEM" --memory-swap "$K6_MEM" \
       -v "$repo_dir/scripts/verifier-isolated:/scripts:ro" -v "$5:/results" --user "$(id -u):$(id -g)" "${e[@]}" -e TARGETS="http://$P-app1:8080,http://$P-app2:8080" \
       "$K6_IMAGE" run --out json=/results/k6.json --summary-export /results/k6-summary.json --console-output /results/k6-failures.log \
       /scripts/stock-arrival-record.js > "$5/k6-console.log" 2>&1 || true
@@ -71,6 +71,11 @@ k6_stock() { # $1=stock_id $2=user_start $3=rate $4=duration $5=out_dir
   fi
 }
 
+stock_sampling_pids=()
+stop_stock_samplers() {
+  local pid
+  for pid in ${stock_sampling_pids[@]+"${stock_sampling_pids[@]}"}; do kill "$pid" 2>/dev/null || true; done
+}
 run_stock() {
   : "${RUN_LABEL:?RUN_LABEL}"; : "${RATE:?RATE}"
   local dur=${DURATION:-10s} total=${STOCK_TOTAL:-1000} ustart=${USER_ID_START:-900000000}
@@ -87,6 +92,8 @@ run_stock() {
   for port in "$PORT_A" "$PORT_B"; do curl -sf "http://127.0.0.1:$port/actuator/prometheus" > "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-before.prom" || true; done
   snap "$root/containers-run-start.txt"
   ( while :; do t=$(python3 -c 'import time;print(int(time.time()*1000))'); docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}},{{.PIDs}}' | sed "s/^/$t,/"; sleep 1; done ) > "$rd/docker-stats.csv" 2>/dev/null & local ds=$!
+  python3 "$repo_dir/scripts/verifier-isolated/fast-sampler.py" "$rd" unused unused - "$PORT_A" "$PORT_B" "${PROM_INTERVAL_S:-1}" & local psampler=$!
+  stock_sampling_pids=("$ds" "$psampler"); trap stop_stock_samplers EXIT
   k6_stock "$sid" "$ustart" "$RATE" "$dur" "$rd"
   # 수렴: accept 모드는 워커 처리 대기(PENDING 0, 행 수 안정), sync 는 즉시 안정
   local prev="" stable=0 deadline=$((SECONDS+${DRAIN_MAX_S:-180})) row
@@ -97,7 +104,8 @@ run_stock() {
     if [[ "$row" == "$prev" && "${row##*$'\t'}" == 0 ]]; then stable=$((stable+1)); [[ $stable -ge 3 ]] && break; else stable=0; fi
     prev=$row; sleep 2
   done
-  kill "$ds" 2>/dev/null || true; wait "$ds" 2>/dev/null || true
+  stop_stock_samplers; wait "$ds" "$psampler" 2>/dev/null || true
+  stock_sampling_pids=(); trap - EXIT
   for port in "$PORT_A" "$PORT_B"; do curl -sf "http://127.0.0.1:$port/actuator/prometheus" > "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-after.prom" || true; done
   snap "$root/containers-after.txt"
   "$repo_dir/scripts/verifier-isolated/capture-manifest.sh" "$root/manifest-after.txt" || true

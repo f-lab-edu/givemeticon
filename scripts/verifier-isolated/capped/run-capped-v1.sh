@@ -138,13 +138,22 @@ remove() { # 명시 삭제: 소유 검증 + 모든 대상이 정지 상태일 �
 
 create_event() { dbx "$DB_NAME" --batch --skip-column-names -e "INSERT INTO coupon_event (public_id,status,starts_at_utc,total_quantity,high_quantity,high_points,normal_points,settings_locked_at) VALUES ('$1','SCHEDULED',UTC_TIMESTAMP(6),$2,$3,10000,5000,UTC_TIMESTAMP(6)); SELECT LAST_INSERT_ID();" | tail -1; }
 
+k6_docker() {
+  local out=$1; shift
+  if [[ "${CAPTURE_K6_RUNTIME:-false}" == true ]]; then
+    python3 "$repo_dir/scripts/verifier-isolated/run-k6-recorded.py" "$P-k6" "$OWNER" "$out/k6-cgroup.jsonl" "$@"
+  else
+    docker run --rm --name "$P-k6" "$@"
+  fi
+}
+
 k6_run() { # $1=event $2=member_start $3=rate $4=duration $5=dup $6=out_dir $7=vus
   local ev=$1 ms=$2 rate=$3 dur=$4 dup=$5 out=$6 vus=${7:-6500}
   local envs=(EVENT_ID="$ev" MEMBER_ID_START="$ms" RATE="$rate" DURATION="$dur" DUPLICATE_RATE="$dup" POLL_BUDGET_MS=0
               PRE_ALLOCATED_VUS="$vus" MAX_VUS="${MAX_VUS:-$((vus+1500))}" HTTP_TIMEOUT="${HTTP_TIMEOUT:-10s}" GRACEFUL_STOP=30s)
   if [[ "$K6_MODE" == container ]]; then
     local e=(); for kv in "${envs[@]}"; do e+=(-e "$kv"); done
-    docker run --rm --name "$P-k6" "${common[@]}" --cpus "$K6_CPUS" --memory "$K6_MEM" --memory-swap "$K6_MEM" \
+    k6_docker "$out" "${common[@]}" --cpus "$K6_CPUS" --memory "$K6_MEM" --memory-swap "$K6_MEM" \
       -v "$repo_dir/scripts/coupon-integrated-loadtest:/scripts:ro" -v "$out:/results" --user "$(id -u):$(id -g)" "${e[@]}" \
       -e TARGETS="http://$P-app1:8080,http://$P-app2:8080" "$K6_IMAGE" run --out json=/results/k6.json --summary-export /results/k6-summary.json \
       --console-output /results/k6-failures.log /scripts/integrated-admission-poll.js > "$out/k6-console.log" 2>&1 || true
@@ -186,7 +195,7 @@ run() {
   echo "event_id=$ev member_start=700200000" >> "$root/run-meta.txt"
   for port in "$PORT_A" "$PORT_B"; do curl -sf "http://127.0.0.1:$port/actuator/prometheus" > "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-before.prom" || true; done
   snap "$root/containers-run-start.txt"
-  python3 "$repo_dir/scripts/verifier-isolated/fast-sampler.py" "$rd" "$P-mysql" "$DB_NAME" "$ev" "$PORT_A" "$PORT_B" 0.2 & local sp=$!
+  python3 "$repo_dir/scripts/verifier-isolated/fast-sampler.py" "$rd" "$P-mysql" "$DB_NAME" "$ev" "$PORT_A" "$PORT_B" "${PROM_INTERVAL_S:-0.2}" & local sp=$!
   ( while :; do t=$(python3 -c 'import time;print(int(time.time()*1000))'); docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}},{{.PIDs}}' | sed "s/^/$t,/"; sleep 1; done ) > "$rd/docker-stats.csv" 2>/dev/null & local ds=$!
   python3 -c 'import time;print(int(time.time()*1000))' > "$rd/k6-started-host-ms.txt"
   k6_run "$ev" 700200000 "$RATE" "$dur" "$dup" "$rd" "${VUS:-6500}"

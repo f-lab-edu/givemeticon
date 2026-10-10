@@ -64,4 +64,8 @@ for path in stock v1; do
   "$runner" remove
   runner=''
 done
-python3 scripts/verifier-isolated/compare-workload.py "$REPORT_BASE/v1-10k/run" 700200000 "$REPORT_BASE/stock-10k/run" 900000000 > "$REPORT_BASE/workload-comparison.json"
+# Unequal executed sets are a diagnostic; they do not identify a generation-gate exit.
+comparison_exit=0
+python3 scripts/verifier-isolated/compare-workload.py "$REPORT_BASE/v1-10k/run" 700200000 "$REPORT_BASE/stock-10k/run" 900000000 > "$REPORT_BASE/workload-comparison.json" || comparison_exit=$?
+printf '{"executed_set_comparator_exit":%s,"scope":"executed-set equality diagnostic"}\n' "$comparison_exit" > "$REPORT_BASE/comparison-exit.json"
+python3 scripts/verifier-isolated/hosted/final-generation-gate.py "$REPORT_BASE/stock-10k" "$REPORT_BASE/v1-10k" > "$REPORT_BASE/generation-gate.json"
