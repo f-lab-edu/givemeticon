@@ -8,8 +8,9 @@ polls = collections.Counter()
 inflight = collections.Counter(); max_inflight = collections.Counter(); ilock = threading.Lock()
 def behavior(m):   # offset -> (kind, param)
     return {0: ("immediate", None), 1: ("after", 0.6), 2: ("after", 2.6), 3: ("never", None), 4: ("always503", None), 5: ("timeout", None),
-            6: ("flaky", 2), 7: ("ended_get", None), 8: ("immediate", None), 10: ("never", None), 11: ("slow", 0.4)}.get(m - BASE, ("immediate", None))
+            6: ("flaky", 2), 7: ("ended_get", None), 8: ("immediate", None), 10: ("never", None), 11: ("slow", 0.4), 12: ("timeout_once", 0.5), 13: ("immediate", None), 14: ("immediate", None)}.get(m - BASE, ("never", None) if 30 <= m - BASE < 60 else ("immediate", None))
 class H(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
     def do_GET(self):
         m = int(self.headers["X-Coupon-Admission-Test-Member"]); polls[m] += 1
         kind, prm = behavior(m); el = time.time() - T0[0]
@@ -20,10 +21,14 @@ class H(http.server.BaseHTTPRequestHandler):
             with ilock: inflight[m] -= 1
     def _serve(self, m, kind, prm, el):
         def send(code, status=None):
-            self.send_response(code); self.send_header("content-type", "application/json"); self.end_headers()
-            self.wfile.write(json.dumps({"data": {"status": status}} if status else {}).encode())
+            body = json.dumps({"data": {"status": status}} if status else {}).encode()
+            self.send_response(code); self.send_header("content-type", "application/json"); self.send_header("content-length", str(len(body))); self.end_headers()
+            self.wfile.write(body)
         if kind == "timeout": time.sleep(1.0); return send(200, "CHECKING")
         if kind == "slow": time.sleep(prm); return send(200, "CHECKING")
+        if kind == "timeout_once":
+            if polls[m] == 1: time.sleep(prm); return send(200, "CHECKING")
+            return send(200, "ISSUED")
         if kind == "always503": return send(503)
         if kind == "flaky": return send(503) if polls[m] <= prm else send(200, "ISSUED")
         if kind == "ended_get": return send(200, "ENDED")
@@ -68,8 +73,9 @@ class T(unittest.TestCase):
         self.assertEqual(c(7), "never_terminal_observed"); self.assertGreater(r[BASE + 7]["endedResponses"], 0)       # GET 의 ENDED 는 최종이 아니다
         self.assertEqual(c(9), "business_ended"); self.assertEqual(polls[BASE + 9], 0)                               # ENDED POST 회원은 폴링하지 않는다
         self.assertEqual(s["denominator_first_posts"], 10); self.assertEqual(sum(s["classification"].values()), 10)
-        self.assertEqual(s["terminal_within_budget"]["count"], 4)   # 0,1,6,8
-        self.assertEqual(s["never_observed_terminal"], 4)           # 3,4,5,7
+        self.assertEqual(s["slo"]["success_terminal_within_budget"], 4)   # 0,1,6,8
+        ns = s["slo"]["not_counted_as_success"]
+        self.assertEqual(ns["never_terminal_observed"] + ns["unreachable_all_polls_failed"], 4)   # 3,7 / 4,5
         self.assertGreater(s["polls"]["total"], 20); self.assertLessEqual(s["polls"]["configured_max_rps"], 500)
     def test_duplicate_member_counted_once_in_denominator(self):
         sent = int(time.time() * 1000)
@@ -84,7 +90,7 @@ class T(unittest.TestCase):
             return [post_line(BASE + 10, "event_closed", sent + 800), post_line(BASE + 10, "client_timeout", sent)]
         s, r = self.run_observer(base_lines=lines, budget=1200, grace=800)
         rec = r[BASE + 10]
-        self.assertEqual(rec["postCategory"], "client_timeout")        # sentAtMs 가 이른 기록이 '최초'
+        self.assertEqual(rec["firstRequestResult"], "client_timeout")        # sentAtMs 가 이른 기록이 '최초'
         self.assertNotEqual(rec["classification"], "business_ended")   # 후속 ENDED 가 이전 uncertain 을 해결하지 않는다 -> 폴링됨
         self.assertGreater(rec["polls"], 0)
         self.assertEqual(s["input"]["members_where_file_order_first_differs_from_earliest_sentAtMs"], 1)
@@ -97,7 +103,7 @@ class T(unittest.TestCase):
     def test_missing_sentAt_is_reported(self):
         def lines(sent): return [json.dumps({"kind": "admission", "memberId": BASE, "target": 1, "category": "success"})]
         s, r = self.run_observer(base_lines=lines, budget=600, grace=0)
-        self.assertEqual(s["input"]["admission_records_missing_sentAtMs"], 1); self.assertEqual(r[BASE]["classification"], "no_sent_time_in_log")
+        self.assertEqual(s["input"]["admission_records_missing_or_invalid_sentAtMs"], 1); self.assertEqual(r[BASE]["classification"], "slo_indeterminate")
     def test_single_inflight_per_member_with_slow_responses(self):
         # 응답(0.4s) > interval(0.1s): 회원당 동시 polling 이 생기면 안 되고, 발송 창이 겹치면 안 된다
         def lines(sent): return [post_line(BASE + 11, "success", sent)]
@@ -114,4 +120,56 @@ class T(unittest.TestCase):
             for s0, e0 in rec["pollWindows"]: sent_ok &= s0 <= rec["firstSentAtMs"] + 400 + 60   # 발송 시각이 deadline 을 넘지 않음(시계 허용 60ms)
         self.assertTrue(sent_ok)
         self.assertGreater(s["polls_skipped_past_deadline"], 0)
+    def test_first_ended_but_duplicate_success_is_polled_and_fields_preserved(self):
+        def lines(sent): return [post_line(BASE + 13, "event_closed", sent), post_line(BASE + 13, "success", sent + 50, kind="duplicate")]
+        s, r = self.run_observer(base_lines=lines, budget=1500, grace=0)
+        rec = r[BASE + 13]
+        self.assertEqual(rec["firstRequestResult"], "event_closed")            # 최초 요청 결과(ENDED)는 보존
+        self.assertEqual(rec["applicationResult"], "ISSUED")                   # 이후 application 결과는 별도 필드
+        self.assertEqual(rec["classification"], "terminal_within_budget"); self.assertGreater(polls[BASE + 13], 0)
+        self.assertEqual(s["denominator_first_posts"], 1)
+        self.assertEqual(s["input"]["members_first_request_ended_but_other_attempt_not_ended(polled)"], 1)
+    def test_all_ended_admission_and_duplicate_not_polled(self):
+        def lines(sent): return [post_line(BASE + 13, "event_closed", sent), post_line(BASE + 13, "event_closed", sent + 5, kind="duplicate")]
+        s, r = self.run_observer(base_lines=lines, budget=600, grace=0)
+        self.assertEqual(r[BASE + 13]["classification"], "business_ended"); self.assertEqual(polls[BASE + 13], 0)
+        self.assertEqual(s["slo"]["success_terminal_within_budget"], 0)     # ENDED 는 ISSUED/SOLD_OUT 성공이 아니다
+    def test_partial_or_invalid_sentAt_is_indeterminate_but_in_denominator(self):
+        def lines(sent):
+            return [post_line(BASE + 13, "success", sent), json.dumps({"kind": "admission", "memberId": BASE + 13, "target": 1, "category": "client_timeout"}),   # 한 건 시각 누락
+                    json.dumps({"kind": "admission", "memberId": BASE + 14, "target": 1, "category": "success", "sentAtMs": "yesterday"}),                   # 유효하지 않은 시각
+                    post_line(BASE + 0, "success", sent)]
+        s, r = self.run_observer(base_lines=lines, budget=1500, grace=0)
+        self.assertEqual(r[BASE + 13]["classification"], "slo_indeterminate"); self.assertEqual(r[BASE + 14]["classification"], "slo_indeterminate")
+        self.assertEqual(r[BASE + 0]["classification"], "terminal_within_budget")
+        self.assertEqual(s["denominator_first_posts"], 3); self.assertEqual(s["slo"]["success_terminal_within_budget"], 1)   # indeterminate 는 성공 제외, 분모 유지
+        self.assertEqual(s["slo"]["not_counted_as_success"]["slo_indeterminate"], 2)
+        self.assertIsNotNone(r[BASE + 13]["terminalObservedAtMs"])           # 관찰 사실은 기록하되 SLO 판정에서만 제외
+    def test_reconnects_normally_after_timeout(self):
+        def lines(sent): return [post_line(BASE + 12, "success", sent)]
+        s, r = self.run_observer(base_lines=lines, budget=3000, grace=0)
+        rec = r[BASE + 12]
+        self.assertEqual(rec["errors"], {"timeout": 1})                       # 가짜 connection_error/CannotSendRequest 없음
+        self.assertEqual(rec["classification"], "terminal_within_budget")
+        self.assertGreaterEqual(s["resources"]["connections_opened"], 2)
+    def test_fixed_pool_reuses_and_closes_connections(self):
+        def lines(sent): return [post_line(BASE + 30 + i, "success", sent) for i in range(30)]    # 30명 never(CHECKING 지속)
+        s, r = self.run_observer(base_lines=lines, budget=1500, grace=0, extra_args=("--concurrency", "4"))
+        res = s["resources"]
+        self.assertGreater(s["polls"]["total"], 60)
+        self.assertEqual(res["pool_threads"], 4); self.assertLessEqual(res["peak_active_threads_in_process"], 4 + 3)
+        self.assertLessEqual(res["connections_opened"], 4 + 2); self.assertLessEqual(res["max_open_connections"], 4)   # 폴링 수가 아니라 pool 크기에 비례
+        self.assertEqual(res["open_connections_at_exit"], 0); self.assertEqual(res["connections_opened"], res["connections_closed"])
+    def test_observation_budget_insufficient_is_flagged_and_can_refuse(self):
+        def lines(sent): return [post_line(BASE + 30 + i, "success", sent) for i in range(30)]
+        s, r = self.run_observer(base_lines=lines, budget=1000, grace=0, extra_args=("--max-rps", "5"))     # 30명/5rps=6s > 1s
+        self.assertTrue(s["observation_budget"]["observation_budget_insufficient"])
+        # 이미 deadline 이 지난 로그(관찰 시작 지연)
+        polls.clear(); old = int((time.time() - 600) * 1000)
+        with tempfile.TemporaryDirectory() as t:
+            t = pathlib.Path(t); (t / "l.log").write_text("\n".join(post_line(BASE + 30 + i, "success", old) for i in range(5)))
+            rr = subprocess.run([sys.executable, "-B", str(HERE / "v1-observer.py"), "--post-log", str(t / "l.log"), "--targets", f"http://127.0.0.1:{self.port}", "--event-id", "2",
+                                 "--out-dir", str(t / "o"), "--budget-ms", "1000", "--require-budget"], capture_output=True, text=True, timeout=30)
+            self.assertEqual(rr.returncode, 4); out = json.loads((t / "o/observer-summary.json").read_text())
+            self.assertTrue(out["not_run"]); self.assertEqual(sum(polls.values()), 0)
 if __name__ == "__main__": unittest.main()

@@ -13,3 +13,11 @@
 - 시각 전제: POST 로그 `sentAtMs`와 같은 호스트 시계. 다르면 결과를 신뢰하지 않는다.
 - 검증(합성): `test-v1-observer.py` — immediate/after(within)/late/never/503 always/timeout/flaky(503 후 확정)/GET ENDED/ENDED POST 미폴링/중복 회원/파싱 오류/역순 로그(이전 timeout→후속 ENDED)/ENDED만 있는 회원/sentAtMs 누락/느린 응답 시 회원당 단일 in-flight와 발송창 비중첩/deadline 직전 재확인.
 - 미검증: 실제 앱 대상 동작, 대규모(10k+) 폴링 시 달성 rps와 서버 영향, hosted Linux 동작.
+
+## 수정 2 (Reviewer MAJOR 1~3 + Architect 결정, 원본 12c009a 보존)
+- **폴링 필요성**: 회원의 admission **과 duplicate** 기록 전부가 event_closed 일 때만 면제(`business_ended`). 최초 ENDED + 다른 시도 비ENDED 회원은 폴링하며, 최초 요청 결과(`firstRequestResult`)와 이후 application 결과(`applicationResult`)를 별도 필드로 보존한다. 그런 회원 수는 `members_first_request_ended_but_other_attempt_not_ended(polled)`로 보고한다. 분모는 최초 admission 회원 그대로.
+- **`slo_indeterminate`**: sentAtMs 가 없거나 유효하지 않은(문자열/비현실적 값) admission 기록이 하나라도 있는 회원. 전체 분모에 남기고 within-budget 성공에서 제외하며(관찰 사실은 기록), p50/p95 계산에서도 제외한다.
+- **연결/스레드**: 고정 worker pool(`--concurrency`)이 스레드별 연결을 재사용하고, timeout/오류/종료 시 close 한다(`CannotSendRequest` 방지). 요약에 `pool_threads`, `peak_active_threads_in_process`, `connections_opened/closed`, `max_open_connections`, `open_connections_at_exit` 보고. 회원당 client in-flight 1·발송 직전 deadline 재확인은 유지.
+- **관찰 예산 점검(실행 전)**: 폴링 대상 수 / min(max-rps, concurrency/assumed-latency)로 1회전 시간을 구해 가장 이른 deadline 까지 남은 시간과 비교하고 `observation_budget_insufficient`를 명시한다(관찰 시작 지연 포함). `--require-budget`이면 부족 시 exit 4로 폴링 없이 종료. **가능 판정은 성공 보장이 아니다.** 성공 = 실제 terminal 을 budget 내에 본 회원뿐이며 never_polled/late/indeterminate/누락은 분모에서 빼지 않는다.
+- 50k/100k 전수 예산이 맞지 않으면 관측 180초 SLO는 **미검증**으로 남긴다. 표본 관찰이 전수 180초 PASS를 대체하지 않으며 DB 대조는 별도로 유지하되 client 관찰을 대체하지 않는다.
+- 합성 서버 검증(14건): 위 기존 항목 + 첫 ENDED/duplicate success, 모두 ENDED, 일부/유효하지 않은 sentAt, timeout 뒤 정상 재연결, 고정 pool의 연결/스레드 상한, 예산 부족 표식과 `--require-budget` 거부(폴링 0).

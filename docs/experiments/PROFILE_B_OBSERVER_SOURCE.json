@@ -1,9 +1,9 @@
 {
-  "source": "12c009a97d3a3842eb931982ac4df60519503d55",
+  "source": "04e5f020909a90777444648d67bfa2fbf9629550",
   "status": "candidate snapshot; no live SLO PASS",
   "files": {
-    "scripts/verifier-isolated/v1-observer.py": "a26e8dd45296e7442b6f89f3bb5e4d6c2170fb9e1dbf59d23eb2d50bbfd65918",
-    "scripts/verifier-isolated/test-v1-observer.py": "b0453775ced02d64030119dce29844579c2bb17d963682389c5467a94765c73f",
-    "docs/experiments/v1-observer-166.md": "6262a3b29842a566be4af3d1fae004c8afc9e85a27fb5a4f32937f347e06e6c0"
+    "scripts/verifier-isolated/v1-observer.py": "3984a91bea06d4e52ef47ec1212a5bb616049b5ae81739a3895f6b3ac77e7f60",
+    "scripts/verifier-isolated/test-v1-observer.py": "50a5d997a635c3e97f4b376aa171bb41cfed3ac1fb06971a43a7ff4f4d39b1ba",
+    "docs/experiments/v1-observer-166.md": "ff39df105d52553dde1b3f796ed227c12abb97a56e2172799148fc818f61e032"
   }
 }
