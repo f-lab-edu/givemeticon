@@ -22,25 +22,13 @@ class T(unittest.TestCase):
    self.assertTrue(caps.check_generator(p,'job')['pass']);p.write_text('');self.assertFalse(caps.check_generator(p,'job')['pass'])
  def test_b_capacity_is_distinct_and_fixed(self):
   b=capacity.assess(4,15000,10000,'B');self.assertEqual(b['required_memory_mib'],9088);self.assertEqual(b['caps']['mysql']['cpu'],1);self.assertEqual(b['caps']['apps']['cpu_each'],.55);self.assertIn('broker_empty_slot',b['caps']);self.assertFalse(capacity.assess(4,8000,10000,'B')['pass'])
- def test_get_grouped_by_recorded_target_state_and_errors(self):
-  rows=[{'target':'a','http_status':200,'application_status':'ISSUED','error':None,'latency_ms':10},{'target':'b','http_status':503,'application_status':None,'error':None,'latency_ms':30}]
-  s=get.summarize(rows);self.assertEqual(s['sample_n'],2);self.assertEqual(s['usable_get_success_n'],1);self.assertEqual(len(s['by_target_and_status']),2)
- def test_get_uses_recorded_member_endpoint_and_captures_state(self):
-  seen=[]
-  class H(http.server.BaseHTTPRequestHandler):
-   def do_GET(self):
-    seen.append((self.path,self.headers.get('X-Coupon-Admission-Test-Member')))
-    body=b'{"data":{"status":"SOLD_OUT"}}';self.send_response(200);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
-   def log_message(self,*args):pass
-  server=http.server.HTTPServer(('127.0.0.1',0),H);thread=threading.Thread(target=server.serve_forever);thread.start()
-  try:
-   r=get.sample('http://127.0.0.1:'+str(server.server_port),7,91);self.assertEqual(r['application_status'],'SOLD_OUT');self.assertEqual(seen,[('/test-support/coupon-events/7/applications/me','91')]);self.assertIsNone(r['error'])
-  finally:server.shutdown();thread.join();server.server_close()
+ def test_adapter_uses_source_observer_with_required_budget(self):
+  cmd=get.command('input','http://a',7,'out','idle');self.assertIn('--require-budget',cmd);self.assertIn('conservative-assumption',cmd);self.assertIn('3000',cmd);self.assertIn('v1-observer.py',cmd[2])
  def test_cli_during_get_marks_real_post_interval_overlap(self):
   import time,sys
   class H(http.server.BaseHTTPRequestHandler):
    def do_GET(self):
-    body=b'{"data":{"status":"PENDING"}}';self.send_response(200);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
+    body=b'{"data":{"status":"ISSUED"}}';self.send_response(200);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
    def log_message(self,*args):pass
   server=http.server.HTTPServer(('127.0.0.1',0),H);thread=threading.Thread(target=server.serve_forever);thread.start()
   try:
@@ -49,7 +37,25 @@ class T(unittest.TestCase):
     (p/'run/k6-failures.log').write_text(json.dumps({'kind':'admission','memberId':91,'target':1,'sentAtMs':now-100,'respondedAtMs':now+5000}))
     (p/'run/k6-started-host-ms.txt').write_text(str(now-100));(p/'run/k6-finished-host-ms.txt').write_text(str(now+5000))
     r=subprocess.run([sys.executable,str(HERE/'get-smoke.py'),str(p),'http://127.0.0.1:'+str(server.server_port),'--mode','during'],capture_output=True,text=True,timeout=10)
-    self.assertEqual(r.returncode,0,r.stderr);s=json.loads((p/'get-smoke-during-summary.json').read_text());self.assertEqual(s['observed_get_active_post_overlap_n'],1);self.assertEqual(s['mode'],'during');self.assertEqual(s['usable_get_success_n'],1)
+    self.assertEqual(r.returncode,0,r.stderr);s=json.loads((p/'get-during-condition.json').read_text());self.assertEqual(s['observed_get_active_post_overlap_n'],1);self.assertEqual(s['mode'],'during');self.assertEqual(s['get_latency_ms']['http_200']['n'],1)
+  finally:server.shutdown();thread.join();server.server_close()
+ def test_bad_json_200_remains_in_observer_poll_denominator(self):
+  import time,sys
+  seen=[0]
+  class H(http.server.BaseHTTPRequestHandler):
+   def do_GET(self):
+    seen[0]+=1;body=b'invalid-json' if seen[0]==1 else b'{"data":{"status":"ISSUED"}}'
+    self.send_response(200);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
+   def log_message(self,*args):pass
+  server=http.server.HTTPServer(('127.0.0.1',0),H);thread=threading.Thread(target=server.serve_forever);thread.start()
+  try:
+   with tempfile.TemporaryDirectory() as d:
+    p=Path(d);(p/'run').mkdir();now=int(time.time()*1000);(p/'run-meta.txt').write_text('event_id=7 member_start=91\n')
+    (p/'run/k6-failures.log').write_text(json.dumps({'kind':'admission','memberId':91,'target':1,'category':'success','sentAtMs':now,'respondedAtMs':now+1}))
+    r=subprocess.run([sys.executable,str(HERE/'get-smoke.py'),str(p),'http://127.0.0.1:'+str(server.server_port),'--mode','idle'],capture_output=True,text=True,timeout=10)
+    self.assertEqual(r.returncode,0,r.stderr);s=json.loads((p/'get-idle/observer-summary.json').read_text());self.assertEqual(s['polls']['errors']['bad_json'],1)
+    n=sum(v['n'] for v in s['get_latency_ms']['by_http_status'].values())+s['get_latency_ms']['timeouts_or_connection_errors_not_in_latency']+s['polls']['errors']['bad_json']
+    self.assertEqual(n,s['polls']['total']);self.assertEqual(s['polls']['total'],2)
   finally:server.shutdown();thread.join();server.server_close()
  def test_guard_refuses_local_before_sudo_or_docker(self):
   r=subprocess.run(['bash',str(HERE/'observer-scope.sh')],env={'PATH':'/usr/bin:/bin','GITHUB_ACTIONS':'false'},capture_output=True,text=True);self.assertEqual(r.returncode,2)

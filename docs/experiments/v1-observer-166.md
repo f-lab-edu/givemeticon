@@ -27,3 +27,7 @@
 - **사후 판정(직접 증거)**: `observation_budget_post_run`은 한 번도 못 폴링한 회원 수, deadline 때문에 건너뛴 폴링 수, 끝내 미확정이면서 관측 간격이 budget을 넘은 회원 수로 `post_run_observation_budget_insufficient`를 계산하고 사전 판정과의 차이(`differs_from_pre_run_verdict`/`overrides_pre_run_verdict`)를 기록한다. 평균 rps는 참고값이며(대상이 빨리 수렴해 작업량이 줄어든 구간 포함) 이미 budget 내에 관찰된 terminal을 무효화하지 않는다.
 - **두 지표 분리**: `issuance_result_coverage`(ISSUED/SOLD_OUT을 budget 내 관찰)와 `business_outcome_convergence`(위 분자 + business_ended). business_ended는 해당 회원의 **모든** 시도(admission+duplicate)의 ENDED 응답 시각(`respondedAtMs`)이 유효하고 firstSentAtMs 기준 budget 내일 때만 분자에 들어가며, 시각 누락(`business_ended_untimed_not_counted`)·초과(`..._late_not_counted`)·이전 uncertain·slo_indeterminate는 성공에 합치지 않는다. 최초 ENDED(`firstRequestResult`)와 이후 application 결과(`applicationResult`)는 한 회원 레코드의 별도 필드다.
 - 합성 검증 21건: 위 항목 + 지연 입력 검증(0/누락 sample-n/POST 출처 거부), 출처 summary 기록, ENDED 시각 유효/누락/초과/duplicate 누락, 빨리 수렴한 경우 사후 판정 false, 낙관적 가정에서 사후 판정이 사전 판정을 뒤집는 경우.
+
+## 수정 4 (GET calibration 입력 수집 지원, dbe7ffc 위 별도 commit)
+- summary `get_latency_ms`: 응답을 받은 폴링의 상태별(200/503/…) 지연 분포(n/p50/p95/p99/max)와 timeout·연결오류 수를 분리해 보고한다. `measured-get-smoke` 입력(p95·표본수)의 근거로 쓰되 조건(유휴 vs 낮은 POST 부하 중)은 호출 측이 `--assumed-latency-condition`에 별도로 기록해야 하며, smoke의 낮은 지연이 필수 부하 중 지연을 보장하지 않는다.
+- summary `observer_process`: 이 프로세스의 wall/CPU 초, 평균 CPU 비율, 최대 RSS. docker CLI·sampler·Hikari 프로세스는 공유 observer 예산(0.25 CPU/512 MiB)에 별도로 합산해야 한다.

@@ -233,4 +233,15 @@ class T(unittest.TestCase):
         s, r = self.run_observer(base_lines=lines, budget=3000, grace=0)
         self.assertFalse(s["observation_budget_post_run"]["post_run_observation_budget_insufficient"])
         self.assertFalse(s["observation_budget_post_run"]["differs_from_pre_run_verdict"]); self.assertEqual(s["slo"]["success_terminal_within_budget"], 2)
+    def test_get_latency_by_status_and_observer_cost_reported(self):
+        s, r = self.run_observer()
+        g = s["get_latency_ms"]
+        self.assertGreater(g["http_200"]["n"], 10); self.assertIsNotNone(g["http_200"]["p95"])
+        self.assertIn("503", g["by_http_status"])                                       # 오류 상태 응답도 상태별 지연으로 분리
+        self.assertEqual(g["timeouts_or_connection_errors_not_in_latency"], s["polls"]["errors"].get("timeout", 0) + s["polls"]["errors"].get("connection_error", 0))
+        n_total = sum(v["n"] for v in g["by_http_status"].values())
+        self.assertEqual(n_total + g["timeouts_or_connection_errors_not_in_latency"] + s["polls"]["errors"].get("bad_json", 0), s["polls"]["total"])   # 모든 폴링이 지연 또는 오류로 계상
+        o = s["observer_process"]
+        self.assertGreater(o["wall_s"], 0); self.assertGreaterEqual(o["cpu_s"], 0); self.assertGreater(o["max_rss_mib"], 1)
+        self.assertLess(o["avg_cpu_fraction"], 1.5)
 if __name__ == "__main__": unittest.main()

@@ -16,7 +16,7 @@
  - 시각은 호스트 epoch ms. POST 로그의 sentAtMs 와 같은 호스트/시계여야 한다.
 산출: observer-records.jsonl(회원별), observer-summary.json
 """
-import argparse, collections, heapq, http.client, json, pathlib, queue, random, re, socket, sys, threading, time, urllib.parse
+import argparse, collections, heapq, http.client, json, pathlib, queue, random, re, resource, socket, sys, threading, time, urllib.parse
 
 p = argparse.ArgumentParser()
 p.add_argument("--post-log", required=True); p.add_argument("--targets", required=True); p.add_argument("--event-id", required=True, type=int)
@@ -80,6 +80,8 @@ for m, lst in by_member.items():
 
 TERMINAL = ("ISSUED", "SOLD_OUT")
 lock = threading.Lock()
+lat_samples = collections.defaultdict(list)
+proc_t0 = time.time(); cpu_t0 = resource.getrusage(resource.RUSAGE_SELF)
 t_start = now_ms() + a.start_delay_ms
 def base_ms(st): return st["firstSentAtMs"] if st["firstSentAtMs"] else t_start    # 시각 불명 회원은 관찰 시작 시각을 기준으로 상한만 둔다
 def deadline(st): return base_ms(st) + a.budget_ms + a.grace_ms
@@ -146,6 +148,7 @@ def poll(m):
     if err in ("timeout", "connection_error"): close_conn(conn)    # 오류/timeout 뒤 연결 재사용 금지(CannotSendRequest 방지)
     t1 = now_ms()
     with lock:
+        if err is None: lat_samples[str(status)].append(t1 - t0)      # 응답을 받은 요청의 지연(상태별). timeout/연결오류는 지연이 아니라 오류로만 계수
         st["polls"] += 1
         if st["firstPollAtMs"] is None: st["firstPollAtMs"] = t0
         if err: st["errors"][err] += 1
@@ -270,6 +273,15 @@ adr001 = {"issuance_result_coverage": {"definition": "ISSUED/SOLD_OUT observed v
               "rate": round((cls["terminal_within_budget"] + len(ended_timed_in)) / n_den, 4),
               "business_ended_counted": len(ended_timed_in), "business_ended_untimed_not_counted": len(ended_untimed), "business_ended_late_not_counted": len(ended_late),
               "note": "uncertain earlier attempts, slo_indeterminate, untimed ENDED and late ENDED are never merged into success"}}
+ru = resource.getrusage(resource.RUSAGE_SELF); wall = max(1e-9, time.time() - proc_t0)
+cpu_s = (ru.ru_utime - cpu_t0.ru_utime) + (ru.ru_stime - cpu_t0.ru_stime)
+maxrss_mib = ru.ru_maxrss / (1024.0 * 1024.0 if sys.platform == "darwin" else 1024.0)     # macOS: bytes, Linux: KiB
+def dist_ms(v): return {"n": len(v), "p50": pct(v, 50), "p95": pct(v, 95), "p99": pct(v, 99), "max": max(v) if v else None}
+get_latency = {"by_http_status": {k: dist_ms(v) for k, v in sorted(lat_samples.items())}, "http_200": dist_ms(lat_samples.get("200", [])),
+               "timeouts_or_connection_errors_not_in_latency": errs.get("timeout", 0) + errs.get("connection_error", 0),
+               "note": "feeds --assumed-latency-ms (measured-get-smoke). State the load condition (idle vs under N rps POST load) separately; a low smoke p95 does not guarantee latency under the required load"}
+observer_process = {"wall_s": round(wall, 2), "cpu_s": round(cpu_s, 3), "avg_cpu_fraction": round(cpu_s / wall, 3), "max_rss_mib": round(maxrss_mib, 1),
+                    "note": "this process only; docker CLI/sampler/Hikari processes must be added to the shared observer budget separately"}
 summary = {
     "input": {"post_log_parse_errors": parse_errors, "admission_records": len(adm), "unique_first_post_members": len(state),
               "members_with_multiple_admission_records": sum(1 for l in by_member.values() if len(l) > 1),
@@ -290,6 +302,7 @@ summary = {
     "observation_gap_ms_per_member_max": {"p50": pct(gaps, 50), "p95": pct(gaps, 95), "max": max(gaps) if gaps else None, "configured_interval_ms": a.interval_ms},
     "polls": {"total": total_polls, "http_status": dict(httpc), "errors": dict(errs), "timeouts": errs.get("timeout", 0),
               "achieved_rps": round(total_polls / span, 1) if span and span > 0 else None, "configured_max_rps": a.max_rps, "concurrency": a.concurrency},
+    "get_latency_ms": get_latency, "observer_process": observer_process,
     "resources": {"pool_threads": a.concurrency, "peak_active_threads_in_process": stats["peak_threads"], "connections_opened": stats["opened"],
                   "connections_closed": stats["closed"], "max_open_connections": stats["max_live"], "open_connections_at_exit": stats["live"],
                   "note": "client in-flight per member is 1; a request abandoned by a client timeout may still run on the server"},
