@@ -8,6 +8,8 @@ pw="${RUNNER_TEMP:?}/issue177-b-password"
 source_dir="$repo/scripts/verifier-isolated/results/calibration"
 mkdir -p "$source_dir"
 status=0
+# stock sources V1 owned_names/down/remove: both share owner, network and five containers.
+# Regression test pins this equality; new stock-specific resources must extend cleanup.
 # The common runner checks all existing labels before any mutation, including partial up.
 for action in down remove; do
   rc=0; bash scripts/verifier-isolated/capped/run-capped-v1.sh "$action" > "$source_dir/cleanup-$action.log" 2>&1 || rc=$?

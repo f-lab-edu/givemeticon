@@ -13,6 +13,48 @@ class T(unittest.TestCase):
    self.assertTrue(scope.assess(p)['pass']);(p/'cpu.max').write_text('max 100000');self.assertFalse(scope.assess(p)['pass'])
    (p/'memory.max').unlink()
    with self.assertRaises(OSError):scope.assess(p)
+ def test_scope_throttling_delta_and_missing_reset(self):
+  b={'scope_cgroup':'/same','files':{'cpu.stat':'usage_usec 10\nnr_periods 2\nnr_throttled 1\nthrottled_usec 4'}}
+  a={'scope_cgroup':'/same','files':{'cpu.stat':'usage_usec 30\nnr_periods 5\nnr_throttled 3\nthrottled_usec 14'}}
+  self.assertEqual(get.scope_delta(b,a)['cpu_stat_delta']['throttled_usec'],10)
+  self.assertEqual(get.scope_delta(a,b)['status'],'MISSING_OR_RESET')
+  self.assertIsNone(get.scope_delta({},a)['cpu_stat_delta']['nr_throttled'])
+ def test_cleanup_stock_and_v1_share_exact_owned_set_and_functions(self):
+  capped=HERE.parent/'capped';outputs=[]
+  for script in ('run-capped-v1.sh','run-capped-stock.sh'):
+   cmd='source "$1"; owned_names; printf "%s\n" "$NET" "$VERIFIER_OWNER_ID"; declare -f down remove'
+   result=subprocess.run(['/bin/bash','-c',cmd,str(capped/'contract-test-wrapper'),str(capped/script)],env=dict(os.environ,VERIFIER_PREFIX='contract',VERIFIER_OWNER_ID='same-owner'),capture_output=True,text=True)
+   self.assertEqual(result.returncode,0,result.stderr);outputs.append(result.stdout)
+  self.assertEqual(outputs[0],outputs[1]);self.assertIn('contract-app1',outputs[0]);self.assertIn('contract-redis-coupon',outputs[0])
+ def test_late_fixture_calibration_polls_without_slo_and_no_overlap_is_nonfatal(self):
+  import time
+  class H(http.server.BaseHTTPRequestHandler):
+   def do_GET(self):
+    body=b'{"data":{"status":"SOLD_OUT"}}';self.send_response(200);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
+   def log_message(self,*args):pass
+  server=http.server.HTTPServer(('127.0.0.1',0),H);thread=threading.Thread(target=server.serve_forever);thread.start()
+  try:
+   with tempfile.TemporaryDirectory() as d:
+    p=Path(d);(p/'run').mkdir();old=int(time.time()*1000)-600000;(p/'run-meta.txt').write_text('event_id=7\n')
+    original={'kind':'admission','memberId':91,'target':1,'category':'event_closed','sentAtMs':old,'respondedAtMs':old+1}
+    log=p/'run/k6-failures.log';log.write_text(json.dumps(original))
+    for mode in ('during','idle'):
+     result=subprocess.run([sys.executable,str(HERE/'get-smoke.py'),str(p),'http://127.0.0.1:'+str(server.server_port),'--mode',mode],capture_output=True,text=True,timeout=10)
+     self.assertEqual(result.returncode,0,result.stderr)
+     report=json.loads((p/('get-'+mode+'-condition.json')).read_text());self.assertEqual(report['active_post_overlap_status'],'NOT_OBSERVED');self.assertEqual(report['get_latency_active_post_only']['polls'],0)
+     summary=json.loads((p/('get-'+mode)/'observer-summary.json').read_text());self.assertEqual(summary['slo']['verdict'],'NOT_APPLICABLE(calibration)');self.assertEqual(summary['polls']['total'],1);self.assertNotIn('adr001_metrics',summary)
+     rows=[json.loads(x) for x in (p/('get-'+mode)/'observer-records.jsonl').read_text().splitlines()];self.assertEqual(rows[0]['firstSentAtMs'],old);self.assertEqual(rows[0]['classification'],'calibration_only')
+     self.assertEqual(json.loads((p/('get-'+mode)/'post-input.log').read_text()),original)
+    self.assertEqual(json.loads(log.read_text()),original)
+  finally:server.shutdown();thread.join();server.server_close()
+ def test_calibration_rejects_unbounded_parameters_and_members(self):
+  import time
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);log=p/'input';now=int(time.time()*1000)
+   log.write_text(''.join(json.dumps({'kind':'admission','memberId':i,'sentAtMs':now})+'\n' for i in range(41)))
+   cmd=get.command(log,'http://127.0.0.1:1',7,p/'out','idle')
+   result=subprocess.run(cmd,capture_output=True,text=True);self.assertNotEqual(result.returncode,0);self.assertIn('at most 40',result.stderr)
+   result=subprocess.run(cmd+['--require-budget'],capture_output=True,text=True);self.assertNotEqual(result.returncode,0);self.assertIn('calibration requires',result.stderr)
  def test_caps_owner_and_budget(self):
   state={'labels':{'xyz.buzz.verifier.owner':'job','xyz.buzz.verifier.managed':'capped-harness'},'cpu':550000000,'memory':768*1024**2,'memswap':768*1024**2,'running':True}
   self.assertTrue(caps.check(state,.55,768*1024**2,'job'));self.assertFalse(caps.check(state,.55,768*1024**2,'other'));self.assertFalse(caps.check(state,1,768*1024**2,'job'))
@@ -22,8 +64,8 @@ class T(unittest.TestCase):
    self.assertTrue(caps.check_generator(p,'job')['pass']);p.write_text('');self.assertFalse(caps.check_generator(p,'job')['pass'])
  def test_b_capacity_is_distinct_and_fixed(self):
   b=capacity.assess(4,15000,10000,'B');self.assertEqual(b['required_memory_mib'],9088);self.assertEqual(b['caps']['mysql']['cpu'],1);self.assertEqual(b['caps']['apps']['cpu_each'],.55);self.assertIn('broker_empty_slot',b['caps']);self.assertFalse(capacity.assess(4,8000,10000,'B')['pass'])
- def test_adapter_uses_source_observer_with_required_budget(self):
-  cmd=get.command('input','http://a',7,'out','idle');self.assertIn('--require-budget',cmd);self.assertIn('conservative-assumption',cmd);self.assertIn('3000',cmd);self.assertIn('v1-observer.py',cmd[2])
+ def test_adapter_uses_explicit_calibration_without_slo_budget(self):
+  cmd=get.command('input','http://a',7,'out','idle');self.assertNotIn('--require-budget',cmd);self.assertIn('--calibration',cmd);self.assertIn('conservative-assumption',cmd);self.assertIn('3000',cmd);self.assertIn('v1-observer.py',cmd[2])
  def test_cli_during_get_marks_real_post_interval_overlap(self):
   import time,sys
   class H(http.server.BaseHTTPRequestHandler):

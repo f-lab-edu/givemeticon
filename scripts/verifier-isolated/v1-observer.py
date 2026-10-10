@@ -29,7 +29,12 @@ p.add_argument("--assumed-latency-source", required=True, choices=["measured-get
                help="measured-get-smoke: 실제 GET smoke 의 p95 (--assumed-latency-sample-n/--assumed-latency-condition 필요). conservative-assumption: 예) GET timeout 값, provisional 로 표시")
 p.add_argument("--assumed-latency-sample-n", type=int, default=0); p.add_argument("--assumed-latency-condition", default="")
 p.add_argument("--require-budget", action="store_true"); p.add_argument("--record-poll-windows", action="store_true")
+p.add_argument("--calibration", action="store_true", help="GET calibration only: <=40 members, 60s from observation start, no SLO verdict")
 a = p.parse_args()
+if a.calibration:
+    if a.require_budget or a.start_delay_ms or not 1 <= a.concurrency <= 4 or not 0 < a.max_rps <= 20 or not 0 < a.timeout_ms <= 3000:
+        p.error("calibration requires no SLO budget gate/delay; concurrency<=4, rps<=20, timeout<=3000ms")
+    a.budget_ms = 60000; a.grace_ms = 0
 if a.assumed_latency_ms <= 0: p.error("--assumed-latency-ms must be a positive integer")
 if a.assumed_latency_source == "measured-get-smoke" and (a.assumed_latency_sample_n <= 0 or not a.assumed_latency_condition):
     p.error("--assumed-latency-source measured-get-smoke requires --assumed-latency-sample-n > 0 and --assumed-latency-condition (smoke 조건 설명)")
@@ -78,12 +83,16 @@ for m, lst in by_member.items():
                 "maxGapMs": 0, "terminalStatus": None, "terminalObservedAtMs": None, "firstPollAlreadyTerminal": False, "endedResponses": 0,
                 "skippedPastDeadline": 0, "pollWindows": []}
 
+if a.calibration:
+    if len(state) > 40: p.error("calibration allows at most 40 recorded members")
+    for st in state.values():
+        st["polled"] = True; st["classification"] = None; st["calibrationPolls"] = []
 TERMINAL = ("ISSUED", "SOLD_OUT")
 lock = threading.Lock()
 lat_samples = collections.defaultdict(list)
 proc_t0 = time.time(); cpu_t0 = resource.getrusage(resource.RUSAGE_SELF)
 t_start = now_ms() + a.start_delay_ms
-def base_ms(st): return st["firstSentAtMs"] if st["firstSentAtMs"] else t_start    # 시각 불명 회원은 관찰 시작 시각을 기준으로 상한만 둔다
+def base_ms(st): return t_start if a.calibration else (st["firstSentAtMs"] if st["firstSentAtMs"] else t_start)    # 시각 불명 회원은 관찰 시작 시각을 기준으로 상한만 둔다
 def deadline(st): return base_ms(st) + a.budget_ms + a.grace_ms
 
 # ---- 관찰 예산 점검(실행 전)
@@ -135,6 +144,9 @@ def conn_for(idx):
 def poll(m):
     st = state[m]; idx = ((st["postTarget"] or 1) - 1) % len(targets)
     conn = conn_for(idx); was = conn.sock is not None
+    if a.calibration:
+        conn.timeout = max(.001, min(a.timeout_ms / 1000, (deadline(st) - now_ms()) / 1000))
+        if conn.sock is not None: conn.sock.settimeout(conn.timeout)
     t0 = now_ms(); status = None; body_status = None; err = None
     try:
         conn.request("GET", f"/test-support/coupon-events/{a.event_id}/applications/me", headers={"X-Coupon-Admission-Test-Member": str(m)})
@@ -150,6 +162,7 @@ def poll(m):
     with lock:
         if err is None: lat_samples[str(status)].append(t1 - t0)      # 응답을 받은 요청의 지연(상태별). timeout/연결오류는 지연이 아니라 오류로만 계수
         st["polls"] += 1
+        if a.calibration: st["calibrationPolls"].append({"sentAtMs": t0, "respondedAtMs": t1, "latencyMs": t1-t0, "httpStatus": status, "error": err, "applicationStatus": body_status})
         if st["firstPollAtMs"] is None: st["firstPollAtMs"] = t0
         if err: st["errors"][err] += 1
         elif status != 200: st["http"][str(status)] += 1; st["errors"][f"http_{status}"] += 1
@@ -214,6 +227,7 @@ for _ in pool: work.put(None)
 for t in pool: t.join()
 
 def classify(st):
+    if a.calibration: return "calibration_only"
     if st["classification"]: return st["classification"]
     if st["sloIndeterminate"]: return "slo_indeterminate"
     if st["terminalObservedAtMs"] is not None:
@@ -227,7 +241,7 @@ with open(out / "observer-records.jsonl", "w") as f:
         r = dict(st); r["http"] = dict(st["http"]); r["errors"] = dict(st["errors"])
         r["applicationResult"] = st["terminalStatus"]          # 이후 application 결과(요청 결과 firstRequestResult 와 별개)
         if not a.record_poll_windows: r.pop("pollWindows", None)
-        r["firstPostToTerminalObservedMs"] = (st["terminalObservedAtMs"] - st["firstSentAtMs"]) if st["terminalObservedAtMs"] and st["firstSentAtMs"] else None
+        r["firstPostToTerminalObservedMs"] = ((st["terminalObservedAtMs"] - st["firstSentAtMs"]) if st["terminalObservedAtMs"] and st["firstSentAtMs"] else None) if not a.calibration else None
         f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 def pct(v, q):
@@ -311,5 +325,12 @@ summary = {
               "classification counts every first POST member; none is dropped from the denominator",
               "DB reconciliation is separate and does not replace this client observation"],
 }
+if a.calibration:
+    for key in ("adr001_metrics", "slo", "classification", "first_post_to_terminal_observed_ms(excluding slo_indeterminate)", "observation_budget_post_run"):
+        summary.pop(key, None)
+    summary["slo"] = {"verdict": "NOT_APPLICABLE(calibration)"}
+    summary["observation_budget"]["verdict"] = "NOT_APPLICABLE(calibration)"
+    summary["calibration"] = {"started_ms": t_start, "deadline_ms": t_start+60000, "max_members": 40, "note": "original POST timestamps preserved; no issuance coverage or convergence verdict"}
+    summary["get_latency_ms"]["measurement"] = "end-to-end client observed latency, includes client scheduling"
 (out / "observer-summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
 print(json.dumps(summary, indent=2, ensure_ascii=False))
