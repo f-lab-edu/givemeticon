@@ -1,3 +1,4 @@
+# Approval-branch fast-forward registration recovery; execution contract unchanged.
 name: Issue 177 profile B warmed 10rps preparation (approval branch only)
 on:
   push:
