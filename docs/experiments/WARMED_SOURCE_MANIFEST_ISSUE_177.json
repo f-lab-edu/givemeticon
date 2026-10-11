@@ -21,7 +21,7 @@
     {
       "path": "scripts/verifier-isolated/capped/run-capped-v1.sh",
       "source_sha256": "1e8cfdfbeb6edf9c74bce292fc803ec677b2787fa74379180be0b689be5bda84",
-      "derived_sha256": "1ca1b41c6de0f8062253d232ff939a265bf612d7f358638dba360e1fb8ebb06f"
+      "derived_sha256": "22c7906c2dafd0ed713c50384c6174bbc2a7c8d5634c8c1f1f84a07659c6ed1d"
     },
     {
       "path": "scripts/verifier-isolated/hosted/observer-scope.sh",
@@ -29,5 +29,6 @@
       "derived_sha256": "104c221a9da91fdde90a494238655d812c3d2855ca059ed48f04dd2692919bfa"
     }
   ],
-  "scope": "source provenance; not runtime PASS"
+  "scope": "source provenance; not runtime PASS",
+  "analyzer_correction_note": "fc2f27b withheld: external capture and registry-policy provenance interface awaits reviewed Verifier revision; no gate inference enabled"
 }

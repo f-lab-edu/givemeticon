@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Five fixed post-warmup samples: same targets/JVMs, idle pool and fixture drain."""
-import argparse,json,math,os,re,subprocess,time
+import argparse,importlib.util,json,math,os,re,subprocess,time
 from pathlib import Path
+spec=importlib.util.spec_from_file_location("capture_prom",Path(__file__).with_name("capture-prom.py"));CP=importlib.util.module_from_spec(spec);spec.loader.exec_module(CP)
 
 def series(text,name):
     values=[]
@@ -70,8 +71,8 @@ def execute(root,path,out):
             row={'host_ms':int(time.time()*1000),'fixture_id':fixture,'path':path,'apps':[]}
             for app in (1,2):
                 target=f'http://127.0.0.1:{18079+app}/actuator/prometheus';file=out/f'app{app}-{tick}.prom'
-                p=subprocess.run(['curl','--max-time','3','-fsS','-o',str(file),'-w','%{url_effective}',target],capture_output=True,text=True)
-                row['apps'].append({'target':target,'effective_target':p.stdout,'scrape_exit':p.returncode,'body':file.read_text() if file.exists() else ''})
+                provenance=CP.capture(target,file)
+                row['apps'].append({'target':target,'effective_target':provenance['effective_target'],'scrape_exit':provenance['curl_exit'],'capture':provenance,'body':file.read_text() if file.exists() else ''})
             p=subprocess.run(['docker','exec',f'{prefix}-mysql','sh','-c','MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot --batch --skip-column-names "$1" -e "$2"','sh',dbname,sql],capture_output=True,text=True,timeout=10)
             (out/f'fixture-{tick}.tsv').write_text(p.stdout);row['db_exit']=p.returncode
             try:row['db']=[int(x) for x in p.stdout.strip().split('\t')]

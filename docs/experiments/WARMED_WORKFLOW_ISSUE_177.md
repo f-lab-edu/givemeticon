@@ -29,3 +29,23 @@ Run38096702816 remains a cold100rps2s capability smoke. idleGET11ms p95(n40) is 
 Preflight counts carry OBSERVED/value, NOT_EMITTED/null, or MALFORMED/null. HTTP/drop series may not be emitted in the verified actual-script no-HTTP `per-vu-iterations` mode; this allowance requires the recorded scriptSHA/mode and complete actual201/401 start/end ledger without request records. It does not create directly observed zeros. Required iterations, run-meta PRE/MAX and actual allocated/active VU gauges must be present and agree with the fixed size. Corrupt summaries, missing required metrics/settings, unexpected HTTP, malformed optional metrics or missing ledger/mode refuse readiness.
 
 Five stabilization samples now verify exact expected/effective targets, successful curl status and parseable full Prometheus bodies, process_start_time equal to each warmup-final process, and the expected HikariPool-1 active=0/pending=0 gauges. Every sample queries the same warmup fixture: stock inventory conservation/coupon count/duplicate0/PENDING0; V1 fixed inventory/issued/application/award count agreement, PENDING/CHECKING0 and duplicate0. Expected counts must match the preceding DB reconciliation and remain unchanged. Missing metric/query, restart, wrong body/target or non-idle/draining condition refuses transition without extending/retrying the5-sample policy. This is sampled readiness, not global background-idleness proof. Cold stock meter UNKNOWN remains unchanged and cannot be replaced by these stability checks. Corrected analyzer provenance integration is still pending.
+
+
+### Future scrape transport evidence (2026-10-11)
+
+`hosted/capture-prom.py` records curl exit/status, requested/effective target,
+start/end timestamps, download/body bytes and SHA-256 beside each new scrape.
+Failed capture clears the dedicated body path so it cannot reuse a prior success.
+The fixed Accept header, empty query and config source hash are recorded. The
+config source hash does not prove effective runtime registry/filter policy.
+`transport_body_complete` describes transfer evidence only;
+`metric_semantic_completeness=NOT_ESTABLISHED_BY_TRANSPORT_CAPTURE` remains explicit.
+A response truncated by the server at a valid line boundary can pass transport
+checks. Missing HTTP series never become observed or inferred zero through this
+helper. Registry registration/removal/filter policy and other lock caller scope
+remain unverified pending the reviewed analyzer provenance interface.
+
+Architect e7d400e4/16752bc2 requires that interface before analyzer integration.
+Verifier fc2f27b has not been copied or used to unlock the cold meter UNKNOWN gate.
+Past artifacts receive no newly invented capture metadata. This change prepares
+future evidence collection, and does not authorize or claim a runtime execution.

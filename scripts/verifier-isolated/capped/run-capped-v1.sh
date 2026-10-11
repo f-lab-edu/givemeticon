@@ -174,9 +174,9 @@ snap() { # 소유 컨테이너 상태 스냅샷: limits, cgroup cpu.stat, OOM �
 }
 
 capture_prom() {
-  local port=$1 destination=$2 rc=0
-  curl --max-time "${PROM_TIMEOUT_S:-3}" -fsS "http://127.0.0.1:$port/actuator/prometheus" > "$destination" || rc=$?
-  printf '%s\n' "$rc" > "$destination.exit.txt"
+  local port=$1 destination=$2
+  # Capture failure stays evidence; warmed gates refuse it. No inferred metric zero.
+  python3 "$repo_dir/scripts/verifier-isolated/hosted/capture-prom.py" "http://127.0.0.1:$port/actuator/prometheus" "$destination" || true
 }
 
 run() {
