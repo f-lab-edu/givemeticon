@@ -28,10 +28,27 @@ class Warmed(unittest.TestCase):
     target=f'http://127.0.0.1:{18079+a}/actuator/prometheus';sc={}
     for when in ('before','after'):
      f=p/f'run/app{a}-{when}.prom';sc[when]={'exit_code':0,'http_status':200,'requested_target':target,'effective_target':target,'body_bytes':f.stat().st_size,'body_sha256':hashlib.sha256(f.read_bytes()).hexdigest()}
-    (p/f'run/app{a}-scrape-provenance.json').write_text(json.dumps({'schema':'scrape-provenance/v1','expected_target':target,'scrapes':sc,'meter_policy':{'meter_filter_or_registry_remove_used':False,'evidence':'synthetic complete capture policy','spring_boot':'3.1.3','micrometer':'1.11.3','registration_paths':{'http_server_requests':'synthetic registration fixture'}}}))
+    (p/f'run/app{a}-scrape-provenance.json').write_text(json.dumps({'schema':'scrape-provenance/v1','expected_target':target,'scrapes':sc,'meter_policy':{'custom_app_meter_filter_or_registry_remove_used':False,'framework_meter_filters':['synthetic Boot filters'],'effective_metrics_config':{'max_uri_tags':100,'enable':{},'source_sha256':'synthetic'},'evidence':'synthetic complete capture policy','spring_boot':'3.1.3','micrometer':'1.11.3','registration_paths':{'http_server_requests':'synthetic registration fixture'}}}))
    self.assertTrue(stage.drain(p,'stock',rows,{'pass':True},True)['warmup_transition_allowed'])
    f=p/'run/app1-after.prom';f.write_text(f.read_text().replace('seconds 10','seconds 11'))
    self.assertFalse(stage.drain(p,'stock',rows,{'pass':True},True)['warmup_transition_allowed'])
+ def test_http_absent_before_never_inferred_for_gate(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);(p/'run').mkdir()
+   for app in (1,2):
+    for when in ('before','after'):
+     (p/f'run/app{app}-{when}.prom').write_text('process_start_time_seconds 10\nprocess_uptime_seconds 20\njvm_info{version="17"} 1\n'+('http_server_requests_seconds_count{method="POST",uri="/internal/loadtest/coupons",status="200"} 1\n' if when=='after' else ''))
+     (p/f'run/app{app}-{when}.prom.exit.txt').write_text('0')
+   r=stage.drain(p,'stock',[],{'pass':True},True);self.assertFalse(r['warmup_transition_allowed']);self.assertTrue(all(x['baseline_status']=='MISSING' and not x['inferred_zero_baseline'] for x in r['http_completion']))
+ def test_registration_is_separate_and_failed_response_refuses(self):
+  spec=importlib.util.spec_from_file_location('reg',HERE/'warmed-registration.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);(p/'run').mkdir()
+   for app in (1,2):(p/f'run/app{app}-after.prom').write_text('process_start_time_seconds 10\nhttp_server_requests_seconds_count{method="POST",uri="/internal/loadtest/coupons",status="200"} 1\n')
+   rows=[{'kind':'stock_request','target':app,'status':200,'sentAtMs':10,'respondedAtMs':20} for app in (1,2)]
+   with __import__('unittest.mock',fromlist=['patch']).patch.object(m.stage.gate.workload,'parse',return_value=rows):
+    r=m.assess(p,'stock');self.assertTrue(r['pass']);self.assertTrue(r['excluded_from_warmup_and_measurement']);rows[0]['status']=429;self.assertFalse(m.assess(p,'stock')['pass'])
+  text=(HERE/'run-warmed.sh').read_text();self.assertLess(text.index('warmed-registration.py'),text.index('DURATION=20s'));self.assertIn('USER_ID_START=900000000 MEMBER_ID_START=700000000',text)
  def test_v1_worker_unresolved_refuses(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d);(p/'run').mkdir();f=p/'run/unresolved-after-quiescence.txt';f.write_text('1')

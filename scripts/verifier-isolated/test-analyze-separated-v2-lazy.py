@@ -13,7 +13,7 @@ def prov(before, after, policy=True, paths=None):
     d = {"schema": "scrape-provenance/v1", "expected_target": TARGET, "scrapes": {
         "before": {"exit_code": 0, "http_status": 200, "requested_target": TARGET, "effective_target": TARGET, "body_bytes": len(before.encode()), "body_sha256": h(before)},
         "after": {"exit_code": 0, "http_status": 200, "requested_target": TARGET, "effective_target": TARGET, "body_bytes": len(after.encode()), "body_sha256": h(after)}}}
-    if policy: d["meter_policy"] = {"meter_filter_or_registry_remove_used": False, "evidence": "git grep: none", "spring_boot": "3.1.3", "micrometer": "1.11.x", "registration_paths": paths if paths is not None else {"coupon_admission_batch_queue_wait": "CouponBatchAdmissionAcceptor:175", "coupon_admission_transaction": "CouponAdmissionTransactionTimers"}}
+    if policy: d["meter_policy"] = {"custom_app_meter_filter_or_registry_remove_used": False, "framework_meter_filters": ["OnlyOnceLoggingDenyMeterFilter(max-uri-tags)", "PropertiesMeterFilter"], "effective_metrics_config": {"max_uri_tags": 100, "enable": {}, "source_sha256": "abc"}, "evidence": "git grep: none", "spring_boot": "3.1.3", "micrometer": "1.11.x", "registration_paths": paths if paths is not None else {"coupon_admission_batch_queue_wait": "CouponBatchAdmissionAcceptor:175", "coupon_admission_transaction": "CouponAdmissionTransactionTimers"}}
     return json.dumps(d)
 
 def run(before, after, with_prov=True, extra=(), policy=True, paths=None):

@@ -48,23 +48,21 @@ def drain(root,path,records,ledger,warmup):
             bp=root/f'run/app{app}-before.prom';ap=root/f'run/app{app}-after.prom'
             prov=pb.read_provenance(root/f'run/app{app}-scrape-provenance.json')
             ev=pb.scrape_evidence(pb.read_prom(bp),pb.read_prom(ap),prov,(bp,ap))
-            inferred_status=None;reason='direct baseline'
-            if before is None:
-                inferred_status,reason=pb.lazy_zero_allowed(ev,'http_server_requests')
             direct=scrapes_complete and before is not None and after is not None and after>=before
-            inferred=before is None and after is not None and inferred_status=='OK_INFERRED_ZERO_BASELINE'
-            delta=after-before if direct else (after if inferred else None)
+            delta=after-before if direct else None
+            # HTTP absent-before is never inferred in this execution gate.
             evidence_ok=ev['structural_ok'] and ev['provenance_ok']
             checks.append({'app':app,'sent':sent[app],'before_observed':before,'after_observed':after,'delta':delta,
-                           'baseline_status':inferred_status if before is None else ('OK_DIRECT' if direct else 'MISSING'),
-                           'baseline_reason':reason,'inferred_zero_baseline':inferred,'scrape_evidence':ev,
+                           'baseline_status':'OK_DIRECT' if direct else 'MISSING',
+                           'baseline_reason':'direct aggregate POST completion counter; absent baseline refuses transition',
+                           'inferred_zero_baseline':False,'scrape_evidence':ev,
                            'successful_capture_evidence':evidence_ok,'same_process':len(bst)==1 and bst==ast,
-                           'completion_reconciled':evidence_ok and (direct or inferred) and len(bst)==1 and bst==ast and delta==sent[app]})
+                           'completion_reconciled':evidence_ok and direct and len(bst)==1 and bst==ast and delta==sent[app]})
         result['http_completion']=checks
         # First cold baseline can legitimately be missing; do not infer it here.
         result['server_residual_processing']='RECONCILED_HTTP_HANDLERS' if all(c['completion_reconciled'] for c in checks) else 'UNKNOWN'
         result['warmup_transition_allowed']=all(c['completion_reconciled'] for c in checks) and ledger['pass']
-        result['cold_meter_dependency']='Reviewed analyzer db39d41 family check, external provenance, no manual inference; missing evidence refuses transition.'
+        result['cold_meter_dependency']='Direct HTTP baseline only; registration fixture separate; absent baseline refuses transition; no HTTP/manual inference.'
     else:
         try:pending=int((root/'run/unresolved-after-quiescence.txt').read_text().strip())
         except (OSError,ValueError):pending=None

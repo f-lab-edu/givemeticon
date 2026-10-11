@@ -36,7 +36,7 @@ up_stock() {
   fi
   local legacy_args=()
   if [[ "${WARMED_LEGACY_WORKERS_OFF:-false}" == true ]]; then
-    legacy_args=(--coupon.issue-worker.mode=off --coupon.issue-worker.enabled=false --management.endpoints.web.exposure.include=health,prometheus,conditions)
+    legacy_args=(--coupon.issue-worker.mode=off --coupon.issue-worker.enabled=false --management.endpoints.web.exposure.include=health,prometheus,conditions --management.metrics.web.server.max-uri-tags=100)
   fi
   local i=0
   for port in "$PORT_A" "$PORT_B"; do

@@ -31,19 +31,23 @@ class WarmedWorkerConditionTest {
     }
     @Test void warmedStockExcludesLegacyWorkersAndRecovery() {
         runner("mysql-loadtest,redis-lock-loadtest").withPropertyValues(
-            "coupon.issue-worker.mode=off", "coupon.issue-worker.enabled=false").run(c -> {
+            "coupon.issue-worker.mode=off", "coupon.issue-worker.enabled=false", "management.metrics.web.server.max-uri-tags=100").run(c -> {
             assertThat(c).hasNotFailed().doesNotHaveBean(CouponIssueAsyncWorker.class)
                 .doesNotHaveBean(CouponBatchIssueWorker.class).doesNotHaveBean(CouponIssueRequestRecoveryScheduler.class)
                 .doesNotHaveBean(CouponEventIssuanceWorker.class);
+            assertThat(org.springframework.boot.context.properties.bind.Binder.get(c.getEnvironment()).bind("management.metrics", org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties.class).get().getWeb().getServer().getMaxUriTags()).isEqualTo(100);
+            assertThat(org.springframework.boot.context.properties.bind.Binder.get(c.getEnvironment()).bind("management.metrics", org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties.class).get().getEnable()).isEmpty();
             assertThat(c.getEnvironment().getProperty("coupon.issue-worker.enabled")).isEqualTo("false");
         });
     }
     @Test void warmedV1KeepsEventIssuanceWorker() {
         runner("coupon-admission,coupon-issuance,coupon-issuance-batch").withPropertyValues(
-            "coupon.issue-worker.mode=off", "coupon.issue-worker.enabled=false").run(c -> {
+            "coupon.issue-worker.mode=off", "coupon.issue-worker.enabled=false", "management.metrics.web.server.max-uri-tags=100").run(c -> {
             assertThat(c).hasNotFailed().doesNotHaveBean(CouponIssueAsyncWorker.class)
                 .doesNotHaveBean(CouponBatchIssueWorker.class).doesNotHaveBean(CouponIssueRequestRecoveryScheduler.class)
                 .hasSingleBean(CouponEventIssuanceWorker.class);
+            assertThat(org.springframework.boot.context.properties.bind.Binder.get(c.getEnvironment()).bind("management.metrics", org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties.class).get().getWeb().getServer().getMaxUriTags()).isEqualTo(100);
+            assertThat(org.springframework.boot.context.properties.bind.Binder.get(c.getEnvironment()).bind("management.metrics", org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties.class).get().getEnable()).isEmpty();
             assertThat(c.getEnvironment().getProperty("coupon.event-issuance.worker.enabled")).isEqualTo("true");
         });
     }

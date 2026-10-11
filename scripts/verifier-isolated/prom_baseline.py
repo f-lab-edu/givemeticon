@@ -114,14 +114,22 @@ def scrape_evidence(b, a, prov=None, paths=None):
             put(pc, "body_integrity", ok, "recorded bytes/sha256 vs files (post-collection integrity; not proof the server exposed every series)")
         else: put(pc, "body_integrity", False, "files or recorded hashes unavailable")
         mp = prov.get("meter_policy") or {}
-        put(pc, "exposure_policy", mp.get("meter_filter_or_registry_remove_used") is False and bool(str(mp.get("evidence", "")).strip())
-            and bool(mp.get("spring_boot")) and bool(mp.get("micrometer")) and isinstance(mp.get("registration_paths"), dict) and bool(mp.get("registration_paths")),
-            "recorded claim + evidence + versions + registration paths present (existence/format only, claim truth not proven here)")
+        ecfg = mp.get("effective_metrics_config") if isinstance(mp.get("effective_metrics_config"), dict) else {}
+        fmf = mp.get("framework_meter_filters")
+        put(pc, "exposure_policy", mp.get("custom_app_meter_filter_or_registry_remove_used") is False and bool(str(mp.get("evidence", "")).strip())
+            and bool(mp.get("spring_boot")) and bool(mp.get("micrometer")) and isinstance(mp.get("registration_paths"), dict) and bool(mp.get("registration_paths"))
+            and isinstance(fmf, list) and bool(fmf) and all(isinstance(x, str) and x.strip() for x in fmf)
+            and type(ecfg.get("max_uri_tags")) is int and ecfg.get("max_uri_tags") > 0 and isinstance(ecfg.get("enable"), dict) and bool(str(ecfg.get("source_sha256", "")).strip()),
+            "recorded: custom-app filter/remove claim (not framework filters) + evidence + versions + registration paths + framework_meter_filters list + effective_metrics_config(max_uri_tags, enable overrides, source hash); existence/format only, claim truth not proven here")
     rp = (prov.get("meter_policy") or {}).get("registration_paths") if isinstance(prov, dict) else None
+    uc = (prov.get("meter_policy") or {}).get("http_uri_contract") if isinstance(prov, dict) else None
+    after_uris = sorted({l.get("uri", "") for n, l, v in a["rows"] if n == "http_server_requests_seconds_count"})
+    mx = ((prov.get("meter_policy") or {}).get("effective_metrics_config") or {}).get("max_uri_tags") if isinstance(prov, dict) else None
     s_ok = all(x["pass"] for x in c.values())
     p_ok = all(x["pass"] for x in pc.values()) if pc else False
     return {"structural_ok": s_ok, "provenance_ok": p_ok, "checks": c, "provenance_checks": pc, "diagnostics": diag,
-            "registration_paths": rp if isinstance(rp, dict) else {}}
+            "registration_paths": rp if isinstance(rp, dict) else {}, "http_uri_contract": uc if isinstance(uc, dict) else None,
+            "after_http_uris": after_uris, "max_uri_tags": mx}
 
 
 def lazy_zero_allowed(ev, family, allow_manual=False):
@@ -133,6 +141,14 @@ def lazy_zero_allowed(ev, family, allow_manual=False):
     bad = [k for k, x in ev["provenance_checks"].items() if not x["pass"]] or (["provenance_present"] if not ev["provenance_checks"] else [])
     rp = str(ev.get("registration_paths", {}).get(fam, "")).strip()   # 요청한 family 자신의 등록 근거가 있어야 한다(다른 family 경로로 대체 불가)
     if not rp and ev["provenance_checks"]: bad.append(f"registration_paths[{fam}]")
+    if fam == "http_server_requests" and ev["provenance_checks"]:
+        # 선언된 제한 URI 계약이 있고 after 에 관측된 모든 uri 가 그 안에 있으며 distinct uri 수가 유효 max-uri-tags 미만일 때만(필요조건).
+        # 이것만으로 과거 deny 부재를 확정하지 않는다: 계약/유효 필터 근거가 없으면 HTTP absent-before 는 MISSING.
+        c = ev.get("http_uri_contract") or {}
+        allowed = c.get("allowed_uris") if isinstance(c.get("allowed_uris"), list) else []
+        mx = ev.get("max_uri_tags")
+        if not allowed or not set(ev.get("after_http_uris", [])) <= set(allowed) or not (type(mx) is int and len(ev.get("after_http_uris", [])) < mx):
+            bad.append("http_uri_contract")
     if ev["provenance_ok"] and not bad: return "OK_INFERRED_ZERO_BASELINE", "structural + external provenance verified; registration evidence for %s: %s; code basis: %s" % (fam, rp, LAZY_FAMILIES[fam])
     if allow_manual:
         return "CONDITIONAL_MANUAL_INFERENCE", "manual: structural only; provenance unverified (" + ",".join(bad) + "); registration basis: " + LAZY_FAMILIES[fam]

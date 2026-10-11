@@ -33,7 +33,7 @@ for image in "$MYSQL_IMAGE" "$REDIS_IMAGE" "$JRE_IMAGE" "$K6_IMAGE"; do docker p
 python3 - <<'PY'
 import json,subprocess
 from pathlib import Path
-Path('scripts/verifier-isolated/results/warmed/contract.json').write_text(json.dumps({'sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'profile':'B','legacy_worker_policy':{'mode':'off','recovery_enabled':False,'v1_event_worker_enabled':True,'changed_from_cold_stock':True},'expected_prometheus_targets':{'app1':'http://127.0.0.1:18080/actuator/prometheus','app2':'http://127.0.0.1:18081/actuator/prometheus'},'service_cpu':2.7,'broker_slot_cpu':.5,'broker_slot_memory_mib':768,'broker_slot':'EMPTY','total_cpu':3.95,'total_memory_mib':9088,'paths':['stock','v1'],'rate':10,'duration_s':10,'duplicate_rate':.1,'pre_allocated_vus':201,'max_vus':201,'warmup':{'rate':10,'duration_s':20,'fixture':'separate','same_jvm':True},'phase':'preflight and warmed low-rate diagnosis; not mandatory baseline','inactive_rates':[20,40],'get_smoke':'V1 recorded members after quiescence; stock has no equivalent final GET endpoint; report unsupported rather than invent endpoint'},indent=2)+'\n')
+Path('scripts/verifier-isolated/results/warmed/contract.json').write_text(json.dumps({'sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'profile':'B','legacy_worker_policy':{'mode':'off','recovery_enabled':False,'v1_event_worker_enabled':True,'changed_from_cold_stock':True},'changed_from_cold_settings':{'endpoint_exposure':{'before':'*','after':'health,prometheus,conditions','direction':'narrowed'},'max_uri_tags':{'before':'Boot default 100','after':'explicit CLI 100'}},'registration_fixture':{'rate':1,'duration_s':2,'nominal_first_requests':2,'duplicate_rate':0.1,'separate_from_warmup_and_measurement':True,'purpose':'direct HTTP baseline registration, not performance evidence'},'expected_prometheus_targets':{'app1':'http://127.0.0.1:18080/actuator/prometheus','app2':'http://127.0.0.1:18081/actuator/prometheus'},'service_cpu':2.7,'broker_slot_cpu':.5,'broker_slot_memory_mib':768,'broker_slot':'EMPTY','total_cpu':3.95,'total_memory_mib':9088,'paths':['stock','v1'],'rate':10,'duration_s':10,'duplicate_rate':.1,'pre_allocated_vus':201,'max_vus':201,'warmup':{'rate':10,'duration_s':20,'fixture':'separate','same_jvm':True},'phase':'preflight and warmed low-rate diagnosis; not mandatory baseline','inactive_rates':[20,40],'get_smoke':'V1 recorded members after quiescence; stock has no equivalent final GET endpoint; report unsupported rather than invent endpoint'},indent=2)+'\n')
 PY
 mkdir -p build/verifier-cap
 python3 -c 'from pathlib import Path;import shutil;shutil.copyfile(next(p for p in Path("build/libs").glob("*.jar") if "plain" not in p.name),"build/verifier-cap/app.jar")'
@@ -54,6 +54,14 @@ for path in stock v1; do
     python3 scripts/verifier-isolated/hosted/warmed-preflight.py "$path" "$size" "$REPORT_BASE/$path-preflight-$size"
   done
   export CALIBRATION_GET_DURING=false INITIALIZATION_PREFLIGHT=false
+  # Owned registration fixture only: response/state evidence retained separately.
+  export STOCK_TOTAL=1000 STOCK_HIGH=500 VUS=3 MAX_VUS=3 RATE=1 DURATION=2s
+  export USER_ID_START=900000000 MEMBER_ID_START=700000000
+  export RUN_LABEL="w-$path-registration" REPORT_ROOT="$REPORT_BASE/$path-registration"
+  "$runner" run
+  python3 scripts/verifier-isolated/hosted/verify-calibration-caps.py "$VERIFIER_PREFIX" "$VERIFIER_OWNER_ID" "$REPORT_ROOT/service-limits-after.json"
+  python3 scripts/verifier-isolated/hosted/warmed-stage.py "$REPORT_ROOT" "$path" 2
+  python3 scripts/verifier-isolated/hosted/warmed-registration.py "$REPORT_ROOT" "$path"
   export STOCK_TOTAL=1000 STOCK_HIGH=500 VUS=201 MAX_VUS=201 RATE=10
   export USER_ID_START=910000000 MEMBER_ID_START=710000000
   export RUN_LABEL="w-$path-warmup" REPORT_ROOT="$REPORT_BASE/$path-warmup" DURATION=20s

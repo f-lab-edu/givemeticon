@@ -42,3 +42,8 @@ The EXIT handler gathers evidence and invokes normal stop followed by explicit r
 ## Validation boundary
 
 Local tests are package/config tests and synthetic/recording-Docker command tests. They do not start an application or broker. The first hosted run and independent assessment are separate evidence and will be linked in the PR. A downloaded artifact copy belongs in the workspace research directory; never commit synthetic raw ledgers or secrets to this repository.
+
+
+## Separate warmed diagnosis candidate (PR181)
+
+The profile A contract above is historical and unchanged. PR181 uses the fixed profile B envelope and remains an unexecuted candidate. Its reviewed preparation consists of 201/401-VU initialization-only preflight, a separate owned HTTP registration fixture at 1rps×2s, 20s×10rps warmup on another fixture, then 10s×10rps on a fresh fixture of the same JVM. Registration requests and outcomes are retained outside warmup/measurement denominators. Registration must complete on both apps; stock HTTP before counters must be directly present before the warmup drain can pass. HTTP absent-before inference is prohibited in this execution gate. See [meter/filter evidence](warmed-meter-registration-evidence/METER_REGISTRATION_EVIDENCE.md) for framework filter limits and configuration differences. No20/40rps or mandatory10k/50k/100k run is enabled by this candidate.

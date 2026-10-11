@@ -1,0 +1,286 @@
+Compiled from "PropertiesMeterFilter.java"
+public class org.springframework.boot.actuate.autoconfigure.metrics.PropertiesMeterFilter implements io.micrometer.core.instrument.config.MeterFilter {
+  private final org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties properties;
+
+  private final io.micrometer.core.instrument.config.MeterFilter mapFilter;
+
+  public org.springframework.boot.actuate.autoconfigure.metrics.PropertiesMeterFilter(org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties);
+    Code:
+       0: aload_0
+       1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+       4: aload_1
+       5: ldc           #7                  // String Properties must not be null
+       7: invokestatic  #9                  // Method org/springframework/util/Assert.notNull:(Ljava/lang/Object;Ljava/lang/String;)V
+      10: aload_0
+      11: aload_1
+      12: putfield      #15                 // Field properties:Lorg/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties;
+      15: aload_0
+      16: aload_1
+      17: invokevirtual #21                 // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties.getTags:()Ljava/util/Map;
+      20: invokestatic  #27                 // Method createMapFilter:(Ljava/util/Map;)Lio/micrometer/core/instrument/config/MeterFilter;
+      23: putfield      #31                 // Field mapFilter:Lio/micrometer/core/instrument/config/MeterFilter;
+      26: return
+
+  private static io.micrometer.core.instrument.config.MeterFilter createMapFilter(java.util.Map<java.lang.String, java.lang.String>);
+    Code:
+       0: aload_0
+       1: invokeinterface #35,  1           // InterfaceMethod java/util/Map.isEmpty:()Z
+       6: ifeq          17
+       9: new           #41                 // class org/springframework/boot/actuate/autoconfigure/metrics/PropertiesMeterFilter$1
+      12: dup
+      13: invokespecial #43                 // Method org/springframework/boot/actuate/autoconfigure/metrics/PropertiesMeterFilter$1."<init>":()V
+      16: areturn
+      17: aload_0
+      18: invokeinterface #44,  1           // InterfaceMethod java/util/Map.entrySet:()Ljava/util/Set;
+      23: invokeinterface #48,  1           // InterfaceMethod java/util/Set.stream:()Ljava/util/stream/Stream;
+      28: invokedynamic #54,  0             // InvokeDynamic #0:apply:()Ljava/util/function/Function;
+      33: invokeinterface #58,  2           // InterfaceMethod java/util/stream/Stream.map:(Ljava/util/function/Function;)Ljava/util/stream/Stream;
+      38: invokeinterface #64,  1           // InterfaceMethod java/util/stream/Stream.toList:()Ljava/util/List;
+      43: invokestatic  #68                 // Method io/micrometer/core/instrument/Tags.of:(Ljava/lang/Iterable;)Lio/micrometer/core/instrument/Tags;
+      46: astore_1
+      47: aload_1
+      48: invokestatic  #74                 // InterfaceMethod io/micrometer/core/instrument/config/MeterFilter.commonTags:(Ljava/lang/Iterable;)Lio/micrometer/core/instrument/config/MeterFilter;
+      51: areturn
+
+  private static io.micrometer.core.instrument.Tag asTag(java.util.Map$Entry<java.lang.String, java.lang.String>);
+    Code:
+       0: aload_0
+       1: invokeinterface #80,  1           // InterfaceMethod java/util/Map$Entry.getKey:()Ljava/lang/Object;
+       6: checkcast     #86                 // class java/lang/String
+       9: aload_0
+      10: invokeinterface #88,  1           // InterfaceMethod java/util/Map$Entry.getValue:()Ljava/lang/Object;
+      15: checkcast     #86                 // class java/lang/String
+      18: invokestatic  #91                 // InterfaceMethod io/micrometer/core/instrument/Tag.of:(Ljava/lang/String;Ljava/lang/String;)Lio/micrometer/core/instrument/Tag;
+      21: areturn
+
+  public io.micrometer.core.instrument.config.MeterFilterReply accept(io.micrometer.core.instrument.Meter$Id);
+    Code:
+       0: aload_0
+       1: aload_0
+       2: getfield      #15                 // Field properties:Lorg/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties;
+       5: invokevirtual #96                 // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties.getEnable:()Ljava/util/Map;
+       8: aload_1
+       9: iconst_1
+      10: invokestatic  #99                 // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      13: invokevirtual #105                // Method lookupWithFallbackToAll:(Ljava/util/Map;Lio/micrometer/core/instrument/Meter$Id;Ljava/lang/Object;)Ljava/lang/Object;
+      16: checkcast     #100                // class java/lang/Boolean
+      19: invokevirtual #109                // Method java/lang/Boolean.booleanValue:()Z
+      22: istore_2
+      23: iload_2
+      24: ifeq          33
+      27: getstatic     #112                // Field io/micrometer/core/instrument/config/MeterFilterReply.NEUTRAL:Lio/micrometer/core/instrument/config/MeterFilterReply;
+      30: goto          36
+      33: getstatic     #118                // Field io/micrometer/core/instrument/config/MeterFilterReply.DENY:Lio/micrometer/core/instrument/config/MeterFilterReply;
+      36: areturn
+
+  public io.micrometer.core.instrument.Meter$Id map(io.micrometer.core.instrument.Meter$Id);
+    Code:
+       0: aload_0
+       1: getfield      #31                 // Field mapFilter:Lio/micrometer/core/instrument/config/MeterFilter;
+       4: aload_1
+       5: invokeinterface #121,  2          // InterfaceMethod io/micrometer/core/instrument/config/MeterFilter.map:(Lio/micrometer/core/instrument/Meter$Id;)Lio/micrometer/core/instrument/Meter$Id;
+      10: areturn
+
+  public io.micrometer.core.instrument.distribution.DistributionStatisticConfig configure(io.micrometer.core.instrument.Meter$Id, io.micrometer.core.instrument.distribution.DistributionStatisticConfig);
+    Code:
+       0: aload_0
+       1: getfield      #15                 // Field properties:Lorg/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties;
+       4: invokevirtual #124                // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties.getDistribution:()Lorg/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Distribution;
+       7: astore_3
+       8: invokestatic  #128                // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig.builder:()Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder;
+      11: aload_0
+      12: aload_3
+      13: invokevirtual #134                // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Distribution.getPercentilesHistogram:()Ljava/util/Map;
+      16: aload_1
+      17: aconst_null
+      18: invokevirtual #105                // Method lookupWithFallbackToAll:(Ljava/util/Map;Lio/micrometer/core/instrument/Meter$Id;Ljava/lang/Object;)Ljava/lang/Object;
+      21: checkcast     #100                // class java/lang/Boolean
+      24: invokevirtual #139                // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder.percentilesHistogram:(Ljava/lang/Boolean;)Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder;
+      27: aload_0
+      28: aload_3
+      29: invokevirtual #145                // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Distribution.getPercentiles:()Ljava/util/Map;
+      32: aload_1
+      33: aconst_null
+      34: invokevirtual #105                // Method lookupWithFallbackToAll:(Ljava/util/Map;Lio/micrometer/core/instrument/Meter$Id;Ljava/lang/Object;)Ljava/lang/Object;
+      37: checkcast     #148                // class "[D"
+      40: invokevirtual #150                // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder.percentiles:([D)Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder;
+      43: aload_0
+      44: aload_1
+      45: invokevirtual #154                // Method io/micrometer/core/instrument/Meter$Id.getType:()Lio/micrometer/core/instrument/Meter$Type;
+      48: aload_0
+      49: aload_3
+      50: invokevirtual #160                // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Distribution.getSlo:()Ljava/util/Map;
+      53: aload_1
+      54: aconst_null
+      55: invokevirtual #163                // Method lookup:(Ljava/util/Map;Lio/micrometer/core/instrument/Meter$Id;Ljava/lang/Object;)Ljava/lang/Object;
+      58: checkcast     #166                // class "[Lorg/springframework/boot/actuate/autoconfigure/metrics/ServiceLevelObjectiveBoundary;"
+      61: invokevirtual #168                // Method convertServiceLevelObjectives:(Lio/micrometer/core/instrument/Meter$Type;[Lorg/springframework/boot/actuate/autoconfigure/metrics/ServiceLevelObjectiveBoundary;)[D
+      64: invokevirtual #172                // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder.serviceLevelObjectives:([D)Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder;
+      67: aload_0
+      68: aload_1
+      69: invokevirtual #154                // Method io/micrometer/core/instrument/Meter$Id.getType:()Lio/micrometer/core/instrument/Meter$Type;
+      72: aload_0
+      73: aload_3
+      74: invokevirtual #175                // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Distribution.getMinimumExpectedValue:()Ljava/util/Map;
+      77: aload_1
+      78: aconst_null
+      79: invokevirtual #163                // Method lookup:(Ljava/util/Map;Lio/micrometer/core/instrument/Meter$Id;Ljava/lang/Object;)Ljava/lang/Object;
+      82: checkcast     #86                 // class java/lang/String
+      85: invokevirtual #178                // Method convertMeterValue:(Lio/micrometer/core/instrument/Meter$Type;Ljava/lang/String;)Ljava/lang/Double;
+      88: invokevirtual #182                // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder.minimumExpectedValue:(Ljava/lang/Double;)Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder;
+      91: aload_0
+      92: aload_1
+      93: invokevirtual #154                // Method io/micrometer/core/instrument/Meter$Id.getType:()Lio/micrometer/core/instrument/Meter$Type;
+      96: aload_0
+      97: aload_3
+      98: invokevirtual #186                // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Distribution.getMaximumExpectedValue:()Ljava/util/Map;
+     101: aload_1
+     102: aconst_null
+     103: invokevirtual #163                // Method lookup:(Ljava/util/Map;Lio/micrometer/core/instrument/Meter$Id;Ljava/lang/Object;)Ljava/lang/Object;
+     106: checkcast     #86                 // class java/lang/String
+     109: invokevirtual #178                // Method convertMeterValue:(Lio/micrometer/core/instrument/Meter$Type;Ljava/lang/String;)Ljava/lang/Double;
+     112: invokevirtual #189                // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder.maximumExpectedValue:(Ljava/lang/Double;)Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder;
+     115: aload_0
+     116: aload_3
+     117: invokevirtual #192                // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Distribution.getExpiry:()Ljava/util/Map;
+     120: aload_1
+     121: aconst_null
+     122: invokevirtual #105                // Method lookupWithFallbackToAll:(Ljava/util/Map;Lio/micrometer/core/instrument/Meter$Id;Ljava/lang/Object;)Ljava/lang/Object;
+     125: checkcast     #195                // class java/time/Duration
+     128: invokevirtual #197                // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder.expiry:(Ljava/time/Duration;)Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder;
+     131: aload_0
+     132: aload_3
+     133: invokevirtual #201                // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Distribution.getBufferLength:()Ljava/util/Map;
+     136: aload_1
+     137: aconst_null
+     138: invokevirtual #105                // Method lookupWithFallbackToAll:(Ljava/util/Map;Lio/micrometer/core/instrument/Meter$Id;Ljava/lang/Object;)Ljava/lang/Object;
+     141: checkcast     #204                // class java/lang/Integer
+     144: invokevirtual #206                // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder.bufferLength:(Ljava/lang/Integer;)Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder;
+     147: invokevirtual #210                // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder.build:()Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig;
+     150: aload_2
+     151: invokevirtual #214                // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig.merge:(Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig;)Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig;
+     154: areturn
+
+  private double[] convertServiceLevelObjectives(io.micrometer.core.instrument.Meter$Type, org.springframework.boot.actuate.autoconfigure.metrics.ServiceLevelObjectiveBoundary[]);
+    Code:
+       0: aload_2
+       1: ifnonnull     6
+       4: aconst_null
+       5: areturn
+       6: aload_2
+       7: invokestatic  #218                // Method java/util/Arrays.stream:([Ljava/lang/Object;)Ljava/util/stream/Stream;
+      10: aload_1
+      11: invokedynamic #223,  0            // InvokeDynamic #1:apply:(Lio/micrometer/core/instrument/Meter$Type;)Ljava/util/function/Function;
+      16: invokeinterface #58,  2           // InterfaceMethod java/util/stream/Stream.map:(Ljava/util/function/Function;)Ljava/util/stream/Stream;
+      21: invokedynamic #226,  0            // InvokeDynamic #2:test:()Ljava/util/function/Predicate;
+      26: invokeinterface #230,  2          // InterfaceMethod java/util/stream/Stream.filter:(Ljava/util/function/Predicate;)Ljava/util/stream/Stream;
+      31: invokedynamic #234,  0            // InvokeDynamic #3:applyAsDouble:()Ljava/util/function/ToDoubleFunction;
+      36: invokeinterface #238,  2          // InterfaceMethod java/util/stream/Stream.mapToDouble:(Ljava/util/function/ToDoubleFunction;)Ljava/util/stream/DoubleStream;
+      41: invokeinterface #242,  1          // InterfaceMethod java/util/stream/DoubleStream.toArray:()[D
+      46: astore_3
+      47: aload_3
+      48: arraylength
+      49: ifeq          56
+      52: aload_3
+      53: goto          57
+      56: aconst_null
+      57: areturn
+
+  private java.lang.Double convertMeterValue(io.micrometer.core.instrument.Meter$Type, java.lang.String);
+    Code:
+       0: aload_2
+       1: ifnull        15
+       4: aload_2
+       5: invokestatic  #248                // Method org/springframework/boot/actuate/autoconfigure/metrics/MeterValue.valueOf:(Ljava/lang/String;)Lorg/springframework/boot/actuate/autoconfigure/metrics/MeterValue;
+       8: aload_1
+       9: invokevirtual #253                // Method org/springframework/boot/actuate/autoconfigure/metrics/MeterValue.getValue:(Lio/micrometer/core/instrument/Meter$Type;)Ljava/lang/Double;
+      12: goto          16
+      15: aconst_null
+      16: areturn
+
+  private <T> T lookup(java.util.Map<java.lang.String, T>, io.micrometer.core.instrument.Meter$Id, T);
+    Code:
+       0: aload_1
+       1: invokeinterface #35,  1           // InterfaceMethod java/util/Map.isEmpty:()Z
+       6: ifeq          11
+       9: aload_3
+      10: areturn
+      11: aload_0
+      12: aload_1
+      13: aload_2
+      14: aload_3
+      15: invokedynamic #256,  0            // InvokeDynamic #4:get:(Ljava/lang/Object;)Ljava/util/function/Supplier;
+      20: invokevirtual #260                // Method doLookup:(Ljava/util/Map;Lio/micrometer/core/instrument/Meter$Id;Ljava/util/function/Supplier;)Ljava/lang/Object;
+      23: areturn
+
+  private <T> T lookupWithFallbackToAll(java.util.Map<java.lang.String, T>, io.micrometer.core.instrument.Meter$Id, T);
+    Code:
+       0: aload_1
+       1: invokeinterface #35,  1           // InterfaceMethod java/util/Map.isEmpty:()Z
+       6: ifeq          11
+       9: aload_3
+      10: areturn
+      11: aload_0
+      12: aload_1
+      13: aload_2
+      14: aload_1
+      15: aload_3
+      16: invokedynamic #264,  0            // InvokeDynamic #5:get:(Ljava/util/Map;Ljava/lang/Object;)Ljava/util/function/Supplier;
+      21: invokevirtual #260                // Method doLookup:(Ljava/util/Map;Lio/micrometer/core/instrument/Meter$Id;Ljava/util/function/Supplier;)Ljava/lang/Object;
+      24: areturn
+
+  private <T> T doLookup(java.util.Map<java.lang.String, T>, io.micrometer.core.instrument.Meter$Id, java.util.function.Supplier<T>);
+    Code:
+       0: aload_2
+       1: invokevirtual #267                // Method io/micrometer/core/instrument/Meter$Id.getName:()Ljava/lang/String;
+       4: astore        4
+       6: aload         4
+       8: invokestatic  #271                // Method org/springframework/util/StringUtils.hasLength:(Ljava/lang/String;)Z
+      11: ifeq          66
+      14: aload_1
+      15: aload         4
+      17: invokeinterface #277,  2          // InterfaceMethod java/util/Map.get:(Ljava/lang/Object;)Ljava/lang/Object;
+      22: astore        5
+      24: aload         5
+      26: ifnull        32
+      29: aload         5
+      31: areturn
+      32: aload         4
+      34: bipush        46
+      36: invokevirtual #280                // Method java/lang/String.lastIndexOf:(I)I
+      39: istore        6
+      41: iload         6
+      43: iconst_m1
+      44: if_icmpeq     58
+      47: aload         4
+      49: iconst_0
+      50: iload         6
+      52: invokevirtual #284                // Method java/lang/String.substring:(II)Ljava/lang/String;
+      55: goto          61
+      58: ldc_w         #288                // String
+      61: astore        4
+      63: goto          6
+      66: aload_3
+      67: invokeinterface #290,  1          // InterfaceMethod java/util/function/Supplier.get:()Ljava/lang/Object;
+      72: areturn
+
+  private static java.lang.Object lambda$lookupWithFallbackToAll$2(java.util.Map, java.lang.Object);
+    Code:
+       0: aload_0
+       1: ldc_w         #294                // String all
+       4: aload_1
+       5: invokeinterface #296,  3          // InterfaceMethod java/util/Map.getOrDefault:(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+      10: areturn
+
+  private static java.lang.Object lambda$lookup$1(java.lang.Object);
+    Code:
+       0: aload_0
+       1: areturn
+
+  private static java.lang.Double lambda$convertServiceLevelObjectives$0(io.micrometer.core.instrument.Meter$Type, org.springframework.boot.actuate.autoconfigure.metrics.ServiceLevelObjectiveBoundary);
+    Code:
+       0: aload_1
+       1: aload_0
+       2: invokevirtual #300                // Method org/springframework/boot/actuate/autoconfigure/metrics/ServiceLevelObjectiveBoundary.getValue:(Lio/micrometer/core/instrument/Meter$Type;)Ljava/lang/Double;
+       5: areturn
+}

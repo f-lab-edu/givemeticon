@@ -1,7 +1,7 @@
 {
   "base_develop": "b941a04efa9d547a845cd5df05c055eab756e9bc",
   "approved_source": "b1e08f7d0093c9431f735f8b21639c19e9186229",
-  "analyzer_correction": "db39d41dd07a03649e9d2f8c93aa03c03033a852",
+  "analyzer_correction": "ec04d68138d2ec2c85e3e72aa2afa0f5890b8049",
   "builder_modified_files": [
     {
       "path": "scripts/coupon-integrated-loadtest/integrated-admission-poll.js",
@@ -16,12 +16,12 @@
     {
       "path": "scripts/verifier-isolated/capped/run-capped-stock.sh",
       "source_sha256": "228d156dbc072ce6ab53ad3fc0de7f0f6cb1fa652c0bfe00e7a8fac8ae594261",
-      "derived_sha256": "eb8bec32c59726c1fe00236cb0a4e9787dfa955af9056ffc8d3a05b1afb22cde"
+      "derived_sha256": "d84c79157fd668d96637d83ede8d05b71a26fd3c22b9479815e449431e84969f"
     },
     {
       "path": "scripts/verifier-isolated/capped/run-capped-v1.sh",
       "source_sha256": "1e8cfdfbeb6edf9c74bce292fc803ec677b2787fa74379180be0b689be5bda84",
-      "derived_sha256": "a72f01575c6d089dd63a01c1dc71cf2e4fb352c16bb0b174d85ae6943debf5f1"
+      "derived_sha256": "3f3c1fd05b9a41124e7a9b51ec92ab1507183c536c987b319b38b97cf5a46cd9"
     },
     {
       "path": "scripts/verifier-isolated/hosted/observer-scope.sh",
@@ -54,7 +54,7 @@
     },
     {
       "path": "docs/experiments/calibration-run-38096702816-verifier-review.md",
-      "source_sha256": "14c9c9d61b7d2708218979a481d78e7ae738a2187961a1529d950317621df1de"
+      "source_sha256": "03aad2c48c0aee8109ca740d33c8d5ca984e4b9de8868d916c2aeaf6eba2695b"
     },
     {
       "path": "scripts/verifier-isolated/analyze-lock-metrics.py",
@@ -66,15 +66,15 @@
     },
     {
       "path": "scripts/verifier-isolated/prom_baseline.py",
-      "source_sha256": "3f2286c736b220a14c2f186af7eb5f4696171672d02daadcbfb47ee9df0acbd0"
+      "source_sha256": "137df956fdd5d4a45fe01fba531b1df3f25847c7dbbf7e1f36dc3a5d4da5cc2d"
     },
     {
       "path": "scripts/verifier-isolated/test-analyze-lock-metrics.py",
-      "source_sha256": "9616f1ad5d1e831530e9f29f196e85eaaffe85cecee4c539f831a3afbec80c53"
+      "source_sha256": "58a725015c000df167e22893be35b59310243b7a756d8f5940498e4cdbf2c431"
     },
     {
       "path": "scripts/verifier-isolated/test-analyze-separated-v2-lazy.py",
-      "source_sha256": "dab2694944e62cd291abbd8fe68f5d05fc78a0397808fb5b97a5a20bd95c6c6a"
+      "source_sha256": "2319812b66d5ff6bbf7f9e45c8f604cecd3650e8f68827646aae8e02046504ee"
     }
   ]
 }

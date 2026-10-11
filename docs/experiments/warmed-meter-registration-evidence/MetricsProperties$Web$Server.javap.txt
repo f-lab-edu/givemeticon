@@ -1,0 +1,39 @@
+Compiled from "MetricsProperties.java"
+public class org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties$Web$Server {
+  private final org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties$Web$Server$ServerRequest request;
+
+  private int maxUriTags;
+
+  public org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties$Web$Server();
+    Code:
+       0: aload_0
+       1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: new           #7                  // class org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Web$Server$ServerRequest
+       8: dup
+       9: invokespecial #9                  // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Web$Server$ServerRequest."<init>":()V
+      12: putfield      #10                 // Field request:Lorg/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Web$Server$ServerRequest;
+      15: aload_0
+      16: bipush        100
+      18: putfield      #16                 // Field maxUriTags:I
+      21: return
+
+  public org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties$Web$Server$ServerRequest getRequest();
+    Code:
+       0: aload_0
+       1: getfield      #10                 // Field request:Lorg/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Web$Server$ServerRequest;
+       4: areturn
+
+  public int getMaxUriTags();
+    Code:
+       0: aload_0
+       1: getfield      #16                 // Field maxUriTags:I
+       4: ireturn
+
+  public void setMaxUriTags(int);
+    Code:
+       0: aload_0
+       1: iload_1
+       2: putfield      #16                 // Field maxUriTags:I
+       5: return
+}

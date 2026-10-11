@@ -52,6 +52,7 @@ for runner in run-capped-v1.sh run-capped-stock.sh; do
   reset; rc=$(WARMED_LEGACY_WORKERS_OFF=true runit $runner up)
   [[ $rc -eq 0 && $(grep '^docker run -d' "$tmp/docker.log" | grep -c -e '--coupon.issue-worker.mode=off --coupon.issue-worker.enabled=false') -eq 2 ]] && ok "$runner: warmed legacy mode/recovery overrides both apps" || bad "$runner warmed worker arguments"
   [[ $(grep '^docker run -d' "$tmp/docker.log" | grep -c -e '--management.endpoints.web.exposure.include=health,prometheus,conditions') -eq 2 ]] && ok "$runner: warmed condition evidence endpoint explicitly enabled" || bad "$runner warmed endpoint arguments"
+  [[ $(grep '^docker run -d' "$tmp/docker.log" | grep -c -e '--management.metrics.web.server.max-uri-tags=100') -eq 2 ]] && ok "$runner: warmed explicit URI cap both apps" || bad "$runner warmed URI cap arguments"
 
   reset; rc=$(STUB_EXISTS=1 runit $runner up)
   [[ $rc -eq 2 ]] && ! grep -q '^docker run' "$tmp/docker.log" && grep -q 'already exists' "$tmp/out" && ok "$runner: existing name refused, no run" || bad "$runner existing rc=$rc"

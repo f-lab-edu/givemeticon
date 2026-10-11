@@ -30,7 +30,7 @@ jobs:
           bash scripts/verifier-isolated/capped/test-memory-guard.sh
           bash scripts/verifier-isolated/capped/test-capped-runners.sh
           find scripts/verifier-isolated -name '*.sh' -exec bash -n {} \;
-      - name: Capped controller and observers, 201/401 VU initialization, stock/V1 warmup and 10rps x10s only
+      - name: Capped controller and observers, 201/401 VU initialization, separate registration, stock/V1 warmup and 10rps x10s
         run: bash scripts/verifier-isolated/hosted/observer-scope.sh warmed
       - name: Rescue owned cleanup and evidence
         if: always()

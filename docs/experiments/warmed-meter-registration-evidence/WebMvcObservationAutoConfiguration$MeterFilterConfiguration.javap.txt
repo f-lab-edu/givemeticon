@@ -1,0 +1,42 @@
+Compiled from "WebMvcObservationAutoConfiguration.java"
+class org.springframework.boot.actuate.autoconfigure.observation.web.servlet.WebMvcObservationAutoConfiguration$MeterFilterConfiguration {
+  org.springframework.boot.actuate.autoconfigure.observation.web.servlet.WebMvcObservationAutoConfiguration$MeterFilterConfiguration();
+    Code:
+       0: aload_0
+       1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+       4: return
+
+  io.micrometer.core.instrument.config.MeterFilter metricsHttpServerUriTagFilter(org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties, org.springframework.boot.actuate.autoconfigure.observation.ObservationProperties);
+    Code:
+       0: aload_2
+       1: aload_1
+       2: invokestatic  #7                  // Method org/springframework/boot/actuate/autoconfigure/observation/web/servlet/WebMvcObservationAutoConfiguration.httpRequestsMetricName:(Lorg/springframework/boot/actuate/autoconfigure/observation/ObservationProperties;Lorg/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties;)Ljava/lang/String;
+       5: astore_3
+       6: new           #13                 // class org/springframework/boot/actuate/autoconfigure/metrics/OnlyOnceLoggingDenyMeterFilter
+       9: dup
+      10: aload_3
+      11: invokedynamic #15,  0             // InvokeDynamic #0:get:(Ljava/lang/String;)Ljava/util/function/Supplier;
+      16: invokespecial #19                 // Method org/springframework/boot/actuate/autoconfigure/metrics/OnlyOnceLoggingDenyMeterFilter."<init>":(Ljava/util/function/Supplier;)V
+      19: astore        4
+      21: aload_3
+      22: ldc           #22                 // String uri
+      24: aload_1
+      25: invokevirtual #24                 // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties.getWeb:()Lorg/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Web;
+      28: invokevirtual #30                 // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Web.getServer:()Lorg/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Web$Server;
+      31: invokevirtual #36                 // Method org/springframework/boot/actuate/autoconfigure/metrics/MetricsProperties$Web$Server.getMaxUriTags:()I
+      34: aload         4
+      36: invokestatic  #42                 // InterfaceMethod io/micrometer/core/instrument/config/MeterFilter.maximumAllowableTags:(Ljava/lang/String;Ljava/lang/String;ILio/micrometer/core/instrument/config/MeterFilter;)Lio/micrometer/core/instrument/config/MeterFilter;
+      39: areturn
+
+  private static java.lang.String lambda$metricsHttpServerUriTagFilter$0(java.lang.String);
+    Code:
+       0: ldc           #48                 // String Reached the maximum number of URI tags for \'%s\'.
+       2: iconst_1
+       3: anewarray     #2                  // class java/lang/Object
+       6: dup
+       7: iconst_0
+       8: aload_0
+       9: aastore
+      10: invokestatic  #50                 // Method java/lang/String.format:(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+      13: areturn
+}

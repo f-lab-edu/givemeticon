@@ -75,14 +75,18 @@ def after_with_lock(uptime=60, start="1.7E9", http=5):
     return (PROC.replace("1.7E9", start) % uptime) + HEALTH + p
 def sha(t): return hashlib.sha256(t.encode()).hexdigest()
 ALL_PATHS = {f: "reviewed source ref for " + f for f in ("coupon_redis_lock_acquire", "coupon_redis_lock_hold", "http_server_requests", "coupon_admission_transaction")}
-def prov(before, after, exit_b=0, target=TARGET, policy=True, filt_used=False, sites=True, schema="scrape-provenance/v1", paths=None, requested=TARGET):
+def prov(before, after, exit_b=0, target=TARGET, policy=True, filt_used=False, sites=True, schema="scrape-provenance/v1", paths=None, requested=TARGET, mutate=None):
     d = {"schema": schema, "expected_target": TARGET,
          "scrapes": {"before": {"exit_code": exit_b, "http_status": 200, "requested_target": requested, "effective_target": target, "body_bytes": len(before.encode()), "body_sha256": sha(before)},
                      "after": {"exit_code": 0, "http_status": 200, "requested_target": TARGET, "effective_target": TARGET, "body_bytes": len(after.encode()), "body_sha256": sha(after)}}}
-    if policy: d["meter_policy"] = {"meter_filter_or_registry_remove_used": filt_used, "evidence": "git grep MeterFilter|remove @b1e08f7: none; application.yml sha256=abc",
+    if policy: d["meter_policy"] = {"custom_app_meter_filter_or_registry_remove_used": filt_used,
+                                    "framework_meter_filters": ["OnlyOnceLoggingDenyMeterFilter(max-uri-tags)", "PropertiesMeterFilter"],
+                                    "effective_metrics_config": {"max_uri_tags": 100, "enable": {}, "source_sha256": "abc"},
+                                    "http_uri_contract": {"allowed_uris": ["/actuator/health", "/internal/loadtest/coupons"]}, "evidence": "git grep MeterFilter|remove @b1e08f7: none; application.yml sha256=abc",
                                     "spring_boot": "3.1.3", "micrometer": "1.11.x", "registration_paths": ALL_PATHS if paths is None else paths}
     # 주의: 아래 evidence 문구는 형식 검증용 예시이며 실제 stock runner 설정을 대표하지 않는다(실제 runner 는 recovery scheduler 를 끄지 않는다 - Reviewer 지적).
     if sites: d["lock_call_sites"] = {"worker_disabled": True, "recovery_disabled": True, "evidence": "COUPON_ISSUE_WORKER_MODE=off, recovery scheduler off (run-meta)"}
+    if mutate: mutate(d)
     return json.dumps(d)
 class Lazy(unittest.TestCase):
     def run_lazy(self, before, after, with_prov=True, extra=(), **kw):
@@ -133,6 +137,30 @@ class Lazy(unittest.TestCase):
         with self.subTest("http family without its own path"):
             s = self.run_lazy(b, a, paths={"coupon_redis_lock_acquire": "ref"})
             self.assertEqual(s["untimed_reconciliation"]["app1"]["http_baseline_status"], "MISSING")
+    def test_framework_filter_and_http_uri_contract_requirements(self):
+        b, a = base(), after_with_lock()
+        def drop(*path):
+            def f(d):
+                x = d["meter_policy"]
+                for k in path[:-1]: x = x[k]
+                x.pop(path[-1], None)
+            return f
+        def rename_old(d): d["meter_policy"]["meter_filter_or_registry_remove_used"] = d["meter_policy"].pop("custom_app_meter_filter_or_registry_remove_used")
+        for name, m in (("old ambiguous key", rename_old), ("no framework filters", drop("framework_meter_filters")),
+                        ("no effective metrics config", drop("effective_metrics_config")), ("no max_uri_tags", drop("effective_metrics_config", "max_uri_tags"))):
+            with self.subTest(name): self.assertEqual(self.acq(self.run_lazy(b, a, mutate=m))["status"], "MISSING")
+        # HTTP family: 계약 없음 / after uri 가 계약 밖 / distinct uri 수가 한도 이상 -> HTTP baseline 만 MISSING (락 timer 는 영향 없음)
+        def set_contract(allowed=None, mx=None):
+            def f(d):
+                if allowed is not None: d["meter_policy"]["http_uri_contract"]["allowed_uris"] = allowed
+                if mx is not None: d["meter_policy"]["effective_metrics_config"]["max_uri_tags"] = mx
+            return f
+        for name, m in (("no uri contract", drop("http_uri_contract")), ("uri outside contract", set_contract(allowed=["/internal/loadtest/coupons"])),
+                        ("distinct uris >= max", set_contract(mx=1)), ("empty allowed", set_contract(allowed=[]))):
+            with self.subTest("http " + name):
+                s = self.run_lazy(b, a, mutate=m)
+                self.assertEqual(s["untimed_reconciliation"]["app1"]["http_baseline_status"], "MISSING")
+                self.assertEqual(self.acq(s)["status"], "OK_INFERRED_ZERO_BASELINE") if name in ("no uri contract", "uri outside contract", "empty allowed") else None
     def test_requested_target_must_match_run_contract(self):
         s = self.run_lazy(base(), after_with_lock(), requested="http://127.0.0.1:9999/actuator/prometheus")   # redirect/잘못된 앱 포트
         self.assertEqual(self.acq(s)["status"], "MISSING")
@@ -174,7 +202,7 @@ class Lazy(unittest.TestCase):
     def test_non_lazy_family_never_inferred(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location("pb", HERE / "prom_baseline.py"); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-        ev = {"structural_ok": True, "provenance_ok": True, "checks": {}, "provenance_checks": {"x": {"pass": True, "detail": ""}}, "registration_paths": ALL_PATHS}
+        ev = {"structural_ok": True, "provenance_ok": True, "checks": {}, "provenance_checks": {"x": {"pass": True, "detail": ""}}, "registration_paths": ALL_PATHS, "http_uri_contract": {"allowed_uris": ["/a"]}, "after_http_uris": ["/a"], "max_uri_tags": 100}
         self.assertIsNone(m.lazy_zero_allowed(ev, "jvm_gc_pause", True)[0])
         self.assertEqual(m.lazy_zero_allowed(ev, "coupon_redis_lock_hold")[0], "OK_INFERRED_ZERO_BASELINE")
         self.assertEqual(m.lazy_zero_allowed(ev, "http_server_requests")[0], "OK_INFERRED_ZERO_BASELINE")
