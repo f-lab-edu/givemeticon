@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Actual iteration ledger and conservative per-path warmup drain evidence."""
-import importlib.util,json,re,sys
+import importlib.util,json,re,sys,math
 from pathlib import Path
 HERE=Path(__file__).parent
 s=importlib.util.spec_from_file_location('gate',HERE/'final-generation-gate.py');gate=importlib.util.module_from_spec(s);s.loader.exec_module(gate)
@@ -22,14 +22,31 @@ def occupancy(records,dropped):
             'scheduled_backlog_definition':'scheduled - completed includes dropped/unstarted demand; never actual VU occupancy',
             'invalid_records':invalid,'pass':bool(started) and invalid==0 and set(started)==set(finished)}
 
+def http_series(file,uri):
+    spec=importlib.util.spec_from_file_location('pb',HERE.parent/'prom_baseline.py');pb=importlib.util.module_from_spec(spec);spec.loader.exec_module(pb)
+    document=pb.read_prom(file);values={};starts=[];invalid=document is None or document['bad_lines']>0
+    for name,labels,value in (document or {}).get('rows',[]):
+        if name=='process_start_time_seconds':starts.append(value)
+        if name=='http_server_requests_seconds_count' and labels.get('method')=='POST' and labels.get('uri')==uri:
+            key=tuple(sorted(labels.items()))
+            if key in values or not math.isfinite(value) or value<0:invalid=True
+            values[key]=value
+    return values,starts,invalid
+
 def http_counts(file,uri):
-    text=file.read_text();values=[];starts=[]
-    for line in text.splitlines():
-        if line.startswith('process_start_time_seconds'):starts.append(float(line.rsplit(' ',1)[1]))
-        if line.startswith('http_server_requests_seconds_count{'):
-            labels=dict(re.findall(r'(\w+)="([^"]*)"',line))
-            if labels.get('method')=='POST' and labels.get('uri')==uri:values.append(float(line.rsplit(' ',1)[1]))
-    return sum(values) if values else None, starts
+    values,starts,invalid=http_series(file,uri)
+    return sum(values.values()) if values and not invalid else None,starts
+
+def direct_http_delta(before,after):
+    new=set(after)-set(before);gone=set(before)-set(after)
+    decreased={key for key in set(before)&set(after) if after[key]<before[key]}
+    complete=bool(before) and bool(after) and not (new or gone or decreased)
+    show=lambda keys:[dict(key) for key in sorted(keys)]
+    return {'pass':complete,'baseline_status':'RESET' if decreased else 'MISSING_SERIES' if gone else 'MISSING_NEW_SERIES' if new else 'OK_DIRECT' if complete else 'MISSING',
+            'new_series':show(new),'missing_after_series':show(gone),'decreased_series':show(decreased),
+            'series_deltas':[{'labels':dict(key),'before':before[key],'after':after[key],'delta':after[key]-before[key]} for key in sorted(before) if key in after],
+            'delta':sum(after[key]-before[key] for key in before) if complete else None,
+            'scope':'all POST/URI labels must match exactly, including status/outcome/exception; no absent series receives zero'}
 
 def drain(root,path,records,ledger,warmup):
     result={'client_iterations_finished':ledger['pass'],'generator_finished':'see retained generator exit/state',
@@ -48,13 +65,17 @@ def drain(root,path,records,ledger,warmup):
             bp=root/f'run/app{app}-before.prom';ap=root/f'run/app{app}-after.prom'
             prov=pb.read_provenance(root/f'run/app{app}-scrape-provenance.json')
             ev=pb.scrape_evidence(pb.read_prom(bp),pb.read_prom(ap),prov,(bp,ap))
-            direct=scrapes_complete and before is not None and after is not None and after>=before
-            delta=after-before if direct else None
+            bseries,_,binvalid=http_series(bp,'/internal/loadtest/coupons')
+            aseries,_,ainvalid=http_series(ap,'/internal/loadtest/coupons')
+            series=direct_http_delta(bseries,aseries)
+            direct=scrapes_complete and not binvalid and not ainvalid and series['pass']
+            delta=series['delta'] if direct else None
             # HTTP absent-before is never inferred in this execution gate.
             evidence_ok=ev['structural_ok'] and ev['provenance_ok']
             checks.append({'app':app,'sent':sent[app],'before_observed':before,'after_observed':after,'delta':delta,
-                           'baseline_status':'OK_DIRECT' if direct else 'MISSING',
-                           'baseline_reason':'direct aggregate POST completion counter; absent baseline refuses transition',
+                           'baseline_status':'OK_DIRECT' if direct else series['baseline_status'] if not series['pass'] else 'MISSING_CAPTURE',
+                           'baseline_reason':'exact full-label series baselines required; new/missing/decreased series refuses transition',
+                           'series_baseline':series,
                            'inferred_zero_baseline':False,'scrape_evidence':ev,
                            'successful_capture_evidence':evidence_ok,'same_process':len(bst)==1 and bst==ast,
                            'completion_reconciled':evidence_ok and direct and len(bst)==1 and bst==ast and delta==sent[app]})
