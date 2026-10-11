@@ -49,6 +49,10 @@ for runner in run-capped-v1.sh run-capped-stock.sh; do
   grep -E 'givemeticon-(mysql|redis|kafka)|-p (3306|6379|6380|9092):' "$tmp/docker.log" >/dev/null && bad "$runner references shared infra" || ok "$runner: no shared infra reference"
   grep -q 'network create --label xyz.buzz.verifier.managed=capped-harness verifier-cap-net' "$tmp/docker.log" && ok "$runner: own labeled network" || bad "$runner network"
 
+  reset; rc=$(WARMED_LEGACY_WORKERS_OFF=true runit $runner up)
+  [[ $rc -eq 0 && $(grep '^docker run -d' "$tmp/docker.log" | grep -c -e '--coupon.issue-worker.mode=off --coupon.issue-worker.enabled=false') -eq 2 ]] && ok "$runner: warmed legacy mode/recovery overrides both apps" || bad "$runner warmed worker arguments"
+  [[ $(grep '^docker run -d' "$tmp/docker.log" | grep -c -e '--management.endpoints.web.exposure.include=health,prometheus,conditions') -eq 2 ]] && ok "$runner: warmed condition evidence endpoint explicitly enabled" || bad "$runner warmed endpoint arguments"
+
   reset; rc=$(STUB_EXISTS=1 runit $runner up)
   [[ $rc -eq 2 ]] && ! grep -q '^docker run' "$tmp/docker.log" && grep -q 'already exists' "$tmp/out" && ok "$runner: existing name refused, no run" || bad "$runner existing rc=$rc"
 

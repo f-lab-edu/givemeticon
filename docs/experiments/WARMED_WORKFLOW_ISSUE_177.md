@@ -49,3 +49,40 @@ Architect e7d400e4/16752bc2 requires that interface before analyzer integration.
 Verifier fc2f27b has not been copied or used to unlock the cold meter UNKNOWN gate.
 Past artifacts receive no newly invented capture metadata. This change prepares
 future evidence collection, and does not authorize or claim a runtime execution.
+
+
+### Reviewed analyzer / future worker-policy integration
+
+Analyzer snapshot is Verifier `db39d41dd07a03649e9d2f8c93aa03c03033a852`.
+Full copied-file hashes are in the source manifest; parent runners/config are not
+copied. Default historical reanalysis is MISSING/UNKNOWN and manual conditional
+outputs remain separate. No manual inference flag is used by warmed gates.
+
+The adapter obtains expected endpoints from contract.json, compares BOTH
+requested/effective targets, and hashes the stored .prom bytes without normalization.
+A wrong app port in requested/effective cannot become the expected target.
+Bytes differing from curl download size are refused. Missing policy remains
+MISSING. Transport sidecars still do not certify semantic completeness.
+
+For this future diagnosis only, both paths use explicit CLI legacy mode=off and
+recovery enabled=false. V1 event worker remains enabled through its own profile.
+Cold stock recovery was enabled by default; cold V1 disabled it via coupon-admission.
+That is a source/profile condition asymmetry, not evidence of recovery activity
+or performance impact. Previous same-condition wording applies only to cap/workload.
+
+The warmed-only CLI additionally exposes actuator conditions so the owned app's
+selected scheduler conditions can be checked before any preflight/workload.
+Only selected condition entries, whitelisted explicit settings, owner/source mount
+checks and jar/config/dependency/source hashes are saved; no full env/config or
+condition dump is saved. Actual Spring config/condition tests independently exercise
+cold stock recovery and warmed stock/V1. Missing runtime condition evidence refuses
+transition. These are conditional registration decisions, not measured scheduler activity.
+
+Local bootJar embeds Micrometer1.11.3 / SpringWeb6.0.11; retained matching jar
+javap outputs show ServerHttpObservationFilter.stop and DefaultMeterObservationHandler
+onStop -> Timer.builder(tags).register -> sample.stop. This is family/version-specific.
+Policy provenance connects the reviewed source/config/jar/dependency to the run,
+but records a bounded application-policy claim and runtime_registry_policy UNKNOWN;
+nonempty strings alone do not automatically verify all library/runtime meter policies.
+Final independent review must assess this boundary. All metadata is future-run
+only and does not repair historical collection facts.

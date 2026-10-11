@@ -33,14 +33,21 @@ for image in "$MYSQL_IMAGE" "$REDIS_IMAGE" "$JRE_IMAGE" "$K6_IMAGE"; do docker p
 python3 - <<'PY'
 import json,subprocess
 from pathlib import Path
-Path('scripts/verifier-isolated/results/warmed/contract.json').write_text(json.dumps({'sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'profile':'B','service_cpu':2.7,'broker_slot_cpu':.5,'broker_slot_memory_mib':768,'broker_slot':'EMPTY','total_cpu':3.95,'total_memory_mib':9088,'paths':['stock','v1'],'rate':10,'duration_s':10,'duplicate_rate':.1,'pre_allocated_vus':201,'max_vus':201,'warmup':{'rate':10,'duration_s':20,'fixture':'separate','same_jvm':True},'phase':'preflight and warmed low-rate diagnosis; not mandatory baseline','inactive_rates':[20,40],'get_smoke':'V1 recorded members after quiescence; stock has no equivalent final GET endpoint; report unsupported rather than invent endpoint'},indent=2)+'\n')
+Path('scripts/verifier-isolated/results/warmed/contract.json').write_text(json.dumps({'sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'profile':'B','legacy_worker_policy':{'mode':'off','recovery_enabled':False,'v1_event_worker_enabled':True,'changed_from_cold_stock':True},'expected_prometheus_targets':{'app1':'http://127.0.0.1:18080/actuator/prometheus','app2':'http://127.0.0.1:18081/actuator/prometheus'},'service_cpu':2.7,'broker_slot_cpu':.5,'broker_slot_memory_mib':768,'broker_slot':'EMPTY','total_cpu':3.95,'total_memory_mib':9088,'paths':['stock','v1'],'rate':10,'duration_s':10,'duplicate_rate':.1,'pre_allocated_vus':201,'max_vus':201,'warmup':{'rate':10,'duration_s':20,'fixture':'separate','same_jvm':True},'phase':'preflight and warmed low-rate diagnosis; not mandatory baseline','inactive_rates':[20,40],'get_smoke':'V1 recorded members after quiescence; stock has no equivalent final GET endpoint; report unsupported rather than invent endpoint'},indent=2)+'\n')
 PY
 mkdir -p build/verifier-cap
 python3 -c 'from pathlib import Path;import shutil;shutil.copyfile(next(p for p in Path("build/libs").glob("*.jar") if "plain" not in p.name),"build/verifier-cap/app.jar")'
+export WARMED_LEGACY_WORKERS_OFF=true
+export WARMED_CONTRACT_FILE="$REPORT_BASE/contract.json"
 for path in stock v1; do
   runner="$repo/scripts/verifier-isolated/capped/run-capped-$path.sh"
   export DB_NAME="givemeticon_coupon_admission_loadtest_177_w_$path"
+  export WARMED_POLICY_DIR="$REPORT_BASE/$path-policy"
+  mkdir -p "$WARMED_POLICY_DIR"
   "$runner" up
+  for app in app1 app2; do
+    python3 scripts/verifier-isolated/hosted/worker-meter-policy.py "$path" "$app" "$WARMED_CONTRACT_FILE" "$WARMED_POLICY_DIR/$app.json"
+  done
   python3 scripts/verifier-isolated/hosted/verify-calibration-caps.py "$VERIFIER_PREFIX" "$VERIFIER_OWNER_ID" "$REPORT_BASE/caps-$path.json"
   # The real script and imports initialize201/401 VUs; no HTTP or dummy endpoint.
   for size in 201 401; do

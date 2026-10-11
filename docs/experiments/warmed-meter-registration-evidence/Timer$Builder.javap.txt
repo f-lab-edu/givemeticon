@@ -1,0 +1,263 @@
+Compiled from "Timer.java"
+public class io.micrometer.core.instrument.Timer$Builder extends io.micrometer.core.instrument.AbstractTimerBuilder<io.micrometer.core.instrument.Timer$Builder> {
+  io.micrometer.core.instrument.Timer$Builder(java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #1                  // Method io/micrometer/core/instrument/AbstractTimerBuilder."<init>":(Ljava/lang/String;)V
+       5: return
+
+  public io.micrometer.core.instrument.Timer$Builder tags(java.lang.String...);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #7                  // Method io/micrometer/core/instrument/AbstractTimerBuilder.tags:([Ljava/lang/String;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder tags(java.lang.Iterable<io.micrometer.core.instrument.Tag>);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #13                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.tags:(Ljava/lang/Iterable;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder tag(java.lang.String, java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_2
+       3: invokespecial #16                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.tag:(Ljava/lang/String;Ljava/lang/String;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       6: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       9: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder publishPercentiles(double...);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #20                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.publishPercentiles:([D)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder percentilePrecision(java.lang.Integer);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #24                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.percentilePrecision:(Ljava/lang/Integer;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder publishPercentileHistogram();
+    Code:
+       0: aload_0
+       1: invokespecial #28                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.publishPercentileHistogram:()Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       4: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       7: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder publishPercentileHistogram(java.lang.Boolean);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #32                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.publishPercentileHistogram:(Ljava/lang/Boolean;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder sla(java.time.Duration...);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #35                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.sla:([Ljava/time/Duration;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder serviceLevelObjectives(java.time.Duration...);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #39                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.serviceLevelObjectives:([Ljava/time/Duration;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder minimumExpectedValue(java.time.Duration);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #42                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.minimumExpectedValue:(Ljava/time/Duration;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder maximumExpectedValue(java.time.Duration);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #46                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.maximumExpectedValue:(Ljava/time/Duration;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder distributionStatisticExpiry(java.time.Duration);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #49                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.distributionStatisticExpiry:(Ljava/time/Duration;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder distributionStatisticBufferLength(java.lang.Integer);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #52                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.distributionStatisticBufferLength:(Ljava/lang/Integer;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder pauseDetector(io.micrometer.core.instrument.distribution.pause.PauseDetector);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #55                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.pauseDetector:(Lio/micrometer/core/instrument/distribution/pause/PauseDetector;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer$Builder description(java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #59                 // Method io/micrometer/core/instrument/AbstractTimerBuilder.description:(Ljava/lang/String;)Lio/micrometer/core/instrument/AbstractTimerBuilder;
+       5: checkcast     #11                 // class io/micrometer/core/instrument/Timer$Builder
+       8: areturn
+
+  public io.micrometer.core.instrument.Timer register(io.micrometer.core.instrument.MeterRegistry);
+    Code:
+       0: aload_1
+       1: new           #63                 // class io/micrometer/core/instrument/Meter$Id
+       4: dup
+       5: aload_0
+       6: getfield      #65                 // Field name:Ljava/lang/String;
+       9: aload_0
+      10: getfield      #69                 // Field tags:Lio/micrometer/core/instrument/Tags;
+      13: aconst_null
+      14: aload_0
+      15: getfield      #72                 // Field description:Ljava/lang/String;
+      18: getstatic     #74                 // Field io/micrometer/core/instrument/Meter$Type.TIMER:Lio/micrometer/core/instrument/Meter$Type;
+      21: invokespecial #80                 // Method io/micrometer/core/instrument/Meter$Id."<init>":(Ljava/lang/String;Lio/micrometer/core/instrument/Tags;Ljava/lang/String;Ljava/lang/String;Lio/micrometer/core/instrument/Meter$Type;)V
+      24: aload_0
+      25: getfield      #83                 // Field distributionConfigBuilder:Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder;
+      28: invokevirtual #87                 // Method io/micrometer/core/instrument/distribution/DistributionStatisticConfig$Builder.build:()Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig;
+      31: aload_0
+      32: getfield      #93                 // Field pauseDetector:Lio/micrometer/core/instrument/distribution/pause/PauseDetector;
+      35: ifnonnull     48
+      38: aload_1
+      39: invokevirtual #96                 // Method io/micrometer/core/instrument/MeterRegistry.config:()Lio/micrometer/core/instrument/MeterRegistry$Config;
+      42: invokevirtual #102                // Method io/micrometer/core/instrument/MeterRegistry$Config.pauseDetector:()Lio/micrometer/core/instrument/distribution/pause/PauseDetector;
+      45: goto          52
+      48: aload_0
+      49: getfield      #93                 // Field pauseDetector:Lio/micrometer/core/instrument/distribution/pause/PauseDetector;
+      52: invokevirtual #107                // Method io/micrometer/core/instrument/MeterRegistry.timer:(Lio/micrometer/core/instrument/Meter$Id;Lio/micrometer/core/instrument/distribution/DistributionStatisticConfig;Lio/micrometer/core/instrument/distribution/pause/PauseDetector;)Lio/micrometer/core/instrument/Timer;
+      55: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder description(java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #111                // Method description:(Ljava/lang/String;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder pauseDetector(io.micrometer.core.instrument.distribution.pause.PauseDetector);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #114                // Method pauseDetector:(Lio/micrometer/core/instrument/distribution/pause/PauseDetector;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder distributionStatisticBufferLength(java.lang.Integer);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #117                // Method distributionStatisticBufferLength:(Ljava/lang/Integer;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder distributionStatisticExpiry(java.time.Duration);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #120                // Method distributionStatisticExpiry:(Ljava/time/Duration;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder maximumExpectedValue(java.time.Duration);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #123                // Method maximumExpectedValue:(Ljava/time/Duration;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder minimumExpectedValue(java.time.Duration);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #125                // Method minimumExpectedValue:(Ljava/time/Duration;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder serviceLevelObjectives(java.time.Duration[]);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #127                // Method serviceLevelObjectives:([Ljava/time/Duration;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder sla(java.time.Duration[]);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #130                // Method sla:([Ljava/time/Duration;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder publishPercentileHistogram(java.lang.Boolean);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #132                // Method publishPercentileHistogram:(Ljava/lang/Boolean;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder publishPercentileHistogram();
+    Code:
+       0: aload_0
+       1: invokevirtual #135                // Method publishPercentileHistogram:()Lio/micrometer/core/instrument/Timer$Builder;
+       4: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder percentilePrecision(java.lang.Integer);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #138                // Method percentilePrecision:(Ljava/lang/Integer;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder publishPercentiles(double[]);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #140                // Method publishPercentiles:([D)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder tag(java.lang.String, java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_2
+       3: invokevirtual #143                // Method tag:(Ljava/lang/String;Ljava/lang/String;)Lio/micrometer/core/instrument/Timer$Builder;
+       6: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder tags(java.lang.Iterable);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #146                // Method tags:(Ljava/lang/Iterable;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+
+  public io.micrometer.core.instrument.AbstractTimerBuilder tags(java.lang.String[]);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokevirtual #149                // Method tags:([Ljava/lang/String;)Lio/micrometer/core/instrument/Timer$Builder;
+       5: areturn
+}

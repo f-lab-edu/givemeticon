@@ -1,0 +1,380 @@
+{
+  "acquire": {
+    "per_app": {
+      "app1": {
+        "outcome=acquired": {
+          "status": "CONDITIONAL_MANUAL_INFERENCE",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": true,
+            "reason": "manual: structural only; provenance unverified (provenance_present,registration_paths[coupon_redis_lock_acquire]); registration basis: DistributedLockAop: Timer.builder(\"coupon.redis_lock.acquire\").tags(outcome).register(..) at call time",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/955, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.014/1791676716.014, labels_equal=True, uptime=44.408/64.044 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          },
+          "count_delta": 49.0,
+          "sum_s_delta": 177.725477,
+          "mean_ms": 3627.051,
+          "quantile_upper_le_s": {
+            "p50": "3.937053352",
+            "p95": "5.726623061",
+            "p99": "5.726623061"
+          }
+        },
+        "outcome=rejected": {
+          "status": "CONDITIONAL_MANUAL_INFERENCE",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": true,
+            "reason": "manual: structural only; provenance unverified (provenance_present,registration_paths[coupon_redis_lock_acquire]); registration basis: DistributedLockAop: Timer.builder(\"coupon.redis_lock.acquire\").tags(outcome).register(..) at call time",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/955, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.014/1791676716.014, labels_equal=True, uptime=44.408/64.044 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          },
+          "count_delta": 52.0,
+          "sum_s_delta": 260.042523,
+          "mean_ms": 5000.818,
+          "quantile_upper_le_s": {
+            "p50": "5.726623061",
+            "p95": "5.726623061",
+            "p99": "5.726623061"
+          }
+        }
+      },
+      "app2": {
+        "outcome=acquired": {
+          "status": "CONDITIONAL_MANUAL_INFERENCE",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": true,
+            "reason": "manual: structural only; provenance unverified (provenance_present,registration_paths[coupon_redis_lock_acquire]); registration basis: DistributedLockAop: Timer.builder(\"coupon.redis_lock.acquire\").tags(outcome).register(..) at call time",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/1030, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.205/1791676716.205, labels_equal=True, uptime=44.273/63.873 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          },
+          "count_delta": 62.0,
+          "sum_s_delta": 152.662441,
+          "mean_ms": 2462.297,
+          "quantile_upper_le_s": {
+            "p50": "2.505397588",
+            "p95": "5.726623061",
+            "p99": "5.726623061"
+          }
+        },
+        "outcome=rejected": {
+          "status": "CONDITIONAL_MANUAL_INFERENCE",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": true,
+            "reason": "manual: structural only; provenance unverified (provenance_present,registration_paths[coupon_redis_lock_acquire]); registration basis: DistributedLockAop: Timer.builder(\"coupon.redis_lock.acquire\").tags(outcome).register(..) at call time",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/1030, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.205/1791676716.205, labels_equal=True, uptime=44.273/63.873 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          },
+          "count_delta": 59.0,
+          "sum_s_delta": 295.838293,
+          "mean_ms": 5014.208,
+          "quantile_upper_le_s": {
+            "p50": "5.726623061",
+            "p95": "5.726623061",
+            "p99": "5.726623061"
+          }
+        }
+      }
+    },
+    "combined": {
+      "outcome=acquired": {
+        "status": "CONDITIONAL_MANUAL_INFERENCE(bucket-summed)",
+        "count_delta": 111.0,
+        "mean_ms": 2976.468,
+        "quantile_upper_le_s": {
+          "p50": "2.863311529",
+          "p95": "5.726623061",
+          "p99": "5.726623061"
+        }
+      },
+      "outcome=rejected": {
+        "status": "CONDITIONAL_MANUAL_INFERENCE(bucket-summed)",
+        "count_delta": 111.0,
+        "mean_ms": 5007.935,
+        "quantile_upper_le_s": {
+          "p50": "5.726623061",
+          "p95": "5.726623061",
+          "p99": "5.726623061"
+        }
+      }
+    }
+  },
+  "hold": {
+    "per_app": {
+      "app1": {
+        "(no-tags)": {
+          "status": "CONDITIONAL_MANUAL_INFERENCE",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": true,
+            "reason": "manual: structural only; provenance unverified (provenance_present,registration_paths[coupon_redis_lock_hold]); registration basis: DistributedLockAop: Timer.builder(\"coupon.redis_lock.hold\").register(..) at call time",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/955, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.014/1791676716.014, labels_equal=True, uptime=44.408/64.044 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          },
+          "count_delta": 49.0,
+          "sum_s_delta": 1.856148,
+          "mean_ms": 37.881,
+          "quantile_upper_le_s": {
+            "p50": "0.013981011",
+            "p95": "0.111848106",
+            "p99": "0.134217727"
+          }
+        }
+      },
+      "app2": {
+        "(no-tags)": {
+          "status": "CONDITIONAL_MANUAL_INFERENCE",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": true,
+            "reason": "manual: structural only; provenance unverified (provenance_present,registration_paths[coupon_redis_lock_hold]); registration basis: DistributedLockAop: Timer.builder(\"coupon.redis_lock.hold\").register(..) at call time",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/1030, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.205/1791676716.205, labels_equal=True, uptime=44.273/63.873 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          },
+          "count_delta": 62.0,
+          "sum_s_delta": 3.118578,
+          "mean_ms": 50.3,
+          "quantile_upper_le_s": {
+            "p50": "0.011184809",
+            "p95": "0.111848106",
+            "p99": "0.805306366"
+          }
+        }
+      }
+    },
+    "combined": {
+      "(no-tags)": {
+        "status": "CONDITIONAL_MANUAL_INFERENCE(bucket-summed)",
+        "count_delta": 111.0,
+        "mean_ms": 44.817,
+        "quantile_upper_le_s": {
+          "p50": "0.01258291",
+          "p95": "0.111848106",
+          "p99": "0.134217727"
+        }
+      }
+    }
+  },
+  "untimed_reconciliation": {
+    "app1": {
+      "http_loadtest_requests_delta": 101.0,
+      "http_before_series_absent": true,
+      "http_baseline_status": "CONDITIONAL_MANUAL_INFERENCE",
+      "lock_acquire_timer_count_all_outcomes": 101.0,
+      "depends_on_inferred_zero_baseline": {
+        "timer_series": [
+          "outcome=acquired",
+          "outcome=rejected"
+        ],
+        "http_before_series_absent": true,
+        "any": true,
+        "note": "true 면 untimed 추정은 직접 관측이 아니라 추론(또는 조건부 수동 추론)에 근거한 값"
+      },
+      "lock_call_sites_evidence": {
+        "verified": false,
+        "recorded": null,
+        "scope": "락 timer(coupon.redis_lock.*)는 worker/recovery 등 모든 @DistributedLock 사이트를 포함한다. loadtest URI 요청만 센 http 와 대조하려면 다른 사이트 비활성 근거가 필요하다"
+      },
+      "untimed_estimate(http - timer, NOT assumed zero)": "UNKNOWN",
+      "gap_numeric_diagnostic_only(not a conclusion)": 0.0,
+      "app_log_counts": {
+        "LockAcquisitionFailedException": 0,
+        "Lock acquisition interrupted": 0,
+        "ERROR_lines": 0,
+        "RedisException/timeout lines": 0
+      }
+    },
+    "app2": {
+      "http_loadtest_requests_delta": 121.0,
+      "http_before_series_absent": true,
+      "http_baseline_status": "CONDITIONAL_MANUAL_INFERENCE",
+      "lock_acquire_timer_count_all_outcomes": 121.0,
+      "depends_on_inferred_zero_baseline": {
+        "timer_series": [
+          "outcome=acquired",
+          "outcome=rejected"
+        ],
+        "http_before_series_absent": true,
+        "any": true,
+        "note": "true 면 untimed 추정은 직접 관측이 아니라 추론(또는 조건부 수동 추론)에 근거한 값"
+      },
+      "lock_call_sites_evidence": {
+        "verified": false,
+        "recorded": null,
+        "scope": "락 timer(coupon.redis_lock.*)는 worker/recovery 등 모든 @DistributedLock 사이트를 포함한다. loadtest URI 요청만 센 http 와 대조하려면 다른 사이트 비활성 근거가 필요하다"
+      },
+      "untimed_estimate(http - timer, NOT assumed zero)": "UNKNOWN",
+      "gap_numeric_diagnostic_only(not a conclusion)": 0.0,
+      "app_log_counts": {
+        "LockAcquisitionFailedException": 0,
+        "Lock acquisition interrupted": 0,
+        "ERROR_lines": 0,
+        "RedisException/timeout lines": 0
+      }
+    }
+  },
+  "notes": [
+    "hold wraps the whole REQUIRES_NEW transaction (DB connection acquire..commit) - not pure Redis time",
+    "default wait 5s / lease 3s (DistributedLock annotation defaults); see lock-annotation-sites.txt for per-site config",
+    "same metric names are used by the async worker and recovery worker sites; metrics carry no method tag -> separate by running with COUPON_ISSUE_WORKER_MODE=off and checking worker logs",
+    "non-interrupt tryLock exceptions are NOT timed; compare with http 5xx/log counts, do not treat the gap as zero"
+  ]
+}

@@ -1,0 +1,158 @@
+Compiled from "DefaultMeterObservationHandler.java"
+public class io.micrometer.core.instrument.observation.DefaultMeterObservationHandler implements io.micrometer.core.instrument.observation.MeterObservationHandler<io.micrometer.observation.Observation$Context> {
+  private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
+  public io.micrometer.core.instrument.observation.DefaultMeterObservationHandler(io.micrometer.core.instrument.MeterRegistry);
+    Code:
+       0: aload_0
+       1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: aload_1
+       6: putfield      #7                  // Field meterRegistry:Lio/micrometer/core/instrument/MeterRegistry;
+       9: return
+
+  public void onStart(io.micrometer.observation.Observation$Context);
+    Code:
+       0: new           #13                 // class java/lang/StringBuilder
+       3: dup
+       4: invokespecial #15                 // Method java/lang/StringBuilder."<init>":()V
+       7: aload_1
+       8: invokevirtual #16                 // Method io/micrometer/observation/Observation$Context.getName:()Ljava/lang/String;
+      11: invokevirtual #22                 // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+      14: ldc           #26                 // String .active
+      16: invokevirtual #22                 // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+      19: invokevirtual #28                 // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+      22: invokestatic  #31                 // InterfaceMethod io/micrometer/core/instrument/LongTaskTimer.builder:(Ljava/lang/String;)Lio/micrometer/core/instrument/LongTaskTimer$Builder;
+      25: aload_0
+      26: aload_1
+      27: invokespecial #37                 // Method createTags:(Lio/micrometer/observation/Observation$Context;)Ljava/util/List;
+      30: invokevirtual #41                 // Method io/micrometer/core/instrument/LongTaskTimer$Builder.tags:(Ljava/lang/Iterable;)Lio/micrometer/core/instrument/LongTaskTimer$Builder;
+      33: aload_0
+      34: getfield      #7                  // Field meterRegistry:Lio/micrometer/core/instrument/MeterRegistry;
+      37: invokevirtual #47                 // Method io/micrometer/core/instrument/LongTaskTimer$Builder.register:(Lio/micrometer/core/instrument/MeterRegistry;)Lio/micrometer/core/instrument/LongTaskTimer;
+      40: invokeinterface #51,  1           // InterfaceMethod io/micrometer/core/instrument/LongTaskTimer.start:()Lio/micrometer/core/instrument/LongTaskTimer$Sample;
+      45: astore_2
+      46: aload_1
+      47: ldc           #55                 // class io/micrometer/core/instrument/LongTaskTimer$Sample
+      49: aload_2
+      50: invokevirtual #57                 // Method io/micrometer/observation/Observation$Context.put:(Ljava/lang/Object;Ljava/lang/Object;)Lio/micrometer/observation/Observation$Context;
+      53: pop
+      54: aload_0
+      55: getfield      #7                  // Field meterRegistry:Lio/micrometer/core/instrument/MeterRegistry;
+      58: invokestatic  #61                 // InterfaceMethod io/micrometer/core/instrument/Timer.start:(Lio/micrometer/core/instrument/MeterRegistry;)Lio/micrometer/core/instrument/Timer$Sample;
+      61: astore_3
+      62: aload_1
+      63: ldc           #66                 // class io/micrometer/core/instrument/Timer$Sample
+      65: aload_3
+      66: invokevirtual #57                 // Method io/micrometer/observation/Observation$Context.put:(Ljava/lang/Object;Ljava/lang/Object;)Lio/micrometer/observation/Observation$Context;
+      69: pop
+      70: return
+
+  public void onStop(io.micrometer.observation.Observation$Context);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokespecial #37                 // Method createTags:(Lio/micrometer/observation/Observation$Context;)Ljava/util/List;
+       5: astore_2
+       6: aload_2
+       7: ldc           #68                 // String error
+       9: aload_0
+      10: aload_1
+      11: invokespecial #70                 // Method getErrorValue:(Lio/micrometer/observation/Observation$Context;)Ljava/lang/String;
+      14: invokestatic  #74                 // InterfaceMethod io/micrometer/core/instrument/Tag.of:(Ljava/lang/String;Ljava/lang/String;)Lio/micrometer/core/instrument/Tag;
+      17: invokeinterface #80,  2           // InterfaceMethod java/util/List.add:(Ljava/lang/Object;)Z
+      22: pop
+      23: aload_1
+      24: ldc           #66                 // class io/micrometer/core/instrument/Timer$Sample
+      26: invokevirtual #86                 // Method io/micrometer/observation/Observation$Context.getRequired:(Ljava/lang/Object;)Ljava/lang/Object;
+      29: checkcast     #66                 // class io/micrometer/core/instrument/Timer$Sample
+      32: astore_3
+      33: aload_3
+      34: aload_1
+      35: invokevirtual #16                 // Method io/micrometer/observation/Observation$Context.getName:()Ljava/lang/String;
+      38: invokestatic  #90                 // InterfaceMethod io/micrometer/core/instrument/Timer.builder:(Ljava/lang/String;)Lio/micrometer/core/instrument/Timer$Builder;
+      41: aload_2
+      42: invokevirtual #93                 // Method io/micrometer/core/instrument/Timer$Builder.tags:(Ljava/lang/Iterable;)Lio/micrometer/core/instrument/Timer$Builder;
+      45: aload_0
+      46: getfield      #7                  // Field meterRegistry:Lio/micrometer/core/instrument/MeterRegistry;
+      49: invokevirtual #98                 // Method io/micrometer/core/instrument/Timer$Builder.register:(Lio/micrometer/core/instrument/MeterRegistry;)Lio/micrometer/core/instrument/Timer;
+      52: invokevirtual #101                // Method io/micrometer/core/instrument/Timer$Sample.stop:(Lio/micrometer/core/instrument/Timer;)J
+      55: pop2
+      56: aload_1
+      57: ldc           #55                 // class io/micrometer/core/instrument/LongTaskTimer$Sample
+      59: invokevirtual #86                 // Method io/micrometer/observation/Observation$Context.getRequired:(Ljava/lang/Object;)Ljava/lang/Object;
+      62: checkcast     #55                 // class io/micrometer/core/instrument/LongTaskTimer$Sample
+      65: astore        4
+      67: aload         4
+      69: invokevirtual #105                // Method io/micrometer/core/instrument/LongTaskTimer$Sample.stop:()J
+      72: pop2
+      73: return
+
+  public void onEvent(io.micrometer.observation.Observation$Event, io.micrometer.observation.Observation$Context);
+    Code:
+       0: new           #13                 // class java/lang/StringBuilder
+       3: dup
+       4: invokespecial #15                 // Method java/lang/StringBuilder."<init>":()V
+       7: aload_2
+       8: invokevirtual #16                 // Method io/micrometer/observation/Observation$Context.getName:()Ljava/lang/String;
+      11: invokevirtual #22                 // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+      14: ldc           #108                // String .
+      16: invokevirtual #22                 // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+      19: aload_1
+      20: invokeinterface #110,  1          // InterfaceMethod io/micrometer/observation/Observation$Event.getName:()Ljava/lang/String;
+      25: invokevirtual #22                 // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+      28: invokevirtual #28                 // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+      31: invokestatic  #113                // InterfaceMethod io/micrometer/core/instrument/Counter.builder:(Ljava/lang/String;)Lio/micrometer/core/instrument/Counter$Builder;
+      34: aload_0
+      35: aload_2
+      36: invokespecial #37                 // Method createTags:(Lio/micrometer/observation/Observation$Context;)Ljava/util/List;
+      39: invokevirtual #118                // Method io/micrometer/core/instrument/Counter$Builder.tags:(Ljava/lang/Iterable;)Lio/micrometer/core/instrument/Counter$Builder;
+      42: aload_0
+      43: getfield      #7                  // Field meterRegistry:Lio/micrometer/core/instrument/MeterRegistry;
+      46: invokevirtual #123                // Method io/micrometer/core/instrument/Counter$Builder.register:(Lio/micrometer/core/instrument/MeterRegistry;)Lio/micrometer/core/instrument/Counter;
+      49: invokeinterface #126,  1          // InterfaceMethod io/micrometer/core/instrument/Counter.increment:()V
+      54: return
+
+  private java.lang.String getErrorValue(io.micrometer.observation.Observation$Context);
+    Code:
+       0: aload_1
+       1: invokevirtual #129                // Method io/micrometer/observation/Observation$Context.getError:()Ljava/lang/Throwable;
+       4: astore_2
+       5: aload_2
+       6: ifnull        19
+       9: aload_2
+      10: invokevirtual #133                // Method java/lang/Object.getClass:()Ljava/lang/Class;
+      13: invokevirtual #137                // Method java/lang/Class.getSimpleName:()Ljava/lang/String;
+      16: goto          21
+      19: ldc           #142                // String none
+      21: areturn
+
+  private java.util.List<io.micrometer.core.instrument.Tag> createTags(io.micrometer.observation.Observation$Context);
+    Code:
+       0: new           #144                // class java/util/ArrayList
+       3: dup
+       4: invokespecial #146                // Method java/util/ArrayList."<init>":()V
+       7: astore_2
+       8: aload_1
+       9: invokevirtual #147                // Method io/micrometer/observation/Observation$Context.getLowCardinalityKeyValues:()Lio/micrometer/common/KeyValues;
+      12: invokevirtual #151                // Method io/micrometer/common/KeyValues.iterator:()Ljava/util/Iterator;
+      15: astore_3
+      16: aload_3
+      17: invokeinterface #157,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+      22: ifeq          63
+      25: aload_3
+      26: invokeinterface #163,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+      31: checkcast     #167                // class io/micrometer/common/KeyValue
+      34: astore        4
+      36: aload_2
+      37: aload         4
+      39: invokeinterface #169,  1          // InterfaceMethod io/micrometer/common/KeyValue.getKey:()Ljava/lang/String;
+      44: aload         4
+      46: invokeinterface #172,  1          // InterfaceMethod io/micrometer/common/KeyValue.getValue:()Ljava/lang/String;
+      51: invokestatic  #74                 // InterfaceMethod io/micrometer/core/instrument/Tag.of:(Ljava/lang/String;Ljava/lang/String;)Lio/micrometer/core/instrument/Tag;
+      54: invokeinterface #80,  2           // InterfaceMethod java/util/List.add:(Ljava/lang/Object;)Z
+      59: pop
+      60: goto          16
+      63: aload_2
+      64: areturn
+}

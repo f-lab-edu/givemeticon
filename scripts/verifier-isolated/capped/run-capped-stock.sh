@@ -34,6 +34,10 @@ up_stock() {
     jar=$(find "$repo_dir/build/libs" -maxdepth 1 -name '*.jar' ! -name '*plain*' | head -1); [[ -n "$jar" ]] || { echo 'no jar' >&2; exit 2; }
     cp "$jar" "$repo_dir/build/verifier-cap/app.jar"
   fi
+  local legacy_args=()
+  if [[ "${WARMED_LEGACY_WORKERS_OFF:-false}" == true ]]; then
+    legacy_args=(--coupon.issue-worker.mode=off --coupon.issue-worker.enabled=false --management.endpoints.web.exposure.include=health,prometheus,conditions)
+  fi
   local i=0
   for port in "$PORT_A" "$PORT_B"; do
     i=$((i+1))
@@ -46,7 +50,7 @@ up_stock() {
       --spring.config.additional-location=file:/cfg/config.yml \
       --spring.data.redis.mail.host="$P-redis-mail" --spring.data.redis.mail.port=6379 \
       --spring.data.redis.coupon.host="$P-redis-coupon" --spring.data.redis.coupon.port=6379 \
-      --bootstrap.server=localhost:19092 --spring.flyway.enabled=false >/dev/null
+      --bootstrap.server=localhost:19092 --spring.flyway.enabled=false ${legacy_args[@]+"${legacy_args[@]}"} >/dev/null
   done
   for port in "$PORT_A" "$PORT_B"; do
     for _ in $(seq 1 120); do curl -sf "http://127.0.0.1:$port/actuator/health" >/dev/null && break; sleep 1; done
@@ -108,6 +112,11 @@ run_stock() {
   stop_stock_samplers; wait "$ds" "$psampler" 2>/dev/null || true
   stock_sampling_pids=(); trap - EXIT
   for port in "$PORT_A" "$PORT_B"; do capture_prom "$port" "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-after.prom"; done
+  if [[ "${WARMED_LEGACY_WORKERS_OFF:-false}" == true ]]; then
+    for app in app1 app2; do
+      python3 "$repo_dir/scripts/verifier-isolated/hosted/scrape-provenance.py" "$rd" "$app" "$WARMED_CONTRACT_FILE" --policy "$WARMED_POLICY_DIR/$app.json"
+    done
+  fi
   snap "$root/containers-after.txt"
   "$repo_dir/scripts/verifier-isolated/capture-manifest.sh" "$root/manifest-after.txt" || true
   { printf 'SET @stock_id=%s;\nSET @stock_total=%s;\n' "$sid" "$total"; sed -n '2,$p' "$repo_dir/scripts/loadtest/verify-event.sql"; } | dbx "$DB_NAME" --batch --skip-column-names > "$rd/consistency.txt" || true

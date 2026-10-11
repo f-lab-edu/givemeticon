@@ -80,6 +80,10 @@ up() {
     jar=$(find "$repo_dir/build/libs" -maxdepth 1 -name '*.jar' ! -name '*plain*' | head -1); [[ -n "$jar" ]] || { echo 'no jar' >&2; exit 2; }
     cp "$jar" "$repo_dir/build/verifier-cap/app.jar"
   fi
+  local legacy_args=()
+  if [[ "${WARMED_LEGACY_WORKERS_OFF:-false}" == true ]]; then
+    legacy_args=(--coupon.issue-worker.mode=off --coupon.issue-worker.enabled=false --management.endpoints.web.exposure.include=health,prometheus,conditions)
+  fi
   local i=0
   for port in "$PORT_A" "$PORT_B"; do
     i=$((i+1))
@@ -90,7 +94,7 @@ up() {
       -e VERIFIER_KAFKA_DUMMY_HOST=localhost "$JRE_IMAGE" \
       java -Xmx"$APP_XMX" -XX:+ExitOnOutOfMemoryError -jar /app.jar --server.port=8080 \
       --spring.profiles.active=verifier-loadtest,coupon-admission,coupon-admission-test,coupon-admission-batch,coupon-issuance,coupon-issuance-batch \
-      --spring.config.additional-location=file:/cfg/config.yml --coupon.admission.diagnostics.enabled=false --spring.flyway.enabled=false >/dev/null
+      --spring.config.additional-location=file:/cfg/config.yml --coupon.admission.diagnostics.enabled=false --spring.flyway.enabled=false ${legacy_args[@]+"${legacy_args[@]}"} >/dev/null
   done
   for port in "$PORT_A" "$PORT_B"; do
     for _ in $(seq 1 120); do curl -sf "http://127.0.0.1:$port/actuator/health" >/dev/null && break; sleep 1; done
@@ -226,6 +230,11 @@ run() {
   done
   kill "$sp" "$ds" 2>/dev/null || true; wait "$sp" "$ds" 2>/dev/null || true
   for port in "$PORT_A" "$PORT_B"; do capture_prom "$port" "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-after.prom"; done
+  if [[ "${WARMED_LEGACY_WORKERS_OFF:-false}" == true ]]; then
+    for app in app1 app2; do
+      python3 "$repo_dir/scripts/verifier-isolated/hosted/scrape-provenance.py" "$rd" "$app" "$WARMED_CONTRACT_FILE" --policy "$WARMED_POLICY_DIR/$app.json"
+    done
+  fi
   snap "$root/containers-after.txt"
   "$repo_dir/scripts/verifier-isolated/capture-manifest.sh" "$root/manifest-after.txt" || true
   local q="event_id=$ev"

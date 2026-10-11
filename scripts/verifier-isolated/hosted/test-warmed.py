@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import importlib.util,json,subprocess,tempfile,unittest
+import hashlib,importlib.util,json,subprocess,tempfile,unittest
 from pathlib import Path
 HERE=Path(__file__).parent;REPO=HERE.parents[2]
 spec=importlib.util.spec_from_file_location('stage',HERE/'warmed-stage.py');stage=importlib.util.module_from_spec(spec);spec.loader.exec_module(stage)
@@ -23,7 +23,12 @@ class Warmed(unittest.TestCase):
    for a in (1,2):
     for when,n in [('before',2),('after',3)]:
      (p/f'run/app{a}-{when}.prom.exit.txt').write_text('0')
-     (p/f'run/app{a}-{when}.prom').write_text(f'process_start_time_seconds 10\nhttp_server_requests_seconds_count{{method="POST",uri="/internal/loadtest/coupons",status="200"}} {n}\n')
+     (p/f'run/app{a}-{when}.prom').write_text(f'process_start_time_seconds 10\nprocess_uptime_seconds {10 if when=="before" else 20}\njvm_info{{version="17"}} 1\nhttp_server_requests_seconds_count{{method="POST",uri="/internal/loadtest/coupons",status="200"}} {n}\n')
+   for a in (1,2):
+    target=f'http://127.0.0.1:{18079+a}/actuator/prometheus';sc={}
+    for when in ('before','after'):
+     f=p/f'run/app{a}-{when}.prom';sc[when]={'exit_code':0,'http_status':200,'requested_target':target,'effective_target':target,'body_bytes':f.stat().st_size,'body_sha256':hashlib.sha256(f.read_bytes()).hexdigest()}
+    (p/f'run/app{a}-scrape-provenance.json').write_text(json.dumps({'schema':'scrape-provenance/v1','expected_target':target,'scrapes':sc,'meter_policy':{'meter_filter_or_registry_remove_used':False,'evidence':'synthetic complete capture policy','spring_boot':'3.1.3','micrometer':'1.11.3','registration_paths':{'http_server_requests':'synthetic registration fixture'}}}))
    self.assertTrue(stage.drain(p,'stock',rows,{'pass':True},True)['warmup_transition_allowed'])
    f=p/'run/app1-after.prom';f.write_text(f.read_text().replace('seconds 10','seconds 11'))
    self.assertFalse(stage.drain(p,'stock',rows,{'pass':True},True)['warmup_transition_allowed'])

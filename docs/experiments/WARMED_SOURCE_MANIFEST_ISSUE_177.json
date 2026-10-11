@@ -1,7 +1,7 @@
 {
   "base_develop": "b941a04efa9d547a845cd5df05c055eab756e9bc",
   "approved_source": "b1e08f7d0093c9431f735f8b21639c19e9186229",
-  "analyzer_correction": "PENDING_FIXED_VERIFIER_SHA",
+  "analyzer_correction": "db39d41dd07a03649e9d2f8c93aa03c03033a852",
   "builder_modified_files": [
     {
       "path": "scripts/coupon-integrated-loadtest/integrated-admission-poll.js",
@@ -16,12 +16,12 @@
     {
       "path": "scripts/verifier-isolated/capped/run-capped-stock.sh",
       "source_sha256": "228d156dbc072ce6ab53ad3fc0de7f0f6cb1fa652c0bfe00e7a8fac8ae594261",
-      "derived_sha256": "82f161633b2b4cdb452ebc278bfba5271615fa6f7625247fd7534f595ae1bb22"
+      "derived_sha256": "eb8bec32c59726c1fe00236cb0a4e9787dfa955af9056ffc8d3a05b1afb22cde"
     },
     {
       "path": "scripts/verifier-isolated/capped/run-capped-v1.sh",
       "source_sha256": "1e8cfdfbeb6edf9c74bce292fc803ec677b2787fa74379180be0b689be5bda84",
-      "derived_sha256": "22c7906c2dafd0ed713c50384c6174bbc2a7c8d5634c8c1f1f84a07659c6ed1d"
+      "derived_sha256": "a72f01575c6d089dd63a01c1dc71cf2e4fb352c16bb0b174d85ae6943debf5f1"
     },
     {
       "path": "scripts/verifier-isolated/hosted/observer-scope.sh",
@@ -30,5 +30,51 @@
     }
   ],
   "scope": "source provenance; not runtime PASS",
-  "analyzer_correction_note": "fc2f27b withheld: external capture and registry-policy provenance interface awaits reviewed Verifier revision; no gate inference enabled"
+  "analyzer_correction_note": "Verifier source snapshot; independent integrated verification and runtime admission pending",
+  "analyzer_snapshot_files": [
+    {
+      "path": "docs/experiments/calibration-run-38096702816-reanalysis/conditional-manual/stock-lock/lock-metrics.json",
+      "source_sha256": "d81e610da39a3b5c3c85123e230acd5e51e9eb15872b887a038eda77268a4375"
+    },
+    {
+      "path": "docs/experiments/calibration-run-38096702816-reanalysis/conditional-manual/v1-server/server-metrics.json",
+      "source_sha256": "087502d2aa84962c79b5ecf34443d7e106fb80cf32a494f09ddeb06b03fc746c"
+    },
+    {
+      "path": "docs/experiments/calibration-run-38096702816-reanalysis/default-no-provenance/stock-lock/lock-metrics.json",
+      "source_sha256": "f9241512d2500751f036feafa7f73b12ffc986521ab4e5a25e54dbbb549d04e8"
+    },
+    {
+      "path": "docs/experiments/calibration-run-38096702816-reanalysis/default-no-provenance/v1-server/server-metrics.json",
+      "source_sha256": "2952bac195b2a642470a7604117794ec0cb6af7c60226022072c07ddf544fd8a"
+    },
+    {
+      "path": "docs/experiments/calibration-run-38096702816-reanalysis/reanalyze-v1-server-metrics.py",
+      "source_sha256": "7a2f9c22b08c12084ab3e70882b866f02d56f79ec7d810540c28260e18896dc4"
+    },
+    {
+      "path": "docs/experiments/calibration-run-38096702816-verifier-review.md",
+      "source_sha256": "14c9c9d61b7d2708218979a481d78e7ae738a2187961a1529d950317621df1de"
+    },
+    {
+      "path": "scripts/verifier-isolated/analyze-lock-metrics.py",
+      "source_sha256": "dcc1ce06dc8abc33b2e623659eaa794a1bf24abdfd3f8534bbd839a3fa9bef5e"
+    },
+    {
+      "path": "scripts/verifier-isolated/analyze-separated-v2.py",
+      "source_sha256": "ea755cf1cf5f330fb6f33af4936a4eb4cec8e28975dbde6aa3c0455532ff3c62"
+    },
+    {
+      "path": "scripts/verifier-isolated/prom_baseline.py",
+      "source_sha256": "3f2286c736b220a14c2f186af7eb5f4696171672d02daadcbfb47ee9df0acbd0"
+    },
+    {
+      "path": "scripts/verifier-isolated/test-analyze-lock-metrics.py",
+      "source_sha256": "9616f1ad5d1e831530e9f29f196e85eaaffe85cecee4c539f831a3afbec80c53"
+    },
+    {
+      "path": "scripts/verifier-isolated/test-analyze-separated-v2-lazy.py",
+      "source_sha256": "dab2694944e62cd291abbd8fe68f5d05fc78a0397808fb5b97a5a20bd95c6c6a"
+    }
+  ]
 }

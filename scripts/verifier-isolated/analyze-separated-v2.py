@@ -10,6 +10,8 @@ v1 대비 변경:
 """
 import collections, csv, json, pathlib, re, statistics, subprocess, sys
 
+ALLOW_MANUAL = "--allow-manual-inference" in sys.argv
+sys.argv = [x for x in sys.argv if x != "--allow-manual-inference"]
 run_dir = pathlib.Path(sys.argv[1]); out = pathlib.Path(sys.argv[2]); out.mkdir(parents=True, exist_ok=True)
 container, database, event_id, member_start = sys.argv[3], sys.argv[4], int(sys.argv[5]), int(sys.argv[6])
 budget_ms = int(sys.argv[7]) if len(sys.argv) > 7 else 180000
@@ -123,23 +125,48 @@ if pc.exists():
     hk = per_app
 else: hk = {"status": "MISSING fast-prom.csv"}
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import prom_baseline as PB
+
+def series_sum(rows, name):
+    v = [x for n, lab, x in rows if n == name]
+    return (sum(v), len(v)) if v else None
+
+def delta_pair(brows, arows, name, ev, allow_manual=False):
+    """서버측 counter 의 run 증가분. before 부재는 prom_baseline 의 증거(본문+provenance)와 등록 경로가 확인된 family 일 때만 baseline 0 으로 '추론'하며 직접 관측과 구분한다."""
+    a = series_sum(arows, name) if arows is not None else None
+    b = series_sum(brows, name) if brows is not None else None
+    if a is None: return "MISSING", None, "series absent in after"
+    if b is None:
+        st, why = PB.lazy_zero_allowed(ev, name.rsplit("_seconds_", 1)[0], allow_manual)
+        return (st, a[0], why) if st else ("MISSING", None, "absent-before not inferable: " + why)
+    if a[0] < b[0]: return "RESET", None, "after < before"
+    return "OK", a[0] - b[0], "direct"
+
 def prom_val(path, name):
-    if not path.exists(): return None
-    t = 0.0; f = False
-    for line in path.read_text(errors="replace").splitlines():
-        if line.startswith(name + "{") or line.startswith(name + " "):
-            try: t += float(line.rsplit(" ", 1)[1]); f = True
-            except ValueError: pass
-    return t if f else None
+    r = PB.read_prom(path)
+    if r is None: return None
+    v = [x for n, lab, x in r["rows"] if n == name]
+    return sum(v) if v else None
 srv = {}
-for app, tag in (("app1", "app1"), ("app2", "app2")):
-    b, a = run_dir / f"{tag}-before.prom", run_dir / f"{tag}-after.prom"
+for app in ("app1", "app2"):
+    br, ar = PB.read_prom(run_dir / f"{app}-before.prom"), PB.read_prom(run_dir / f"{app}-after.prom")
+    ev = PB.scrape_evidence(br, ar, PB.read_provenance(run_dir / f"{app}-scrape-provenance.json"), (run_dir / f"{app}-before.prom", run_dir / f"{app}-after.prom"))
+    brows, arows = (br["rows"] if br else None), (ar["rows"] if ar else None)
     row = {}
     for key, cnt, sm in (("batch_queue_wait", "coupon_admission_batch_queue_wait_seconds_count", "coupon_admission_batch_queue_wait_seconds_sum"),
                          ("admission_tx", "coupon_admission_transaction_seconds_count", "coupon_admission_transaction_seconds_sum")):
-        c0, c1, s0, s1 = prom_val(b, cnt), prom_val(a, cnt), prom_val(b, sm), prom_val(a, sm)
-        row[key] = {"count_delta": c1 - c0, "mean_ms": round(1000 * (s1 - s0) / (c1 - c0), 2)} if None not in (c0, c1, s0, s1) and c1 > c0 else "MISSING"
-    row["batch_queue_wait_max_s_after(cumulative gauge)"] = prom_val(a, "coupon_admission_batch_queue_wait_seconds_max")
+        cs, cd, cw = delta_pair(brows, arows, cnt, ev, ALLOW_MANUAL); ss, sd, sw = delta_pair(brows, arows, sm, ev, ALLOW_MANUAL)
+        usable_st = lambda x: x.startswith("OK") or x == "CONDITIONAL_MANUAL_INFERENCE"
+        if usable_st(cs) and usable_st(ss) and cd > 0:
+            sts = (cs, ss)
+            st = "CONDITIONAL_MANUAL_INFERENCE" if "CONDITIONAL_MANUAL_INFERENCE" in sts else ("OK_INFERRED_ZERO_BASELINE" if "OK_INFERRED_ZERO_BASELINE" in sts else "OK")
+            row[key] = {"status": st, "count_delta": cd, "mean_ms": round(1000 * sd / cd, 2),
+                        "baseline": "direct" if st == "OK" else (st + " (not directly observed): " + cw),
+                        **({"structural_checks": ev["checks"], "provenance_checks": ev["provenance_checks"]} if st != "OK" else {})}
+        else:
+            row[key] = {"status": "MISSING" if "MISSING" in (cs, ss) else (cs if cs != "OK" else ss), "reason": cw if cs != "OK" else sw}
+    row["batch_queue_wait_max_s_after(cumulative gauge)"] = prom_val(run_dir / f"{app}-after.prom", "coupon_admission_batch_queue_wait_seconds_max")
     srv[app] = row
 
 sent_ts = sorted(r["sentAtMs"] for r in adm.values() if r.get("sentAtMs"))
