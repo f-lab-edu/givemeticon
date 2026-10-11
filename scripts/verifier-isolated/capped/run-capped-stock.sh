@@ -56,7 +56,7 @@ up_stock() {
 }
 
 k6_stock() { # $1=stock_id $2=user_start $3=rate $4=duration $5=out_dir
-  local envs=(STOCK_ID="$1" USER_ID_START="$2" RATE="$3" DURATION="$4" MODE="${MODE:-sync}" DUPLICATE_RATE="${DUPLICATE_RATE:-0.10}" RUN_ID="$RUN_LABEL" HTTP_TIMEOUT="${HTTP_TIMEOUT:-10s}"
+  local envs=(ITERATION_LEDGER="${ITERATION_LEDGER:-false}" INITIALIZATION_PREFLIGHT="${INITIALIZATION_PREFLIGHT:-false}" STOCK_ID="$1" USER_ID_START="$2" RATE="$3" DURATION="$4" MODE="${MODE:-sync}" DUPLICATE_RATE="${DUPLICATE_RATE:-0.10}" RUN_ID="$RUN_LABEL" HTTP_TIMEOUT="${HTTP_TIMEOUT:-10s}"
               PRE_ALLOCATED_VUS="${VUS:-2000}" MAX_VUS="${MAX_VUS:-8000}")
   local script="$repo_dir/scripts/verifier-isolated/stock-arrival-record.js"
   if [[ "$K6_MODE" == container ]]; then
@@ -90,7 +90,7 @@ run_stock() {
   printf "k6_pre_allocated_vus=%s\nk6_max_vus=%s\n" "${VUS:-2000}" "${MAX_VUS:-8000}" >> "$root/run-meta.txt"
   local sid; sid=$(dbx "$DB_NAME" --batch --skip-column-names -e "INSERT INTO coupon_stock(total, remain) VALUES ($total, $total); SELECT LAST_INSERT_ID();" | tail -1)
   echo "stock_id=$sid user_id_start=$ustart" >> "$root/run-meta.txt"
-  for port in "$PORT_A" "$PORT_B"; do curl -sf "http://127.0.0.1:$port/actuator/prometheus" > "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-before.prom" || true; done
+  for port in "$PORT_A" "$PORT_B"; do capture_prom "$port" "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-before.prom"; done
   snap "$root/containers-run-start.txt"
   ( while :; do t=$(python3 -c 'import time;print(int(time.time()*1000))'); docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}},{{.PIDs}}' | sed "s/^/$t,/"; sleep 1; done ) > "$rd/docker-stats.csv" 2>/dev/null & local ds=$!
   python3 "$repo_dir/scripts/verifier-isolated/fast-sampler.py" "$rd" unused unused - "$PORT_A" "$PORT_B" "${PROM_INTERVAL_S:-1}" & local psampler=$!
@@ -107,7 +107,7 @@ run_stock() {
   done
   stop_stock_samplers; wait "$ds" "$psampler" 2>/dev/null || true
   stock_sampling_pids=(); trap - EXIT
-  for port in "$PORT_A" "$PORT_B"; do curl -sf "http://127.0.0.1:$port/actuator/prometheus" > "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-after.prom" || true; done
+  for port in "$PORT_A" "$PORT_B"; do capture_prom "$port" "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-after.prom"; done
   snap "$root/containers-after.txt"
   "$repo_dir/scripts/verifier-isolated/capture-manifest.sh" "$root/manifest-after.txt" || true
   { printf 'SET @stock_id=%s;\nSET @stock_total=%s;\n' "$sid" "$total"; sed -n '2,$p' "$repo_dir/scripts/loadtest/verify-event.sql"; } | dbx "$DB_NAME" --batch --skip-column-names > "$rd/consistency.txt" || true

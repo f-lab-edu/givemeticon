@@ -4,6 +4,7 @@
 // 기본 DUPLICATE_RATE=0.10 (ADR-001 주 계약). DUPLICATE_RATE=0 은 고유 요청만 보내는 별도 보조 실험이다.
 import http from 'k6/http';
 import exec from 'k6/execution';
+import { sleep } from 'k6';
 
 const targets = (__ENV.TARGETS || 'http://127.0.0.1:18080,http://127.0.0.1:18081').split(',').map((v) => v.trim()).filter(Boolean);
 const rate = Number(__ENV.RATE || 1000);
@@ -43,7 +44,7 @@ function post(target, userId) {
     timeout: __ENV.HTTP_TIMEOUT || '10s' });
 }
 
-export default function () {
+function workloadIteration() {
   const sequence = exec.scenario.iterationInTest;
   const userId = userIdStart + sequence;
   const targetIndex = sequence % targets.length;
@@ -60,4 +61,25 @@ export default function () {
     console.log(JSON.stringify({ kind: 'stock_request', attempt: 2, userId, target: dupIndex + 1, category: classify(d), status: d.status,
       durationMs: d.timings.duration, sentAtMs: dupSentAtMs, respondedAtMs: Date.now(), scenarioStartMs, inWindow: dupSentAtMs <= scenarioStartMs + windowMs }));
   }
+}
+
+// Opt-in ledger counts actual starts/completions, never dropped/unstarted demand.
+export default function () {
+  const tracked = __ENV.ITERATION_LEDGER === 'true';
+  const initializationOnly = __ENV.INITIALIZATION_PREFLIGHT === 'true';
+  const key = initializationOnly ? `${exec.vu.idInTest}:${exec.vu.iterationInScenario}` : String(exec.scenario.iterationInTest);
+  if (tracked) console.log(JSON.stringify({kind:'iteration_started', iterationKey:key, atMs:Date.now()}));
+  let completed = false;
+  try {
+    if (initializationOnly) sleep(2); // No HTTP, no synthetic SUT; actual module/VU state initialized.
+    else workloadIteration();
+    completed = true;
+  } finally {
+    if (tracked) console.log(JSON.stringify({kind:'iteration_completed', iterationKey:key, atMs:Date.now(), completedNormally:completed}));
+  }
+}
+if (__ENV.INITIALIZATION_PREFLIGHT === 'true') {
+  const count = Number(__ENV.PRE_ALLOCATED_VUS);
+  if (![201,401].includes(count) || Number(__ENV.MAX_VUS) !== count) throw new Error('preflight requires fixed 201 or 401 VUs');
+  options.scenarios = { initialization: { executor:'per-vu-iterations', vus:count, iterations:1, maxDuration:'60s' } };
 }

@@ -149,7 +149,7 @@ k6_docker() {
 
 k6_run() { # $1=event $2=member_start $3=rate $4=duration $5=dup $6=out_dir $7=vus
   local ev=$1 ms=$2 rate=$3 dur=$4 dup=$5 out=$6 vus=${7:-6500}
-  local envs=(EVENT_ID="$ev" MEMBER_ID_START="$ms" RATE="$rate" DURATION="$dur" DUPLICATE_RATE="$dup" POLL_BUDGET_MS=0
+  local envs=(ITERATION_LEDGER="${ITERATION_LEDGER:-false}" INITIALIZATION_PREFLIGHT="${INITIALIZATION_PREFLIGHT:-false}" EVENT_ID="$ev" MEMBER_ID_START="$ms" RATE="$rate" DURATION="$dur" DUPLICATE_RATE="$dup" POLL_BUDGET_MS=0
               PRE_ALLOCATED_VUS="$vus" MAX_VUS="${MAX_VUS:-$((vus+1500))}" HTTP_TIMEOUT="${HTTP_TIMEOUT:-10s}" GRACEFUL_STOP=30s)
   if [[ "$K6_MODE" == container ]]; then
     local e=(); for kv in "${envs[@]}"; do e+=(-e "$kv"); done
@@ -173,6 +173,12 @@ snap() { # 소유 컨테이너 상태 스냅샷: limits, cgroup cpu.stat, OOM �
   done
 }
 
+capture_prom() {
+  local port=$1 destination=$2 rc=0
+  curl --max-time "${PROM_TIMEOUT_S:-3}" -fsS "http://127.0.0.1:$port/actuator/prometheus" > "$destination" || rc=$?
+  printf '%s\n' "$rc" > "$destination.exit.txt"
+}
+
 run() {
   : "${RUN_LABEL:?RUN_LABEL}"; : "${RATE:?RATE}"
   local dur=${DURATION:-10s} dup=${DUPLICATE_RATE:-0.10} st=${STOCK_TOTAL:-1000} hi=${STOCK_HIGH:-500}
@@ -193,8 +199,8 @@ run() {
     sleep 8
   fi
   local ev; ev=$(create_event "$RUN_LABEL-$(date -u +%s)" "$st" "$hi")
-  echo "event_id=$ev member_start=700200000" >> "$root/run-meta.txt"
-  for port in "$PORT_A" "$PORT_B"; do curl -sf "http://127.0.0.1:$port/actuator/prometheus" > "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-before.prom" || true; done
+  echo "event_id=$ev member_start=${MEMBER_ID_START:-700200000}" >> "$root/run-meta.txt"
+  for port in "$PORT_A" "$PORT_B"; do capture_prom "$port" "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-before.prom"; done
   snap "$root/containers-run-start.txt"
   python3 "$repo_dir/scripts/verifier-isolated/fast-sampler.py" "$rd" "$P-mysql" "$DB_NAME" "$ev" "$PORT_A" "$PORT_B" "${PROM_INTERVAL_S:-0.2}" & local sp=$!
   ( while :; do t=$(python3 -c 'import time;print(int(time.time()*1000))'); docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}},{{.PIDs}}' | sed "s/^/$t,/"; sleep 1; done ) > "$rd/docker-stats.csv" 2>/dev/null & local ds=$!
@@ -203,7 +209,7 @@ run() {
   if [[ "${CALIBRATION_GET_DURING:-false}" == true ]]; then
     python3 "$repo_dir/scripts/verifier-isolated/hosted/get-smoke.py" "$root" "http://127.0.0.1:$PORT_A,http://127.0.0.1:$PORT_B" --mode during & get_pid=$!
   fi
-  k6_run "$ev" 700200000 "$RATE" "$dur" "$dup" "$rd" "${VUS:-6500}"
+  k6_run "$ev" "${MEMBER_ID_START:-700200000}" "$RATE" "$dur" "$dup" "$rd" "${VUS:-6500}"
   python3 -c 'import time;print(int(time.time()*1000))' > "$rd/k6-finished-host-ms.txt"
   if [[ -n "$get_pid" ]]; then
     local get_exit=0; wait "$get_pid" || get_exit=$?
@@ -219,7 +225,7 @@ run() {
     prev=$row; sleep 2
   done
   kill "$sp" "$ds" 2>/dev/null || true; wait "$sp" "$ds" 2>/dev/null || true
-  for port in "$PORT_A" "$PORT_B"; do curl -sf "http://127.0.0.1:$port/actuator/prometheus" > "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-after.prom" || true; done
+  for port in "$PORT_A" "$PORT_B"; do capture_prom "$port" "$rd/app$([[ $port == "$PORT_A" ]] && echo 1 || echo 2)-after.prom"; done
   snap "$root/containers-after.txt"
   "$repo_dir/scripts/verifier-isolated/capture-manifest.sh" "$root/manifest-after.txt" || true
   local q="event_id=$ev"
@@ -231,7 +237,7 @@ run() {
   dbx "$DB_NAME" --batch --skip-column-names -e "SELECT COUNT(*) FROM coupon_application WHERE $q AND status IN ('PENDING','CHECKING')" > "$rd/unresolved-after-quiescence.txt" || true
   dbx "$DB_NAME" --batch --skip-column-names -e "SELECT ca.acceptance_sequence, cw.tier FROM coupon_application ca JOIN coupon_award cw ON cw.application_id=ca.id WHERE ca.$q AND ((ca.acceptance_sequence<=(SELECT high_quantity FROM coupon_event WHERE id=$ev) AND cw.tier<>'HIGH') OR (ca.acceptance_sequence>(SELECT high_quantity FROM coupon_event WHERE id=$ev) AND cw.tier<>'NORMAL'))" > "$rd/tier-mismatch.tsv" || true
   docker exec "$P-mysql" sh -c "MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\" mysqldump -uroot --no-tablespaces $DB_NAME 2>/dev/null" | gzip > "$root/db-dump.sql.gz" || true
-  python3 "$repo_dir/scripts/verifier-isolated/analyze-separated-v2.py" "$rd" "$root/analysis" "$P-mysql" "$DB_NAME" "$ev" 700200000 > /dev/null 2>"$root/analysis-stderr.txt" || echo "analysis failed" >> "$root/analysis-stderr.txt"
+  python3 "$repo_dir/scripts/verifier-isolated/analyze-separated-v2.py" "$rd" "$root/analysis" "$P-mysql" "$DB_NAME" "$ev" "${MEMBER_ID_START:-700200000}" > /dev/null 2>"$root/analysis-stderr.txt" || echo "analysis failed" >> "$root/analysis-stderr.txt"
   echo "$root"
 }
 
