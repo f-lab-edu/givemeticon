@@ -53,15 +53,8 @@ for path in stock v1; do
   "$runner" run
   python3 scripts/verifier-isolated/hosted/verify-calibration-caps.py "$VERIFIER_PREFIX" "$VERIFIER_OWNER_ID" "$REPORT_ROOT/service-limits-after.json"
   python3 scripts/verifier-isolated/hosted/warmed-stage.py "$REPORT_ROOT" "$path" 200 --warmup
-  # Post-warmup baseline: five successful scrapes on each unchanged process.
-  mkdir -p "$REPORT_BASE/$path-stabilization"
-  for tick in 1 2 3 4 5; do
-    for app in 1 2; do
-      port=$((18079+app))
-      curl --max-time 3 -fsS "http://127.0.0.1:$port/actuator/prometheus" > "$REPORT_BASE/$path-stabilization/app$app-$tick.prom"
-    done
-    sleep 1
-  done
+  # Five full same-target/process, idle-pool and fixture-drain checks; no extension.
+  python3 scripts/verifier-isolated/hosted/warmed-stabilization.py "$REPORT_ROOT" "$path" "$REPORT_BASE/$path-stabilization"
   export USER_ID_START=920000000 MEMBER_ID_START=720000000
   export RUN_LABEL="w-$path-10rps" REPORT_ROOT="$REPORT_BASE/$path-10rps" DURATION=10s
   "$runner" run
