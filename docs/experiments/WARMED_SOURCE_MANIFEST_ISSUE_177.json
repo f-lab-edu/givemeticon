@@ -76,5 +76,36 @@
       "path": "scripts/verifier-isolated/test-analyze-separated-v2-lazy.py",
       "source_sha256": "2319812b66d5ff6bbf7f9e45c8f604cecd3650e8f68827646aae8e02046504ee"
     }
-  ]
+  ],
+  "policy_failure_diagnostic_delta": {
+    "parent_sha": "0c59657c92c33e61168a573feeafe72d84a4ce1c",
+    "scope": "local diagnostic-only; gate criteria, production, caps, worker settings and workload unchanged; no hosted execution authorization",
+    "files": [
+      {
+        "path": "scripts/verifier-isolated/hosted/worker-meter-policy.py",
+        "source_sha256": "6a77acb06f1d3fcb4e67afc08e3a7599201208d7f02984a8dc994bc046ebaaa0",
+        "derived_sha256": "f8d38c95c5b962d4060a0c3bed88dcc68a9e9523921716ed3b8a30b9daff60e0"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/policy-failure.py",
+        "source_sha256": null,
+        "derived_sha256": "4020f77e6828d05ed3370c5ed41cb162f3a1aa8726539c31c4ec7e84437d5ad2"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/collect-evidence.py",
+        "source_sha256": "17f25e6582069ca10faaa5bbda4b2d559f111581c10722c0a0ee5283df390391",
+        "derived_sha256": "a32eb72a46b58897cfc3b1bf8714bfff4db69aaff658c34f986b533ae77bad1c"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/test-worker-meter-policy.py",
+        "source_sha256": "a5bf2b5b783cc375a71f9d58f7a21423ffae51b8e2e10111521b8b4567391032",
+        "derived_sha256": "4301eb66d8ca54b488588a5ecb306f9f725bf05f9d31a048230fef1e57d4c002"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/test-collect-evidence.py",
+        "source_sha256": "bbb66b31161ae47a326c5783ca9981fb0012af5bff827adda819fdf39d8f314a",
+        "derived_sha256": "18c898f473e5636ea70b34652039a1ca0184a2ce11224f03af2b80a29555c2e5"
+      }
+    ]
+  }
 }

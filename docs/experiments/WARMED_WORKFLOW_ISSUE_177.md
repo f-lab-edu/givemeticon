@@ -86,3 +86,44 @@ but records a bounded application-policy claim and runtime_registry_policy UNKNO
 nonempty strings alone do not automatically verify all library/runtime meter policies.
 Final independent review must assess this boundary. All metadata is future-run
 only and does not repair historical collection facts.
+
+
+### Run 38137748465: policy gate refusal (2026-10-11)
+
+Actual SHA `0c59657c92c33e61168a573feeafe72d84a4ce1c`, run completed/failure:
+https://github.com/f-lab-edu/givemeticon/actions/runs/38137748465 .
+Original log records memory-guard OK, up, then the generic policy refusal and exit 1.
+Registration, warmup and measurement were not reached; VU initialization evidence
+is absent. Service consistency/performance verdict is NOT_ESTABLISHED. Exact policy
+failure cause remains UNKNOWN; original exception details were not retained.
+Verifier event `b6e6cafcb630343091ba38e707077e01246497ab83eaba7d6fbc88328f19d1b6`
+independently reports checked SHA/checksums and cleanup down/remove exit 0.
+Builder independently checked the existing local original artifact on 2026-10-11:
+SHA matches, checksum mismatches 0, cleanup exits both 0. Original artifacts/logs
+remain unchanged under `.scratch/run38137748465/`; durable findings are in workspace
+`RESEARCH/ISSUE_177_POLICY_GATE_DIAGNOSTIC_20261011.md`. collection-status says
+COLLECTED_REDACTED/exit 0; its missing-secret prohibition note alone does not prove
+that this collection had an empty redaction input.
+
+The local diagnostic delta emits `<app>.failure.json`: fixed stage/reason vocabulary,
+allowlisted exception class, stock/v1 path, app1/app2, validated 40-hex run SHA (UNKNOWN
+until available), bounded return code/HTTP status or null. Raw exception text,
+tracebacks, subprocess argv/stdout/stderr and full env/config/conditions are excluded.
+Docker inspect stderr is captured; diagnostic failure preserves exit 1/refusal.
+`collect-evidence.py` validates and reserializes only four fixed sidecar paths before
+reading the redaction credential. A missing/empty credential still refuses raw
+collection (exit 3). Cleanup calls this collector twice; final workflow checksums
+and upload include the independently collected safe sidecar. No workflow/cleanup
+change is needed. Corrupt, oversized or symlink sidecars cannot become raw-copy
+exceptions. Safe diagnostics do not establish gate passage or repair historical runs.
+
+Validation: full Gradle cleanTest/test/bootJar passed (49 XML suites, 254 tests,
+0 failures/errors/skips); every root/hosted harness Python test script, both capped
+shell test packages and all harness shell syntax checks passed. Final diagnostic
+and collection regressions each pass 9 tests, including real CLI/fake subprocess
+stderr suppression, HTTP failure, JSON decode failure, timeout, owner mismatch,
+missing contract, sidecar write failure and diagnostic failure, credential-like
+payload rejection, and safe collection with missing/empty redaction input.
+These are local checks on the delta, not hosted Docker/cgroup behavior or a rerun.
+Source hashes and parent SHA are recorded in WARMED_SOURCE_MANIFEST_ISSUE_177.json.
+No remote push, dispatch, rerun, load/cap/worker-setting change or merge is authorized.

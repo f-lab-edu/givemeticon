@@ -5,6 +5,8 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[3]
 LEGACY=('CouponIssueAsyncWorker','CouponBatchIssueWorker','CouponIssueRequestRecoveryScheduler')
 EVENT='CouponEventIssuanceWorker'
+_spec=importlib.util.spec_from_file_location('policy_failure',Path(__file__).with_name('policy-failure.py'))
+failure=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(failure)
 
 def conditions(document,path):
     pos={};neg={}
@@ -36,30 +38,48 @@ def metrics_config(args,environment,configurations):
             'configuration_sha256':hashes,'uri_limit_source':'explicit CLI on same owned container',
             'enable_scope':'no enable override in reviewed embedded/mounted configuration, selected CLI and environment keys; not proof of every runtime registry policy'}
 
-def execute(path,app,contract,out):
-    declared=json.loads(contract.read_text());expected=declared['expected_prometheus_targets'][app];owner=__import__('os').environ['VERIFIER_OWNER_ID'];prefix=__import__('os').environ['VERIFIER_PREFIX']
+def execute(path,app,contract,out,diagnostic=None):
+    d=diagnostic or failure.Diagnostic(path,app)
+    d.stage('contract')
+    declared=json.loads(contract.read_text());d.sha(declared['sha']);expected=declared['expected_prometheus_targets'][app]
+    d.stage('runtime_context')
+    owner=__import__('os').environ['VERIFIER_OWNER_ID'];prefix=__import__('os').environ['VERIFIER_PREFIX']
+    d.stage('endpoint')
     if expected!=f'http://127.0.0.1:{18080 if app=="app1" else 18081}/actuator/prometheus':raise ValueError('run endpoint mismatch')
-    inspected=json.loads(subprocess.check_output(['docker','inspect',f'{prefix}-{app}'],text=True))[0]
+    d.stage('inspect')
+    inspected=json.loads(subprocess.check_output(['docker','inspect',f'{prefix}-{app}'],text=True,stderr=subprocess.PIPE))[0]
+    d.stage('owner')
     if inspected['Config']['Labels'].get('xyz.buzz.verifier.owner')!=owner or inspected['Config']['Labels'].get('xyz.buzz.verifier.managed')!='capped-harness':raise ValueError('owner mismatch')
+    d.stage('binding')
     bindings=inspected.get('NetworkSettings',{}).get('Ports',{}).get('8080/tcp') or []
     if not any(b.get('HostPort')==str(18080 if app=='app1' else 18081) for b in bindings):raise ValueError('app endpoint binding mismatch')
+    d.stage('worker_args')
     args=inspected['Config'].get('Cmd') or []
     if '--coupon.issue-worker.mode=off' not in args or '--coupon.issue-worker.enabled=false' not in args:raise ValueError('legacy override absent')
     jar=ROOT/'build/verifier-cap/app.jar';config=ROOT/'scripts/verifier-isolated/verifier-loadtest-config.yml'
+    d.stage('mounts')
     mounts={x['Destination']:x for x in inspected['Mounts']}
     for dst,source in (('/app.jar',jar),('/cfg/config.yml',config)):
         if Path(mounts[dst]['Source']).resolve()!=source.resolve() or mounts[dst]['RW']:raise ValueError('run source mount mismatch')
+    d.stage('conditions_capture')
     target=expected.replace('/actuator/prometheus','/actuator/conditions')
     response=subprocess.run(['curl','--max-time','3','-fsS','-w','\n%{http_code}\n%{url_effective}',target],capture_output=True,text=True,timeout=5)
+    if type(response.returncode) is int and -255<=response.returncode<=255:d.record['return_code']=response.returncode
     body,status,effective=response.stdout.rsplit('\n',2)
+    if re.fullmatch(r'[1-5][0-9]{2}',status):d.record['http_status']=int(status)
     if response.returncode!=0 or status!='200' or effective!=target:raise ValueError('condition capture failed')
+    d.stage('conditions_decode')
     verdict=conditions(json.loads(body),path)
+    d.stage('conditions_match')
     if not verdict['pass']:raise ValueError('Spring worker conditions mismatch')
+    d.stage('process_capture')
     capture_spec=importlib.util.spec_from_file_location('capture',Path(__file__).with_name('capture-prom.py'));capture=importlib.util.module_from_spec(capture_spec);capture_spec.loader.exec_module(capture)
     anchor_file=out.with_suffix('.prom');anchor=capture.capture(expected,anchor_file)
+    d.stage('process_identity')
     starts=[float(line.rsplit(' ',1)[1]) for line in anchor_file.read_text().splitlines() if line.startswith('process_start_time_seconds')]
     if not anchor['transport_body_complete'] or len(starts)!=1 or starts[0]<=0:raise ValueError('policy process identity missing')
 
+    d.stage('jar_libraries')
     with zipfile.ZipFile(jar) as z:
         libs=[n for n in z.namelist() if n.startswith('BOOT-INF/lib/')]
         for exact in ('micrometer-core-1.11.3.jar','spring-web-6.0.11.jar','spring-boot-actuator-autoconfigure-3.1.3.jar'):
@@ -67,13 +87,18 @@ def execute(path,app,contract,out):
         hashes={n:hashlib.sha256(z.read('BOOT-INF/lib/'+n)).hexdigest() for n in ('micrometer-core-1.11.3.jar','spring-web-6.0.11.jar','spring-boot-actuator-autoconfigure-3.1.3.jar')}
         config_inputs={n:z.read(n) for n in z.namelist() if n.startswith('BOOT-INF/classes/application') and n.endswith(('.yml','.yaml','.properties'))}
         config_inputs['mounted:/cfg/config.yml']=config.read_bytes()
+        d.stage('metrics_config')
         effective_metrics=metrics_config(args,inspected['Config'].get('Env',[]),config_inputs)
     # Reviewed application scope only; do not dump environments, conditions or private configs.
+    d.stage('dependency_reference')
     reviewed=json.loads((ROOT/'docs/experiments/warmed-meter-registration-evidence/boot-dependencies.json').read_text())
     expected_hashes={Path(x['path']).name:x['sha256'] for x in reviewed['libraries']}
+    d.stage('dependency_hashes')
     if any(expected_hashes.get(k)!=v for k,v in hashes.items()):raise ValueError('dependency bytecode differs from reviewed jars')
+    d.stage('custom_policy')
     app_sources=list((ROOT/'src/main/java').rglob('*.java'))
     if any('MeterFilter' in f.read_text() or re.search(r'(?:meterRegistry|registry)\s*\.\s*remove\s*\(',f.read_text(),re.I) for f in app_sources):raise ValueError('unreviewed custom meter policy')
+    d.stage('source_hashes')
     source_hashes={str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in app_sources if f.name in ('DistributedLockAop.java','CouponBatchAdmissionAcceptor.java','CouponAdmissionTransactionTimers.java','CouponLoadTestController.java','CouponAdmissionTestController.java','UserController.java','SpendCashPointFacade.java',*tuple(x+'.java' for x in (*LEGACY,EVENT)))}
     refs={'http_server_requests':'Spring6.0.11 ServerHttpObservationFilter.stop -> Micrometer1.11.3 DefaultMeterObservationHandler.onStop Timer.builder.tags.register; retained matching-jar javap evidence',
           'coupon_redis_lock_acquire':'src/main/java/com/jinddung2/givemeticon/common/aop/DistributedLockAop.java:54-58 and73-74',
@@ -82,6 +107,7 @@ def execute(path,app,contract,out):
           'coupon_admission_transaction':'CouponAdmissionTransactionTimers timer register per call',
           'coupon_admission_commit':'CouponAdmissionTransactionTimers timer register per call',
           'coupon_admission_post_lock_work':'CouponAdmissionTransactionTimers timer register per call'}
+    d.stage('result')
     result={'run_sha':declared['sha'],'app':app,'expected_target':expected,'jar_sha256':hashlib.sha256(jar.read_bytes()).hexdigest(),'config_source_sha256':hashlib.sha256(config.read_bytes()).hexdigest(),'dependency_hashes':hashes,'reviewed_source_sha256':source_hashes,
             'process_start_time_seconds_at_policy':starts[0],'policy_process_capture':anchor,'whitelisted_explicit_properties':{'coupon.issue-worker.mode':'off','coupon.issue-worker.enabled':False,'management.metrics.web.server.max-uri-tags':100,'management.endpoints.web.exposure.include':'health,prometheus,conditions'},'spring_worker_conditions':verdict,
             'recorded_at_ms':int(time.time()*1000),'condition_capture':{'exit_code':response.returncode,'http_status':200,'requested_target':target,'effective_target':effective,'body_sha256':hashlib.sha256(body.encode()).hexdigest()},
@@ -89,8 +115,20 @@ def execute(path,app,contract,out):
             'lock_call_sites':{'worker_disabled':True,'recovery_disabled':True,'scope':'legacy worker and recovery conditional beans only; other lock sites not excluded','other_lock_call_sites_verdict':'UNKNOWN','evidence':'','worker_recovery_evidence':'same owned app: explicit CLI off/false plus selected actual Spring conditions; V1 event worker separately remains enabled; insufficient for all-site HTTP/lock reconciliation','artifact_ref':out.name},
             'lock_input_scope':{'contract_ref':'contract.json','stock_route':'POST /internal/loadtest/coupons -> CreateCouponFacade.createCouponAndDecreaseStock','v1_route':'POST /test-support/coupon-events/{eventId}/applications -> CouponAdmissionService.accept','other_lock_route':'UserController POST /api/v1/users/my-point/spend -> SpendCashPointFacade.spendPoint; not a generated workload route, other callers remain UNKNOWN','workload_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in (ROOT/'scripts/verifier-isolated/stock-arrival-record.js',ROOT/'scripts/coupon-integrated-loadtest/integrated-admission-poll.js') if f.exists()}},
             'source_manifest_sha256':hashlib.sha256((ROOT/'docs/experiments/WARMED_SOURCE_MANIFEST_ISSUE_177.json').read_bytes()).hexdigest()}
+    d.stage('policy_write')
     out.write_text(json.dumps(result,indent=2)+'\n');return result
+def run(path,app,contract,out):
+    diagnostic=failure.Diagnostic(path,app)
+    try:execute(path,app,contract,out,diagnostic)
+    except Exception as exc:
+        try:diagnostic.fail(exc,out)
+        except Exception:
+            # Diagnostic failure must never turn refusal into success or expose its exception.
+            try:print('policy diagnostic failed; gate remains refused',file=__import__('sys').stderr)
+            except Exception:pass
+        return 1
+    return 0
+
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('path',choices=['stock','v1']);p.add_argument('app',choices=['app1','app2']);p.add_argument('contract',type=Path);p.add_argument('out',type=Path);a=p.parse_args()
-    try:execute(a.path,a.app,a.contract,a.out)
-    except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError):raise SystemExit('run policy evidence unavailable/mismatched; no inferred defaults')
+    raise SystemExit(run(a.path,a.app,a.contract,a.out))

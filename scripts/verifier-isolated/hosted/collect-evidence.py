@@ -1,9 +1,22 @@
 #!/usr/bin/env python3
 """Allowlisted, bounded synthetic evidence. Never copies raw dumps or credentials."""
-import hashlib,json,sys
+import hashlib,importlib.util,json,sys
 from pathlib import Path
 ALLOWED={'.json','.jsonl','.txt','.tsv','.csv','.prom','.log'}
 LIMIT=16*1024*1024;TOTAL=128*1024*1024
+_spec=importlib.util.spec_from_file_location('policy_failure',Path(__file__).with_name('policy-failure.py'))
+failure=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(failure)
+
+def collect_policy_failures(src,dst):
+    for path in ('stock','v1'):
+        for app in ('app1','app2'):
+            rel=Path(path+'-policy')/(app+'.failure.json');p=src/rel
+            if p.is_symlink() or p.parent.is_symlink() or not p.is_file():continue
+            if p.stat().st_size>4096:raise ValueError('invalid diagnostic')
+            record=failure.validate(json.loads(p.read_text()))
+            if record['path']!=path or record['app']!=app:raise ValueError('invalid diagnostic')
+            target=dst/rel;target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_text(json.dumps(record,sort_keys=True)+'\n')
 
 def collect(src,dst,secret):
     if not secret: raise ValueError('redaction input missing or empty; evidence destination unchanged')
@@ -23,6 +36,7 @@ def collect(src,dst,secret):
     (dst/'artifact-manifest.json').write_text(json.dumps({'scope':'synthetic isolated run; omissions prohibit completeness claims','redaction_applied':True,'files':entries},indent=2)+'\n')
 if __name__=='__main__':
     try:
+        collect_policy_failures(Path(sys.argv[1]),Path(sys.argv[2]))
         secret=Path(sys.argv[3]).read_bytes().strip()
         collect(Path(sys.argv[1]),Path(sys.argv[2]),secret)
     except (OSError,ValueError):

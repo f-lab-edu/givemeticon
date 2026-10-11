@@ -41,4 +41,24 @@ class T(unittest.TestCase):
    try:m.collect(src,Path(d)/'dst',b'sentinel')
    finally:m.LIMIT=old
    self.assertFalse((Path(d)/'dst/x.log').exists());self.assertIn('size-budget',(Path(d)/'dst/artifact-manifest.json').read_text())
+ def test_safe_policy_sidecar_without_redaction_input(self):
+  for secret_state in ('missing','empty'):
+   with tempfile.TemporaryDirectory() as d:
+    p=Path(d);src=p/'src';policy=src/'stock-policy';policy.mkdir(parents=True);dst=p/'dst';secret=p/'pw'
+    if secret_state=='empty':secret.write_bytes(b'')
+    record=m.failure.Diagnostic('stock','app1').record
+    (policy/'app1.failure.json').write_text(json.dumps(record));(src/'raw.log').write_text('password=sentinel-secret')
+    result=subprocess.run([sys.executable,str(Path(__file__).with_name('collect-evidence.py')),str(src),str(dst),str(secret)],capture_output=True,text=True)
+    self.assertEqual(result.returncode,3);self.assertEqual(json.loads((dst/'stock-policy/app1.failure.json').read_text()),record);self.assertFalse((dst/'raw.log').exists());self.assertNotIn('sentinel-secret',result.stdout+result.stderr)
+ def test_untrusted_sidecar_cannot_bypass_redaction(self):
+  for key,value in (('stage','password=sentinel-secret'),('exception_class','token=sentinel-secret'),('run_sha','a'*40+'\ncredential'),('return_code','secret'),('extra','password=sentinel-secret')):
+   with tempfile.TemporaryDirectory() as d:
+    p=Path(d);src=p/'src';policy=src/'stock-policy';policy.mkdir(parents=True);dst=p/'dst';record=m.failure.Diagnostic('stock','app1').record;record[key]=value
+    (policy/'app1.failure.json').write_text(json.dumps(record))
+    result=subprocess.run([sys.executable,str(Path(__file__).with_name('collect-evidence.py')),str(src),str(dst),str(p/'missing')],capture_output=True,text=True)
+    self.assertEqual(result.returncode,3);self.assertFalse(dst.exists());self.assertNotIn('sentinel-secret',result.stdout+result.stderr)
+ def test_symlink_policy_sidecar_is_not_collected(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);src=p/'src';policy=src/'stock-policy';policy.mkdir(parents=True);outside=p/'outside';outside.write_text(json.dumps(m.failure.Diagnostic('stock','app1').record));(policy/'app1.failure.json').symlink_to(outside)
+   m.collect_policy_failures(src,p/'dst');self.assertFalse((p/'dst').exists())
 unittest.main()
