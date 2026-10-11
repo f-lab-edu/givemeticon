@@ -1,0 +1,317 @@
+Compiled from "DefaultServerRequestObservationConvention.java"
+public class org.springframework.http.server.observation.DefaultServerRequestObservationConvention implements org.springframework.http.server.observation.ServerRequestObservationConvention {
+  private static final java.lang.String DEFAULT_NAME;
+
+  private static final io.micrometer.common.KeyValue METHOD_UNKNOWN;
+
+  private static final io.micrometer.common.KeyValue STATUS_UNKNOWN;
+
+  private static final io.micrometer.common.KeyValue HTTP_OUTCOME_SUCCESS;
+
+  private static final io.micrometer.common.KeyValue HTTP_OUTCOME_UNKNOWN;
+
+  private static final io.micrometer.common.KeyValue URI_UNKNOWN;
+
+  private static final io.micrometer.common.KeyValue URI_ROOT;
+
+  private static final io.micrometer.common.KeyValue URI_NOT_FOUND;
+
+  private static final io.micrometer.common.KeyValue URI_REDIRECTION;
+
+  private static final io.micrometer.common.KeyValue EXCEPTION_NONE;
+
+  private static final io.micrometer.common.KeyValue HTTP_URL_UNKNOWN;
+
+  private final java.lang.String name;
+
+  public org.springframework.http.server.observation.DefaultServerRequestObservationConvention();
+    Code:
+       0: aload_0
+       1: ldc           #3                  // String http.server.requests
+       3: invokespecial #5                  // Method "<init>":(Ljava/lang/String;)V
+       6: return
+
+  public org.springframework.http.server.observation.DefaultServerRequestObservationConvention(java.lang.String);
+    Code:
+       0: aload_0
+       1: invokespecial #9                  // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: aload_1
+       6: putfield      #14                 // Field name:Ljava/lang/String;
+       9: return
+
+  public java.lang.String getName();
+    Code:
+       0: aload_0
+       1: getfield      #14                 // Field name:Ljava/lang/String;
+       4: areturn
+
+  public java.lang.String getContextualName(org.springframework.http.server.observation.ServerRequestObservationContext);
+    Code:
+       0: aload_1
+       1: invokevirtual #18                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getCarrier:()Ljava/lang/Object;
+       4: checkcast     #24                 // class jakarta/servlet/http/HttpServletRequest
+       7: invokeinterface #26,  1           // InterfaceMethod jakarta/servlet/http/HttpServletRequest.getMethod:()Ljava/lang/String;
+      12: invokevirtual #30                 // Method java/lang/String.toLowerCase:()Ljava/lang/String;
+      15: astore_2
+      16: aload_1
+      17: invokevirtual #35                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getPathPattern:()Ljava/lang/String;
+      20: ifnull        34
+      23: aload_2
+      24: aload_1
+      25: invokevirtual #35                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getPathPattern:()Ljava/lang/String;
+      28: invokedynamic #38,  0             // InvokeDynamic #0:makeConcatWithConstants:(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+      33: areturn
+      34: aload_2
+      35: invokedynamic #42,  0             // InvokeDynamic #1:makeConcatWithConstants:(Ljava/lang/String;)Ljava/lang/String;
+      40: areturn
+
+  public io.micrometer.common.KeyValues getLowCardinalityKeyValues(org.springframework.http.server.observation.ServerRequestObservationContext);
+    Code:
+       0: iconst_5
+       1: anewarray     #45                 // class io/micrometer/common/KeyValue
+       4: dup
+       5: iconst_0
+       6: aload_0
+       7: aload_1
+       8: invokevirtual #47                 // Method exception:(Lorg/springframework/http/server/observation/ServerRequestObservationContext;)Lio/micrometer/common/KeyValue;
+      11: aastore
+      12: dup
+      13: iconst_1
+      14: aload_0
+      15: aload_1
+      16: invokevirtual #51                 // Method method:(Lorg/springframework/http/server/observation/ServerRequestObservationContext;)Lio/micrometer/common/KeyValue;
+      19: aastore
+      20: dup
+      21: iconst_2
+      22: aload_0
+      23: aload_1
+      24: invokevirtual #54                 // Method outcome:(Lorg/springframework/http/server/observation/ServerRequestObservationContext;)Lio/micrometer/common/KeyValue;
+      27: aastore
+      28: dup
+      29: iconst_3
+      30: aload_0
+      31: aload_1
+      32: invokevirtual #57                 // Method status:(Lorg/springframework/http/server/observation/ServerRequestObservationContext;)Lio/micrometer/common/KeyValue;
+      35: aastore
+      36: dup
+      37: iconst_4
+      38: aload_0
+      39: aload_1
+      40: invokevirtual #60                 // Method uri:(Lorg/springframework/http/server/observation/ServerRequestObservationContext;)Lio/micrometer/common/KeyValue;
+      43: aastore
+      44: invokestatic  #63                 // Method io/micrometer/common/KeyValues.of:([Lio/micrometer/common/KeyValue;)Lio/micrometer/common/KeyValues;
+      47: areturn
+
+  public io.micrometer.common.KeyValues getHighCardinalityKeyValues(org.springframework.http.server.observation.ServerRequestObservationContext);
+    Code:
+       0: iconst_1
+       1: anewarray     #45                 // class io/micrometer/common/KeyValue
+       4: dup
+       5: iconst_0
+       6: aload_0
+       7: aload_1
+       8: invokevirtual #69                 // Method httpUrl:(Lorg/springframework/http/server/observation/ServerRequestObservationContext;)Lio/micrometer/common/KeyValue;
+      11: aastore
+      12: invokestatic  #63                 // Method io/micrometer/common/KeyValues.of:([Lio/micrometer/common/KeyValue;)Lio/micrometer/common/KeyValues;
+      15: areturn
+
+  protected io.micrometer.common.KeyValue method(org.springframework.http.server.observation.ServerRequestObservationContext);
+    Code:
+       0: aload_1
+       1: invokevirtual #18                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getCarrier:()Ljava/lang/Object;
+       4: ifnull        28
+       7: getstatic     #72                 // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.METHOD:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      10: aload_1
+      11: invokevirtual #18                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getCarrier:()Ljava/lang/Object;
+      14: checkcast     #24                 // class jakarta/servlet/http/HttpServletRequest
+      17: invokeinterface #26,  1           // InterfaceMethod jakarta/servlet/http/HttpServletRequest.getMethod:()Ljava/lang/String;
+      22: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      25: goto          31
+      28: getstatic     #81                 // Field METHOD_UNKNOWN:Lio/micrometer/common/KeyValue;
+      31: areturn
+
+  protected io.micrometer.common.KeyValue status(org.springframework.http.server.observation.ServerRequestObservationContext);
+    Code:
+       0: aload_1
+       1: invokevirtual #85                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getResponse:()Ljava/lang/Object;
+       4: ifnull        31
+       7: getstatic     #88                 // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.STATUS:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      10: aload_1
+      11: invokevirtual #85                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getResponse:()Ljava/lang/Object;
+      14: checkcast     #91                 // class jakarta/servlet/http/HttpServletResponse
+      17: invokeinterface #93,  1           // InterfaceMethod jakarta/servlet/http/HttpServletResponse.getStatus:()I
+      22: invokestatic  #97                 // Method java/lang/Integer.toString:(I)Ljava/lang/String;
+      25: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      28: goto          34
+      31: getstatic     #103                // Field STATUS_UNKNOWN:Lio/micrometer/common/KeyValue;
+      34: areturn
+
+  protected io.micrometer.common.KeyValue uri(org.springframework.http.server.observation.ServerRequestObservationContext);
+    Code:
+       0: aload_1
+       1: invokevirtual #18                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getCarrier:()Ljava/lang/Object;
+       4: ifnull        84
+       7: aload_1
+       8: invokevirtual #35                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getPathPattern:()Ljava/lang/String;
+      11: astore_2
+      12: aload_2
+      13: ifnull        35
+      16: aload_2
+      17: invokevirtual #106                // Method java/lang/String.isEmpty:()Z
+      20: ifeq          27
+      23: getstatic     #110                // Field URI_ROOT:Lio/micrometer/common/KeyValue;
+      26: areturn
+      27: getstatic     #113                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.URI:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      30: aload_2
+      31: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      34: areturn
+      35: aload_1
+      36: invokevirtual #85                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getResponse:()Ljava/lang/Object;
+      39: ifnull        84
+      42: aload_1
+      43: invokevirtual #85                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getResponse:()Ljava/lang/Object;
+      46: checkcast     #91                 // class jakarta/servlet/http/HttpServletResponse
+      49: invokeinterface #93,  1           // InterfaceMethod jakarta/servlet/http/HttpServletResponse.getStatus:()I
+      54: invokestatic  #116                // Method org/springframework/http/HttpStatus.resolve:(I)Lorg/springframework/http/HttpStatus;
+      57: astore_3
+      58: aload_3
+      59: ifnull        84
+      62: aload_3
+      63: invokevirtual #122                // Method org/springframework/http/HttpStatus.is3xxRedirection:()Z
+      66: ifeq          73
+      69: getstatic     #125                // Field URI_REDIRECTION:Lio/micrometer/common/KeyValue;
+      72: areturn
+      73: aload_3
+      74: getstatic     #128                // Field org/springframework/http/HttpStatus.NOT_FOUND:Lorg/springframework/http/HttpStatus;
+      77: if_acmpne     84
+      80: getstatic     #132                // Field URI_NOT_FOUND:Lio/micrometer/common/KeyValue;
+      83: areturn
+      84: getstatic     #135                // Field URI_UNKNOWN:Lio/micrometer/common/KeyValue;
+      87: areturn
+
+  protected io.micrometer.common.KeyValue exception(org.springframework.http.server.observation.ServerRequestObservationContext);
+    Code:
+       0: aload_1
+       1: invokevirtual #138                // Method org/springframework/http/server/observation/ServerRequestObservationContext.getError:()Ljava/lang/Throwable;
+       4: astore_2
+       5: aload_2
+       6: ifnull        42
+       9: aload_2
+      10: invokevirtual #142                // Method java/lang/Object.getClass:()Ljava/lang/Class;
+      13: invokevirtual #146                // Method java/lang/Class.getSimpleName:()Ljava/lang/String;
+      16: astore_3
+      17: getstatic     #151                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.EXCEPTION:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      20: aload_3
+      21: invokestatic  #154                // Method org/springframework/util/StringUtils.hasText:(Ljava/lang/String;)Z
+      24: ifeq          31
+      27: aload_3
+      28: goto          38
+      31: aload_2
+      32: invokevirtual #142                // Method java/lang/Object.getClass:()Ljava/lang/Class;
+      35: invokevirtual #160                // Method java/lang/Class.getName:()Ljava/lang/String;
+      38: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      41: areturn
+      42: getstatic     #163                // Field EXCEPTION_NONE:Lio/micrometer/common/KeyValue;
+      45: areturn
+
+  protected io.micrometer.common.KeyValue outcome(org.springframework.http.server.observation.ServerRequestObservationContext);
+    Code:
+       0: aload_1
+       1: invokevirtual #85                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getResponse:()Ljava/lang/Object;
+       4: ifnull        28
+       7: aload_1
+       8: invokevirtual #85                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getResponse:()Ljava/lang/Object;
+      11: checkcast     #91                 // class jakarta/servlet/http/HttpServletResponse
+      14: invokeinterface #93,  1           // InterfaceMethod jakarta/servlet/http/HttpServletResponse.getStatus:()I
+      19: invokestatic  #166                // InterfaceMethod org/springframework/http/HttpStatusCode.valueOf:(I)Lorg/springframework/http/HttpStatusCode;
+      22: astore_2
+      23: aload_2
+      24: invokestatic  #172                // Method org/springframework/http/server/observation/DefaultServerRequestObservationConvention$HttpOutcome.forStatus:(Lorg/springframework/http/HttpStatusCode;)Lio/micrometer/common/KeyValue;
+      27: areturn
+      28: getstatic     #178                // Field HTTP_OUTCOME_UNKNOWN:Lio/micrometer/common/KeyValue;
+      31: areturn
+
+  protected io.micrometer.common.KeyValue httpUrl(org.springframework.http.server.observation.ServerRequestObservationContext);
+    Code:
+       0: aload_1
+       1: invokevirtual #18                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getCarrier:()Ljava/lang/Object;
+       4: ifnull        26
+       7: getstatic     #181                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$HighCardinalityKeyNames.HTTP_URL:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$HighCardinalityKeyNames;
+      10: aload_1
+      11: invokevirtual #18                 // Method org/springframework/http/server/observation/ServerRequestObservationContext.getCarrier:()Ljava/lang/Object;
+      14: checkcast     #24                 // class jakarta/servlet/http/HttpServletRequest
+      17: invokeinterface #187,  1          // InterfaceMethod jakarta/servlet/http/HttpServletRequest.getRequestURI:()Ljava/lang/String;
+      22: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      25: areturn
+      26: getstatic     #190                // Field HTTP_URL_UNKNOWN:Lio/micrometer/common/KeyValue;
+      29: areturn
+
+  public java.lang.String getContextualName(io.micrometer.observation.Observation$Context);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: checkcast     #19                 // class org/springframework/http/server/observation/ServerRequestObservationContext
+       5: invokevirtual #193                // Method getContextualName:(Lorg/springframework/http/server/observation/ServerRequestObservationContext;)Ljava/lang/String;
+       8: areturn
+
+  public io.micrometer.common.KeyValues getHighCardinalityKeyValues(io.micrometer.observation.Observation$Context);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: checkcast     #19                 // class org/springframework/http/server/observation/ServerRequestObservationContext
+       5: invokevirtual #197                // Method getHighCardinalityKeyValues:(Lorg/springframework/http/server/observation/ServerRequestObservationContext;)Lio/micrometer/common/KeyValues;
+       8: areturn
+
+  public io.micrometer.common.KeyValues getLowCardinalityKeyValues(io.micrometer.observation.Observation$Context);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: checkcast     #19                 // class org/springframework/http/server/observation/ServerRequestObservationContext
+       5: invokevirtual #201                // Method getLowCardinalityKeyValues:(Lorg/springframework/http/server/observation/ServerRequestObservationContext;)Lio/micrometer/common/KeyValues;
+       8: areturn
+
+  static {};
+    Code:
+       0: getstatic     #72                 // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.METHOD:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+       3: ldc           #204                // String UNKNOWN
+       5: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+       8: putstatic     #81                 // Field METHOD_UNKNOWN:Lio/micrometer/common/KeyValue;
+      11: getstatic     #88                 // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.STATUS:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      14: ldc           #204                // String UNKNOWN
+      16: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      19: putstatic     #103                // Field STATUS_UNKNOWN:Lio/micrometer/common/KeyValue;
+      22: getstatic     #206                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.OUTCOME:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      25: ldc           #209                // String SUCCESS
+      27: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      30: putstatic     #211                // Field HTTP_OUTCOME_SUCCESS:Lio/micrometer/common/KeyValue;
+      33: getstatic     #206                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.OUTCOME:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      36: ldc           #204                // String UNKNOWN
+      38: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      41: putstatic     #178                // Field HTTP_OUTCOME_UNKNOWN:Lio/micrometer/common/KeyValue;
+      44: getstatic     #113                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.URI:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      47: ldc           #204                // String UNKNOWN
+      49: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      52: putstatic     #135                // Field URI_UNKNOWN:Lio/micrometer/common/KeyValue;
+      55: getstatic     #113                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.URI:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      58: ldc           #214                // String root
+      60: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      63: putstatic     #110                // Field URI_ROOT:Lio/micrometer/common/KeyValue;
+      66: getstatic     #113                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.URI:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      69: ldc           #216                // String NOT_FOUND
+      71: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      74: putstatic     #132                // Field URI_NOT_FOUND:Lio/micrometer/common/KeyValue;
+      77: getstatic     #113                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.URI:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      80: ldc           #217                // String REDIRECTION
+      82: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      85: putstatic     #125                // Field URI_REDIRECTION:Lio/micrometer/common/KeyValue;
+      88: getstatic     #151                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames.EXCEPTION:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$LowCardinalityKeyNames;
+      91: ldc           #219                // String none
+      93: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+      96: putstatic     #163                // Field EXCEPTION_NONE:Lio/micrometer/common/KeyValue;
+      99: getstatic     #181                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation$HighCardinalityKeyNames.HTTP_URL:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation$HighCardinalityKeyNames;
+     102: ldc           #204                // String UNKNOWN
+     104: invokestatic  #78                 // InterfaceMethod io/micrometer/common/KeyValue.of:(Lio/micrometer/common/docs/KeyName;Ljava/lang/String;)Lio/micrometer/common/KeyValue;
+     107: putstatic     #190                // Field HTTP_URL_UNKNOWN:Lio/micrometer/common/KeyValue;
+     110: return
+}

@@ -1,0 +1,15 @@
+{
+  "source": "cb732c72d78f194bceefd692d85964d3ffd995cf",
+  "status": "cb732c7 source preserved in history; Builder calibration adaptation under Architect f8229ffc, no live SLO PASS",
+  "files": {
+    "scripts/verifier-isolated/v1-observer.py": "9778b1915771d7224c620c0ad77c4493f0724f845ed5897fad1c80285d0b4dcc",
+    "scripts/verifier-isolated/test-v1-observer.py": "b8629c74231c13c5c0bdc06fea95bdc17d71963e45330860a6c6d447d7bd1843",
+    "docs/experiments/v1-observer-166.md": "3d41ea012581a459e07a6825bd1fbb405c4567ecc62a2395cc992b9cb74d1c60"
+  },
+  "derived_files": {
+    "scripts/verifier-isolated/v1-observer.py": "8491a31499026b352278bb87635b40b5360aa2ec61fa52858839429229eb877b",
+    "scripts/verifier-isolated/test-v1-observer.py": "b8629c74231c13c5c0bdc06fea95bdc17d71963e45330860a6c6d447d7bd1843",
+    "docs/experiments/v1-observer-166.md": "3d41ea012581a459e07a6825bd1fbb405c4567ecc62a2395cc992b9cb74d1c60"
+  },
+  "adaptation": "observer calibration flag only; source test/doc unchanged; hosted contract tests verify new calibration boundary"
+}

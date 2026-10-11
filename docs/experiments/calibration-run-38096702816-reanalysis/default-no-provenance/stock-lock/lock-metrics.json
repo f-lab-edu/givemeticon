@@ -1,0 +1,305 @@
+{
+  "acquire": {
+    "per_app": {
+      "app1": {
+        "outcome=acquired": {
+          "status": "MISSING",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": false,
+            "reason": "provenance not verified: provenance_present,registration_paths[coupon_redis_lock_acquire]",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/955, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.014/1791676716.014, labels_equal=True, uptime=44.408/64.044 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          }
+        },
+        "outcome=rejected": {
+          "status": "MISSING",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": false,
+            "reason": "provenance not verified: provenance_present,registration_paths[coupon_redis_lock_acquire]",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/955, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.014/1791676716.014, labels_equal=True, uptime=44.408/64.044 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          }
+        }
+      },
+      "app2": {
+        "outcome=acquired": {
+          "status": "MISSING",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": false,
+            "reason": "provenance not verified: provenance_present,registration_paths[coupon_redis_lock_acquire]",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/1030, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.205/1791676716.205, labels_equal=True, uptime=44.273/63.873 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          }
+        },
+        "outcome=rejected": {
+          "status": "MISSING",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": false,
+            "reason": "provenance not verified: provenance_present,registration_paths[coupon_redis_lock_acquire]",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/1030, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.205/1791676716.205, labels_equal=True, uptime=44.273/63.873 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          }
+        }
+      }
+    },
+    "combined": {
+      "outcome=acquired": {
+        "status": "NOT_COMBINED (an app is missing/reset for this series; report per-app)"
+      },
+      "outcome=rejected": {
+        "status": "NOT_COMBINED (an app is missing/reset for this series; report per-app)"
+      }
+    }
+  },
+  "hold": {
+    "per_app": {
+      "app1": {
+        "(no-tags)": {
+          "status": "MISSING",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": false,
+            "reason": "provenance not verified: provenance_present,registration_paths[coupon_redis_lock_hold]",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/955, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.014/1791676716.014, labels_equal=True, uptime=44.408/64.044 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          }
+        }
+      },
+      "app2": {
+        "(no-tags)": {
+          "status": "MISSING",
+          "absent_before": {
+            "inferred_zero_baseline": false,
+            "conditional_manual": false,
+            "reason": "provenance not verified: provenance_present,registration_paths[coupon_redis_lock_hold]",
+            "structural_checks": {
+              "anchors_present": {
+                "pass": true,
+                "detail": "rows=247/1030, unparsed=0/0, missing_anchors=[]"
+              },
+              "same_process": {
+                "pass": true,
+                "detail": "start_time=1791676716.205/1791676716.205, labels_equal=True, uptime=44.273/63.873 (restart-free within checkable range)"
+              },
+              "no_counter_reset": {
+                "pass": true,
+                "detail": "0 series decreased"
+              },
+              "exposure_unchanged": {
+                "pass": true,
+                "detail": "0 counter series vanished (filter-change-free within checkable range)"
+              }
+            },
+            "provenance_checks": {
+              "provenance_present": {
+                "pass": false,
+                "detail": "no scrape provenance file"
+              }
+            },
+            "diagnostics": {
+              "non_actuator_http_count_before": 0,
+              "note": "diagnostic only; prior activity does not decide inference validity"
+            }
+          }
+        }
+      }
+    },
+    "combined": {
+      "(no-tags)": {
+        "status": "NOT_COMBINED (an app is missing/reset for this series; report per-app)"
+      }
+    }
+  },
+  "untimed_reconciliation": {
+    "app1": {
+      "http_loadtest_requests_delta": null,
+      "http_before_series_absent": true,
+      "http_baseline_status": "MISSING",
+      "lock_acquire_timer_count_all_outcomes": 0,
+      "depends_on_inferred_zero_baseline": {
+        "timer_series": [],
+        "http_before_series_absent": true,
+        "any": true,
+        "note": "true 면 untimed 추정은 직접 관측이 아니라 추론(또는 조건부 수동 추론)에 근거한 값"
+      },
+      "lock_call_sites_evidence": {
+        "verified": false,
+        "recorded": null,
+        "scope": "락 timer(coupon.redis_lock.*)는 worker/recovery 등 모든 @DistributedLock 사이트를 포함한다. loadtest URI 요청만 센 http 와 대조하려면 다른 사이트 비활성 근거가 필요하다"
+      },
+      "untimed_estimate(http - timer, NOT assumed zero)": "UNKNOWN",
+      "gap_numeric_diagnostic_only(not a conclusion)": null,
+      "app_log_counts": {
+        "LockAcquisitionFailedException": 0,
+        "Lock acquisition interrupted": 0,
+        "ERROR_lines": 0,
+        "RedisException/timeout lines": 0
+      }
+    },
+    "app2": {
+      "http_loadtest_requests_delta": null,
+      "http_before_series_absent": true,
+      "http_baseline_status": "MISSING",
+      "lock_acquire_timer_count_all_outcomes": 0,
+      "depends_on_inferred_zero_baseline": {
+        "timer_series": [],
+        "http_before_series_absent": true,
+        "any": true,
+        "note": "true 면 untimed 추정은 직접 관측이 아니라 추론(또는 조건부 수동 추론)에 근거한 값"
+      },
+      "lock_call_sites_evidence": {
+        "verified": false,
+        "recorded": null,
+        "scope": "락 timer(coupon.redis_lock.*)는 worker/recovery 등 모든 @DistributedLock 사이트를 포함한다. loadtest URI 요청만 센 http 와 대조하려면 다른 사이트 비활성 근거가 필요하다"
+      },
+      "untimed_estimate(http - timer, NOT assumed zero)": "UNKNOWN",
+      "gap_numeric_diagnostic_only(not a conclusion)": null,
+      "app_log_counts": {
+        "LockAcquisitionFailedException": 0,
+        "Lock acquisition interrupted": 0,
+        "ERROR_lines": 0,
+        "RedisException/timeout lines": 0
+      }
+    }
+  },
+  "notes": [
+    "hold wraps the whole REQUIRES_NEW transaction (DB connection acquire..commit) - not pure Redis time",
+    "default wait 5s / lease 3s (DistributedLock annotation defaults); see lock-annotation-sites.txt for per-site config",
+    "same metric names are used by the async worker and recovery worker sites; metrics carry no method tag -> separate by running with COUPON_ISSUE_WORKER_MODE=off and checking worker logs",
+    "non-interrupt tryLock exceptions are NOT timed; compare with http 5xx/log counts, do not treat the gap as zero"
+  ]
+}

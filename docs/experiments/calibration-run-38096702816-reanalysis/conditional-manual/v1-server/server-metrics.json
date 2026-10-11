@@ -1,0 +1,86 @@
+{
+  "app1": {
+    "structural_ok": true,
+    "provenance_ok": false,
+    "structural_checks": {
+      "anchors_present": {
+        "pass": true,
+        "detail": "rows=248/736, unparsed=0/0, missing_anchors=[]"
+      },
+      "same_process": {
+        "pass": true,
+        "detail": "start_time=1791676806.898/1791676806.898, labels_equal=True, uptime=45.526/61.258 (restart-free within checkable range)"
+      },
+      "no_counter_reset": {
+        "pass": true,
+        "detail": "0 series decreased"
+      },
+      "exposure_unchanged": {
+        "pass": true,
+        "detail": "0 counter series vanished (filter-change-free within checkable range)"
+      }
+    },
+    "provenance_checks": {
+      "provenance_present": {
+        "pass": false,
+        "detail": "no scrape provenance file"
+      }
+    },
+    "batch_queue_wait": {
+      "status": "CONDITIONAL_MANUAL_INFERENCE",
+      "count_delta": 101.0,
+      "sum_s_delta": 28.312572,
+      "mean_ms": 280.32,
+      "basis": "manual: structural only; provenance unverified (provenance_present,registration_paths[coupon_admission_batch_queue_wait]); registration basis: CouponBatchAdmissionAcceptor:175 Timer.builder(\"coupon.admission.batch.queue_wait\")...register(..) per flush"
+    },
+    "admission_tx": {
+      "status": "CONDITIONAL_MANUAL_INFERENCE",
+      "count_delta": 6.0,
+      "sum_s_delta": 1.862023,
+      "mean_ms": 310.34,
+      "basis": "manual: structural only; provenance unverified (provenance_present,registration_paths[coupon_admission_transaction]); registration basis: CouponAdmissionTransactionTimers: Timer.builder(\"coupon.admission.transaction\").register(..) at call time"
+    }
+  },
+  "app2": {
+    "structural_ok": true,
+    "provenance_ok": false,
+    "structural_checks": {
+      "anchors_present": {
+        "pass": true,
+        "detail": "rows=245/655, unparsed=0/0, missing_anchors=[]"
+      },
+      "same_process": {
+        "pass": true,
+        "detail": "start_time=1791676807.086/1791676807.086, labels_equal=True, uptime=45.413/61.087 (restart-free within checkable range)"
+      },
+      "no_counter_reset": {
+        "pass": true,
+        "detail": "0 series decreased"
+      },
+      "exposure_unchanged": {
+        "pass": true,
+        "detail": "0 counter series vanished (filter-change-free within checkable range)"
+      }
+    },
+    "provenance_checks": {
+      "provenance_present": {
+        "pass": false,
+        "detail": "no scrape provenance file"
+      }
+    },
+    "batch_queue_wait": {
+      "status": "CONDITIONAL_MANUAL_INFERENCE",
+      "count_delta": 100.0,
+      "sum_s_delta": 28.764737,
+      "mean_ms": 287.65,
+      "basis": "manual: structural only; provenance unverified (provenance_present,registration_paths[coupon_admission_batch_queue_wait]); registration basis: CouponBatchAdmissionAcceptor:175 Timer.builder(\"coupon.admission.batch.queue_wait\")...register(..) per flush"
+    },
+    "admission_tx": {
+      "status": "CONDITIONAL_MANUAL_INFERENCE",
+      "count_delta": 6.0,
+      "sum_s_delta": 1.730891,
+      "mean_ms": 288.48,
+      "basis": "manual: structural only; provenance unverified (provenance_present,registration_paths[coupon_admission_transaction]); registration basis: CouponAdmissionTransactionTimers: Timer.builder(\"coupon.admission.transaction\").register(..) at call time"
+    }
+  }
+}

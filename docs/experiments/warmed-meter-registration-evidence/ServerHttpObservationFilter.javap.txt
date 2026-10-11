@@ -1,0 +1,214 @@
+Compiled from "ServerHttpObservationFilter.java"
+public class org.springframework.web.filter.ServerHttpObservationFilter extends org.springframework.web.filter.OncePerRequestFilter {
+  public static final java.lang.String CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE;
+
+  private static final org.springframework.http.server.observation.ServerRequestObservationConvention DEFAULT_OBSERVATION_CONVENTION;
+
+  private static final java.lang.String CURRENT_OBSERVATION_ATTRIBUTE;
+
+  private final io.micrometer.observation.ObservationRegistry observationRegistry;
+
+  private final org.springframework.http.server.observation.ServerRequestObservationConvention observationConvention;
+
+  public org.springframework.web.filter.ServerHttpObservationFilter(io.micrometer.observation.ObservationRegistry);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: getstatic     #1                  // Field DEFAULT_OBSERVATION_CONVENTION:Lorg/springframework/http/server/observation/ServerRequestObservationConvention;
+       5: invokespecial #7                  // Method "<init>":(Lio/micrometer/observation/ObservationRegistry;Lorg/springframework/http/server/observation/ServerRequestObservationConvention;)V
+       8: return
+
+  public org.springframework.web.filter.ServerHttpObservationFilter(io.micrometer.observation.ObservationRegistry, org.springframework.http.server.observation.ServerRequestObservationConvention);
+    Code:
+       0: aload_0
+       1: invokespecial #11                 // Method org/springframework/web/filter/OncePerRequestFilter."<init>":()V
+       4: aload_0
+       5: aload_1
+       6: putfield      #16                 // Field observationRegistry:Lio/micrometer/observation/ObservationRegistry;
+       9: aload_0
+      10: aload_2
+      11: putfield      #20                 // Field observationConvention:Lorg/springframework/http/server/observation/ServerRequestObservationConvention;
+      14: return
+
+  public static java.util.Optional<org.springframework.http.server.observation.ServerRequestObservationContext> findObservationContext(jakarta.servlet.http.HttpServletRequest);
+    Code:
+       0: aload_0
+       1: getstatic     #23                 // Field CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE:Ljava/lang/String;
+       4: invokeinterface #27,  2           // InterfaceMethod jakarta/servlet/http/HttpServletRequest.getAttribute:(Ljava/lang/String;)Ljava/lang/Object;
+       9: checkcast     #33                 // class org/springframework/http/server/observation/ServerRequestObservationContext
+      12: invokestatic  #35                 // Method java/util/Optional.ofNullable:(Ljava/lang/Object;)Ljava/util/Optional;
+      15: areturn
+
+  protected boolean shouldNotFilterAsyncDispatch();
+    Code:
+       0: iconst_0
+       1: ireturn
+
+  protected void doFilterInternal(jakarta.servlet.http.HttpServletRequest, jakarta.servlet.http.HttpServletResponse, jakarta.servlet.FilterChain) throws jakarta.servlet.ServletException, java.io.IOException;
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_2
+       3: invokevirtual #41                 // Method createOrFetchObservation:(Ljakarta/servlet/http/HttpServletRequest;Ljakarta/servlet/http/HttpServletResponse;)Lio/micrometer/observation/Observation;
+       6: astore        4
+       8: aload         4
+      10: invokeinterface #45,  1           // InterfaceMethod io/micrometer/observation/Observation.openScope:()Lio/micrometer/observation/Observation$Scope;
+      15: astore        5
+      17: aload_3
+      18: aload_1
+      19: aload_2
+      20: invokeinterface #51,  3           // InterfaceMethod jakarta/servlet/FilterChain.doFilter:(Ljakarta/servlet/ServletRequest;Ljakarta/servlet/ServletResponse;)V
+      25: aload         5
+      27: ifnull        69
+      30: aload         5
+      32: invokeinterface #57,  1           // InterfaceMethod io/micrometer/observation/Observation$Scope.close:()V
+      37: goto          69
+      40: astore        6
+      42: aload         5
+      44: ifnull        66
+      47: aload         5
+      49: invokeinterface #57,  1           // InterfaceMethod io/micrometer/observation/Observation$Scope.close:()V
+      54: goto          66
+      57: astore        7
+      59: aload         6
+      61: aload         7
+      63: invokevirtual #64                 // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+      66: aload         6
+      68: athrow
+      69: aload_1
+      70: invokeinterface #68,  1           // InterfaceMethod jakarta/servlet/http/HttpServletRequest.isAsyncStarted:()Z
+      75: ifne          184
+      78: aload_0
+      79: aload_1
+      80: invokevirtual #72                 // Method fetchException:(Ljakarta/servlet/http/HttpServletRequest;)Ljava/lang/Throwable;
+      83: astore        5
+      85: aload         5
+      87: ifnull        100
+      90: aload         4
+      92: aload         5
+      94: invokeinterface #76,  2           // InterfaceMethod io/micrometer/observation/Observation.error:(Ljava/lang/Throwable;)Lio/micrometer/observation/Observation;
+      99: pop
+     100: aload         4
+     102: invokeinterface #80,  1           // InterfaceMethod io/micrometer/observation/Observation.stop:()V
+     107: goto          184
+     110: astore        5
+     112: aload         4
+     114: aload_0
+     115: aload         5
+     117: invokevirtual #85                 // Method unwrapServletException:(Ljava/lang/Throwable;)Ljava/lang/Throwable;
+     120: invokeinterface #76,  2           // InterfaceMethod io/micrometer/observation/Observation.error:(Ljava/lang/Throwable;)Lio/micrometer/observation/Observation;
+     125: pop
+     126: aload_2
+     127: getstatic     #89                 // Field org/springframework/http/HttpStatus.INTERNAL_SERVER_ERROR:Lorg/springframework/http/HttpStatus;
+     130: invokevirtual #95                 // Method org/springframework/http/HttpStatus.value:()I
+     133: invokeinterface #99,  2           // InterfaceMethod jakarta/servlet/http/HttpServletResponse.setStatus:(I)V
+     138: aload         5
+     140: athrow
+     141: astore        8
+     143: aload_1
+     144: invokeinterface #68,  1           // InterfaceMethod jakarta/servlet/http/HttpServletRequest.isAsyncStarted:()Z
+     149: ifne          181
+     152: aload_0
+     153: aload_1
+     154: invokevirtual #72                 // Method fetchException:(Ljakarta/servlet/http/HttpServletRequest;)Ljava/lang/Throwable;
+     157: astore        9
+     159: aload         9
+     161: ifnull        174
+     164: aload         4
+     166: aload         9
+     168: invokeinterface #76,  2           // InterfaceMethod io/micrometer/observation/Observation.error:(Ljava/lang/Throwable;)Lio/micrometer/observation/Observation;
+     173: pop
+     174: aload         4
+     176: invokeinterface #80,  1           // InterfaceMethod io/micrometer/observation/Observation.stop:()V
+     181: aload         8
+     183: athrow
+     184: return
+    Exception table:
+       from    to  target type
+          17    25    40   Class java/lang/Throwable
+          47    54    57   Class java/lang/Throwable
+           8    69   110   Class java/lang/Exception
+           8    69   141   any
+         110   143   141   any
+
+  private io.micrometer.observation.Observation createOrFetchObservation(jakarta.servlet.http.HttpServletRequest, jakarta.servlet.http.HttpServletResponse);
+    Code:
+       0: aload_1
+       1: getstatic     #105                // Field CURRENT_OBSERVATION_ATTRIBUTE:Ljava/lang/String;
+       4: invokeinterface #27,  2           // InterfaceMethod jakarta/servlet/http/HttpServletRequest.getAttribute:(Ljava/lang/String;)Ljava/lang/Object;
+       9: checkcast     #46                 // class io/micrometer/observation/Observation
+      12: astore_3
+      13: aload_3
+      14: ifnonnull     92
+      17: new           #33                 // class org/springframework/http/server/observation/ServerRequestObservationContext
+      20: dup
+      21: aload_1
+      22: aload_2
+      23: invokespecial #108                // Method org/springframework/http/server/observation/ServerRequestObservationContext."<init>":(Ljakarta/servlet/http/HttpServletRequest;Ljakarta/servlet/http/HttpServletResponse;)V
+      26: astore        4
+      28: getstatic     #111                // Field org/springframework/http/server/observation/ServerHttpObservationDocumentation.HTTP_SERVLET_SERVER_REQUESTS:Lorg/springframework/http/server/observation/ServerHttpObservationDocumentation;
+      31: aload_0
+      32: getfield      #20                 // Field observationConvention:Lorg/springframework/http/server/observation/ServerRequestObservationConvention;
+      35: getstatic     #1                  // Field DEFAULT_OBSERVATION_CONVENTION:Lorg/springframework/http/server/observation/ServerRequestObservationConvention;
+      38: aload         4
+      40: invokedynamic #117,  0            // InvokeDynamic #0:get:(Lorg/springframework/http/server/observation/ServerRequestObservationContext;)Ljava/util/function/Supplier;
+      45: aload_0
+      46: getfield      #16                 // Field observationRegistry:Lio/micrometer/observation/ObservationRegistry;
+      49: invokevirtual #121                // Method org/springframework/http/server/observation/ServerHttpObservationDocumentation.observation:(Lio/micrometer/observation/ObservationConvention;Lio/micrometer/observation/ObservationConvention;Ljava/util/function/Supplier;Lio/micrometer/observation/ObservationRegistry;)Lio/micrometer/observation/Observation;
+      52: invokeinterface #125,  1          // InterfaceMethod io/micrometer/observation/Observation.start:()Lio/micrometer/observation/Observation;
+      57: astore_3
+      58: aload_1
+      59: getstatic     #105                // Field CURRENT_OBSERVATION_ATTRIBUTE:Ljava/lang/String;
+      62: aload_3
+      63: invokeinterface #129,  3          // InterfaceMethod jakarta/servlet/http/HttpServletRequest.setAttribute:(Ljava/lang/String;Ljava/lang/Object;)V
+      68: aload_3
+      69: invokeinterface #133,  1          // InterfaceMethod io/micrometer/observation/Observation.isNoop:()Z
+      74: ifne          92
+      77: aload_1
+      78: getstatic     #23                 // Field CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE:Ljava/lang/String;
+      81: aload_3
+      82: invokeinterface #136,  1          // InterfaceMethod io/micrometer/observation/Observation.getContext:()Lio/micrometer/observation/Observation$Context;
+      87: invokeinterface #129,  3          // InterfaceMethod jakarta/servlet/http/HttpServletRequest.setAttribute:(Ljava/lang/String;Ljava/lang/Object;)V
+      92: aload_3
+      93: areturn
+
+  private java.lang.Throwable unwrapServletException(java.lang.Throwable);
+    Code:
+       0: aload_1
+       1: instanceof    #140                // class jakarta/servlet/ServletException
+       4: ifeq          14
+       7: aload_1
+       8: invokevirtual #142                // Method java/lang/Throwable.getCause:()Ljava/lang/Throwable;
+      11: goto          15
+      14: aload_1
+      15: areturn
+
+  private java.lang.Throwable fetchException(jakarta.servlet.http.HttpServletRequest);
+    Code:
+       0: aload_1
+       1: ldc           #148                // String jakarta.servlet.error.exception
+       3: invokeinterface #27,  2           // InterfaceMethod jakarta/servlet/http/HttpServletRequest.getAttribute:(Ljava/lang/String;)Ljava/lang/Object;
+       8: checkcast     #62                 // class java/lang/Throwable
+      11: areturn
+
+  private static org.springframework.http.server.observation.ServerRequestObservationContext lambda$createOrFetchObservation$0(org.springframework.http.server.observation.ServerRequestObservationContext);
+    Code:
+       0: aload_0
+       1: areturn
+
+  static {};
+    Code:
+       0: ldc           #2                  // class org/springframework/web/filter/ServerHttpObservationFilter
+       2: invokevirtual #150                // Method java/lang/Class.getName:()Ljava/lang/String;
+       5: invokedynamic #156,  0            // InvokeDynamic #1:makeConcatWithConstants:(Ljava/lang/String;)Ljava/lang/String;
+      10: putstatic     #23                 // Field CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE:Ljava/lang/String;
+      13: new           #160                // class org/springframework/http/server/observation/DefaultServerRequestObservationConvention
+      16: dup
+      17: invokespecial #162                // Method org/springframework/http/server/observation/DefaultServerRequestObservationConvention."<init>":()V
+      20: putstatic     #1                  // Field DEFAULT_OBSERVATION_CONVENTION:Lorg/springframework/http/server/observation/ServerRequestObservationConvention;
+      23: ldc           #2                  // class org/springframework/web/filter/ServerHttpObservationFilter
+      25: invokevirtual #150                // Method java/lang/Class.getName:()Ljava/lang/String;
+      28: invokedynamic #163,  0            // InvokeDynamic #2:makeConcatWithConstants:(Ljava/lang/String;)Ljava/lang/String;
+      33: putstatic     #105                // Field CURRENT_OBSERVATION_ATTRIBUTE:Ljava/lang/String;
+      36: return
+}

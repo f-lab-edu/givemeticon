@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+import hashlib,importlib.util,json,subprocess,tempfile,unittest
+from pathlib import Path
+HERE=Path(__file__).parent;REPO=HERE.parents[2]
+spec=importlib.util.spec_from_file_location('stage',HERE/'warmed-stage.py');stage=importlib.util.module_from_spec(spec);spec.loader.exec_module(stage)
+class Warmed(unittest.TestCase):
+ def test_dropped_is_demand_not_occupancy(self):
+  rows=[{'kind':k,'iterationKey':i,'atMs':t,'completedNormally':True} for k,i,t in [('iteration_started','0',0),('iteration_started','1',1),('iteration_completed','0',2),('iteration_completed','1',3)]]
+  r=stage.occupancy(rows,8);self.assertTrue(r['pass']);self.assertEqual(r['actual_occupancy_peak'],2);self.assertEqual(r['scheduled_demand_backlog_at_end'],8)
+ def test_aborted_duplicate_iteration_and_missing_start(self):
+  r=stage.occupancy([{'kind':'iteration_started','iterationKey':'0','atMs':0}],0);self.assertFalse(r['pass']);self.assertEqual(r['unfinished_iteration_keys'],['0'])
+  r=stage.occupancy([{'kind':'iteration_completed','iterationKey':'0','atMs':0,'completedNormally':False}],0);self.assertFalse(r['pass'])
+ def test_stock_pending_does_not_prove_drain(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);(p/'run').mkdir();
+   for a in (1,2):
+    for when in ('before','after'):
+     (p/f'run/app{a}-{when}.prom').write_text('process_start_time_seconds 10\n');(p/f'run/app{a}-{when}.prom.exit.txt').write_text('0')
+   r=stage.drain(p,'stock',[],{'pass':True},True);self.assertFalse(r['warmup_transition_allowed']);self.assertEqual(r['server_residual_processing'],'UNKNOWN')
+ def test_direct_http_completions_and_restart(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);(p/'run').mkdir();rows=[{'kind':'stock_request','target':1},{'kind':'stock_request','target':2}]
+   for a in (1,2):
+    for when,n in [('before',2),('after',3)]:
+     (p/f'run/app{a}-{when}.prom.exit.txt').write_text('0')
+     (p/f'run/app{a}-{when}.prom').write_text(f'process_start_time_seconds 10\nprocess_uptime_seconds {10 if when=="before" else 20}\njvm_info{{version="17"}} 1\nhttp_server_requests_seconds_count{{method="POST",uri="/internal/loadtest/coupons",status="200"}} {n}\n')
+   for a in (1,2):
+    target=f'http://127.0.0.1:{18079+a}/actuator/prometheus';sc={}
+    for when in ('before','after'):
+     f=p/f'run/app{a}-{when}.prom';sc[when]={'exit_code':0,'http_status':200,'requested_target':target,'effective_target':target,'body_bytes':f.stat().st_size,'body_sha256':hashlib.sha256(f.read_bytes()).hexdigest()}
+    (p/f'run/app{a}-scrape-provenance.json').write_text(json.dumps({'schema':'scrape-provenance/v1','expected_target':target,'scrapes':sc,'meter_policy':{'meter_filter_or_registry_remove_used':False,'evidence':'synthetic complete capture policy','spring_boot':'3.1.3','micrometer':'1.11.3','registration_paths':{'http_server_requests':'synthetic registration fixture'}}}))
+   self.assertTrue(stage.drain(p,'stock',rows,{'pass':True},True)['warmup_transition_allowed'])
+   f=p/'run/app1-after.prom';f.write_text(f.read_text().replace('seconds 10','seconds 11'))
+   self.assertFalse(stage.drain(p,'stock',rows,{'pass':True},True)['warmup_transition_allowed'])
+ def test_v1_worker_unresolved_refuses(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);(p/'run').mkdir();f=p/'run/unresolved-after-quiescence.txt';f.write_text('1')
+   self.assertFalse(stage.drain(p,'v1',[],{'pass':True},True)['warmup_transition_allowed']);f.write_text('0')
+   self.assertTrue(stage.drain(p,'v1',[],{'pass':True},True)['warmup_transition_allowed'])
+ def test_actual_scripts_preflight_no_http_and_sequential_ledger(self):
+  js=r'''
+const fs=require('fs'),vm=require('vm');let source=fs.readFileSync(process.argv[1],'utf8');source=source.replace(/^import .*;\n/gm,'').replace(/export const /g,'const ').replace('export default function ()','function runIteration()');
+let logs=[],posts=0;class Metric{add(){}};let c={__ENV:{EVENT_ID:'1',STOCK_ID:'1',INITIALIZATION_PREFLIGHT:process.argv[2],ITERATION_LEDGER:'true',PRE_ALLOCATED_VUS:'201',MAX_VUS:'201',POLL_BUDGET_MS:'0'},exec:{scenario:{iterationInTest:0,startTime:Date.now()},vu:{idInTest:1,iterationInScenario:0}},Counter:Metric,Trend:Metric,sleep:()=>{},check:()=>{},http:{post:()=>{posts++;return {status:200,body:'{"data":{"status":"ENDED"}}',timings:{duration:1}}}},Date,Math,Number,String,Boolean,JSON,console:{log:s=>logs.push(JSON.parse(s))}};
+vm.createContext(c);vm.runInContext(source+'\nrunIteration();globalThis.result=options;',c);process.stdout.write(JSON.stringify({logs,posts,scenarios:c.result.scenarios}));
+'''
+  for script in (REPO/'scripts/verifier-isolated/stock-arrival-record.js',REPO/'scripts/coupon-integrated-loadtest/integrated-admission-poll.js'):
+   pre=json.loads(subprocess.check_output(['node','-e',js,str(script),'true'],text=True));self.assertEqual(pre['posts'],0);self.assertEqual(pre['scenarios']['initialization']['vus'],201)
+   live=json.loads(subprocess.check_output(['node','-e',js,str(script),'false'],text=True));self.assertEqual(live['posts'],2)
+   self.assertEqual(live['logs'][0]['kind'],'iteration_started');self.assertEqual(live['logs'][-1]['kind'],'iteration_completed');self.assertTrue(live['logs'][-1]['completedNormally'])
+ def test_db_missing_and_duplicate_refuse(self):
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d);self.assertFalse(stage.db_reconciliation(root,'stock')['pass']);(root/'analysis').mkdir()
+   data={'integrity':{'verdict':'OK'},'db':{'duplicate_users':0,'over_issued':0},'success_response_but_not_in_db':0}
+   f=root/'analysis/stock-summary.json';f.write_text(json.dumps(data));self.assertTrue(stage.db_reconciliation(root,'stock')['pass'])
+   data['db']['duplicate_users']=1;f.write_text(json.dumps(data));self.assertFalse(stage.db_reconciliation(root,'stock')['pass'])
+ def test_preflight_missing_evidence_refuses(self):
+  spec=importlib.util.spec_from_file_location('preflight',HERE/'warmed-preflight.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d);(root/'run').mkdir();(root/'run/k6-summary.json').write_text(json.dumps({'metrics':{'iterations':{'count':201}}}));(root/'run/k6-cgroup.jsonl').write_text('')
+   self.assertFalse(m.assess(root,201)['pass'])
+ def test_no_expansion_or_trigger_branch_creation(self):
+  s=(HERE/'run-warmed.sh').read_text();self.assertIn('for size in 201 401',s);self.assertIn('DURATION=20s',s);self.assertIn('DURATION=10s',s);self.assertNotIn('RATE=20',s);self.assertNotIn('RATE=40',s)
+  workflow=(REPO/'.github/workflows/hosted-warmed.yml').read_text();self.assertIn('test/issue-177-warmed-workflow-approved',workflow);self.assertNotIn('workflow_dispatch',workflow);self.assertIn('timeout-minutes: 30',workflow)
+  self.assertLess(workflow.index('cleanup-warmed.sh'),workflow.index('rm -f'));self.assertLess(workflow.index('rm -f'),workflow.index('sha256sum'))
+unittest.main()
