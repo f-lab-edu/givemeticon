@@ -1,0 +1,14 @@
+{
+  "contexts" : {
+    "context0" : {
+      "positiveMatches" : {
+        "CouponEventIssuanceWorker" : true
+      },
+      "negativeMatches" : {
+        "CouponIssueAsyncWorker" : true,
+        "CouponBatchIssueWorker" : true,
+        "CouponIssueRequestRecoveryScheduler" : true
+      }
+    }
+  }
+}

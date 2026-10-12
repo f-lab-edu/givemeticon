@@ -9,17 +9,26 @@ _spec=importlib.util.spec_from_file_location('policy_failure',Path(__file__).wit
 failure=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(failure)
 
 def conditions(document,path):
-    pos={};neg={}
-    for ctx in document.get('contexts',{}).values():
-        pos.update(ctx.get('positiveMatches',{}));neg.update(ctx.get('negativeMatches',{}))
-    def find(table,name):return [(k,v) for k,v in table.items() if k.endswith('.'+name) or k==name]
+    if not isinstance(document,dict): raise ValueError('invalid conditions')
+    contexts=document.get('contexts',{})
+    if not isinstance(contexts,dict): raise ValueError('invalid conditions')
+    for ctx in contexts.values():
+        if not isinstance(ctx,dict): raise ValueError('invalid conditions')
+        for polarity in ('positiveMatches','negativeMatches'):
+            if not isinstance(ctx.get(polarity,{}),dict): raise ValueError('invalid conditions')
     selected={};ok=True
     for name in (*LEGACY,EVENT):
-        p=find(pos,name);n=find(neg,name);wanted=(name==EVENT and path=='v1')
-        matched=len(p)==1 and not n;excluded=len(n)==1 and not p
+        counts=[]
+        for polarity in ('positiveMatches','negativeMatches'):
+            counts.append(sum(1 for ctx in contexts.values()
+                for key in ctx.get(polarity,{}) if key.endswith('.'+name) or key==name))
+        pos_count,neg_count=counts;wanted=(name==EVENT and path=='v1')
+        matched=pos_count==1 and neg_count==0;excluded=neg_count==1 and pos_count==0
         ok=ok and (matched if wanted else excluded)
-        selected[name]={'expected_present':wanted,'condition_matched':matched,'condition_excluded':excluded,'condition_evidence':p or n}
-    return {'pass':bool(ok),'selected_conditions':selected,'scope':'Spring conditional registration decision; not scheduler activity/latency evidence'}
+        selected[name]={'expected_present':wanted,'condition_matched':matched,'condition_excluded':excluded,
+            'pos_count':min(pos_count,2),'neg_count':min(neg_count,2)}
+    return {'pass':bool(ok),'selected_conditions':selected,'count_encoding':'2 means 2 or more',
+        'scope':'Spring conditional registration decision; not scheduler activity/latency evidence'}
 
 def metrics_config(args,environment,configurations):
     """Audit known mounted/embedded inputs; never claim framework filters absent."""
@@ -71,7 +80,11 @@ def execute(path,app,contract,out,diagnostic=None):
     d.stage('conditions_decode')
     verdict=conditions(json.loads(body),path)
     d.stage('conditions_match')
-    if not verdict['pass']:raise ValueError('Spring worker conditions mismatch')
+    if not verdict['pass']:
+        # Count failures fall back to strict v1 while the gate remains refused.
+        try:d.counts({name:{key:verdict['selected_conditions'][name][key] for key in ('pos_count','neg_count')} for name in failure.WORKERS})
+        except Exception:pass
+        raise ValueError('Spring worker conditions mismatch')
     d.stage('process_capture')
     capture_spec=importlib.util.spec_from_file_location('capture',Path(__file__).with_name('capture-prom.py'));capture=importlib.util.module_from_spec(capture_spec);capture_spec.loader.exec_module(capture)
     anchor_file=out.with_suffix('.prom');anchor=capture.capture(expected,anchor_file)

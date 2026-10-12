@@ -107,5 +107,66 @@
         "derived_sha256": "18c898f473e5636ea70b34652039a1ca0184a2ce11224f03af2b80a29555c2e5"
       }
     ]
+  },
+  "conditions_count_delta": {
+    "parent_sha": "baa4464eb20346143cb28e99b4b3fed2bdb5e688",
+    "scope": "local fail-closed correction and bounded diagnostics; hosted refusal cause UNKNOWN; no hosted execution",
+    "files": [
+      {
+        "path": "scripts/verifier-isolated/hosted/collect-evidence.py",
+        "source_sha256": "a32eb72a46b58897cfc3b1bf8714bfff4db69aaff658c34f986b533ae77bad1c",
+        "derived_sha256": "a32eb72a46b58897cfc3b1bf8714bfff4db69aaff658c34f986b533ae77bad1c"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/fixtures/worker-conditions/direct-stock.json",
+        "source_sha256": null,
+        "derived_sha256": "d6d3752fcca714e9f12d0a1a3f11654e0c9c73c4f023db06cce414c8123645e2"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/fixtures/worker-conditions/direct-v1.json",
+        "source_sha256": null,
+        "derived_sha256": "b6d530ffb0710f6202b3b359839bca43b637d864aa57a48d661dcc7ef5371d73"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/fixtures/worker-conditions/hosted-v1-failure.json",
+        "source_sha256": null,
+        "derived_sha256": "f98e170408f6ef0094fa4aea23af35febc4d1cfdd0cd08760c043f92dee2d63a"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/fixtures/worker-conditions/scanned-stock.json",
+        "source_sha256": null,
+        "derived_sha256": "d6d3752fcca714e9f12d0a1a3f11654e0c9c73c4f023db06cce414c8123645e2"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/fixtures/worker-conditions/scanned-v1.json",
+        "source_sha256": null,
+        "derived_sha256": "b6d530ffb0710f6202b3b359839bca43b637d864aa57a48d661dcc7ef5371d73"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/policy-failure.py",
+        "source_sha256": "4020f77e6828d05ed3370c5ed41cb162f3a1aa8726539c31c4ec7e84437d5ad2",
+        "derived_sha256": "040e3da3ce9fbcf004802d9c1d6f677cd0e3d1338d592bbf0894b56b807e0fda"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/test-collect-evidence.py",
+        "source_sha256": "18c898f473e5636ea70b34652039a1ca0184a2ce11224f03af2b80a29555c2e5",
+        "derived_sha256": "8f2ec43ed399f16e3c86a7f984da9f51abdff6f01d951ea280d42b726ad0076d"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/test-worker-meter-policy.py",
+        "source_sha256": "4301eb66d8ca54b488588a5ecb306f9f725bf05f9d31a048230fef1e57d4c002",
+        "derived_sha256": "16351d1f4907f0f52375ed0933f5eafa1451331a425b44c28a177d22b8a276b1"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/worker-meter-policy.py",
+        "source_sha256": "f8d38c95c5b962d4060a0c3bed88dcc68a9e9523921716ed3b8a30b9daff60e0",
+        "derived_sha256": "9f9d032800f705b4873ac7c535900d7955b11523c2866403347cb6d4836f0c10"
+      },
+      {
+        "path": "src/test/java/com/jinddung2/givemeticon/harness/WarmedWorkerConditionTest.java",
+        "source_sha256": "7d259437019cf6300c191f0bcf1673d35f113f1644a58ba3f3d65e427a19a3e2",
+        "derived_sha256": "c56eee9f4f1f9f55a1f4ac615477cc1595a740a739ddd64384a2fe2880fa5331"
+      }
+    ]
   }
 }

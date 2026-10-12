@@ -1,0 +1,1 @@
+{"app": "app1", "exception_class": "ValueError", "http_status": null, "path": "stock", "reason": "CONDITIONS_MATCH_FAILED", "return_code": null, "run_sha": "baa4464eb20346143cb28e99b4b3fed2bdb5e688", "schema": "policy-failure-v1", "stage": "conditions_match"}

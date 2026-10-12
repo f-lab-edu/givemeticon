@@ -1,4 +1,4 @@
-import importlib.util,tempfile,unittest,subprocess,sys,json
+import copy,importlib.util,tempfile,unittest,subprocess,sys,json
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('collector',Path(__file__).with_name('collect-evidence.py'));m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 class T(unittest.TestCase):
@@ -57,6 +57,46 @@ class T(unittest.TestCase):
     (policy/'app1.failure.json').write_text(json.dumps(record))
     result=subprocess.run([sys.executable,str(Path(__file__).with_name('collect-evidence.py')),str(src),str(dst),str(p/'missing')],capture_output=True,text=True)
     self.assertEqual(result.returncode,3);self.assertFalse(dst.exists());self.assertNotIn('sentinel-secret',result.stdout+result.stderr)
+ def test_v1_hosted_and_strict_v2_boundary(self):
+  fixture=Path(__file__).parent/'fixtures/worker-conditions/hosted-v1-failure.json'
+  old=json.loads(fixture.read_text());self.assertEqual(old['schema'],'policy-failure-v1')
+  counts={name:{'pos_count':0,'neg_count':1} for name in m.failure.WORKERS}
+  counts[m.failure.WORKERS[-1]]={'pos_count':0,'neg_count':0}
+  current=dict(old,schema='policy-failure-v2',condition_counts=counts)
+  bad=[]
+  bad.append(dict(old,condition_counts=counts))
+  bad.append(dict(current,stage='process_capture',reason='PROCESS_CAPTURE_FAILED'))
+  absent=dict(current);del absent['condition_counts'];bad.append(absent)
+  for name in m.failure.WORKERS:
+   for key in ('pos_count','neg_count'):
+    for value in (True,False,-1,3,0.0,None,'password=sentinel'):
+     changed=copy.deepcopy(current);changed['condition_counts'][name][key]=value;bad.append(changed)
+   changed=copy.deepcopy(current);del changed['condition_counts'][name];bad.append(changed)
+   changed=copy.deepcopy(current);changed['condition_counts'][name]['extra']=0;bad.append(changed)
+   changed=copy.deepcopy(current);del changed['condition_counts'][name]['pos_count'];bad.append(changed)
+  changed=copy.deepcopy(current);changed['condition_counts']['unknown']={'pos_count':0,'neg_count':0};bad.append(changed)
+  bad.append(dict(current,extra='password=sentinel'))
+  bad.append(dict(current,condition_counts={n:{'pos_count':0,'neg_count':1} for n in m.failure.WORKERS}))
+  normal_v1=dict(current,path='v1',condition_counts={n:({'pos_count':1,'neg_count':0} if n==m.failure.WORKERS[-1] else {'pos_count':0,'neg_count':1}) for n in m.failure.WORKERS});bad.append(normal_v1)
+  for record,valid in [(old,True),(current,True)]+[(r,False) for r in bad]:
+   with self.subTest(record=record),tempfile.TemporaryDirectory() as d:
+    if valid:self.assertEqual(m.failure.validate(record),record)
+    else:self.assertRaises(ValueError,m.failure.validate,record)
+    p=Path(d);src=p/'src';policy=src/(record['path']+'-policy');policy.mkdir(parents=True);dst=p/'dst'
+    (policy/'app1.failure.json').write_text(json.dumps(record))
+    if valid:
+     m.collect_policy_failures(src,dst);self.assertEqual(json.loads((dst/(record['path']+'-policy/app1.failure.json')).read_text()),record)
+    else:
+     self.assertRaises(ValueError,m.collect_policy_failures,src,dst);self.assertFalse(dst.exists())
+     result=subprocess.run([sys.executable,str(Path(__file__).with_name('collect-evidence.py')),str(src),str(dst),str(p/'missing')],capture_output=True,text=True)
+     self.assertEqual(result.returncode,3);self.assertFalse(dst.exists());self.assertNotIn('sentinel',result.stdout+result.stderr)
+ def test_diagnostic_stage_reset_and_count_fallback(self):
+  diagnostic=m.failure.Diagnostic('stock','app1');diagnostic.stage('conditions_match')
+  counts={n:{'pos_count':0,'neg_count':0} for n in m.failure.WORKERS}
+  diagnostic.counts(counts);self.assertEqual(diagnostic.record['schema'],'policy-failure-v2')
+  diagnostic.stage('process_capture');self.assertEqual(diagnostic.record['schema'],'policy-failure-v1');self.assertNotIn('condition_counts',diagnostic.record);m.failure.validate(diagnostic.record)
+  diagnostic.stage('conditions_match');counts[m.failure.WORKERS[0]]['pos_count']=True
+  self.assertRaises(ValueError,diagnostic.counts,counts);self.assertEqual(diagnostic.record['schema'],'policy-failure-v1');m.failure.validate(diagnostic.record)
  def test_symlink_policy_sidecar_is_not_collected(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d);src=p/'src';policy=src/'stock-policy';policy.mkdir(parents=True);outside=p/'outside';outside.write_text(json.dumps(m.failure.Diagnostic('stock','app1').record));(policy/'app1.failure.json').symlink_to(outside)

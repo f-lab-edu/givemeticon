@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import contextlib,io,sys,hashlib,importlib.util,json,os,subprocess,tempfile,unittest,zipfile
+import copy,contextlib,io,sys,hashlib,importlib.util,json,os,subprocess,tempfile,unittest,zipfile
 from unittest.mock import patch
 from pathlib import Path
 s=importlib.util.spec_from_file_location('p',Path(__file__).with_name('worker-meter-policy.py'));m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
@@ -8,6 +8,62 @@ class T(unittest.TestCase):
   pos={};neg={}
   for n in (*m.LEGACY,m.EVENT):(pos if ((n==m.EVENT and event) or (n=='CouponIssueRequestRecoveryScheduler' and recovery)) else neg)['package.'+n]=[{'condition':'OnPropertyCondition','message':'fixture'}]
   return {'contexts':{'application':{'positiveMatches':pos,'negativeMatches':neg}}}
+ def test_real_endpoint_fixtures_and_80_refusals(self):
+  cases=0
+  for mode in ('direct','scanned'):
+   for path in ('stock','v1'):
+    doc=json.loads((Path(__file__).parent/'fixtures/worker-conditions'/f'{mode}-{path}.json').read_text())
+    verdict=m.conditions(doc,path);self.assertTrue(verdict['pass'])
+    self.assertNotIn('condition_evidence',json.dumps(verdict))
+    for worker in (*m.LEGACY,m.EVENT):
+     polarity='positiveMatches' if worker==m.EVENT and path=='v1' else 'negativeMatches'
+     opposite='negativeMatches' if polarity=='positiveMatches' else 'positiveMatches'
+     for kind in ('missing','same-context-duplicate','cross-context-duplicate','both-polarities','opposite-only'):
+      changed=copy.deepcopy(doc);ctx=changed['contexts']['context0']
+      if kind=='missing':del ctx[polarity][worker]
+      elif kind=='same-context-duplicate':ctx[polarity]['package.'+worker]=True
+      elif kind=='cross-context-duplicate':changed['contexts']['context1']={polarity:{worker:True}}
+      elif kind=='both-polarities':ctx[opposite][worker]=True
+      else:del ctx[polarity][worker];ctx[opposite][worker]=True
+      with self.subTest(mode=mode,path=path,worker=worker,kind=kind):self.assertFalse(m.conditions(changed,path)['pass'])
+      cases+=1
+    # Three identical contexts must refuse; only the output saturates at two.
+    doc['contexts']['context1']=copy.deepcopy(doc['contexts']['context0'])
+    doc['contexts']['context2']=copy.deepcopy(doc['contexts']['context0'])
+    verdict=m.conditions(doc,path);self.assertFalse(verdict['pass'])
+    self.assertTrue(all(v['pos_count']==2 or v['neg_count']==2 for v in verdict['selected_conditions'].values()))
+  self.assertEqual(cases,80)
+ def test_invalid_document_objects_refused(self):
+  for bad in (None, [], 'secret', True):
+   with self.subTest(bad=bad):
+    self.assertRaises(ValueError,m.conditions,bad,'v1')
+    self.assertRaises(ValueError,m.conditions,{'contexts':bad},'v1')
+    self.assertRaises(ValueError,m.conditions,{'contexts':{'app':bad}},'v1')
+    for polarity in ('positiveMatches','negativeMatches'):
+     doc=self.report();doc['contexts']['application'][polarity]=bad
+     self.assertRaises(ValueError,m.conditions,doc,'v1')
+  doc=self.report();doc['contexts']['application']['positiveMatches']=[m.EVENT]
+  self.assertRaises(ValueError,m.conditions,doc,'v1')
+ def test_cli_conditions_to_sidecar_to_collector(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);src=p/'src';out=src/'v1-policy/app1.json';out.parent.mkdir(parents=True)
+   jar=m.ROOT/'build/verifier-cap/app.jar';config=m.ROOT/'scripts/verifier-isolated/verifier-loadtest-config.yml'
+   inspected={'Config':{'Labels':{'xyz.buzz.verifier.owner':'fixture','xyz.buzz.verifier.managed':'capped-harness'},'Cmd':['--coupon.issue-worker.mode=off','--coupon.issue-worker.enabled=false']},'NetworkSettings':{'Ports':{'8080/tcp':[{'HostPort':'18080'}]}},'Mounts':[{'Destination':'/app.jar','Source':str(jar),'RW':False},{'Destination':'/cfg/config.yml','Source':str(config),'RW':False}]}
+   (p/'inspect.json').write_text(json.dumps([inspected]));(p/'body.json').write_text(json.dumps(self.report(event=False)))
+   for name,body in (('docker', '#!/bin/sh\ncat "$FIXTURE_DIR/inspect.json"\n'), ('curl', '#!/bin/sh\ncat "$FIXTURE_DIR/body.json"\nprintf "\\n200\\nhttp://127.0.0.1:18080/actuator/conditions"\n')):
+    f=p/name;f.write_text(body);f.chmod(0o700)
+   contract=p/'contract.json';contract.write_text(json.dumps({'sha':'c'*40,'expected_prometheus_targets':{'app1':'http://127.0.0.1:18080/actuator/prometheus'}}))
+   env=dict(os.environ,PATH=str(p)+os.pathsep+os.environ['PATH'],FIXTURE_DIR=str(p),VERIFIER_OWNER_ID='fixture',VERIFIER_PREFIX='fixture')
+   result=subprocess.run([sys.executable,str(Path(__file__).with_name('worker-meter-policy.py')),'v1','app1',str(contract),str(out)],env=env,capture_output=True,text=True)
+   self.assertEqual(result.returncode,1,result.stderr);record=json.loads(out.with_suffix('.failure.json').read_text())
+   self.assertEqual(record['schema'],'policy-failure-v2');self.assertEqual(record['stage'],'conditions_match');self.assertEqual(record['condition_counts'][m.EVENT],{'pos_count':0,'neg_count':1})
+   for secret_state in ('missing','available'):
+    secret=p/secret_state
+    if secret_state=='available':secret.write_text('sentinel')
+    dst=p/('dst-'+secret_state)
+    result=subprocess.run([sys.executable,str(Path(__file__).with_name('collect-evidence.py')),str(src),str(dst),str(secret)],capture_output=True,text=True)
+    self.assertEqual(result.returncode,3 if secret_state=='missing' else 0,result.stderr)
+    self.assertEqual(json.loads((dst/'v1-policy/app1.failure.json').read_text()),record)
  def test_metrics_inputs_refuse_unknown_overrides(self):
   args=['--management.metrics.web.server.max-uri-tags=100'];good={'application.yml':b'management:\n  metrics:\n    tags:\n      application: test\n'}
   self.assertEqual(m.metrics_config(args,[],good)['enable'],{})
@@ -53,6 +109,17 @@ class T(unittest.TestCase):
      assert_failure('conditions_decode','JSONDecodeError')
     with patch.object(m.subprocess,'run',side_effect=subprocess.TimeoutExpired([sentinel],5,output=sentinel,stderr=sentinel)):
      assert_failure('conditions_capture','TimeoutExpired')
+    with patch.object(m.subprocess,'run',return_value=subprocess.CompletedProcess([],0,json.dumps(self.report(event=False))+'\n200\n'+target.replace('prometheus','conditions'),'')):
+     assert_failure('conditions_match','ValueError')
+     counts=json.loads(out.with_suffix('.failure.json').read_text())['condition_counts']
+     self.assertEqual(counts[m.EVENT],{'pos_count':0,'neg_count':1})
+     with patch.object(m.failure.Diagnostic,'counts',side_effect=ValueError(sentinel)):
+      assert_failure('conditions_match','ValueError')
+      fallback=json.loads(out.with_suffix('.failure.json').read_text());self.assertEqual(fallback['schema'],'policy-failure-v1');self.assertNotIn('condition_counts',fallback)
+    with patch.object(m.subprocess,'run',return_value=response),patch.object(m.subprocess,'check_output',return_value=json.dumps([inspected])):
+     # conditions pass; a later process identity failure must not retain counts.
+     assert_failure('process_identity','ValueError')
+     self.assertNotIn('condition_counts',json.loads(out.with_suffix('.failure.json').read_text()))
     inspected['Config']['Labels']['xyz.buzz.verifier.owner']=sentinel
     assert_failure('owner','ValueError')
     stream=io.StringIO();original_write=Path.write_text
