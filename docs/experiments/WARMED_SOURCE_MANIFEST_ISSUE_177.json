@@ -168,5 +168,26 @@
         "derived_sha256": "c56eee9f4f1f9f55a1f4ac615477cc1595a740a739ddd64384a2fe2880fa5331"
       }
     ]
+  },
+  "conditions_http_delta": {
+    "parent_sha": "be56a6bd3265020db8ff5816aeb73d08e35e0bf5",
+    "scope": "local harness-only strict transport normalization; historical hosted cause UNKNOWN; no push or hosted execution",
+    "files": [
+      {
+        "path": "scripts/verifier-isolated/hosted/worker-meter-policy.py",
+        "source_sha256": "9f9d032800f705b4873ac7c535900d7955b11523c2866403347cb6d4836f0c10",
+        "derived_sha256": "c93ae5405823cafd1d37b93ccf0230e527d48c48b0b8b6d225af368def3af12b"
+      },
+      {
+        "path": "scripts/verifier-isolated/hosted/test-worker-meter-policy.py",
+        "source_sha256": "16351d1f4907f0f52375ed0933f5eafa1451331a425b44c28a177d22b8a276b1",
+        "derived_sha256": "30653defd8ba2fc1b613ef4d6db84740c8bbe8e495731f14bc2704b8b4216e7a"
+      },
+      {
+        "path": "src/test/java/com/jinddung2/givemeticon/harness/WarmedConditionsHttpTest.java",
+        "source_sha256": null,
+        "derived_sha256": "465aeaa81e9e975390a65082f1cdd247ef8b71a6b71db8daf156f98ab34455df"
+      }
+    ]
   }
 }

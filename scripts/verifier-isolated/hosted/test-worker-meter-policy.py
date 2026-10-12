@@ -64,6 +64,28 @@ class T(unittest.TestCase):
     result=subprocess.run([sys.executable,str(Path(__file__).with_name('collect-evidence.py')),str(src),str(dst),str(secret)],capture_output=True,text=True)
     self.assertEqual(result.returncode,3 if secret_state=='missing' else 0,result.stderr)
     self.assertEqual(json.loads((dst/'v1-policy/app1.failure.json').read_text()),record)
+ def test_explicit_transport_forms_and_refusals(self):
+  for path in ('stock','v1'):
+   report=self.report(event=path=='v1');envelope={'message':'SUCCESS','data':report}
+   for document,expected in ((report,False),(envelope,True)):
+    normalized,unwrapped=m.normalize_conditions_response(document)
+    self.assertEqual(unwrapped,expected);self.assertTrue(m.conditions(normalized,path)['pass'])
+   invalid=[None,[],True,'secret',{},
+    {'message':'FAIL','data':report},{'message':True,'data':report},
+    {'message':'SUCCESS','data':None},{'message':'SUCCESS','data':[]},
+    dict(envelope,extra=True),dict(envelope,contexts=report['contexts']),
+    dict(report,message='SUCCESS'),dict(report,data=report),dict(report,error='secret'),
+    {'data':report},{'message':'SUCCESS'},
+    {'message':'SUCCESS','data':envelope},
+    {'message':'SUCCESS','data':dict(report,extra=True)},
+    {'message':'SUCCESS','data':dict(report,message='SUCCESS')}]
+   for document in invalid:
+    with self.subTest(path=path,document=document):self.assertRaises(ValueError,m.normalize_conditions_response,document)
+   for contexts in (None,[],True,'secret',{},0):
+    for wrapped in (False,True):
+     doc={'contexts':contexts};doc={'message':'SUCCESS','data':doc} if wrapped else doc
+     normalized,_=m.normalize_conditions_response(doc)
+     self.assertRaises(ValueError,m.conditions,normalized,path)
  def test_metrics_inputs_refuse_unknown_overrides(self):
   args=['--management.metrics.web.server.max-uri-tags=100'];good={'application.yml':b'management:\n  metrics:\n    tags:\n      application: test\n'}
   self.assertEqual(m.metrics_config(args,[],good)['enable'],{})
@@ -72,7 +94,8 @@ class T(unittest.TestCase):
  def test_event_worker_retained_only_v1(self):
   self.assertTrue(m.conditions(self.report(),'v1')['pass']);self.assertTrue(m.conditions(self.report(event=False),'stock')['pass']);self.assertFalse(m.conditions(self.report(event=False),'v1')['pass'])
  def test_recovery_enabled_refused(self):self.assertFalse(m.conditions(self.report(recovery=True),'v1')['pass'])
- def test_missing_report_is_not_disabled(self):self.assertFalse(m.conditions({},'stock')['pass'])
+ def test_missing_report_is_not_disabled(self):
+  for doc in ({},{'contexts':{}},{'contexts':None}):self.assertRaises(ValueError,m.conditions,doc,'stock')
  def test_recorded_runtime_whitelist_and_source_binding(self):
   with tempfile.TemporaryDirectory() as d:
    root=Path(d);jar=root/'build/verifier-cap/app.jar';jar.parent.mkdir(parents=True);config=root/'scripts/verifier-isolated/verifier-loadtest-config.yml';config.parent.mkdir(parents=True);config.write_text('nonsecret test config')
@@ -91,6 +114,10 @@ class T(unittest.TestCase):
    out=root/'policy.json'
    with patch.object(m,'ROOT',root),patch.dict(os.environ,{'VERIFIER_OWNER_ID':'owner','VERIFIER_PREFIX':'prefix'}),patch.object(m.subprocess,'check_output',side_effect=lambda *a,**k:json.dumps([inspected])),patch.object(m.subprocess,'run',side_effect=recorded_run):
     r=m.execute('v1','app1',contract,out);self.assertTrue(r['lock_call_sites']['recovery_disabled']);self.assertEqual(r['lock_call_sites']['evidence'],'');self.assertEqual(r['lock_call_sites']['other_lock_call_sites_verdict'],'UNKNOWN');self.assertEqual(r['dependency_hashes']['micrometer-core-1.11.3.jar'],hashlib.sha256(libs['micrometer-core-1.11.3.jar']).hexdigest());self.assertNotIn('must-not-persist',out.read_text());self.assertNotIn('meter_filter_or_registry_remove_used',r['meter_policy']);self.assertFalse(r['meter_policy']['custom_app_meter_filter_or_registry_remove_used']);self.assertEqual(r['meter_policy']['effective_metrics_config']['max_uri_tags'],100);self.assertTrue(r['meter_policy']['framework_meter_filters'])
+    self.assertFalse(r['condition_capture']['envelope_unwrapped'])
+    response.stdout=json.dumps({'message':'SUCCESS','data':self.report()})+'\n200\n'+target.replace('prometheus','conditions')
+    r=m.execute('v1','app1',contract,out);self.assertTrue(r['condition_capture']['envelope_unwrapped'])
+    response.stdout=json.dumps(self.report())+'\n200\n'+target.replace('prometheus','conditions')
     # Exercise real checkpoints, with credential-like exception/output fixtures.
     contract.write_text(json.dumps({'sha':'a'*40,'expected_prometheus_targets':{'app1':target}}))
     sentinel='password=sentinel-secret token=credential https://user:pass@example.invalid'
@@ -107,6 +134,10 @@ class T(unittest.TestCase):
      assert_failure('conditions_capture','ValueError',return_code=22,http_status=401)
     with patch.object(m.subprocess,'run',return_value=subprocess.CompletedProcess([],0,sentinel+'\n200\n'+target.replace('prometheus','conditions'),sentinel)):
      assert_failure('conditions_decode','JSONDecodeError')
+    for bad in ({},{'contexts':{}},{'message':'FAIL','data':self.report()}, {'message':'SUCCESS','data':{'message':'SUCCESS','data':self.report()}},dict(self.report(),message='SUCCESS')):
+     with patch.object(m.subprocess,'run',return_value=subprocess.CompletedProcess([],0,json.dumps(bad)+'\n200\n'+target.replace('prometheus','conditions'),'')):
+      assert_failure('conditions_decode','ValueError')
+      record=json.loads(out.with_suffix('.failure.json').read_text());self.assertEqual(record['schema'],'policy-failure-v1');self.assertNotIn('condition_counts',record)
     with patch.object(m.subprocess,'run',side_effect=subprocess.TimeoutExpired([sentinel],5,output=sentinel,stderr=sentinel)):
      assert_failure('conditions_capture','TimeoutExpired')
     with patch.object(m.subprocess,'run',return_value=subprocess.CompletedProcess([],0,json.dumps(self.report(event=False))+'\n200\n'+target.replace('prometheus','conditions'),'')):

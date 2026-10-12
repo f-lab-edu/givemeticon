@@ -8,10 +8,21 @@ EVENT='CouponEventIssuanceWorker'
 _spec=importlib.util.spec_from_file_location('policy_failure',Path(__file__).with_name('policy-failure.py'))
 failure=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(failure)
 
+def normalize_conditions_response(document):
+    """Only a standard report or the exact application success envelope, once."""
+    if not isinstance(document,dict): raise ValueError('invalid conditions response')
+    if set(document)=={'contexts'}:
+        return document,False
+    if set(document)=={'message','data'} and document['message']=='SUCCESS':
+        report=document['data']
+        if isinstance(report,dict) and set(report)=={'contexts'}:
+            return report,True
+    raise ValueError('invalid conditions response')
+
 def conditions(document,path):
     if not isinstance(document,dict): raise ValueError('invalid conditions')
-    contexts=document.get('contexts',{})
-    if not isinstance(contexts,dict): raise ValueError('invalid conditions')
+    contexts=document.get('contexts')
+    if not isinstance(contexts,dict) or not contexts: raise ValueError('invalid conditions')
     for ctx in contexts.values():
         if not isinstance(ctx,dict): raise ValueError('invalid conditions')
         for polarity in ('positiveMatches','negativeMatches'):
@@ -78,7 +89,8 @@ def execute(path,app,contract,out,diagnostic=None):
     if re.fullmatch(r'[1-5][0-9]{2}',status):d.record['http_status']=int(status)
     if response.returncode!=0 or status!='200' or effective!=target:raise ValueError('condition capture failed')
     d.stage('conditions_decode')
-    verdict=conditions(json.loads(body),path)
+    report,unwrapped=normalize_conditions_response(json.loads(body))
+    verdict=conditions(report,path)
     d.stage('conditions_match')
     if not verdict['pass']:
         # Count failures fall back to strict v1 while the gate remains refused.
@@ -123,7 +135,7 @@ def execute(path,app,contract,out,diagnostic=None):
     d.stage('result')
     result={'run_sha':declared['sha'],'app':app,'expected_target':expected,'jar_sha256':hashlib.sha256(jar.read_bytes()).hexdigest(),'config_source_sha256':hashlib.sha256(config.read_bytes()).hexdigest(),'dependency_hashes':hashes,'reviewed_source_sha256':source_hashes,
             'process_start_time_seconds_at_policy':starts[0],'policy_process_capture':anchor,'whitelisted_explicit_properties':{'coupon.issue-worker.mode':'off','coupon.issue-worker.enabled':False,'management.metrics.web.server.max-uri-tags':100,'management.endpoints.web.exposure.include':'health,prometheus,conditions'},'spring_worker_conditions':verdict,
-            'recorded_at_ms':int(time.time()*1000),'condition_capture':{'exit_code':response.returncode,'http_status':200,'requested_target':target,'effective_target':effective,'body_sha256':hashlib.sha256(body.encode()).hexdigest()},
+            'recorded_at_ms':int(time.time()*1000),'condition_capture':{'exit_code':response.returncode,'http_status':200,'requested_target':target,'effective_target':effective,'body_sha256':hashlib.sha256(body.encode()).hexdigest(),'envelope_unwrapped':unwrapped},
             'meter_policy':{'custom_app_meter_filter_or_registry_remove_used':False,'framework_meter_filters':['WebMvcObservationAutoConfiguration.OnlyOnceLoggingDenyMeterFilter(http.server.requests, max-uri-tags=100)','PropertiesMeterFilter(enable overrides, common tags and distribution configuration)'],'effective_metrics_config':effective_metrics,'http_uri_contract':{'allowed_uris':[],'verdict':'NOT_ESTABLISHED; no HTTP absent-before inference in warmed gate'},'spring_boot':'3.1.3','micrometer':'1.11.3','registration_paths':refs,'evidence':'Reviewed app source has no custom MeterFilter/registry.remove; exact mounted jar/config and dependency hashes recorded; matching dependency bytecode retained in docs/experiments/warmed-meter-registration-evidence','scope':'bounded reviewed source/config claim; existence is not automatic proof of every runtime registry policy','runtime_registry_policy_verdict':'UNKNOWN; no general runtime registry introspection'},
             'lock_call_sites':{'worker_disabled':True,'recovery_disabled':True,'scope':'legacy worker and recovery conditional beans only; other lock sites not excluded','other_lock_call_sites_verdict':'UNKNOWN','evidence':'','worker_recovery_evidence':'same owned app: explicit CLI off/false plus selected actual Spring conditions; V1 event worker separately remains enabled; insufficient for all-site HTTP/lock reconciliation','artifact_ref':out.name},
             'lock_input_scope':{'contract_ref':'contract.json','stock_route':'POST /internal/loadtest/coupons -> CreateCouponFacade.createCouponAndDecreaseStock','v1_route':'POST /test-support/coupon-events/{eventId}/applications -> CouponAdmissionService.accept','other_lock_route':'UserController POST /api/v1/users/my-point/spend -> SpendCashPointFacade.spendPoint; not a generated workload route, other callers remain UNKNOWN','workload_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in (ROOT/'scripts/verifier-isolated/stock-arrival-record.js',ROOT/'scripts/coupon-integrated-loadtest/integrated-admission-poll.js') if f.exists()}},

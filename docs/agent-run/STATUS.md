@@ -52,3 +52,46 @@ are persisted separately in RESEARCH/ISSUE_177_CONDITIONS_IMPLEMENTATION_2026101
 No production/workflow/cap/worker config changes, push, dispatch or hosted run.
 Run 38185758150 remains FAIL/NOT_REACHED/NOT_ESTABLISHED; exact cause UNKNOWN.
 This independent false-accept fix does not explain that hosted refusal.
+
+
+### Local HTTP boundary and strict harness normalization (2026-10-12)
+
+Run [38187178304](https://github.com/f-lab-edu/givemeticon/actions/runs/38187178304)
+at `be56a6bd3265020db8ff5816aeb73d08e35e0bf5`, attempt 1, remains
+FAIL / NOT_REACHED / NOT_ESTABLISHED. Reviewer event `857a18a24c691212d949db2cd368b52ac77797dd15b3699808d57f3db1d08029`
+and Verifier event `0cf1a72a333d5f9bec85316e394d5c45185795d94e5ef58357b23f756b07e617`
+confirm stock/app1 conditions_match v2 with four 0/0 counts, cleanup exits 0/0,
+62 matching checksums and redacted collection exit 0. Exact hosted cause UNKNOWN.
+
+The local embedded HTTP test runs actual Actuator -> MVC -> application handler
+-> JSON -> the same Python parser, with mocked worker dependencies and real
+profile conditions. For stock and V1, enabling the unchanged production handler
+applies an envelope: envelope_applied=true, top_level_contexts=false,
+data_contexts=true. Before normalization, the old parser refuses with four 0/0;
+the inner report and the handler-free raw HTTP report satisfy the existing worker
+polarity rules. This reproduces a local mechanism consistent with hosted evidence;
+it does not establish what the historical hosted response actually contained.
+Raw HTTP conditions remain in memory only. Safe structural booleans and fixed
+worker counts are retained under workspace RESEARCH/ISSUE_177_HTTP_BOUNDARY_20261012/.
+
+Architect event `d2e38ea4dffdebbf05c23b7633a5b8d9e78965a4f29efdc86d3e9e2bf02df239`
+authorizes local harness-only B implementation and commit. Transport normalization
+is separate from worker conditions. Exactly two top-level forms are accepted:
+raw `{contexts}` or `{message,data}` with message equal to SUCCESS and object data
+whose exact keys are `{contexts}`. Only one unwrap is performed. Extra, mixed,
+nested, failure or arbitrary data responses refuse. Normalized contexts must be
+present, an object, and nonempty; violations fail at conditions_decode with the
+unchanged v1 diagnostic schema. Missing workers, duplicate entries and polarity
+rules are unchanged. Successful policy evidence records the fixed boolean
+condition_capture.envelope_unwrapped. No raw keys/messages are emitted.
+
+The live HTTP test covers raw and envelope stock/V1 and asserts every fixed count.
+Python regressions cover normal forms, malformed/error/mixed/nested/extra shapes,
+missing/empty/invalid contexts, successful evidence booleans and decode-stage
+failure without v2 counts. Existing direct endpoint fixtures retain their role
+as projections; they do not substitute for the HTTP boundary test.
+
+Production wrapper contract design is a separate pending task: decide which
+endpoint/controller families should be wrapped, with compatibility coverage for
+other endpoints and app API consumers. No production, gate polarity, schema,
+workflow, cap, worker configuration, push or hosted rerun is authorized here.
