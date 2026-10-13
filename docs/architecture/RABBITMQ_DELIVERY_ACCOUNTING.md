@@ -40,3 +40,14 @@ Client observations alone do not define confirmed input. The publisher emits app
 The observed confirmed denominator is the union of server routed-positive-confirm records and client ACCEPTED records, deduplicated by logical attempt; reconcile transport correlation IDs separately and report differences between the two sources. Preserve logs outside the app process and record truncation, dropped-log counters and collection gaps. This union is still only observed evidence: a crash can occur after broker persistence but before any callback/log. Never call a gap-free reconstruction proven solely because the observed union reconciles. Unknown publishes and instrumentation gaps remain explicit, and prevent an unqualified zero-loss claim for all sends.
 Every successfully consumed valid logical attempt has a committed mapping to its canonical application before ACK, including a new attempt by a member already admitted. Invalid attempts have their own terminal rejection record. Redelivery of the same attempt reuses that record. Count the resulting write cost in comparisons.
 ENDED returned before publish is a definitive non-admission business outcome for that individual request; it is not an ISSUED/SOLD_OUT application and is outside the broker-confirmed input set. It does not resolve an earlier uncertain/ACCEPTED attempt for the same member. Such attempts still require lookup/reconciliation. Workload-level convergence and issuance coverage are reported separately as defined in ADR-001 below.
+
+
+## 2026-10-13 contract reconciliation
+
+Current design interpretation is [ADR-004](../adr/ADR-004-rabbitmq-implementation-contract.md), mapped to [#167 AC and fault tests](../tasks/issue-167-contract-review.md). Source boundaries were re-read at develop `1f8d5560eb93a42305ea806b823765c2ff963143`; this is source inspection, not an MQ integration run.
+
+A MAPPED attempt means durable admission to a PENDING/existing application. Broker ACK does not mean issuance or final client observation. Pause blocks new MQ admission but must not erase prior outcomes or block recovery of already committed DB PENDING. Same-key/different-payload copies preserve the first outcome, use durable parking and transport-level reconciliation, and are not a second formal REJECTED result for that key. An API producer without per-request DB lookup does not promise synchronous 409 for such copies.
+
+Seven days after closure is a minimum retention period. Outstanding/unresolved records, export and all referential obligations must also permit cleanup. Removing attempt references alone is insufficient while coupon_award references an application; no award deletion/cascade/automatic cleanup is introduced here.
+
+Large baseline/harness completion is required for comparable performance and rollout decisions, not a dependency for #167 design reconciliation or #170/#171 code writing. Historical measurement limitations and observed-confirm union/gaps above remain unchanged.
