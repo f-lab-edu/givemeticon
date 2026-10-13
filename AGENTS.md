@@ -1,39 +1,85 @@
-# 개발 원칙
+# Engineering Principles
 
-## 1. 구현 전에 확인
-- 추측하지 말고 관련 코드를 먼저 읽는다.
-- 기존 흐름, 호출 관계, 트랜잭션 경계를 확인한다.
-- 요구사항이 불명확하면 임의로 확장하지 않는다.
+Write the smallest correct change that satisfies the explicit requirement.
 
-## 2. 가장 단순한 해결책
-다음 순서로 판단한다.
+Before writing code, check in this order:
 
-1. 정말 새 코드가 필요한가?
-2. 기존 코드/패턴을 재사용할 수 있는가?
-3. Java/Spring/MySQL 기본 기능으로 해결 가능한가?
-4. 이미 설치된 의존성으로 해결 가능한가?
-5. 그 다음에만 새로운 구조나 의존성을 추가한다.
+1. Does this change actually need to exist?
+2. Does the codebase already provide the required behavior?
+3. Can an existing framework or platform feature solve it?
+4. Can an already-installed dependency solve it?
+5. Can the requirement be satisfied by modifying existing code instead of introducing a new abstraction?
+6. Only then add the minimum new code necessary.
 
-과도한 추상화, 미래를 위한 선행 설계, 불필요한 계층 추가를 피한다.
+## Scope
 
-## 3. 최소 변경
-- 요청과 직접 관련된 부분만 수정한다.
-- 관련 없는 리팩터링, 이름 변경, 포맷팅을 하지 않는다.
-- 기존 동작과 인터페이스를 가능한 유지한다.
+- Implement only behavior required by the current issue, acceptance criteria, or verified defect.
+- Do not add speculative features for possible future requirements.
+- Do not perform unrelated refactoring while implementing a feature.
+- Do not rename, reorganize, or reformat unrelated code.
+- Prefer modifying an existing class over introducing a new layer when both are equally correct.
+- Prefer deleting obsolete code over preserving duplicate paths.
 
-## 4. 검증
-완료했다고 말하기 전에 반드시 검증한다.
+## Abstractions
 
-- 관련 테스트 실행
-- 실패 여부 확인
-- 필요하면 실제 DB 상태 확인
-- 테스트하지 않은 것은 테스트했다고 말하지 않는다.
+Do not create a new:
+- interface
+- abstraction layer
+- generic framework
+- wrapper
+- utility
+- configuration mechanism
+- factory
+- strategy
+- DTO hierarchy
 
-## 5. 안전성
-단순화를 위해 다음을 희생하지 않는다.
+unless the current requirement actually needs it or an existing project convention requires it.
 
-- 데이터 정합성
-- 멱등성
-- 동시성 안전성
-- 보안
-- 장애 복구 가능성
+Do not introduce an abstraction merely because it may be useful later.
+
+Duplication is acceptable when removing it would require a speculative abstraction. Refactor only after a real repeated pattern exists and the change improves the current task.
+
+## Dependencies
+
+## Operating Rules
+- Keep changes small and traceable.
+- Do not implement speculative features.
+- Read only files necessary for the task.
+- Before coding, identify the goal, assumptions, and success criteria.
+- Prefer tests before implementation when fixing bugs or changing logic.
+- Final answer must include:
+    - changed files
+    - reason for change
+    - test result
+    - remaining risk
+
+## Agent Roles
+- PO defines customer value, hiring value, and task priority.
+- Backend Developer makes technical decisions and implements.
+- Technical decisions belong to Backend Developer, not PO.
+
+## Cost Rules
+- Do not scan the whole repository unless required.
+- Start from README, current-task.md, and related files only.
+- Summarize findings before opening more files.
+
+# Engineering Workflow
+
+Before implementation:
+
+1. Generate Git Issue
+2. Generate Branch Name
+3. Create Implementation Plan
+
+After implementation:
+
+1. Generate Review Result
+2. Generate Commit Message
+3. Generate Pull Request
+
+Generate ADR when:
+
+- Database schema changes
+- Transaction strategy changes
+- Lock strategy changes
+- Event architecture changes

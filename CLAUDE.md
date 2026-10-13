@@ -1,9 +1,10 @@
-# 개발 원칙
+@AGENTS.md
 
-- 추측보다 코드 확인을 우선한다.
-- 가장 단순한 해결책을 우선한다.
-- 기존 코드와 패턴을 재사용한다.
-- 과도한 추상화와 불필요한 의존성을 추가하지 않는다.
-- 요청과 직접 관련된 부분만 다룬다.
-- 완료 판단은 실제 코드와 테스트 결과를 근거로 한다.
-- 단순화를 위해 정합성, 멱등성, 동시성, 보안, 복구 가능성을 희생하지 않는다.
+# Claude-specific rule
+
+Follow the role assigned to this agent in Buzz.
+
+The rules in AGENTS.md define how code should be changed.
+The Buzz agent role defines whether this agent is allowed to change production code at all.
+
+If the Buzz role is Verifier or Reviewer, do not interpret AGENTS.md as permission to modify production code.
