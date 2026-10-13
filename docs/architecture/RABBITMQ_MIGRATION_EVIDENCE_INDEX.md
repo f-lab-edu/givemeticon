@@ -13,9 +13,9 @@ Status: in progress; no final architecture/performance approval. Original mandat
 |---|---|---|---|
 | Original preparation | [164](https://github.com/f-lab-edu/givemeticon/issues/164) | [165](https://github.com/f-lab-edu/givemeticon/pull/165), head89a5df1 | ARCHITECT APPROVED, documentation only; unmerged |
 | Isolated comparable baseline | [166](https://github.com/f-lab-edu/givemeticon/issues/166) | Verifier new environment | In progress |
-| Architecture contract | [167](https://github.com/f-lab-edu/givemeticon/issues/167) | [169](https://github.com/f-lab-edu/givemeticon/pull/169) | Draft, detailed review |
+| Architecture contract | [167](https://github.com/f-lab-edu/givemeticon/issues/167) | [169](https://github.com/f-lab-edu/givemeticon/pull/169) | #169 MERGED; #167 reconciliation awaiting Verifier |
 | Reproducible harness | [168](https://github.com/f-lab-edu/givemeticon/issues/168) | [176](https://github.com/f-lab-edu/givemeticon/pull/176) | ARCHITECT APPROVED d4855a5, packaging only; unmerged |
-| Producer | [170](https://github.com/f-lab-edu/givemeticon/issues/170) | Pending | Design/baseline gate |
+| Producer | [170](https://github.com/f-lab-edu/givemeticon/issues/170) | Pending | Design gate; baseline for comparison/rollout, not code writing |
 | Consumer consistency | [171](https://github.com/f-lab-edu/givemeticon/issues/171) | Pending | Depends on contract |
 | Retry/DLQ/faults | [172](https://github.com/f-lab-edu/givemeticon/issues/172) | Pending | Depends on consumer |
 | Batch/load comparison | [173](https://github.com/f-lab-edu/givemeticon/issues/173) | Pending | Valid baseline and implementation needed |
@@ -41,7 +41,7 @@ Base b941a04; detailed Verifier diagnostic in harness PR176 and ADR-001. Origina
 5. Consistency — existing diagnostic checks only; RabbitMQ tests pending.
 6. Recovery — RabbitMQ fault matrix pending.
 7. Issues — above.
-8. PRs and approvals — #165/#176 scoped ARCHITECT APPROVED, unmerged. #169 docs and #178 hosted harness remain unapproved; #178 run37586432949 failed its generation gate. No baseline PASS.
+8. PRs and approvals — #165/#176 scoped ARCHITECT APPROVED, unmerged. #169 docs is MERGED (c10a920); #167 reconciliation awaits Verifier; #178 hosted harness remains unapproved; #178 run37586432949 failed its generation gate. No baseline PASS.
 9. ADRs — above.
 10. Removed legacy paths — none.
 11. Technical debt — environment reproducibility, observation coverage, queue/client compatibility, recovery fairness, evidence packaging.
@@ -50,3 +50,8 @@ Base b941a04; detailed Verifier diagnostic in harness PR176 and ADR-001. Origina
 
 ## Resumed hosted evidence — 2026-10-10
 PR178 head1e268d9/run37586432949: archived166 checksum files verified by Architect and independently by Verifier. Stock2029 first requests/dropped7972; V1 4843/dropped5158. 10k target unmet. App cgroup throttling observed; generator cgroup missing and causal bottleneck unresolved. Stock lock rejections and client/DB divergence are observations, not proof RabbitMQ improves them. Source: RESEARCH/ISSUE_177_RUN_37586432949_verifier/VERIFIER_REVIEW.md in Buzz workspace. Next profile must budget broker upfront; baseline leaves that slot idle for fixed-allocation comparison, separately disclose utilized resources. No automatic rerun/cap relaxation.
+
+
+## #167 contract reconciliation — 2026-10-13
+
+[Current contract/AC review](../tasks/issue-167-contract-review.md) links API/message/readiness, ACK/recovery, schema/retention and #170/#171/#172 body drafts. [Source hashes](../tasks/issue-167-contract-sources.json) refer to develop1f8d556; exact local candidate SHAs are in the external Builder handoff. Baseline/harness completion is not a gate for design reconciliation or producer/consumer code writing. Runtime/fault/performance evidence remains pending. Historical measurements and #177 evidence are unchanged; implementation issues are not closed.
