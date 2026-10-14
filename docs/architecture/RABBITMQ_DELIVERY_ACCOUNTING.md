@@ -19,7 +19,7 @@ A queue length cannot prove membership or absence. During active processing, bro
 Confirmed malformed fault-injection messages may lack a trustworthy logical key. Assign an external test ID and content hash before injection, preserve the original bytes in isolated evidence, and reconcile durable parking by that identity. Do not trust an arbitrary payload event ID to select another event's recovery scope.
 
 At a quiescent final checkpoint, after controlled recovery/replay:
-1. All known confirmed valid attempts map to an application and its observable ISSUED/SOLD_OUT result. Invalid attempts map to durable REJECTED/reason without occupying the valid application key or rank.
+1. All known confirmed valid attempts map to an application and its observable ISSUED/SOLD_OUT result. Only the protocol-v1 trusted new explicit-null-token case maps to durable REJECTED/OPEN_PROOF_MISSING without occupying application/rank. Other malformed, mismatched or unknown provenance follows parking/pause; DB failure follows retry/stop.
 2. Every uncertain publish is explicitly classified by authenticated attempt lookup and surviving durable evidence. A confirm timeout is neither proof of loss nor proof of rejection. Missing definitive evidence remains unresolved; the test cannot claim zero unresolved.
 3. Ready/unacked/parking and DB PENDING are drained, or remaining IDs/reasons are listed and final convergence is marked incomplete. Parking retention can prove recovery opportunity; it does not prove completed issuance.
 4. Compare awards with unique valid applications: no duplicate event/member award, no award without its application, issued quantity matches awards and never exceeds total, tiers match rank boundaries. Stable committed ranks survive redelivery.
@@ -51,3 +51,12 @@ A MAPPED attempt means durable admission to a PENDING/existing application. Brok
 Seven days after closure is a minimum retention period. Outstanding/unresolved records, export and all referential obligations must also permit cleanup. Removing attempt references alone is insufficient while coupon_award references an application; no award deletion/cascade/automatic cleanup is introduced here.
 
 Large baseline/harness completion is required for comparable performance and rollout decisions, not a dependency for #167 design reconciliation or #170/#171 code writing. Historical measurement limitations and observed-confirm union/gaps above remain unchanged.
+
+
+## 2026-10-14 r2 — response denominator and narrow rejection
+
+Current classifier is [ADR-004 protocol-v1 rejection](../adr/ADR-004-rabbitmq-implementation-contract.md#protocol-v1-rejection--2026-10-14); concrete input is [the F3 fixture plan](../tasks/issue-167-contract-review.md). REJECTED is not reserved: only trusted, identified, supported, config-matching new input with the openToken field explicitly JSON null and runnable consumer/pause/DB conditions records OPEN_PROOF_MISSING. Normal HTTP producer always supplies verified non-null token and has no such rejection path. HTTP pre-publish refusal/ENDED creates no attempt row. Missing/invalid token, drift and unknown provenance are not this business rejection.
+
+Compare any existing outcome/hash before new eligibility: same hash reuses outcome; different hash preserves first outcome/rank and parks the conflict. New narrow rejection commits attempt only (mapping/token NULL, reason exactly OPEN_PROOF_MISSING), then individual ACK, no application/rank/stock/award effect and no poison pause solely for this classification. Pause/DB failure does not permit bypass rejection writes. Rollback ACK0; commit-before-ACK crash retains the same outcome. F3 uses controlled broker null-token A then normal new API attempt B; fixing A's token with the same ID is a conflict, not promotion. First committed outcome wins null/valid same-key races.
+
+HTTP202/2xx alone never defines storage confirmation or business success. Only response body status=ACCEPTED enters the client's storage-confirm observation; 202 CHECKING remains uncertain. Proxy metrics are transport counts. F1 must distinguish both 202 bodies. Server routed-positive-confirm ∪ client ACCEPTED and late-callback/unknown/gap accounting remain unchanged; neither all503 nor all202 implies the same publish outcome.
