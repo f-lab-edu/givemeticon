@@ -108,6 +108,30 @@ class CouponMqPublisherTest {
         var result=publisher.publish(body(),7,91,"exchange","key");assertEquals(CHECKING,result.status());assertEquals(0,publisher.pendingCount());
         sent.get(0).getFuture().complete(new CorrelationData.Confirm(true,null));assertEquals(CHECKING,result.status());assertEquals(0,publisher.pendingCount());
     }
+    @Test void multiplePublishersShareTheProcessBudget() throws Exception {
+        capture();var secondTemplate=mock(RabbitTemplate.class);var secondFactory=mock(CachingConnectionFactory.class);
+        var second=new CouponMqPublisher(secondTemplate,secondFactory,Duration.ZERO);
+        try {
+            for(int i=0;i<50;i++) {
+                assertEquals(CHECKING,publisher.publish(body(),7,91,"exchange","key").status());
+                assertEquals(CHECKING,second.publish(body(),7,91,"exchange","other").status());
+            }
+            assertEquals(NOT_SENT,publisher.publish(body(),7,91,"exchange","key").status());
+            assertEquals(NOT_SENT,second.publish(body(),7,91,"exchange","other").status());
+            verify(template,times(50)).send(anyString(),anyString(),any(Message.class),any(CorrelationData.class));
+            verify(secondTemplate,times(50)).send(anyString(),anyString(),any(Message.class),any(CorrelationData.class));
+        } finally { publisher.close();second.close(); }
+    }
+    @Test void unknownSlotsStayOwnedUntilTransportDestructionReturns() throws Exception {
+        capture();var otherTemplate=mock(RabbitTemplate.class);var otherFactory=mock(CachingConnectionFactory.class);
+        var other=new CouponMqPublisher(otherTemplate,otherFactory,Duration.ZERO);
+        try {
+            for(int i=0;i<100;i++) publisher.publish(body(),7,91,"exchange","key");
+            doAnswer(inv->{assertEquals(NOT_SENT,other.publish(body(),7,91,"exchange","other").status());return null;}).when(factory).destroy();
+            publisher.close();
+            assertEquals(CHECKING,other.publish(body(),7,91,"exchange","other").status());
+        } finally { publisher.close();other.close(); }
+    }
     @Test void concurrentUnresolvedSendsNeverExceedOneHundred() throws Exception {
         var calls=new java.util.concurrent.atomic.AtomicInteger();
         doAnswer(inv->{calls.incrementAndGet();return null;}).when(template).send(anyString(),anyString(),any(Message.class),any(CorrelationData.class));

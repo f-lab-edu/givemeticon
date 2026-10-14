@@ -30,11 +30,11 @@ Boot 관리 최소 `spring-rabbit` 한 의존성만 추가했다. 실제 depende
 | confirm future exceptional/null | CHECKING/CALLBACK_UNCERTAIN | 불확실 slot 유지·capacity fail-closed, close에서 해소 |
 | late confirm/return·중복 callback | 반환한 caller Result 불변·별도 event | 정상 confirm은 slot1회 반환, 반복 remove는 무효 |
 | interrupt | CHECKING, interrupt flag 보존 | slot 유지 |
-| close | 신규 send 차단, 미확정 response CHECKING/CLOSED | 전용 factory destroy·pending clear, 두 번 close 안전 |
+| close | 신규 send 차단, 미확정 response CHECKING/CLOSED | 전용 factory destroy 성공 뒤 pending/unknown slot 해제, 두 번 close 안전 |
 
-Semaphore100은 모든 행사의 합계이며 pending map은100 이하, timeout/예외로 slot을 조기 반환하지 않는다. 자체 scheduler/executor/queue는 만들지 않았다. 동시200 단위 호출에서도 actual mocked send100을 확인한다. broker가 끝내 응답하지 않으면100건 뒤 새 send를 거부하는 가용성 trade-off이며 hidden retry나 오래된 unknown 폐기는 없다. 외부 영속 evidence/reconciliation·운영 close/restart는 이후 단계 책임이다.
+프로세스 공유 Semaphore100은 모든 Publisher 객체·행사의 합계이며 pending map 전체는100 이하, timeout/예외로 slot을 조기 반환하지 않는다. 자체 scheduler/executor/queue는 만들지 않았다. 동시200 단위 호출에서도 actual mocked send100을 확인한다. 두 Publisher 객체의 50+50 미확정 전송 뒤에는 양쪽의 추가 send를 거부하며 close는 각 객체 소유 slot만 반환한다. broker가 끝내 응답하지 않으면100건 뒤 새 send를 거부하는 가용성 trade-off이며 hidden retry나 오래된 unknown 폐기는 없다. 외부 영속 evidence/reconciliation·운영 close/restart는 이후 단계 책임이다.
 
-전송 호출은 동기 RabbitTemplate.send이며 confirm budget1초는 send가 돌아온 뒤의 future 대기 예산이다. 실제 socket write/connect/channel acquisition의 유한 timeout 설정과 end-to-end HTTP 예산은 실제 transport/API 연결 단계에서 검증해야 한다. 이 단위 구현으로 네트워크 전체 호출이1초 안에 반환한다고 주장하지 않는다. close도 진행 중 send의 entry monitor를 기다릴 수 있다.
+전송 호출은 동기 RabbitTemplate.send이며 confirm budget1초는 send가 돌아온 뒤의 future 대기 예산이다. 실제 socket write/connect/channel acquisition의 유한 timeout 설정과 end-to-end HTTP 예산은 실제 transport/API 연결 단계에서 검증해야 한다. 이 단위 구현으로 네트워크 전체 호출이1초 안에 반환한다고 주장하지 않는다. close도 진행 중 send의 entry monitor를 기다릴 수 있다. destroy 중에는 unknown slot을 다른 객체에 넘기지 않으며 destroy 실패는 unknown capacity를 fail-closed로 유지한다. 이 경우 성공 정리라고 표시하지 않으며 프로세스 운영 복구는 후속 단계 책임이다.
 
 ## 로그·검증 한계
 
@@ -52,7 +52,7 @@ Semaphore100은 모든 행사의 합계이며 pending map은100 이하, timeout/
 ./gradlew dependencyInsight --dependency amqp-client --configuration runtimeClasspath
 ```
 
-구현 중 기본 test279건/실패0·새 MQ30건(Protocol17/Publisher13)을 확인했고 strict time 수정 후 Protocol17도 통과했다. 최종 정확 SHA에서 기본 회귀 실행 결과·커밋별 SHA·로그/보고서 hash는 원본 프로젝트의 별도 Builder 인계에 남긴다. 이전 tree 결과를 최종 SHA 결과로 가장하지 않는다. 전체 suite를 이유 없이 반복하지 않는다.
+구현 중 기본 test279건/실패0·새 MQ30건(Protocol17/Publisher13, 프로세스 한도 회귀 추가 전)을 확인했고 strict time 수정 후 Protocol17도 통과했다. 최종 정확 SHA에서 기본 회귀 실행 결과·커밋별 SHA·로그/보고서 hash는 원본 프로젝트의 별도 Builder 인계에 남긴다. 이전 tree 결과를 최종 SHA 결과로 가장하지 않는다. 전체 suite를 이유 없이 반복하지 않는다.
 
 ## 남은 단계·PR 초안
 

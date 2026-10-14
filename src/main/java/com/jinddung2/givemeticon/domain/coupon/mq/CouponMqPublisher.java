@@ -31,7 +31,7 @@ public final class CouponMqPublisher implements AutoCloseable {
     private final RabbitTemplate template;
     private final CachingConnectionFactory factory;
     private final Duration budget;
-    private final Semaphore slots=new Semaphore(100);
+    private static final Semaphore SLOTS=new Semaphore(100);
     private final ConcurrentHashMap<String, Pending> pending=new ConcurrentHashMap<>();
     private final Object lifecycle=new Object();
     private volatile boolean closed;
@@ -57,7 +57,7 @@ public final class CouponMqPublisher implements AutoCloseable {
         Pending p;
         synchronized(lifecycle) {
             if(closed) return new Result(Status.NOT_SENT,attempt,null,Reason.CLOSED);
-            if(!slots.tryAcquire()) return new Result(Status.NOT_SENT,attempt,null,Reason.CAPACITY);
+            if(!SLOTS.tryAcquire()) return new Result(Status.NOT_SENT,attempt,null,Reason.CAPACITY);
             p=new Pending(attempt,CouponMqProtocol.sha256((trustedEventId+":"+trustedMemberId+":"+attempt).getBytes(StandardCharsets.UTF_8)));
             pending.put(p.correlation.getId(),p);
         }
@@ -113,15 +113,17 @@ public final class CouponMqPublisher implements AutoCloseable {
             release(p);
         }
     }
-    private void release(Pending p) { if(pending.remove(p.correlation.getId(),p)) slots.release(); }
+    private void release(Pending p) { if(pending.remove(p.correlation.getId(),p)) SLOTS.release(); }
     int pendingCount() { return pending.size(); }
     @Override public void close() {
         synchronized(lifecycle) { if(closed) return;closed=true; }
-        try {
-            for(Pending p:pending.values()) synchronized(p) {
-                event(p,"CLOSE_UNRESOLVED",p.response.isDone());p.response.complete(p.result(Status.CHECKING,Reason.CLOSED));release(p);
-            }
-        } finally { factory.destroy(); }
+        for(Pending p:pending.values()) synchronized(p) {
+            event(p,"CLOSE_UNRESOLVED",p.response.isDone());p.response.complete(p.result(Status.CHECKING,Reason.CLOSED));
+        }
+        // Do not hand unknown capacity to another publisher while the old transport is alive.
+        // If destroy fails, retain those slots fail-closed rather than pretend cleanup succeeded.
+        factory.destroy();
+        for(Pending p:pending.values()) synchronized(p) { release(p); }
     }
     private static void event(Pending p,String type,boolean late) {
         // Hash the logical key; never log member IDs, token, body, routing or exception text.
