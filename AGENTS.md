@@ -54,9 +54,12 @@ Duplication is acceptable when removing it would require a speculative abstracti
     - remaining risk
 
 ## Agent Roles
-- PO defines customer value, hiring value, and task priority.
-- Backend Developer makes technical decisions and implements.
-- Technical decisions belong to Backend Developer, not PO.
+- Architect: architecture and consistency/recovery contracts; follow `agents/ARCHITECT.md`.
+- Builder: backend implementation and related tests; follow `agents/BUILDER.md`.
+- Verifier: independent verification and code review; follow `agents/VERIFIER.md`.
+- Read the assigned role file and `agents/HANDOFF.md`. See `agents/README.md` for CLI setup.
+- Architect owns architecture boundaries; Builder owns implementation choices within them. Verifier does not edit production code.
+- Complete each task with a handoff file, code SHA, next owner, and a ready-to-use prompt. A written handoff does not mean another CLI was actually launched or messaged.
 
 ## Cost Rules
 - Do not scan the whole repository unless required.
