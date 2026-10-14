@@ -2,6 +2,8 @@
 
 Status: Superseded in part by [ADR-004](ADR-004-rabbitmq-implementation-contract.md): 엄격한 enqueue 순서와 무조건 stop-the-line poison 정책은 역사적 제안이다. 현재 순서/복구/consumer 계약은 ADR-004를 적용한다. Production 구현 승인 아님.
 
+2026-10-13 안내: 아래 미결정·approval ledger는 당시 검토 이력이다. 현재 B2/M3/M4/M5와 readiness/스키마 판정은 [ADR-004의 #167 정리](ADR-004-rabbitmq-implementation-contract.md) 및 [현재 AC 검토표](../tasks/issue-167-contract-review.md)를 따른다. 과거 ledger를 최신 미결정 목록 또는 구현 PASS로 읽지 않는다.
+
 ## Context / Problem / Constraints
 사용자의 최신 RabbitMQ 학습·burst 측정 요청이 이번 작업의 기술 제약이다. 과거 로컬 docs/coupon-v2.md의 Kafka 선택 및 30k 목표/100k 선택 범위는 이번 작업에 한해 superseded한다. 원문은 변경하거나 무단으로 추적에 추가하지 않는다. 기존 DB 장애 30초 목표는 자동으로 새 요구에 추가하지 않고 장애 실험 후보로 보존한다.
 근거: 사용자 charter 0953bba704f2eb7e5b996893102f0ae7047fab0b9f529fc6de1dd3d302ca445d, Reviewer 보고 84ba06b4790ddd7e5ca82e82086c0e460b84dde1b6f4f7e235f2b4b8f96ed806, ADR-001.

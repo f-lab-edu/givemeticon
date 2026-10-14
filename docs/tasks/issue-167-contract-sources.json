@@ -1,0 +1,53 @@
+{
+  "base_commit": "1f8d5560eb93a42305ea806b823765c2ff963143",
+  "scope": "Source inspection and document contract review; not execution evidence",
+  "sources": [
+    {
+      "path": "docs/adr/ADR-003-rabbitmq.md",
+      "base_sha256": "6c22977bc14d35b7b59fb79641a0a8c476fd352d7b36088a36bef42823146ab5"
+    },
+    {
+      "path": "docs/adr/ADR-004-rabbitmq-implementation-contract.md",
+      "base_sha256": "553991c18afc0c0e0a650bc4aefef601184807b260d433ffbb3d5794ddcd2056"
+    },
+    {
+      "path": "docs/architecture/RABBITMQ_DELIVERY_ACCOUNTING.md",
+      "base_sha256": "9f5d2cb9a904b66cfb49f4704786c79ef3d84f4372ada6ad0bf6c0f35e9f8ce6"
+    },
+    {
+      "path": "docs/architecture/RABBITMQ_MIGRATION_EVIDENCE_INDEX.md",
+      "base_sha256": "66df69c5bbafe4611cfdb5bb5e62a03856fe264bdbc5a11c364952c69d844451"
+    },
+    {
+      "path": "build.gradle",
+      "base_sha256": "d30f329508514b9dc6d9de8593b144000a4a867b0fd891bcb473ecd92ede5fb4"
+    },
+    {
+      "path": "src/main/java/com/jinddung2/givemeticon/domain/coupon/service/CouponBatchAdmissionTransactionService.java",
+      "base_sha256": "bc6b52a2f8826081bce9e5034c7b53e7f3afa534c8b42717e4a432af89555bab"
+    },
+    {
+      "path": "src/main/java/com/jinddung2/givemeticon/domain/coupon/service/CouponEventIssuanceBatchTransactionService.java",
+      "base_sha256": "8023c6893fddc90ff111bfc19118a0737c644343c9549e8d3e1cb74366a5a300"
+    },
+    {
+      "path": "src/main/resources/mapper/CouponApplicationMapper.xml",
+      "base_sha256": "079dd4cf8ac450c91a82fc2494d9b405709232c3e38ea090db3a5f3c4a80b6b0"
+    },
+    {
+      "path": "src/main/java/com/jinddung2/givemeticon/domain/coupon/controller/CouponAdmissionController.java",
+      "base_sha256": "a93323790cf113286787e2429867fa3faaffbcecdb137509f0c66d71b2d4ab97"
+    },
+    {
+      "path": "src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql",
+      "base_sha256": "a43f56a96266e7bc4ab13cd49f6b06c4e646ebbfcbb51236424b4028adb04539"
+    },
+    {
+      "path": "src/main/resources/db/migration/V20260923__add_coupon_award.sql",
+      "base_sha256": "c6998af24b5e2398c2de2d002eb6f9f81b141f165766a885c0c0d6d2b8fa8aef"
+    }
+  ],
+  "original_dirty_adr_sha256": "8c58f387220a08b491e657fc0daa08640ab1e563a0a47a6690d8775c27447e49",
+  "dirty_adr_imported": false,
+  "final_commit_location": "External issue-167 Builder handoff; no recursive self hash"
+}
