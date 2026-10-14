@@ -1,6 +1,6 @@
 # #167 RabbitMQ 계약 검토 후보
 
-상태: 2026-10-14 Architect r2 결정 반영 문서 후보, Verifier 2회차 설계 검토 대기. 기준 develop `1f8d5560eb93a42305ea806b823765c2ff963143`, 브랜치 `docs/issue-167-contract-resolution-r1`. 생산 코드·DDL 적용·broker/MySQL 실행·성능 PASS가 아니다. #169는 `c10a920ad744b7765eec62a6e67aa31b95bf8932`로 MERGED이며 재사용하지 않는다.
+상태: `428d1a7`의 Verifier r2 PASS(설계 문서 한정, 조건부)를 바탕으로 한 마감 수정 후보. 이번 두 경로 delta의 Verifier 3회차 독립 검토 대기. 기준 develop `1f8d5560eb93a42305ea806b823765c2ff963143`, 브랜치 `docs/issue-167-contract-resolution-r3`. 생산 코드·DDL 적용·broker/MySQL 실행·성능 PASS가 아니다. #169는 `c10a920ad744b7765eec62a6e67aa31b95bf8932`로 MERGED이며 재사용하지 않는다.
 
 ## 목표·계획·근거
 
@@ -135,6 +135,16 @@ F6 동일 키 null-token/유효-token 경합은 먼저 commit된 outcome1개만 
 
 MAPPED: mapping NOT NULL AND mapping=member, token NOT NULL, reason NULL. 이번 REJECTED: mapping NULL·token NULL·reason IS NOT NULL AND reason=OPEN_PROOF_MISSING. 단순 reason NOT NULL만으로 거절 의미를 완성하지 않는다. outcome·논리 키 NOT NULL·허용 outcome 열거, event FK 유지, cascade 없음. equality만으로 nullable CHECK의 UNKNOWN 우회를 막을 수 없으므로 [MySQL CHECK](https://dev.mysql.com/doc/refman/8.0/en/create-table-check-constraints.html)를 음성 INSERT로 검증한다. 기존 signedness/engine/collation·FK child 인덱스·Flyway 적용은 실제 격리 DB에서 확인한다. 기존 migration 재작성 없음.
 
+### Nullable FK 근거와 F6 양성·경계 시험 계획 — 2026-10-14
+
+[MySQL 8.0 §1.6.2.3 FOREIGN KEY Constraint Differences](https://dev.mysql.com/doc/refman/8.0/en/ansi-diff-foreign-keys.html)와 [Oracle 공식 배포본의 같은 절](https://docs.oracle.com/cd/E17952_01/mysql-8.0-en/ansi-diff-foreign-keys.html)은 MATCH SIMPLE 의미로 복합 FK가 일부/전부 NULL인 자식 행은 대응 부모 없이 삽입 가능하다고 설명한다. Builder는 2026-10-14 Oracle 원문의 MATCH 설명을 확인했다. 명시 MATCH 절을 추가하라는 뜻이 아니며 공식 문서는 이를 피하도록 한다. 이 근거는 FK(event_id,mapped_member_id)의 mapping NULL 방향만 뒷받침한다. 별도 event FK·NOT NULL·CHECK·다른 제약을 면제하거나 실제 migration 적용 PASS를 뜻하지 않는다.
+
+#171은 다음을 고정 MySQL 버전·실제 DDL·제약 활성화 증거와 함께 확인한다. 이번에는 SQL 작성·실행 없이 계획만 둔다.
+
+- **양성:** 필요한 event/member·논리 키/version/hash 등 나머지 제약을 충족하고 대응 application이 없는 fixture에서 신규 `outcome=REJECTED`, `mapped_member_id=NULL`, `openToken=NULL`, `reason=OPEN_PROOF_MISSING` INSERT 성공. application/rank/award 생성 없음.
+- **경계:** 양성 입력에서 mapping non-null, token non-null, reason NULL, 미지원 reason 어휘를 각각 한 조건만 바꾸면 거부. 나머지 입력은 유효하게 유지한다. mapping non-null 음성 시험은 해당 event/member의 대응 application을 별도 fixture에 미리 준비해 FK 미존재 오류가 CHECK 위반을 대신 검출하지 않도록 한다. token은 형식상 정상 UUID, 미지원 reason은 길이/형식이 정상인 값으로 두어 우연한 다른 실패에 기대지 않는다.
+- 기존 MAPPED NULL·오소유·미존재 application·unknown outcome·동일 키 경합 시험을 보존한다. 설계 문서 PASS와 위 양성/음성 SQL 실행 PASS를 구분한다.
+
 유효 접수의 PENDING application+MAPPED outcome은 함께 원자 commit, 좁은 REJECTED는 attempt만 commit한 뒤 delivery별 ACK. rollback은 ACK0. 동일 회원의 신규 순번은1개여도 유효 attempt 각각 mapping 기록. 부분 INSERT 오류 무시 금지. commit 후 ACK 전 crash는 결과/순번 재사용. ACK 후 worker 정지에서 broker empty/DB PENDING은 미완료다. OPEN_PROOF_MISSING attempt가 새 유효 attempt의 UNIQUE/rank를 막지 않는다.
 
 종료 후7일은 최소 보존. main/unacked/parking/PENDING/unknown 해소·export·참조 FK를 함께 확인한다. attempt 삭제만으로 award FK가 남은 application 삭제를 허용하지 않는다. award 삭제·cascade·자동 cleanup job 없음.
@@ -178,7 +188,7 @@ Verifier 2회차는 이 Builder 대조와 별개로 r2 지시의 공식 SAC/conf
 | F3 / C4,C5 | 명시된 통제 null-token A→정상 새 B, A 재전송·A token 보정 충돌·타 회원 조회 | A REJECTED/OPEN_PROOF_MISSING 고정·B MAPPED·A 변경 없음 / #170/#171 |
 | F4 / C2,C4,C5 | commit 전 rollback/commit 후 ACK 전 crash | ACK0 또는 rank/outcome 재사용·award 중복0 / #171/#172 |
 | F5 / C4,C5 | CLOSED 유효 backlog·worker 중단/재개 | PENDING→ISSUED/SOLD_OUT·broker empty≠완료 / #171/#172 |
-| F6 / C2,C4,C5 | 동일 key의 null-token/유효-token 경합·stock/tier 경계·MAPPED NULL/오소유/미존재 application/REJECTED mapping/unknown outcome | 최초 commit outcome1개·다른 hash 후속 충돌·재고 경계·NULL/reason 음성 DDL / #171 |
+| F6 / C2,C4,C5 | 동일 key의 null-token/유효-token 경합·stock/tier 경계·MAPPED NULL/오소유/미존재 application/REJECTED mapping/unknown outcome | 최초 commit outcome1개·다른 hash 후속 충돌·재고 경계·위 REJECTED 양성 INSERT 및 mapping/token/reason 4개 단일 조건 거부, 기존 MAPPED/NULL 음성 보존 / #171 |
 | F7 / C1,C2,C3,C4 | shared pause 뒤 SAC failover·DB flap·재시작·timeout 전후/부분 batch | pause 뒤 commit0·재개 조건·delivery-count·rank/당첨 변화·접수/발급 잠금 관측 / #172 |
 | F8 / C1,C3,C4 | poison/DLX 목적지 장애/delivery-limit·replay confirm→parking ACK crash | source/parking 내구 보존·중복 수렴 / #172 |
 | F9 / C4 | 여러 행사·mapping 불일치·준비/정리 실패·retention/FK/export | 신뢰범위 격리·다른 행사 영향·삭제 금지 / #171/#172 |
@@ -194,7 +204,7 @@ Verifier 2회차는 이 Builder 대조와 별개로 r2 지시의 공식 SAC/conf
 | Q2 canonical bytes | 위 encoding 및 기존/추가 vector 수용 | #170/#171 실제 Java 직렬화·두 앱 일치 |
 | Q3 실행 정책 | [ADR-004 초기 정책 단일 표](../adr/ADR-004-rabbitmq-implementation-contract.md#initial-execution-policies--2026-10-14)의 선택값 | #170 설정 증거·#172 실효 override/경계 검사; 설정값/관측값 별도 열 |
 
-새 미정/권고값으로 읽지 않는다. 선택은 runtime PASS가 아니며 이 delta의 설계 적합성은 Verifier 2회차 대기다. 접수/발급은 같은 행사 잠금을 공유한다. #172/#173은 각각 행사 잠금 대기·트랜잭션 시간·batch 크기·backlog/drain을 관측하고 수단 없으면 MISSING, broker 병목 단정 금지다. 같은 잠금 순서는 전체 시스템 deadlock 불가능의 증명이 아니다. 새 락/샤딩/튜닝 없음.
+새 미정/권고값으로 읽지 않는다. 선택은 runtime PASS가 아니며 이 마감 delta의 설계 적합성은 Verifier 3회차 대기다. 접수/발급은 같은 행사 잠금을 공유한다. #172/#173은 각각 행사 잠금 대기·트랜잭션 시간·batch 크기·backlog/drain을 관측하고 수단 없으면 MISSING, broker 병목 단정 금지다. 같은 잠금 순서는 전체 시스템 deadlock 불가능의 증명이 아니다. 새 락/샤딩/튜닝 없음.
 
 ## 원격 이슈 본문 수정 초안 (미게시)
 
@@ -213,6 +223,7 @@ F1/F2/F3·callback 원순서/late/unknown·로그 공백, broker/client digest·
 #167 설계 수용·producer 계약에 의존하며 V1 보존. event 전용 quorum+SAC, 공정성은 최초 커밋된 유효 DB rank입니다.
 행사 잠금 아래 shared pause/provenance·기존 attempt/hash·application 확인, 유효 PENDING admission+MAPPED 또는 정의된 명시 null-token REJECTED/OPEN_PROOF_MISSING만 원자 commit 후 개별 ACK. ACK≠발급 완료. 최종 발급/재고/tier/award 원자 처리는 기존 DB worker 담당이며 CLOSED 유효 backlog도 PENDING→ISSUED/SOLD_OUT 수렴입니다.
 단일 attempt outcome·논리 PK·mapped_member_id FK(event_id,mapped_member_id)·명시 NULL/CHECK. REJECTED는 trusted 신규/일치 version/준비·pause=false/DB 가능/명시 null token의 단일 reason OPEN_PROOF_MISSING, mapping/token NULL입니다. 정상 producer는 non-null이라 이 경로 없음; 누락/형식 오류/drift는 parking이며 DB 실패는 retry입니다. F3의 통제 broker A·정상 새 B와 F6 최초 outcome 경합을 검사합니다. application_id/parent 복합 인덱스 초안은 대체됐습니다. 최초 결과·payload 충돌 parking·거절 뒤 새 유효 시도·인증 조회, child index/FK 비용·음성 DDL 검사를 포함합니다.
+F6: 나머지 제약이 유효하고 대응 application 없는 REJECTED(mapping=NULL, token=NULL, reason=OPEN_PROOF_MISSING) INSERT 성공·application/rank/award 생성0. mapping non-null/token non-null/reason NULL/미지원 reason은 각각 하나만 바꾸어 거부하며 다른 제약의 우연한 실패에 기대지 않습니다. 기존 MAPPED NULL/오소유/미존재 application/unknown outcome/동일 키 경합 시험 유지. 고정 MySQL·실제 DDL·제약 활성화 증거로 확인하고 문서 PASS를 SQL 실행 PASS로 쓰지 않습니다.
 ADR-004 초기 정책 표, 공유 pause·앱별 DB health/재개, F2~F6/F9·rollback ACK0·commit/ACK crash·PENDING 복구·V1 회귀의 독립 RabbitMQ/MySQL 검증 필요. 최소7일·drain/export·참조 보호, 자동 cleanup/cascade/award 삭제 없음.
 ```
 
@@ -227,8 +238,8 @@ confirmed 관측 합집합·unknown·parking/DB ID 대조, 비원자 snapshot/�
 
 ## 자체 리뷰·PR 초안
 
-허용 문서만 바꾸며 원본 dirty 번역 ADR·역할·staged 이동/삭제·#177 증거는 가져오지 않는다. src/build/의존성/script/migration/.github 불변. r2의 선택 계약·초기 설정값과 실행 관측 미완료를 구분했다. 실제 구현·SQL·호환성·장애·측정은 미검증이며 독립 Verifier 2회차 판정이 남는다.
+허용 문서만 바꾸며 원본 dirty 번역 ADR·역할·staged 이동/삭제·#177 증거는 가져오지 않는다. src/build/의존성/script/migration/.github 불변. r2의 선택 계약·초기 설정값과 실행 관측 미완료를 구분했다. 실제 구현·SQL·호환성·장애·측정은 미검증이며 r2의 조건부 PASS를 유지하며 이번 마감 delta의 독립 Verifier 3회차 판정이 남는다.
 
 PR 제목: `docs: reconcile issue 167 RabbitMQ contracts and implementation acceptance criteria`.
 
-본문 초안: ADR-004·#171 정정을 맞춰 admission commit→ACK→기존 발급 worker, CLOSED backlog, snapshot/readiness, 소유 FK·보존을 정리합니다. r2에서 수용한 API/message/readiness와 AC↔후속 이슈↔fault matrix, #170/#171/#172 본문 수정 초안을 제공합니다. baseline을 비교/전환 조건으로 분리하며 생산 변경·새 실행·성능 주장은 없습니다. 독립 Verifier 2회차 검토 뒤 Architect가 정확 SHA의 PR·이슈 처리를 담당합니다.
+본문 초안: ADR-004·#171 정정을 맞춰 admission commit→ACK→기존 발급 worker, CLOSED backlog, snapshot/readiness, 소유 FK·보존을 정리합니다. r2에서 수용한 API/message/readiness와 AC↔후속 이슈↔fault matrix, #170/#171/#172 본문 수정 초안을 제공합니다. baseline을 비교/전환 조건으로 분리하며 생산 변경·새 실행·성능 주장은 없습니다. 마감 delta의 독립 Verifier 3회차 검토 뒤 Architect가 정확 SHA의 PR·이슈 처리를 담당합니다.
