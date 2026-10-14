@@ -63,7 +63,7 @@ class CouponMqProtocolTest {
     @Test void utcPrecisionAndConfigRange() throws Exception {
         String s=new String(fixture("config.json"),StandardCharsets.UTF_8);
         assertArrayEquals(fixture("config.json"),CouponMqProtocol.canonicalConfig(s.replace(".000000Z","Z").getBytes(StandardCharsets.UTF_8)));
-        for(String invalid:new String[]{s.replace(".000000Z",".0000000Z"),s.replace("2026-10-13","2026-02-30"),s.replace("\"settingsLockedAt\":\"2026-10-12T23:59:00.000000Z\"","\"settingsLockedAt\":null"),s.replace("\"highQuantity\":50","\"highQuantity\":101"),s.replace("\"totalQuantity\":100","\"totalQuantity\":0")})
+        for(String invalid:new String[]{s.replace(".000000Z",".0000000Z"),s.replace("2026-10-13","2026-02-30"),s.replace("T00:00:00","T24:00:00"),s.replace("T00:00:00","T23:59:60"),s.replace("\"settingsLockedAt\":\"2026-10-12T23:59:00.000000Z\"","\"settingsLockedAt\":null"),s.replace("\"highQuantity\":50","\"highQuantity\":101"),s.replace("\"totalQuantity\":100","\"totalQuantity\":0")})
             assertThrows(IllegalArgumentException.class,()->CouponMqProtocol.canonicalConfig(invalid.getBytes(StandardCharsets.UTF_8)));
     }
     @Test void byteLimitIsInclusiveAndBeforeParsing() throws Exception {

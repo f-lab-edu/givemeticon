@@ -13,7 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
@@ -112,7 +112,7 @@ public final class CouponMqProtocol {
     }
     private static String time(String s) {
         if(!s.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z")) throw invalid();
-        try { return UTC.format(Instant.parse(s)); }
+        try { return UTC.format(LocalDateTime.parse(s.substring(0,s.length()-1), DateTimeFormatter.ISO_LOCAL_DATE_TIME).toInstant(ZoneOffset.UTC)); }
         catch(Exception e) { throw invalid(); }
     }
     private static IllegalArgumentException invalid() { return new IllegalArgumentException("invalid coupon MQ protocol v1"); }
