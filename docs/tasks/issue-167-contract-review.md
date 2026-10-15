@@ -32,7 +32,8 @@
 | startup 미준비·알려진 drift·발행 전 capacity 거부 | 503, ACCEPTED 아님 | 미발행 사유 구분 / #170 |
 | 새 업무 시도에 CLOSED 관측 | ENDED, HTTP200 | 과거 attempt 실패 판정 금지·조회 안내 / #170 |
 | positive confirm + return 없음 | 202 ACCEPTED + 동일 attemptId | 저장 확인, 발급/순번 확정 아님 / #170 |
-| return+ack / return / 명시 nack | 503 retryable | ack만으로 성공 집계 금지 / #170 |
+| return+ack / return / 명시 broker basic.nack | 503 retryable | ack만으로 성공 집계 금지, 내부 전송 거부는 DB 거절 원장이 아님 / #170 |
+| framework 합성 nack / 불확실 transport 종료 | 기존 return/확정 결과가 없으면 202 CHECKING + 동일 attempt | callback만으로 slot 반환 금지, 명시 정리 성공 경계 별도 / #170 |
 | 발행 가능성이 있는 timeout/연결 단절 | CHECKING + 동일 handle, HTTP202 | 성공 지연 표본 아님·동일 ID 조회/재시도 / #170 |
 | timeout 뒤 late callback | 보낸 HTTP 응답 유지 | callback 원순서 보존, unknown 분류 대조 / #170 |
 | GET 자기 REJECTED | 200 REJECTED/OPEN_PROOF_MISSING | 정상 API에서는 생성 안 함·유효 UNIQUE·순번·재고 미소비, 과거 거절 고정 / #171 |
@@ -183,7 +184,7 @@ Verifier 2회차는 이 Builder 대조와 별개로 r2 지시의 공식 SAC/conf
 
 | ID / AC | 실패 주입 | 필수 판정·책임 |
 | --- | --- | --- |
-| F1 / C1,C4 | return+ack/nack/unroutable, timeout/late callback, 같은202의 ACCEPTED/CHECKING body, 발행 전 거부/backpressure/broker 재시작 | client 분모는 ACCEPTED만, 202/2xx 단독 성공 집계 금지·callback/unknown 보존 / #170 |
+| F1 / C1,C4 | return+ack/명시 broker basic.nack/unroutable, framework 합성 nack·종료 중 callback/slot 정리 경계, timeout/late callback, 같은202의 ACCEPTED/CHECKING body, 발행 전 거부/backpressure/broker 재시작 | client 분모는 ACCEPTED만, 202/2xx 단독 성공 집계 금지·callback/unknown 보존 / #170 |
 | F2 / C4 | 시작 전/재시작/refresh 실패/설정·topology 변경 | readiness markOpen/token/unpause 원자 commit→API·실패 rollback·CLOSED 재OPEN 금지·기존 snapshot 유지 / #170/#171 |
 | F3 / C4,C5 | 명시된 통제 null-token A→정상 새 B, A 재전송·A token 보정 충돌·타 회원 조회 | A REJECTED/OPEN_PROOF_MISSING 고정·B MAPPED·A 변경 없음 / #170/#171 |
 | F4 / C2,C4,C5 | commit 전 rollback/commit 후 ACK 전 crash | ACK0 또는 rank/outcome 재사용·award 중복0 / #171/#172 |
@@ -212,7 +213,7 @@ Verifier 2회차는 이 Builder 대조와 별개로 r2 지시의 공식 SAC/conf
 
 ```text
 #167 독립 설계 검토·Architect 수용에 의존합니다. #166/#177 baseline/하니스 전체 완료는 코드 작성 선행 조건에서 제외합니다. V1 경로·측정 기준 commit 보존, 비교/운영 전환 전 baseline·실행 환경 검증은 필요합니다.
-AC: 인증 event/member/attempt·전송 재시도 동일 attempt·별도 correlation, persistent/mandatory/correlated confirm, return 없는 positive confirm만202 ACCEPTED. return/nack·발행 전 거부503, 불확실 publish는 동일 handle CHECKING. r2의 API/wire·canonical vector 및 ADR-004 초기 정책 표를 따릅니다. HTTP202/2xx 단독 성공 집계 금지·status=ACCEPTED만 client 저장 확인 분모입니다. MQ body4096 포함/4097 거부(AMQP properties 별도), 앱당100 모든 행사 합계·timeout 후 미확정 추적을 검증합니다.
+AC: 인증 event/member/attempt·전송 재시도 동일 attempt·별도 correlation, persistent/mandatory/correlated confirm, return 없는 positive confirm만202 ACCEPTED. return/명시 broker basic.nack·발행 전 거부503, framework 합성 nack·불확실 publish는 동일 handle CHECKING. 합성 nack은 단독 slot 반환 금지, 관측된 return/확정 결과 보존·명시 transport 정리 성공 뒤 잔여 slot 반환. r2의 API/wire·canonical vector 및 ADR-004 초기 정책 표를 따릅니다. HTTP202/2xx 단독 성공 집계 금지·status=ACCEPTED만 client 저장 확인 분모입니다. MQ body4096 포함/4097 거부(AMQP properties 별도), 앱당100 모든 행사 합계·timeout 후 미확정 추적을 검증합니다.
 startup/restart fail-closed, topology/listener→readiness 트랜잭션의 event/control 잠금·DB시각/설정 재검사·markOpen/token/unpause 원자 commit→API 활성화. rollback·CLOSED 재OPEN 금지, 기존 V1 전이는 유지합니다. 확인된 immutable snapshot은 refresh DB 실패로2초 만료 안 함. 알려진 drift 차단, consumer pause만으로 readiness 무효화 안 함. 요청별 DB/outbox·동기 payload 충돌409 보장 없음.
 F1/F2/F3·callback 원순서/late/unknown·로그 공백, broker/client digest·실제 resolution, V1 회귀·독립 통합 검증이 필요합니다. 문서 PASS를 런타임 PASS로 쓰지 않습니다.
 ```
@@ -233,7 +234,7 @@ ADR-004 초기 정책 표, 공유 pause·앱별 DB health/재개, F2~F6/F9·roll
 #167 설계 수용과 producer/consumer 구현에 의존. F1/F4/F5/F7~F10을 고정 broker/client/MySQL·하니스 SHA에서 검증합니다.
 일시 장애는 unacked·batch 후속 commit 차단·bounded backoff/중단, 무한 requeue 금지. poison/충돌은 durable parking·공유 pause·명시 조사/재개. DLX 장애·delivery-limit·부분 batch·실효 timeout 전후·consumer cancel/channel close·DB flap/SAC failover를 포함합니다.
 commit→ACK crash 및 replay routed confirm→parking ACK crash는 중복 수렴·최초 outcome/rank 보존. queue와 DB PENDING 양쪽 drain·최종 인증 조회 필요. 원 enqueue 복원 약속 없음·rank/당첨 변화 기록.
-confirmed 관측 합집합·unknown·parking/DB ID 대조, 비원자 snapshot/계측 공백/로그 누락 구분. 미해소 ID를 남기고 유실0/최종완료 PASS 금지. 단일 노드 restart≠복제 node-loss 증거. ADR-004 초기 정책 표·실효 override/경계 및 #172/#173 접수/발급 행사 잠금 대기·트랜잭션 시간·batch/backlog/drain을 관측하고 수단 없으면 MISSING, broker 병목 단정 금지. runbook·정확 실행 증거 필요.
+broker nack과 framework 합성 nack 출처·종료 중 callback/명시 정리 경계를 구분하고, confirmed 관측 합집합·unknown·parking/DB ID 대조, 비원자 snapshot/계측 공백/로그 누락 구분. 미해소 ID를 남기고 유실0/최종완료 PASS 금지. 단일 노드 restart≠복제 node-loss 증거. ADR-004 초기 정책 표·실효 override/경계 및 #172/#173 접수/발급 행사 잠금 대기·트랜잭션 시간·batch/backlog/drain을 관측하고 수단 없으면 MISSING, broker 병목 단정 금지. runbook·정확 실행 증거 필요.
 ```
 
 ## 자체 리뷰·PR 초안
@@ -243,3 +244,9 @@ confirmed 관측 합집합·unknown·parking/DB ID 대조, 비원자 snapshot/�
 PR 제목: `docs: reconcile issue 167 RabbitMQ contracts and implementation acceptance criteria`.
 
 본문 초안: ADR-004·#171 정정을 맞춰 admission commit→ACK→기존 발급 worker, CLOSED backlog, snapshot/readiness, 소유 FK·보존을 정리합니다. r2에서 수용한 API/message/readiness와 AC↔후속 이슈↔fault matrix, #170/#171/#172 본문 수정 초안을 제공합니다. baseline을 비교/전환 조건으로 분리하며 생산 변경·새 실행·성능 주장은 없습니다. 마감 delta의 독립 Verifier 3회차 검토 뒤 Architect가 정확 SHA의 PR·이슈 처리를 담당합니다.
+
+## 2026-10-15 — nack 출처 보완 (#170 MAJOR-3)
+
+[ADR-004 보완](../adr/ADR-004-rabbitmq-implementation-contract.md#publisher-nack-provenance--2026-10-15)에 따라 API 표의 명시 nack은 broker basic.nack을 뜻한다. 고정 Spring3.0.8의 ack=false·reason=null은 broker 거부, non-null(빈 문자열 포함)은 framework 합성 통지다. 후자는 미완료 caller에 CHECKING이며, 이미 관측한 return/확정 결과를 지우지 않는다. 반환 callback보다 CorrelationData.returned가 먼저 기록돼도 return을 보존한다. 합성 callback 자체로 slot을 풀지 않으며 소유 전용 transport 명시 정리 성공 후 잔여 slot을 반환한다. destroy 실패는 유지·명시 재시도다.
+
+F1과 #170/#172 초안의 nack은 이 구분으로 검증한다. framework nack을 broker 거부·저장 확인으로 집계하지 않고 raw reason을 기록하지 않는다. 내부 전송 REJECTED는 DB OPEN_PROOF_MISSING 원장이 아니며 재시도는 같은 논리 attempt다. #167의 과거 설계 승인·vector·source manifest를 바꾸거나 새 상태/HTTP/DB reason을 추가하는 결정이 아니다. 실제 broker 검증은 미완료다.

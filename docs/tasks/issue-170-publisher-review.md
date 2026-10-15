@@ -1,6 +1,6 @@
 # #170 첫 구현 — canonical protocol / Publisher Confirm 핵심
 
-기준 develop `68564030ca1a697f80f110d07c12b2526fff5ed0`, r2 브랜치 `feat/issue-170-publisher-core-r2`. [ADR-004](../adr/ADR-004-rabbitmq-implementation-contract.md), [승인된 wire/vector](issue-167-contract-review.md), [전달 집계](../architecture/RABBITMQ_DELIVERY_ACCOUNTING.md)를 따른다. 상태는 Builder 핵심 구현 후보·독립 검토 대기이며 #170 전체 완료가 아니다. API/readiness/DB/consumer/실제 broker 실행은 없다.
+기준 develop `68564030ca1a697f80f110d07c12b2526fff5ed0`, r3 브랜치 `feat/issue-170-publisher-core-r3`. [ADR-004](../adr/ADR-004-rabbitmq-implementation-contract.md), [승인된 wire/vector](issue-167-contract-review.md), [전달 집계](../architecture/RABBITMQ_DELIVERY_ACCOUNTING.md)를 따른다. 상태는 Builder 핵심 구현 후보·독립 검토 대기이며 #170 전체 완료가 아니다. API/readiness/DB/consumer/실제 broker 실행은 없다.
 
 ## 목표·구현 계획과 자체 리뷰
 
@@ -24,11 +24,12 @@ Boot 관리 최소 `spring-rabbit` 한 의존성만 추가했다. 실제 depende
 | closed 또는 capacity100 | NOT_SENT/CLOSED 또는 CAPACITY | 새 send0 |
 | return | REJECTED/RETURNED | 최초 결과 유지, confirm 전 slot 유지 |
 | ack + 같은 correlation의 return 없음 | ACCEPTED/CONFIRMED | pending remove 성공 때만 slot1회 반환 |
-| nack 또는 return+ack | REJECTED | confirm에 slot 반환, 다른 correlation return 혼선 없음 |
+| 명시 broker nack(reason null) 또는 return+ack | REJECTED | confirm에 slot 반환, 다른 correlation return 혼선 없음 |
 | confirm 대기1초 timeout | CHECKING/TIMEOUT, 동일 attempt | broker 취소 아님, 미확정 slot 유지 |
 | 발행 action 이전 connection/channel/listener 준비 실패 | NOT_SENT/PRE_SEND_FAILURE | publish·pending confirm 없음, pending remove 성공 시 slot1회 반환 |
 | 발행 action 진입 후 RuntimeException | 알려진 결과가 없으면 CHECKING/SEND_UNCERTAIN | 미발행으로 단정하지 않고 slot 유지; 이미 return/confirm으로 완료한 결과는 보존 |
 | confirm future exceptional/null | CHECKING/CALLBACK_UNCERTAIN | 불확실 slot 유지·capacity fail-closed, close에서 해소 |
+| framework 합성 nack(reason non-null, 빈 문자열 포함) | 기존 return/확정 결과 보존, 아니면 CHECKING/FRAMEWORK_NACK | 합성 callback만으로 slot 해제 금지, 명시 소유 transport 정리 성공 경계에서 잔여 slot 반환 |
 | late confirm/return·중복 callback | 반환한 caller Result 불변·별도 event | 정상 confirm은 slot1회 반환, 반복 remove는 무효 |
 | interrupt | CHECKING, interrupt flag 보존 | slot 유지 |
 | close | 신규 send 차단, 미확정 response CHECKING/CLOSED | 전용 factory destroy 성공 뒤 pending/unknown slot 해제, 성공 뒤 중복 close 안전; destroy 실패는 소유 유지·후속 명시 close로 재정리 가능 |
@@ -72,3 +73,13 @@ PR 제목 초안: `feat: implement coupon MQ canonical protocol and bounded publ
 
 r2 PR 제목 초안: `fix: preserve V1 health and classify coupon publisher send failures`.
 본문 초안: 기본 Rabbit health를 비활성화하고 실제 패키징 설정 회귀를 추가합니다. 실제 RabbitTemplate action 진입 전 실패만 NOT_SENT로 슬롯을 반환하며, 발행 후 불확실 결과는 CHECKING으로 유지합니다. 전용 transport 종료 실패 뒤 명시 재정리와 capacity 로그를 보완합니다. 이번은 #170 비활성 core 수정이며 독립 Verifier 결과와 실제 runtime 검증 전 이슈를 닫지 않습니다.
+
+## r3 — MAJOR-3 합성 nack 분류
+
+r2 Verifier의 새 FAIL을 수용했다. 고정 Spring3.0.8의 broker basic.nack은 reason null, framework 합성 nack은 reason non-null(빈 문자열 포함)이다. confirmed에서 합성 nack을 고정 FRAMEWORK_NACK event/reason으로 분리하고, 관측한 return(callback 또는 CorrelationData.returned)이 없으면 CHECKING을 유지한다. callback 자체로 slot을 반환하지 않는다. raw reason 문구는 응답/로그에 넣지 않는다. broker nack까지 CHECKING으로 만드는 변경은 없다. 내부 REJECTED는 전송 거부이며 DB OPEN_PROOF_MISSING 원장이 아니다. 기존 caller 결과는 불변이고 같은 논리 attempt로 재시도한다.
+
+실제 CachingConnectionFactory/RabbitTemplate/PublisherCallbackChannelImpl에 mock amqp-client만 주입해 broker ack/nack, channel shutdown·외부 factory destroy의 합성 nack, return callback보다 future가 먼저 처리되는 순서, timeout/정리 뒤 late callback을 검증한다. 정리 경계 시험의 factory는 실제 resetConnection을 호출하는 테스트 전용 subclass이며, reset 직후·destroy 반환 전 assertion/실패를 주입한다. process100이 채워진 상황에서 합성 callback 후에도 타 publisher가 capacity를 재사용하지 못하고, 명시 정리 성공 뒤만 한 번 재사용하는지 확인한다. sleep이나 실제 소켓/broker/DB 없이 실행한다.
+
+기존 reason이 있는 nack을 broker fixture로 사용한 두 시험은 null reason으로 정정하고, 별도의 non-null/empty·실제 생성 경로 시험을 추가했다. 최초 RED의 합성 nack CHECKING/unknown slot/return 보존 실패는 기존 결함 재현이다. 당시 두 correlation 시험은 캐시가 미확정 channel을 재사용하지 않아 두 번째 callback channel을 지정해야 했던 테스트 오류였으며 수정했다. 실제 factory spy는 내부 owner 상태가 분리돼 테스트 실패를 만들었으므로 실제 인스턴스를 유지했다.
+
+r3 최종 정확 SHA의 Publisher 영향/기본 test 결과와 문서 검사·자체 리뷰는 Builder r3 인계에 기록한다. r2의 health·전송 전 실패·protocol·의존성은 변경하지 않고 기존 검증에 연결한다. transport 전체1초 예산·동시 close의 완료 관측·실제 broker/장애/잔여 callback memory는 여전히 미검증이다. r3 PR 제목 초안: `fix: preserve uncertainty for framework-generated publisher nacks`. 내용은 합성 nack의 CHECKING/slot 유지·return 보존, 명시 정리 경계와 broker nack 구분·관련 계약 명료화이며 #170 전체 완료가 아니다.
