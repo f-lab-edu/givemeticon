@@ -52,6 +52,9 @@ class ItemFavoriteServiceTest {
 
         when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId())).thenReturn(Optional.empty());
 
+        when(itemFavoriteMapper.lockItem(item.getId())).thenReturn(item.getId());
+        when(itemFavoriteMapper.save(any(ItemFavorite.class))).thenReturn(1);
+        when(itemFavoriteMetaMapper.increaseLikeCount(item.getId())).thenReturn(1);
         sut.insertFavorite(user.getId(), item.getId());
 
         assertThat(itemFavorite.getItemId()).isEqualTo(item.getId());
@@ -70,6 +73,7 @@ class ItemFavoriteServiceTest {
         when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId()))
                 .thenReturn(Optional.of(itemFavorite));
 
+        when(itemFavoriteMapper.lockItem(item.getId())).thenReturn(item.getId());
         Assertions.assertThrows(AlreadyPushItemFavorite.class,
                 () -> sut.insertFavorite(user.getId(), item.getId()));
 
@@ -86,7 +90,11 @@ class ItemFavoriteServiceTest {
         when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId()))
                 .thenReturn(Optional.of(itemFavorite));
 
+        when(itemFavoriteMapper.lockItem(item.getId())).thenReturn(item.getId());
+        when(itemFavoriteMapper.update(itemFavorite)).thenReturn(1);
+        when(itemFavoriteMetaMapper.decreaseLikeCount(item.getId())).thenReturn(1);
         sut.cancelItemFavorite(user.getId(), item.getId());
+        verify(itemFavoriteMetaMapper).decreaseLikeCount(item.getId());
 
         assertThat(itemFavorite.getItemId()).isEqualTo(item.getId());
         assertThat(itemFavorite.getUserId()).isEqualTo(user.getId());
@@ -101,6 +109,7 @@ class ItemFavoriteServiceTest {
 
         when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId())).thenReturn(Optional.empty());
 
+        when(itemFavoriteMapper.lockItem(item.getId())).thenReturn(item.getId());
         Assertions.assertThrows(NotPushItemFavorite.class,
                 () -> sut.cancelItemFavorite(user.getId(), item.getId()));
     }

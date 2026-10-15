@@ -10,6 +10,8 @@ public interface ItemFavoriteMetaMapper {
 
     void increaseViewCount(@Param("itemId") int itemId);
 
-    void increaseLikeCount(@Param("itemId") int itemId);
+    int increaseLikeCount(@Param("itemId") int itemId);
+
+    int decreaseLikeCount(@Param("itemId") int itemId);
 
 }
