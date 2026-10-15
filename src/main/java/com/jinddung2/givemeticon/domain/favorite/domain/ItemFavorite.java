@@ -18,6 +18,10 @@ public class ItemFavorite {
         this.isFavorite = isFavorite;
     }
 
+    public void activate() {
+        this.isFavorite = true;
+    }
+
     public void cancel() {
         this.isFavorite = false;
     }

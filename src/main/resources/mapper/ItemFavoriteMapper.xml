@@ -7,9 +7,13 @@
     <resultMap id="itemFavoriteResultMap" type="ItemFavorite">
         <result property="id" column="id"/>
         <result property="userId" column="user_id"/>
-        <result property="itemId" column="item_ud"/>
+        <result property="itemId" column="item_id"/>
         <result property="isFavorite" column="is_favorite"/>
     </resultMap>
+
+    <select id="lockItem" resultType="java.lang.Integer">
+        SELECT id FROM item WHERE id = #{itemId} FOR UPDATE
+    </select>
 
     <insert id="save" parameterType="ItemFavorite">
         INSERT INTO item_favorite(id,
@@ -51,5 +55,6 @@
             is_favorite = #{isFavorite}
         WHERE
             id = #{id}
+            AND is_favorite &lt;&gt; #{isFavorite}
     </update>
 </mapper>

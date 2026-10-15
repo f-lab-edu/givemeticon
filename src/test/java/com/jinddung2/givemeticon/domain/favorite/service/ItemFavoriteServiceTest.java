@@ -52,13 +52,15 @@ class ItemFavoriteServiceTest {
 
         when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId())).thenReturn(Optional.empty());
 
+        when(itemFavoriteMapper.lockItem(item.getId())).thenReturn(item.getId());
+        when(itemFavoriteMapper.save(any(ItemFavorite.class))).thenReturn(1);
         sut.insertFavorite(user.getId(), item.getId());
 
         assertThat(itemFavorite.getItemId()).isEqualTo(item.getId());
         assertThat(itemFavorite.getUserId()).isEqualTo(user.getId());
         assertThat(itemFavorite.isFavorite()).isTrue();
         verify(itemFavoriteMapper).save(any(ItemFavorite.class));
-        verify(itemFavoriteMetaMapper).increaseLikeCount(item.getId());
+        org.mockito.Mockito.verifyNoInteractions(itemFavoriteMetaMapper);
     }
 
     @Test
@@ -70,11 +72,12 @@ class ItemFavoriteServiceTest {
         when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId()))
                 .thenReturn(Optional.of(itemFavorite));
 
+        when(itemFavoriteMapper.lockItem(item.getId())).thenReturn(item.getId());
         Assertions.assertThrows(AlreadyPushItemFavorite.class,
                 () -> sut.insertFavorite(user.getId(), item.getId()));
 
         verify(itemFavoriteMapper, never()).save(any(ItemFavorite.class));
-        verify(itemFavoriteMetaMapper, never()).increaseLikeCount(item.getId());
+        org.mockito.Mockito.verifyNoInteractions(itemFavoriteMetaMapper);
     }
 
     @Test
@@ -86,7 +89,10 @@ class ItemFavoriteServiceTest {
         when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId()))
                 .thenReturn(Optional.of(itemFavorite));
 
+        when(itemFavoriteMapper.lockItem(item.getId())).thenReturn(item.getId());
+        when(itemFavoriteMapper.update(itemFavorite)).thenReturn(1);
         sut.cancelItemFavorite(user.getId(), item.getId());
+        org.mockito.Mockito.verifyNoInteractions(itemFavoriteMetaMapper);
 
         assertThat(itemFavorite.getItemId()).isEqualTo(item.getId());
         assertThat(itemFavorite.getUserId()).isEqualTo(user.getId());
@@ -101,6 +107,7 @@ class ItemFavoriteServiceTest {
 
         when(itemFavoriteMapper.findByIdByUserIDAndItemId(user.getId(), item.getId())).thenReturn(Optional.empty());
 
+        when(itemFavoriteMapper.lockItem(item.getId())).thenReturn(item.getId());
         Assertions.assertThrows(NotPushItemFavorite.class,
                 () -> sut.cancelItemFavorite(user.getId(), item.getId()));
     }
