@@ -45,6 +45,13 @@ public final class CouponMqPublisher implements AutoCloseable {
     CouponMqPublisher(RabbitTemplate template,CachingConnectionFactory factory,Duration budget) {
         if(budget.isNegative() || budget.compareTo(Duration.ofSeconds(1))>0) throw new IllegalArgumentException("invalid confirm budget");
         this.template=template;this.factory=factory;this.budget=budget;
+        var raw=factory.getRabbitConnectionFactory();
+        if(raw==null) throw new IllegalArgumentException("dedicated raw connection factory required");
+        raw.setConnectionTimeout(1000);raw.setHandshakeTimeout(2000);raw.setChannelRpcTimeout(1000);
+        raw.setRequestedHeartbeat(60);raw.setShutdownTimeout(10000);raw.setAutomaticRecoveryEnabled(false);
+        raw.useBlockingIo();
+        factory.setChannelCacheSize(100);factory.setChannelCheckoutTimeout(100);factory.setCloseTimeout(1000);
+        template.setChannelTransacted(false);template.setRetryTemplate(null);
         factory.setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
         factory.setPublisherReturns(true);
         template.setMandatory(true);

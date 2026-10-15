@@ -22,7 +22,11 @@ import static com.jinddung2.givemeticon.domain.coupon.mq.CouponMqPublisher.Statu
 
 class CouponMqPublisherTest {
     RabbitTemplate template=mock(RabbitTemplate.class);
-    CachingConnectionFactory factory=mock(CachingConnectionFactory.class);
+    CachingConnectionFactory factory=dedicatedMock();
+    static CachingConnectionFactory dedicatedMock() {
+        var result=mock(CachingConnectionFactory.class);
+        when(result.getRabbitConnectionFactory()).thenReturn(new com.rabbitmq.client.ConnectionFactory());return result;
+    }
     CouponMqPublisher publisher=new CouponMqPublisher(template,factory,Duration.ZERO);
     { action(template); }
     void action(RabbitTemplate target) {
@@ -115,7 +119,7 @@ class CouponMqPublisherTest {
         sent.get(0).getFuture().complete(new CorrelationData.Confirm(true,null));assertEquals(CHECKING,result.status());assertEquals(0,publisher.pendingCount());
     }
     @Test void multiplePublishersShareTheProcessBudget() throws Exception {
-        capture();var secondTemplate=mock(RabbitTemplate.class);var secondFactory=mock(CachingConnectionFactory.class);
+        capture();var secondTemplate=mock(RabbitTemplate.class);var secondFactory=dedicatedMock();
         var second=new CouponMqPublisher(secondTemplate,secondFactory,Duration.ZERO);action(secondTemplate);
         try {
             for(int i=0;i<50;i++) {
@@ -129,7 +133,7 @@ class CouponMqPublisherTest {
         } finally { publisher.close();second.close(); }
     }
     @Test void unknownSlotsStayOwnedUntilTransportDestructionReturns() throws Exception {
-        capture();var otherTemplate=mock(RabbitTemplate.class);var otherFactory=mock(CachingConnectionFactory.class);
+        capture();var otherTemplate=mock(RabbitTemplate.class);var otherFactory=dedicatedMock();
         var other=new CouponMqPublisher(otherTemplate,otherFactory,Duration.ZERO);action(otherTemplate);
         try {
             for(int i=0;i<100;i++) publisher.publish(body(),7,91,"exchange","key");
@@ -171,7 +175,7 @@ class CouponMqPublisherTest {
     }
     // Real Spring execute/doSend, with a transport that cannot open a network connection.
     static class Transport {
-        final CachingConnectionFactory factory=mock(CachingConnectionFactory.class);
+        final CachingConnectionFactory factory=dedicatedMock();
         final org.springframework.amqp.rabbit.connection.Connection connection=mock(org.springframework.amqp.rabbit.connection.Connection.class);
         final org.springframework.amqp.rabbit.connection.ChannelProxy channel=mock(org.springframework.amqp.rabbit.connection.ChannelProxy.class,
                 withSettings().extraInterfaces(org.springframework.amqp.rabbit.connection.PublisherCallbackChannel.class));
@@ -483,6 +487,17 @@ class CouponMqPublisherTest {
             assertTrue(log.contains("process_used="));assertFalse(log.contains("do-not-log"));
             assertFalse(log.contains(CouponMqProtocolTest.payload()));
         } finally { logger.detachAppender(events); }
+    }
+
+    @Test void lifecycleNativeSettingsAreAppliedToDedicatedFactory() {
+        var dedicated=new CachingConnectionFactory();var instance=new CouponMqPublisher(dedicated);
+        try {
+            assertEquals(1000,dedicated.getRabbitConnectionFactory().getConnectionTimeout());
+            assertEquals(2000,dedicated.getRabbitConnectionFactory().getHandshakeTimeout());
+            assertEquals(1000,dedicated.getRabbitConnectionFactory().getChannelRpcTimeout());
+            assertEquals(1000,dedicated.getCloseTimeout());assertEquals(100,dedicated.getChannelCacheSize());
+            assertEquals(100L,org.springframework.test.util.ReflectionTestUtils.getField(dedicated,"channelCheckoutTimeout"));
+        } finally { instance.close(); }
     }
 
 }
