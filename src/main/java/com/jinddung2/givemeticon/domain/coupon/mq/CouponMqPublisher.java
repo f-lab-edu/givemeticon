@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class CouponMqPublisher implements AutoCloseable {
     public enum Status { ACCEPTED, REJECTED, CHECKING, NOT_SENT }
-    public enum Reason { CONFIRMED, RETURNED, NACK, TIMEOUT, SEND_UNCERTAIN, CALLBACK_UNCERTAIN, CLOSED, CAPACITY, PRE_SEND_FAILURE, INVALID_INPUT }
+    public enum Reason { CONFIRMED, RETURNED, NACK, TIMEOUT, SEND_UNCERTAIN, CALLBACK_UNCERTAIN, FRAMEWORK_NACK, CLOSED, CAPACITY, PRE_SEND_FAILURE, INVALID_INPUT }
     public record Result(Status status, String attemptId, String correlationId, Reason reason) { }
     private static final Logger LOG=LoggerFactory.getLogger(CouponMqPublisher.class);
     private final RabbitTemplate template;
@@ -122,6 +122,14 @@ public final class CouponMqPublisher implements AutoCloseable {
                 event(p,"CALLBACK_UNCERTAIN",late);
                 p.response.complete(p.result(Status.CHECKING,Reason.CALLBACK_UNCERTAIN));
                 return; // Unknown tracking stays bounded/fail-closed until explicit close.
+            }
+            // Spring 3.0.8: broker nacks have null reason; framework shutdown nacks do not.
+            // A synthetic callback proves neither broker rejection nor owned transport cleanup.
+            if(!confirm.isAck() && confirm.getReason()!=null) {
+                event(p,"FRAMEWORK_NACK",late);
+                if(p.returned || p.correlation.getReturned()!=null) p.response.complete(p.result(Status.REJECTED,Reason.RETURNED));
+                else p.response.complete(p.result(Status.CHECKING,Reason.FRAMEWORK_NACK));
+                return;
             }
             event(p,confirm.isAck()?"CONFIRM_ACK":"CONFIRM_NACK",late);
             if(p.returned || p.correlation.getReturned()!=null) p.response.complete(p.result(Status.REJECTED,Reason.RETURNED));

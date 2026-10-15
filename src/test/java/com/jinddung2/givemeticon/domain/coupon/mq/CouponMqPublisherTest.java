@@ -53,7 +53,7 @@ class CouponMqPublisherTest {
         verify(template).setMandatory(true);verify(factory).setPublisherReturns(true);verify(factory).setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
     }
     @Test void nackAndReturnAckAreRejections() throws Exception {
-        doAnswer(inv->{CorrelationData c=inv.getArgument(5);c.getFuture().complete(new CorrelationData.Confirm(false,"not logged"));return null;})
+        doAnswer(inv->{CorrelationData c=inv.getArgument(5);c.getFuture().complete(new CorrelationData.Confirm(false,null));return null;})
                 .when(template).doSend(any(com.rabbitmq.client.Channel.class),anyString(),anyString(),any(Message.class),eq(true),any(CorrelationData.class));
         assertEquals(REJECTED,publisher.publish(body(),7,91,"exchange","key").status());
         doAnswer(inv->{CorrelationData c=inv.getArgument(5);c.setReturned(returnFor(c));c.getFuture().complete(new CorrelationData.Confirm(true,null));return null;})
@@ -92,7 +92,7 @@ class CouponMqPublisherTest {
         String other=CouponMqProtocolTest.payload().replace("\"eventId\":7","\"eventId\":8");
         assertEquals(NOT_SENT,publisher.publish(other.getBytes(java.nio.charset.StandardCharsets.UTF_8),8,91,"exchange","other-key").status());
         assertEquals(100,sent.size());assertEquals(100,publisher.pendingCount());
-        sent.get(0).getFuture().complete(new CorrelationData.Confirm(false,"nack"));
+        sent.get(0).getFuture().complete(new CorrelationData.Confirm(false,null));
         assertEquals(CHECKING,publisher.publish(body(),7,91,"exchange","key").status());assertEquals(100,publisher.pendingCount());
         publisher.close();assertEquals(0,publisher.pendingCount());assertEquals(NOT_SENT,publisher.publish(body(),7,91,"exchange","key").status());
         publisher.close();verify(factory,times(1)).destroy();
@@ -310,6 +310,179 @@ class CouponMqPublisherTest {
             assertTrue(log.contains("event=CLEANUP_COMPLETE"));assertTrue(log.contains("process_used=0 process_limit=100"));
             assertFalse(log.contains("do-not-log"));assertFalse(log.contains("memberId"));assertFalse(log.contains(CouponMqProtocolTest.payload()));
         } finally { t.publisher.close();logger.detachAppender(events); }
+    }
+
+    // Actual Spring connection/cache/callback machinery; only the amqp-client is mocked.
+    static class RealTransport implements AutoCloseable {
+        final com.rabbitmq.client.ConnectionFactory client=mock(com.rabbitmq.client.ConnectionFactory.class);
+        final com.rabbitmq.client.Connection connection=mock(com.rabbitmq.client.Connection.class);
+        final com.rabbitmq.client.Channel channel=mock(com.rabbitmq.client.Channel.class);
+        final CachingConnectionFactory factory;
+        final RabbitTemplate template;
+        final CouponMqPublisher publisher;
+        final List<CorrelationData> correlations=new ArrayList<>();
+        final List<org.springframework.amqp.rabbit.connection.PublisherCallbackChannelImpl> callbacks=new ArrayList<>();
+        final java.util.ArrayDeque<Runnable> queued=new java.util.ArrayDeque<>();
+        boolean defer;
+        Runnable afterDestroy;
+        RealTransport() throws Exception {
+            when(client.newConnection(nullable(java.util.concurrent.ExecutorService.class),anyString())).thenReturn(connection);
+            when(connection.isOpen()).thenReturn(true);when(channel.isOpen()).thenReturn(true);
+            when(connection.createChannel()).thenReturn(channel);
+            var sequence=new java.util.concurrent.atomic.AtomicLong(1);
+            when(channel.getNextPublishSeqNo()).thenAnswer(inv->sequence.get());
+            doAnswer(inv->{sequence.incrementAndGet();return null;}).when(channel).basicPublish(anyString(),anyString(),anyBoolean(),any(),any(byte[].class));
+            factory=new CachingConnectionFactory(client) {
+                @Override public void resetConnection() {
+                    super.resetConnection();
+                    if(afterDestroy!=null) afterDestroy.run();
+                }
+            };
+            var executor=mock(java.util.concurrent.ExecutorService.class);
+            doAnswer(inv->{Runnable job=inv.getArgument(0);if(defer) queued.add(job);else job.run();return null;}).when(executor).execute(any());
+            factory.setPublisherChannelFactory((ch,ignored)->{
+                var callback=new org.springframework.amqp.rabbit.connection.PublisherCallbackChannelImpl(ch,executor);
+                callbacks.add(callback);return callback;
+            });
+            template=new RabbitTemplate(factory);
+            template.setCorrelationDataPostProcessor((message,c)->{correlations.add(c);return c;});
+            publisher=new CouponMqPublisher(template,factory,Duration.ZERO);
+        }
+        void shutdown() {
+            callbacks.get(0).shutdownCompleted(new com.rabbitmq.client.ShutdownSignalException(true,false,
+                    new com.rabbitmq.client.impl.AMQImpl.Connection.Close(320,"endpoint-password-do-not-log",0,0),connection));
+        }
+        void drain() { while(!queued.isEmpty()) queued.remove().run(); }
+        @Override public void close() { afterDestroy=null;defer=false;drain();publisher.close();factory.destroy(); }
+    }
+    @Test void springSyntheticNackRetainsUnknownSlotAfterTimeout() throws Exception {
+        try(var t=new RealTransport()) {
+            var result=t.publisher.publish(body(),7,91,"exchange","key");
+            assertEquals(CHECKING,result.status());assertEquals(1,t.correlations.size());
+            t.shutdown();
+            var confirm=t.correlations.get(0).getFuture().get(5,java.util.concurrent.TimeUnit.SECONDS);
+            assertFalse(confirm.isAck());assertNotNull(confirm.getReason());
+            assertEquals(1,t.publisher.pendingCount());assertEquals(CHECKING,result.status());
+            t.publisher.close();assertEquals(0,t.publisher.pendingCount());
+        }
+    }
+    @Test void springBrokerNackHasNullReasonAndReleasesOnlyItsCorrelation() throws Exception {
+        try(var t=new RealTransport()) {
+            t.publisher.publish(body(),7,91,"exchange","key");
+            t.publisher.publish(body(),7,91,"exchange","key");
+            t.callbacks.get(0).handleNack(1,false);
+            assertNull(t.correlations.get(0).getFuture().get(5,java.util.concurrent.TimeUnit.SECONDS).getReason());
+            assertEquals(1,t.publisher.pendingCount());
+            t.callbacks.get(1).handleAck(2,false);assertEquals(0,t.publisher.pendingCount());
+        }
+    }
+    @Test void springSyntheticNackBeforeWaitIsCheckingWithStableReason() throws Exception {
+        try(var t=new RealTransport()) {
+            doAnswer(inv->{t.shutdown();return null;}).when(t.channel).basicPublish(anyString(),anyString(),anyBoolean(),any(),any(byte[].class));
+            var result=t.publisher.publish(body(),7,91,"exchange","key");
+            assertEquals(CHECKING,result.status());assertEquals("FRAMEWORK_NACK",result.reason().name());
+            assertEquals(1,t.publisher.pendingCount());
+        }
+    }
+    @Test void emptyFrameworkReasonAndStoredReturnPreserveOutcomeAndSlot() throws Exception {
+        for(String reason:List.of("","endpoint-password-do-not-log")) {
+            capture();
+            doAnswer(inv->{CorrelationData c=inv.getArgument(5);c.setReturned(returnFor(c));
+                c.getFuture().complete(new CorrelationData.Confirm(false,reason));return null;})
+                    .when(template).doSend(any(com.rabbitmq.client.Channel.class),anyString(),anyString(),any(Message.class),eq(true),any(CorrelationData.class));
+            var result=publisher.publish(body(),7,91,"exchange","key");
+            assertEquals(REJECTED,result.status());assertEquals(CouponMqPublisher.Reason.RETURNED,result.reason());
+        }
+        assertEquals(2,publisher.pendingCount());
+    }
+
+    @Test void springBrokerAckAndNackBeforeWaitProduceDefinitiveResults() throws Exception {
+        for(boolean ack:List.of(true,false)) try(var t=new RealTransport()) {
+            doAnswer(inv->{if(ack) t.callbacks.get(0).handleAck(1,false);else t.callbacks.get(0).handleNack(1,false);return null;})
+                    .when(t.channel).basicPublish(anyString(),anyString(),anyBoolean(),any(),any(byte[].class));
+            var result=t.publisher.publish(body(),7,91,"exchange","key");
+            assertEquals(ack?ACCEPTED:REJECTED,result.status());
+            assertEquals(ack?CouponMqPublisher.Reason.CONFIRMED:CouponMqPublisher.Reason.NACK,result.reason());
+            assertNull(t.correlations.get(0).getFuture().get(5,java.util.concurrent.TimeUnit.SECONDS).getReason());assertEquals(0,t.publisher.pendingCount());
+            t.factory.destroy();assertEquals(ack?ACCEPTED:REJECTED,result.status());
+        }
+    }
+    @Test void springExternalFactoryDestroyIsNotOwnedPublisherCleanup() throws Exception {
+        try(var t=new RealTransport()) {
+            var result=t.publisher.publish(body(),7,91,"exchange","key");
+            t.factory.destroy();
+            assertNotNull(t.correlations.get(0).getFuture().get(5,java.util.concurrent.TimeUnit.SECONDS).getReason());
+            assertEquals(CHECKING,result.status());assertEquals(1,t.publisher.pendingCount());
+            t.publisher.close();assertEquals(0,t.publisher.pendingCount());
+        }
+    }
+    @Test void emptySyntheticReasonWithoutReturnIsUnknown() throws Exception {
+        doAnswer(inv->{((CorrelationData)inv.getArgument(5)).getFuture().complete(new CorrelationData.Confirm(false,""));return null;})
+                .when(template).doSend(any(com.rabbitmq.client.Channel.class),anyString(),anyString(),any(Message.class),eq(true),any(CorrelationData.class));
+        var result=publisher.publish(body(),7,91,"exchange","key");
+        assertEquals(CHECKING,result.status());assertEquals("FRAMEWORK_NACK",result.reason().name());assertEquals(1,publisher.pendingCount());
+    }
+
+    @Test void springReturnBeforeSyntheticNackPreservesBothCallbackOrders() throws Exception {
+        for(boolean delayReturn:List.of(false,true)) try(var t=new RealTransport()) {
+            doAnswer(inv->{
+                com.rabbitmq.client.AMQP.BasicProperties props=inv.getArgument(3);
+                var headers=new java.util.HashMap<>(props.getHeaders());
+                String key=org.springframework.amqp.rabbit.connection.PublisherCallbackChannel.RETURNED_MESSAGE_CORRELATION_KEY;
+                headers.put(key,com.rabbitmq.client.impl.LongStringHelper.asLongString(headers.get(key).toString()));
+                var returnedProps=props.builder().headers(headers).build();
+                t.defer=delayReturn;
+                t.callbacks.get(0).handle(new com.rabbitmq.client.Return(312,"NO_ROUTE","exchange","key",returnedProps,body()));
+                assertNotNull(t.correlations.get(0).getReturned());
+                // Shutdown generation can overtake the queued returns callback.
+                t.defer=false;t.shutdown();
+                return null;
+            }).when(t.channel).basicPublish(anyString(),anyString(),anyBoolean(),any(),any(byte[].class));
+            var result=t.publisher.publish(body(),7,91,"exchange","key");
+            assertEquals(REJECTED,result.status());assertEquals(CouponMqPublisher.Reason.RETURNED,result.reason());
+            assertEquals(1,t.publisher.pendingCount());t.drain();assertEquals(1,t.publisher.pendingCount());
+        }
+    }
+    @Test void springSyntheticCallbacksDuringDestroyCannotReturnCapacityBeforeCleanupBoundary() throws Exception {
+        try(var t=new RealTransport()) {
+            for(int i=0;i<100;i++) assertEquals(CHECKING,t.publisher.publish(body(),7,91,"exchange","key").status());
+            t.afterDestroy=()->{
+                assertTrue(t.correlations.stream().allMatch(c->c.getFuture().isDone()));
+                assertTrue(t.correlations.stream().allMatch(c->c.getFuture().getNow(null).getReason()!=null));
+                assertEquals(100,t.publisher.pendingCount());
+                try { assertEquals(CouponMqPublisher.Reason.CAPACITY,publisher.publish(body(),7,91,"exchange","key").reason()); }
+                catch(Exception e) { throw new AssertionError(e); }
+                throw new IllegalStateException("cleanup-password-do-not-log");
+            };
+            assertThrows(IllegalStateException.class,t.publisher::close);assertEquals(100,t.publisher.pendingCount());
+            assertEquals(CouponMqPublisher.Reason.CAPACITY,publisher.publish(body(),7,91,"exchange","key").reason());
+            t.afterDestroy=null;t.publisher.close();assertEquals(0,t.publisher.pendingCount());
+            t.publisher.close();
+            for(int i=0;i<100;i++) assertEquals(CHECKING,publisher.publish(body(),7,91,"exchange","key").status());
+            assertEquals(CouponMqPublisher.Reason.CAPACITY,publisher.publish(body(),7,91,"exchange","key").reason());
+        }
+    }
+    @Test void springSyntheticCallbackAfterSuccessfulCleanupDoesNotReleaseTwice() throws Exception {
+        try(var t=new RealTransport()) {
+            t.publisher.publish(body(),7,91,"exchange","key");t.defer=true;t.publisher.close();
+            assertEquals(0,t.publisher.pendingCount());assertFalse(t.correlations.get(0).getFuture().isDone());
+            t.defer=false;t.drain();assertFalse(t.correlations.get(0).getFuture().get(5,java.util.concurrent.TimeUnit.SECONDS).isAck());
+            assertEquals(0,t.publisher.pendingCount());
+            for(int i=0;i<100;i++) assertEquals(CHECKING,publisher.publish(body(),7,91,"exchange","key").status());
+            assertEquals(CouponMqPublisher.Reason.CAPACITY,publisher.publish(body(),7,91,"exchange","key").reason());
+        }
+    }
+    @Test void syntheticAndBrokerLogsDistinguishSourceWithoutRawReason() throws Exception {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(CouponMqPublisher.class);
+        var events=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();events.start();logger.addAppender(events);
+        try(var synthetic=new RealTransport();var broker=new RealTransport()) {
+            synthetic.publisher.publish(body(),7,91,"exchange","key");synthetic.shutdown();
+            broker.publisher.publish(body(),7,91,"exchange","key");broker.callbacks.get(0).handleNack(1,false);
+            String log=events.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage).collect(java.util.stream.Collectors.joining("\n"));
+            assertTrue(log.contains("event=FRAMEWORK_NACK"));assertTrue(log.contains("event=CONFIRM_NACK"));
+            assertTrue(log.contains("process_used="));assertFalse(log.contains("do-not-log"));
+            assertFalse(log.contains(CouponMqProtocolTest.payload()));
+        } finally { logger.detachAppender(events); }
     }
 
 }
