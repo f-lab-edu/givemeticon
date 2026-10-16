@@ -3,7 +3,6 @@ package com.jinddung2.givemeticon.domain.favorite.service;
 import com.jinddung2.givemeticon.domain.favorite.domain.ItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.exception.NotPushItemFavorite;
-import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMetaMapper;
 import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMapper;
 import com.jinddung2.givemeticon.domain.item.exception.NotFoundItemException;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +17,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ItemFavoriteService {
     private final ItemFavoriteMapper itemFavoriteMapper;
-    private final ItemFavoriteMetaMapper itemFavoriteMetaMapper;
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void insertFavorite(int userId, int itemId) {

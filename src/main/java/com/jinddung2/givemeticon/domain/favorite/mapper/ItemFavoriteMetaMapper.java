@@ -2,6 +2,8 @@ package com.jinddung2.givemeticon.domain.favorite.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import com.jinddung2.givemeticon.domain.favorite.domain.ItemFavoriteCount;
+import java.util.List;
 
 @Mapper
 public interface ItemFavoriteMetaMapper {

@@ -61,7 +61,7 @@ class ItemFavoriteServiceTest {
         assertThat(itemFavorite.getUserId()).isEqualTo(user.getId());
         assertThat(itemFavorite.isFavorite()).isTrue();
         verify(itemFavoriteMapper).save(any(ItemFavorite.class));
-        verify(itemFavoriteMetaMapper).increaseLikeCount(item.getId());
+        org.mockito.Mockito.verifyNoInteractions(itemFavoriteMetaMapper);
     }
 
     @Test
@@ -78,7 +78,7 @@ class ItemFavoriteServiceTest {
                 () -> sut.insertFavorite(user.getId(), item.getId()));
 
         verify(itemFavoriteMapper, never()).save(any(ItemFavorite.class));
-        verify(itemFavoriteMetaMapper, never()).increaseLikeCount(item.getId());
+        org.mockito.Mockito.verifyNoInteractions(itemFavoriteMetaMapper);
     }
 
     @Test
