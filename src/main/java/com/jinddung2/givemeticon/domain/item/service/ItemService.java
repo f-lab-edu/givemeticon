@@ -25,8 +25,8 @@ public class ItemService {
     private final ItemFavoriteMetaMapper itemFavoriteMetaMapper;
 
     public Item saveOrUpdate(Item item) {
-        int id = itemMapper.saveOrUpdate(item);
-        return getItem(id);
+        itemMapper.saveOrUpdate(item);
+        return getItem(item.getId());
     }
 
     public Item getItem(int itemId) {

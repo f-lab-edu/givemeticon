@@ -7,6 +7,12 @@ import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMetaMapper;
 import com.jinddung2.givemeticon.domain.favorite.service.ItemFavoriteAggregationService;
 import com.jinddung2.givemeticon.domain.favorite.service.ItemFavoriteService;
 import com.jinddung2.givemeticon.domain.item.controller.ItemController;
+import com.jinddung2.givemeticon.domain.item.controller.dto.ItemDto;
+import com.jinddung2.givemeticon.domain.item.controller.dto.request.ItemCreateRequest;
+import com.jinddung2.givemeticon.domain.item.facade.ItemWriteFacade;
+import com.jinddung2.givemeticon.domain.brand.service.BrandService;
+import com.jinddung2.givemeticon.domain.brand.controller.dto.BrandDto;
+import com.jinddung2.givemeticon.fixture.BrandFixture;
 import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.mapper.ItemMapper;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
@@ -49,9 +55,10 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
     private static ItemFavoriteService favorites;
     private static ItemFavoriteAggregationService aggregation;
     private static ItemMapper items;
+    private static ItemWriteFacade creation;
     private static MockMvc api;
     private static final PublishBarrier barrier = new PublishBarrier();
-    private final List<CompletableFuture<Boolean>> runs = new ArrayList<>();
+    private final List<CompletableFuture<?>> runs = new ArrayList<>();
 
     @Configuration
     @EnableTransactionManagement
@@ -95,6 +102,14 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
         }
 
         @Bean
+        ItemWriteFacade creation(SqlSessionTemplate template) {
+            ItemFavoriteMetaMapper meta = template.getMapper(ItemFavoriteMetaMapper.class);
+            BrandService brand = org.mockito.Mockito.mock(BrandService.class);
+            org.mockito.Mockito.when(brand.getBrand(1)).thenReturn(BrandDto.of(BrandFixture.createBrandFixture()));
+            return new ItemWriteFacade(new ItemService(template.getMapper(ItemMapper.class), null, meta), brand, meta);
+        }
+
+        @Bean
         ItemFavoriteAggregationService aggregation(SqlSessionTemplate template) {
             return new ItemFavoriteAggregationService(template.getMapper(ItemFavoriteMetaMapper.class));
         }
@@ -104,11 +119,18 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
     public static class PublishBarrier implements Interceptor {
         final AtomicInteger calls = new AtomicInteger();
         int pauseAt;
+        volatile boolean pauseCreation;
+        volatile int pendingItemId;
+        CountDownLatch itemSaved = new CountDownLatch(1);
+        CountDownLatch resumeCreation = new CountDownLatch(1);
         CountDownLatch reached = new CountDownLatch(1);
         CountDownLatch resume = new CountDownLatch(1);
 
         void reset(int pauseAt) {
             this.pauseAt = pauseAt;
+            pauseCreation = false;
+            itemSaved = new CountDownLatch(1);
+            resumeCreation = new CountDownLatch(1);
             calls.set(0);
             reached = new CountDownLatch(1);
             resume = new CountDownLatch(1);
@@ -120,6 +142,11 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
             if (statement.getId().endsWith(".replaceLikeCounts") && calls.incrementAndGet() == pauseAt) {
                 reached.countDown();
                 if (!resume.await(20, TimeUnit.SECONDS)) throw new IllegalStateException("test publish barrier timed out");
+            }
+            if (pauseCreation && statement.getId().endsWith("ItemFavoriteMetaMapper.save")) {
+                pendingItemId = (Integer) ((java.util.Map<?, ?>) invocation.getArgs()[1]).get("itemId");
+                itemSaved.countDown();
+                if (!resumeCreation.await(20, TimeUnit.SECONDS)) throw new IllegalStateException("creation barrier timed out");
             }
             return invocation.proceed();
         }
@@ -134,7 +161,7 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
         jdbc.execute("DROP TABLE IF EXISTS item_favorite");
         jdbc.execute("DROP TABLE IF EXISTS item_favorite_meta");
         jdbc.execute("DROP TABLE IF EXISTS item");
-        jdbc.execute("CREATE TABLE item (id INT PRIMARY KEY, brand_id INT NOT NULL, name VARCHAR(50), price INT) ENGINE=InnoDB");
+        jdbc.execute("CREATE TABLE item (id INT PRIMARY KEY AUTO_INCREMENT, brand_id INT NOT NULL, name VARCHAR(50), price INT, created_date DATETIME, updated_date DATETIME) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE item_favorite (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, "
                 + "item_id INT NOT NULL, is_favorite BOOLEAN NOT NULL) ENGINE=InnoDB");
         jdbc.execute("CREATE TABLE item_favorite_meta (id INT PRIMARY KEY AUTO_INCREMENT, item_id INT NOT NULL, "
@@ -144,9 +171,12 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
                     "db/migration/V20261015__add_item_favorite_member_item_unique.sql"));
             ScriptUtils.executeSqlScript(connection, new ClassPathResource(
                     "db/migration/V20261015_2__add_favorite_aggregation_lock.sql"));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource(
+                    "db/migration/V20261016__add_favorite_aggregation_success_state.sql"));
         }
-        context = new AnnotationConfigApplicationContext(Config.class);
+        context = newContext(java.util.Map.of());
         favorites = context.getBean(ItemFavoriteService.class);
+        creation = context.getBean(ItemWriteFacade.class);
         aggregation = context.getBean(ItemFavoriteAggregationService.class);
         SqlSessionTemplate template = context.getBean(SqlSessionTemplate.class);
         items = template.getMapper(ItemMapper.class);
@@ -167,6 +197,9 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
     void reset() {
         barrier.reset(0);
         jdbc.execute("DROP TRIGGER IF EXISTS fail_meta_publish");
+        jdbc.execute("DROP TRIGGER IF EXISTS fail_meta_creation");
+        jdbc.execute("DROP TRIGGER IF EXISTS fail_aggregation_state");
+        jdbc.update("UPDATE item_favorite_aggregation_lock SET last_snapshot_at=NULL,last_success_at=NULL,last_item_count=0 WHERE id=1");
         jdbc.update("DELETE FROM item_favorite");
         jdbc.update("DELETE FROM item_favorite_meta");
         jdbc.update("DELETE FROM item");
@@ -236,6 +269,7 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
         assertThat(run.get(30, TimeUnit.SECONDS)).isTrue();
         assertThat(meta(1)).isEqualTo(1);
         assertThat(meta(2)).isZero();
+        makeDue();
         assertThat(aggregation.refreshLikeCounts()).isTrue();
         assertThat(meta(1)).isZero();
         assertThat(meta(2)).isEqualTo(1);
@@ -252,6 +286,8 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
             barrier.resume.countDown();
         }
         assertThat(owner.get(30, TimeUnit.SECONDS)).isTrue();
+        assertThat(aggregation.refreshLikeCounts()).isFalse();
+        makeDue();
         assertThat(aggregation.refreshLikeCounts()).isTrue();
     }
 
@@ -271,16 +307,21 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
             assertThat(barrier.reached.await(10, TimeUnit.SECONDS)).isTrue();
             assertThat(items.findPopularItemsOrderByLikeCount(50)).allSatisfy(item -> assertThat(item.getLikeCount()).isEqualTo(7));
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite_meta WHERE like_count=7", Integer.class)).isEqualTo(501);
+            assertThat(jdbc.queryForObject("SELECT last_success_at FROM item_favorite_aggregation_lock WHERE id=1", java.sql.Timestamp.class)).isNull();
         } finally {
             barrier.resume.countDown();
         }
         assertThat(run.get(30, TimeUnit.SECONDS)).isTrue();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite_meta WHERE like_count=1", Integer.class)).isEqualTo(501);
+        assertThat(jdbc.queryForObject("SELECT last_success_at FROM item_favorite_aggregation_lock WHERE id=1", java.sql.Timestamp.class)).isNotNull();
+        assertThat(jdbc.queryForObject("SELECT last_item_count FROM item_favorite_aggregation_lock WHERE id=1", Long.class)).isEqualTo(501L);
     }
 
     @Test
     void databaseFailureAfterFirstChunk_keepsPreviousSnapshotAndReleasesLock() throws Exception {
         seedMultipleChunks();
+        jdbc.update("UPDATE item_favorite_aggregation_lock SET last_snapshot_at='2000-01-01',last_success_at='2000-01-02',last_item_count=3 WHERE id=1");
+        java.util.Map<String,Object> previousState = jdbc.queryForMap("SELECT * FROM item_favorite_aggregation_lock WHERE id=1");
         jdbc.execute("CREATE TRIGGER fail_meta_publish BEFORE UPDATE ON item_favorite_meta FOR EACH ROW "
                 + "BEGIN IF NEW.item_id=501 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='injected batch failure'; END IF; END");
         barrier.reset(2);
@@ -293,6 +334,7 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
         }
         assertThatThrownBy(() -> run.get(30, TimeUnit.SECONDS)).hasRootCauseMessage("injected batch failure");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite_meta WHERE like_count=7", Integer.class)).isEqualTo(501);
+        assertThat(jdbc.queryForMap("SELECT * FROM item_favorite_aggregation_lock WHERE id=1")).isEqualTo(previousState);
         jdbc.execute("DROP TRIGGER fail_meta_publish");
         assertThat(aggregation.refreshLikeCounts()).isTrue();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite_meta WHERE like_count=1", Integer.class)).isEqualTo(501);
@@ -303,6 +345,7 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
         favorites.insertFavorite(7, 1);
         assertThat(aggregation.refreshLikeCounts()).isTrue();
         List<java.util.Map<String, Object>> first = jdbc.queryForList("SELECT item_id,like_count,view_count FROM item_favorite_meta ORDER BY item_id");
+        makeDue();
         assertThat(aggregation.refreshLikeCounts()).isTrue();
         assertThat(jdbc.queryForList("SELECT item_id,like_count,view_count FROM item_favorite_meta ORDER BY item_id")).isEqualTo(first);
     }
@@ -320,6 +363,104 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
                 .andExpect(jsonPath("$.data[0].viewCount").value(40));
     }
 
+    @Test
+    void itemCreation_staysInvisibleToAggregationUntilMetaIsReady() throws Exception {
+        barrier.pauseCreation = true;
+        CompletableFuture<ItemDto> run = CompletableFuture.supplyAsync(() -> creation.createItem(1,
+                new ItemCreateRequest("new item", 1234)));
+        runs.add(run);
+        try {
+            assertThat(barrier.itemSaved.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item WHERE id=?", Integer.class, barrier.pendingItemId)).isZero();
+            assertThat(aggregation.refreshLikeCounts()).isTrue();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite_meta WHERE item_id=?", Integer.class,
+                    barrier.pendingItemId)).isZero();
+        } finally {
+            barrier.resumeCreation.countDown();
+        }
+        ItemDto created = run.get(30, TimeUnit.SECONDS);
+        assertThat(created.getId()).isEqualTo(barrier.pendingItemId);
+        assertThat(meta(created.getId())).isZero();
+    }
+
+    @Test
+    void itemCreation_metaFailureRollsBackItem() {
+        jdbc.execute("CREATE TRIGGER fail_meta_creation BEFORE INSERT ON item_favorite_meta FOR EACH ROW "
+                + "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='injected creation failure'");
+        assertThatThrownBy(() -> creation.createItem(1, new ItemCreateRequest("new item", 1234)))
+                .hasRootCauseMessage("injected creation failure");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite_meta", Integer.class)).isEqualTo(2);
+    }
+
+    @Test
+    void itemCreation_returnsGeneratedIdInsteadOfAffectedRows() {
+        ItemDto created = creation.createItem(1, new ItemCreateRequest("generated item", 1234));
+        assertThat(created.getId()).isGreaterThan(2);
+        assertThat(jdbc.queryForObject("SELECT name FROM item WHERE id=?", String.class, created.getId())).isEqualTo("generated item");
+        assertThat(meta(created.getId())).isZero();
+    }
+
+    private static AnnotationConfigApplicationContext newContext(java.util.Map<String,Object> properties) {
+        AnnotationConfigApplicationContext next = new AnnotationConfigApplicationContext();
+        next.getEnvironment().getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("test", properties));
+        next.register(Config.class);
+        next.refresh();
+        return next;
+    }
+
+    private void makeDue() {
+        jdbc.update("UPDATE item_favorite_aggregation_lock SET last_success_at=UTC_TIMESTAMP(6)-INTERVAL 31 MINUTE WHERE id=1");
+    }
+
+    @Test
+    void recentSuccess_isSharedAcrossContextsAndSkipsAnotherSnapshot() {
+        assertThat(aggregation.refreshLikeCounts()).isTrue();
+        favorites.insertFavorite(7, 1);
+        try (AnnotationConfigApplicationContext another = newContext(java.util.Map.of())) {
+            assertThat(another.getBean(ItemFavoriteAggregationService.class).refreshLikeCounts()).isFalse();
+        }
+        assertThat(meta(1)).isZero();
+        makeDue();
+        assertThat(aggregation.refreshLikeCounts()).isTrue();
+        assertThat(meta(1)).isEqualTo(1);
+    }
+
+    @Test
+    void stateWriteFailure_rollsBackPublishedCountersAndSuccessState() {
+        favorites.insertFavorite(7, 1);
+        jdbc.execute("CREATE TRIGGER fail_aggregation_state BEFORE UPDATE ON item_favorite_aggregation_lock FOR EACH ROW "
+                + "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='injected state failure'");
+        assertThatThrownBy(aggregation::refreshLikeCounts).hasRootCauseMessage("injected state failure");
+        assertThat(meta(1)).isEqualTo(7);
+        assertThat(meta(2)).isEqualTo(7);
+        assertThat(jdbc.queryForObject("SELECT last_success_at FROM item_favorite_aggregation_lock WHERE id=1", java.sql.Timestamp.class)).isNull();
+        jdbc.execute("DROP TRIGGER fail_aggregation_state");
+        assertThat(aggregation.refreshLikeCounts()).isTrue();
+    }
+
+    @Test
+    void timeoutAfterFirstChunk_rollsBackAndReleasesJobLock() throws Exception {
+        seedMultipleChunks();
+        barrier.reset(2);
+        try (AnnotationConfigApplicationContext limited = newContext(java.util.Map.of("favorite.aggregation.timeout-seconds", "1"))) {
+            CompletableFuture<Boolean> run = CompletableFuture.supplyAsync(
+                    limited.getBean(ItemFavoriteAggregationService.class)::refreshLikeCounts);
+            runs.add(run);
+            try {
+                assertThat(barrier.reached.await(10, TimeUnit.SECONDS)).isTrue();
+                Thread.sleep(1_200); // Expire the actual Spring transaction deadline after real SQL writes.
+            } finally {
+                barrier.resume.countDown();
+            }
+            assertThatThrownBy(() -> run.get(30, TimeUnit.SECONDS))
+                    .hasRootCauseInstanceOf(org.springframework.transaction.TransactionTimedOutException.class);
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite_meta WHERE like_count=7", Integer.class)).isEqualTo(501);
+        assertThat(jdbc.queryForObject("SELECT last_success_at FROM item_favorite_aggregation_lock WHERE id=1", java.sql.Timestamp.class)).isNull();
+        assertThat(aggregation.refreshLikeCounts()).isTrue();
+    }
+
     private CompletableFuture<Boolean> startRun() {
         CompletableFuture<Boolean> run = CompletableFuture.supplyAsync(aggregation::refreshLikeCounts);
         runs.add(run);
@@ -329,7 +470,8 @@ class ItemFavoriteAggregationMySQLIntegrationTest {
     @AfterEach
     void awaitBatchCleanup() throws Exception {
         barrier.resume.countDown();
-        for (CompletableFuture<Boolean> run : runs) {
+        barrier.resumeCreation.countDown();
+        for (CompletableFuture<?> run : runs) {
             run.handle((result, failure) -> null).get(30, TimeUnit.SECONDS);
         }
     }

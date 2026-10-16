@@ -37,7 +37,6 @@ public class ItemFavoriteService {
                     .build();
             requireOneRow(itemFavoriteMapper.save(favorite));
         }
-        requireOneRow(itemFavoriteMetaMapper.increaseLikeCount(itemId));
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -50,12 +49,11 @@ public class ItemFavoriteService {
         }
         favorite.cancel();
         requireOneRow(itemFavoriteMapper.update(favorite));
-        requireOneRow(itemFavoriteMetaMapper.decreaseLikeCount(itemId));
     }
 
     private void lockItem(int itemId) {
         // All favorite transitions use this existing parent row as their shared lock.
-        // The transaction retains it until both the original and aggregate writes finish.
+        // The transaction retains it until the original state transition finishes.
         if (itemFavoriteMapper.lockItem(itemId) == null) {
             throw new NotFoundItemException();
         }
@@ -63,7 +61,7 @@ public class ItemFavoriteService {
 
     private void requireOneRow(int affectedRows) {
         if (affectedRows != 1) {
-            throw new IllegalStateException("favorite state/count update expected one row, got " + affectedRows);
+            throw new IllegalStateException("favorite state update expected one row, got " + affectedRows);
         }
     }
 

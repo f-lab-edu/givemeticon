@@ -4,7 +4,6 @@ import com.jinddung2.givemeticon.domain.favorite.domain.ItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.exception.AlreadyPushItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.exception.NotPushItemFavorite;
 import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMapper;
-import com.jinddung2.givemeticon.domain.favorite.mapper.ItemFavoriteMetaMapper;
 import com.jinddung2.givemeticon.domain.favorite.service.ItemFavoriteService;
 import org.junit.jupiter.api.*;
 import org.mybatis.spring.SqlSessionFactoryBean;
@@ -68,8 +67,7 @@ class ItemFavoriteMySQLIntegrationTest {
 
         @Bean
         ItemFavoriteService itemFavoriteService(SqlSessionTemplate template) {
-            return new ItemFavoriteService(template.getMapper(ItemFavoriteMapper.class),
-                    template.getMapper(ItemFavoriteMetaMapper.class));
+            return new ItemFavoriteService(template.getMapper(ItemFavoriteMapper.class));
         }
     }
 
@@ -109,16 +107,16 @@ class ItemFavoriteMySQLIntegrationTest {
     }
 
     @Test
-    void add_incrementsCounter() {
+    void add_activatesFavorite() {
         service.insertFavorite(7, 1);
-        assertState(1, 1);
+        assertActive(1);
     }
 
     @Test
-    void cancel_decrementsCounter() {
+    void cancel_deactivatesFavorite() {
         service.insertFavorite(7, 1);
         service.cancelItemFavorite(7, 1);
-        assertState(0, 0);
+        assertActive(0);
     }
 
     @Test
@@ -126,16 +124,16 @@ class ItemFavoriteMySQLIntegrationTest {
         service.insertFavorite(7, 1);
         service.cancelItemFavorite(7, 1);
         service.insertFavorite(7, 1);
-        assertState(1, 1);
+        assertActive(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite", Integer.class)).isEqualTo(1);
     }
 
     @Test
-    void repeatedCancel_doesNotDecrementAgain() {
+    void repeatedCancel_staysInactive() {
         service.insertFavorite(7, 1);
         service.cancelItemFavorite(7, 1);
         service.cancelItemFavorite(7, 1);
-        assertState(0, 0);
+        assertActive(0);
     }
 
     @Test
@@ -152,39 +150,15 @@ class ItemFavoriteMySQLIntegrationTest {
         });
         assertThat(success.get()).isEqualTo(1);
         assertThat(duplicates.get()).isEqualTo(19);
-        assertState(1, 1);
+        assertActive(1);
     }
 
     @Test
-    void metaSqlFailureAfterInsert_rollsBackOriginal() {
-        jdbc.execute("CREATE TRIGGER fail_meta_update BEFORE UPDATE ON item_favorite_meta FOR EACH ROW "
-                + "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'injected meta failure'");
-        assertThatThrownBy(() -> service.insertFavorite(7, 1)).isInstanceOf(RuntimeException.class);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite", Integer.class)).isZero();
-        assertState(0, 0);
-    }
-
-    @Test
-    void missingMeta_zeroUpdatedRowsRollsBackInsert() {
-        jdbc.update("DELETE FROM item_favorite_meta");
-        assertThatThrownBy(() -> service.insertFavorite(7, 1)).isInstanceOf(IllegalStateException.class);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite", Integer.class)).isZero();
-    }
-
-    @Test
-    void invalidZeroCounter_cancelRollsBackOriginal() {
-        jdbc.update("INSERT INTO item_favorite(user_id,item_id,is_favorite) VALUES(7,1,TRUE)");
-        assertThatThrownBy(() -> service.cancelItemFavorite(7, 1)).isInstanceOf(IllegalStateException.class);
-        assertThat(activeCount()).isEqualTo(1);
-        assertThat(counter()).isZero();
-    }
-
-    @Test
-    void concurrentMembers_finalAggregateMatches() throws Exception {
+    void concurrentMembers_finalActiveCountMatches() throws Exception {
         concurrently(20, i -> service.insertFavorite(i + 1, 1));
-        assertState(20, 20);
+        assertActive(20);
         concurrently(20, i -> service.cancelItemFavorite(i + 1, 1));
-        assertState(0, 0);
+        assertActive(0);
     }
 
     @Test
@@ -201,7 +175,7 @@ class ItemFavoriteMySQLIntegrationTest {
                     catch (NotPushItemFavorite expected) { }
                 }
             });
-            assertThat(counter()).isEqualTo(activeCount()).isBetween(0, 1);
+            assertThat(activeCount()).isBetween(0, 1);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite", Integer.class)).isEqualTo(1);
         }
     }
@@ -212,13 +186,13 @@ class ItemFavoriteMySQLIntegrationTest {
         assertThatThrownBy(() -> jdbc.update(
                 "INSERT INTO item_favorite(user_id,item_id,is_favorite) VALUES(7,1,TRUE)"))
                 .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
-        assertState(1, 1);
+        assertActive(1);
     }
 
     @Test
     void absentFavoriteCancel_preservesExistingException() {
         assertThatThrownBy(() -> service.cancelItemFavorite(7, 1)).isInstanceOf(NotPushItemFavorite.class);
-        assertState(0, 0);
+        assertActive(0);
     }
 
     @Test
@@ -230,16 +204,6 @@ class ItemFavoriteMySQLIntegrationTest {
         });
         service.cancelItemFavorite(7, 1);
         assertThat(service.getMyFavorite(7)).isEmpty();
-    }
-
-    @Test
-    void metaSqlFailureAfterReactivation_rollsBackStateAndCounter() {
-        service.insertFavorite(7, 1);
-        service.cancelItemFavorite(7, 1);
-        jdbc.execute("CREATE TRIGGER fail_meta_update BEFORE UPDATE ON item_favorite_meta FOR EACH ROW "
-                + "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'injected meta failure'");
-        assertThatThrownBy(() -> service.insertFavorite(7, 1)).isInstanceOf(RuntimeException.class);
-        assertState(0, 0);
     }
 
     @Test
@@ -255,7 +219,7 @@ class ItemFavoriteMySQLIntegrationTest {
                         "scripts/maintenance/reconcile-item-favorite-count.sql"));
                 connection.commit();
             }
-            assertState(2, 2);
+            assertActive(2);
             assertThat(jdbc.queryForObject("SELECT like_count FROM item_favorite_meta WHERE item_id=2", Integer.class)).isZero();
             assertThat(jdbc.queryForObject("SELECT view_count FROM item_favorite_meta WHERE item_id=2", Integer.class)).isEqualTo(42);
         }
@@ -270,38 +234,15 @@ class ItemFavoriteMySQLIntegrationTest {
             }
         }).isInstanceOf(SQLException.class)
                 .satisfies(error -> assertThat(((SQLException) error).getErrorCode()).isEqualTo(3819));
-        assertState(0, 0);
-    }
-
-    @Test
-    void duplicateMetaRows_unexpectedAffectedCountRollsBackAllWrites() {
-        jdbc.update("INSERT INTO item_favorite_meta(item_id,like_count,view_count) VALUES(1,0,0)");
-        assertThatThrownBy(() -> service.insertFavorite(7, 1)).isInstanceOf(IllegalStateException.class);
-        assertThat(activeCount()).isZero();
-        assertThat(jdbc.queryForList("SELECT like_count FROM item_favorite_meta", Integer.class))
-                .containsExactly(0, 0);
-    }
-
-    @Test
-    void metaSqlFailureAfterCancel_rollsBackStateAndCounter() {
-        service.insertFavorite(7, 1);
-        jdbc.execute("CREATE TRIGGER fail_meta_update BEFORE UPDATE ON item_favorite_meta FOR EACH ROW "
-                + "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'injected meta failure'");
-        assertThatThrownBy(() -> service.cancelItemFavorite(7, 1)).isInstanceOf(RuntimeException.class);
-        assertState(1, 1);
+        assertActive(0);
     }
 
     private int activeCount() {
         return jdbc.queryForObject("SELECT COUNT(*) FROM item_favorite WHERE item_id=1 AND is_favorite=TRUE", Integer.class);
     }
 
-    private int counter() {
-        return jdbc.queryForObject("SELECT like_count FROM item_favorite_meta WHERE item_id=1", Integer.class);
-    }
-
-    private void assertState(int active, int count) {
+    private void assertActive(int active) {
         assertThat(activeCount()).isEqualTo(active);
-        assertThat(counter()).isEqualTo(count);
     }
 
     private interface Operation { void run(int index); }

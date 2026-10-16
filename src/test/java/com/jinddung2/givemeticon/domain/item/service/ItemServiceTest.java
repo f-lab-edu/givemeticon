@@ -51,6 +51,15 @@ class ItemServiceTest {
     }
 
     @Test
+    void saveUsesEntityIdRatherThanAffectedRowCount() {
+        Item item = ItemFixture.createItemFixture(100);
+        when(itemMapper.saveOrUpdate(item)).thenReturn(1);
+        when(itemMapper.findById(100)).thenReturn(Optional.of(item));
+        assertThat(sut.saveOrUpdate(item).getId()).isEqualTo(100);
+        verify(itemMapper, never()).findById(1);
+    }
+
+    @Test
     @DisplayName("호출용 아이템 도메인 조회에 성공한다.")
     void get_Item_Success() {
         Item item = ItemFixture.createItemFixture();
