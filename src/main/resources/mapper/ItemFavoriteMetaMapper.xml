@@ -20,26 +20,15 @@
         WHERE item_id = #{itemId}
     </update>
 
-    <select id="lockAggregation" resultType="java.lang.Integer">
-        SELECT id FROM item_favorite_aggregation_lock WHERE id = 1 FOR UPDATE NOWAIT
-    </select>
-
-    <!-- Plain consistent read: one snapshot, including items with no active favorites. -->
-    <select id="countActiveFavorites"
-            resultType="com.jinddung2.givemeticon.domain.favorite.domain.ItemFavoriteCount">
-        SELECT i.id AS item_id, COUNT(f.id) AS like_count
-        FROM item i
-        LEFT JOIN item_favorite f ON f.item_id = i.id AND f.is_favorite = TRUE
-        GROUP BY i.id
-        ORDER BY i.id
-    </select>
-
-    <insert id="replaceLikeCounts">
-        INSERT INTO item_favorite_meta (item_id, like_count, view_count)
-        VALUES
-        <foreach collection="counts" item="count" separator=",">
-            (#{count.itemId}, #{count.likeCount}, 0)
-        </foreach>
-        ON DUPLICATE KEY UPDATE like_count = VALUES(like_count)
-    </insert>
+    <update id="increaseLikeCount">
+        UPDATE item_favorite_meta
+        SET like_count = like_count + 1
+        WHERE item_id = #{itemId}
+    </update>
+    <update id="decreaseLikeCount">
+        UPDATE item_favorite_meta
+        SET like_count = like_count - 1
+        WHERE item_id = #{itemId}
+          AND like_count &gt; 0
+    </update>
 </mapper>

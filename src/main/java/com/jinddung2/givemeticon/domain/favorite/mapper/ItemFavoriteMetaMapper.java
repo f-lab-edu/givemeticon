@@ -12,10 +12,8 @@ public interface ItemFavoriteMetaMapper {
 
     void increaseViewCount(@Param("itemId") int itemId);
 
-    Integer lockAggregation();
+    int increaseLikeCount(@Param("itemId") int itemId);
 
-    List<ItemFavoriteCount> countActiveFavorites();
-
-    void replaceLikeCounts(@Param("counts") List<ItemFavoriteCount> counts);
+    int decreaseLikeCount(@Param("itemId") int itemId);
 
 }
