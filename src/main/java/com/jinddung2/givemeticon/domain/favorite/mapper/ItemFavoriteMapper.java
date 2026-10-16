@@ -10,12 +10,14 @@ import java.util.Optional;
 @Mapper
 public interface ItemFavoriteMapper {
 
-    void save(ItemFavorite itemFavorite);
+    Integer lockItem(@Param("itemId") int itemId);
+
+    int save(ItemFavorite itemFavorite);
 
     Optional<ItemFavorite> findByIdByUserIDAndItemId(@Param("userId") int userId,
                                                      @Param("itemId") int itemId);
 
     List<ItemFavorite> findFavoritesByUserId(int userId);
 
-    void update(ItemFavorite itemFavorite);
+    int update(ItemFavorite itemFavorite);
 }

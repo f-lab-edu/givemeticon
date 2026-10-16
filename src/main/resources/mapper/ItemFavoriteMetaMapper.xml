@@ -25,4 +25,10 @@
         SET like_count = like_count + 1
         WHERE item_id = #{itemId}
     </update>
+    <update id="decreaseLikeCount">
+        UPDATE item_favorite_meta
+        SET like_count = like_count - 1
+        WHERE item_id = #{itemId}
+          AND like_count &gt; 0
+    </update>
 </mapper>
