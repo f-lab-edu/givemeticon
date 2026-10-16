@@ -8,6 +8,7 @@ import com.jinddung2.givemeticon.domain.item.domain.Item;
 import com.jinddung2.givemeticon.domain.item.service.ItemService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +18,7 @@ public class ItemWriteFacade {
     private final BrandService brandService;
     private final ItemFavoriteMetaMapper itemFavoriteMetaMapper;
 
+    @Transactional
     public ItemDto createItem(int brandId, ItemCreateRequest request) {
         brandService.getBrand(brandId);
         Item item = request.toEntity();

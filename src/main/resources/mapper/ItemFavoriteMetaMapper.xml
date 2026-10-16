@@ -20,9 +20,18 @@
         WHERE item_id = #{itemId}
     </update>
 
-    <select id="lockAggregation" resultType="java.lang.Integer">
-        SELECT id FROM item_favorite_aggregation_lock WHERE id = 1 FOR UPDATE NOWAIT
+    <select id="lockAggregation"
+            resultType="com.jinddung2.givemeticon.domain.favorite.domain.ItemFavoriteAggregationState">
+        SELECT last_success_at, UTC_TIMESTAMP(6) AS database_now
+        FROM item_favorite_aggregation_lock WHERE id = 1 FOR UPDATE NOWAIT
     </select>
+
+    <update id="recordAggregationSuccess">
+        UPDATE item_favorite_aggregation_lock
+        SET last_snapshot_at = #{snapshotAt}, last_success_at = UTC_TIMESTAMP(6),
+            last_item_count = #{itemCount}
+        WHERE id = 1
+    </update>
 
     <!-- Plain consistent read: one snapshot, including items with no active favorites. -->
     <select id="countActiveFavorites"

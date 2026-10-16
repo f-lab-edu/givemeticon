@@ -8,6 +8,11 @@ spring:
   application:
     name: givemeticon
 
+  task:
+    scheduling:
+      pool:
+        size: 2
+
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
