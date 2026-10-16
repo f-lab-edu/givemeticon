@@ -1,6 +1,6 @@
 # CLI 작업 인계 규칙
 
-순서: **Architect → Builder → Verifier → Architect**. FAIL은 Builder 수정 후 Verifier 재검증, 설계 변경은 Architect로 돌아간다.
+순서: **Architect → Builder → Verifier → Architect**. FAIL은 Architect가 원인을 분석하고 Builder에 수정을 지시한 뒤 Verifier가 재검증한다. 최초 구현 외 자동 재작업은 최대 3회다. PASS 후 Architect가 같은 SHA를 최종 승인한 경우에만 PR을 생성하고 병합하지 않는다. 자동 실행은 [ORCHESTRATION.md](ORCHESTRATION.md)를 따른다.
 
 서로 다른 CLI는 대화 기록을 자동 공유하지 않는다. 각 역할은 아래 형식으로 `docs/tasks/handoffs/<작업키>-<역할>.md`에 인계를 저장하고 마지막 응답에 파일 경로와 다음 담당자용 프롬프트를 남긴다. 다음 CLI는 사용자 또는 별도 실행기가 시작한다. 문서에 ‘전달’이라고 쓴 것만으로 다른 프로세스에 메시지가 보내지지는 않는다.
 

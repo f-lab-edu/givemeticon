@@ -1,0 +1,34 @@
+{
+  "defaultBranch": "develop",
+  "sessionPrefix": "coupon",
+  "worker": {
+    "agent": "codex",
+    "agentConfig": {
+      "model": "gpt-6.1-sol",
+      "effort": "medium",
+      "permissions": "default"
+    }
+  },
+  "orchestrator": {
+    "agent": "codex",
+    "agentConfig": {
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "permissions": "default"
+    }
+  },
+  "reviewers": [
+    {
+      "harness": "claude-code",
+      "agentConfig": { "model": "claude-sonnet-5-5" }
+    }
+  ],
+  "agentConfig": { "permissions": "default" },
+  "agentRulesFile": "AGENTS.md",
+  "agentRules": "Follow agents/ORCHESTRATION.md. Never edit develop, push develop, merge a PR, enable auto-merge, change credentials, or change global configuration. Only Builder implements and commits. FAIL returns to Architect for diagnosis before Builder. At most three reworks. Only the workflow controller publishes after Verifier PASS and Architect approval for the same SHA. Do not act on automatic CI/review feedback outside this controlled sequence.",
+  "orchestratorRules": "Follow agents/ARCHITECT.md and agents/ORCHESTRATION.md. Model must be gpt-6-astra with high reasoning. Architect designs, distributes work, diagnoses failures, and gives final approval. No production code edits. No model substitution, direct develop changes, or PR merge. Use the local workflow controller for bounded sequential execution.",
+  "autoReview": false,
+  "workersRequestReview": false,
+  "trackerIntake": { "enabled": false },
+  "containerReap": { "disabled": true }
+}

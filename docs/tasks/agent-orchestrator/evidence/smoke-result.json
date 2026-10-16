@@ -1,0 +1,20 @@
+{
+  "status": "APPROVED",
+  "sha": "SMOKE",
+  "reworks": 0,
+  "builder": {
+    "status": "READY",
+    "sha": "SMOKE",
+    "summary": "WORKFLOW_SMOKE"
+  },
+  "verifier": {
+    "status": "PASS",
+    "sha": "SMOKE",
+    "summary": "WORKFLOW_SMOKE"
+  },
+  "architect": {
+    "status": "APPROVED",
+    "sha": "SMOKE",
+    "summary": "WORKFLOW_SMOKE"
+  }
+}

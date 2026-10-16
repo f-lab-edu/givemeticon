@@ -1,0 +1,14 @@
+{
+  "session": "standalone-4",
+  "model": "gpt-6-astra",
+  "settings": {
+    "model": "gpt-6-astra",
+    "reasoningEffort": "high",
+    "approvalMode": "default"
+  },
+  "result": {
+    "status": "APPROVED",
+    "sha": "SMOKE",
+    "summary": "WORKFLOW_SMOKE"
+  }
+}

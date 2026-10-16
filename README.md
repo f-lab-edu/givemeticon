@@ -1,5 +1,7 @@
 # 🎁 givemeticon
 
+Codex / Claude Code의 Agent Orchestrator 설치·실행 방법은 [멀티 에이전트 워크플로](docs/tasks/agent-orchestrator/README.md)를 참고한다. 역할 순서·재작업 상한·검증 조건은 [실행 계약](agents/ORCHESTRATION.md)에 정의한다.
+
 새로운 소비 트렌드를 반영하여 낭비를 최소화하는 **기프티콘 전문 중고거래 플랫폼**으로, 사용하지 않거나 만료가 임박한 기프티콘을 판매하고 저렴한 가격으로 구매할 수 있는 환경을 제공하는 서비스 플랫폼
 
 ## 🔧 사용 및 기술환경

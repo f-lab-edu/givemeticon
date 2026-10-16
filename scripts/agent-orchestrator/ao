@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+LOCAL="$ROOT/.agent-orchestrator/local"
+RESOURCES="$LOCAL/app/Agent Orchestrator.app/Contents/Resources"
+# Keep binaries, DB, handshake, and worktrees out of global configuration.
+export AO_DATA_DIR="$LOCAL/data" AO_RUN_FILE="$LOCAL/running.json" AO_PORT=3147
+export AO_TRACKER_INTAKE=off
+# Subscription authentication only; never silently select API billing or a gateway.
+unset OPENAI_API_KEY CODEX_API_KEY OPENAI_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+unset ANTHROPIC_BASE_URL CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY
+export PATH="$RESOURCES/daemon:$RESOURCES/tmux/bin:$PATH"
+if [ ! -x "$RESOURCES/daemon/ao" ]; then
+  echo 'Run: bash scripts/agent-orchestrator/install.sh' >&2
+  exit 1
+fi
+exec "$RESOURCES/daemon/ao" "$@"
