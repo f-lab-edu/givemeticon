@@ -1,0 +1,6 @@
+{
+  "tests": 18,
+  "failures": 1,
+  "reason": "CHECK correctly rejected NULL with MySQL error 3819, translated as UncategorizedSQLException rather than the test-expected DataIntegrityViolationException. No production change required.",
+  "failed_method": "databaseKeyConstraint_rejectsNullLogicalKey"
+}
