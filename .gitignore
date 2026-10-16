@@ -49,3 +49,6 @@ out/
 __pycache__/
 *.py[cod]
 /scripts/verifier-isolated/results/
+
+### project-local Agent Orchestrator installation, state, and credentials ###
+/.agent-orchestrator/local/

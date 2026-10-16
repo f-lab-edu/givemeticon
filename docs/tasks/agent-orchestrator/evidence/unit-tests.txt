@@ -1,0 +1,27 @@
+design: session-1 / gpt-6-astra
+design: session-1 / gpt-6-astra
+test_architect_final_failure_is_bounded (test_workflow.WorkflowTests) ... ok
+test_develop_and_dirty_worktrees_cannot_publish (test_workflow.WorkflowTests) ... ok
+test_effort_mismatch_rejected (test_workflow.WorkflowTests) ... ok
+test_evidence_is_present_current_and_confined (test_workflow.WorkflowTests) ... ok
+test_exact_models_and_efforts (test_workflow.WorkflowTests) ... ok
+test_failure_requires_architect_diagnosis (test_workflow.WorkflowTests) ... ok
+test_four_failures_stop_after_three_reworks (test_workflow.WorkflowTests) ... ok
+test_incomplete_does_not_retry_or_approve (test_workflow.WorkflowTests) ... ok
+test_missing_evidence_rejected (test_workflow.WorkflowTests) ... ok
+test_model_failure_does_not_start_another_role (test_workflow.WorkflowTests) ... ok
+test_no_architect_approval_no_publication (test_workflow.WorkflowTests) ... ok
+test_non_smoke_pass_requires_matching_architect_sha (test_workflow.WorkflowTests) ... ok
+test_pass_order (test_workflow.WorkflowTests) ... ok
+test_pending_approval_stops_instead_of_auto_approving (test_workflow.WorkflowTests) ... ok
+test_reroute_rejected_even_when_selection_matches (test_workflow.WorkflowTests) ... ok
+test_same_sha_is_not_a_rework (test_workflow.WorkflowTests) ... ok
+test_skipped_required_check_rejected (test_workflow.WorkflowTests) ... ok
+test_stale_sha_rejected (test_workflow.WorkflowTests) ... ok
+test_timeout_stops_instead_of_retrying_send (test_workflow.WorkflowTests) ... ok
+test_unapproved_result_never_pushes_or_opens_pr (test_workflow.WorkflowTests) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.042s
+
+OK
