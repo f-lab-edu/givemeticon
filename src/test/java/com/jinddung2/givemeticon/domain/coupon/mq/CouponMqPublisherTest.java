@@ -639,7 +639,6 @@ class CouponMqPublisherTest {
             }
         };
         var owner=new CouponMqPublisher(template,factory,Duration.ZERO,Duration.ofSeconds(1),Duration.ofMillis(50),controlled,scope.cleaners,scope.slots);
-        capture();
         doAnswer(inv->{CorrelationData c=inv.getArgument(5);sent.add(c);
             c.getFuture().complete(new CorrelationData.Confirm(true,null));return null;
         }).when(template).doSend(any(com.rabbitmq.client.Channel.class),anyString(),anyString(),any(Message.class),eq(true),any(CorrelationData.class));
