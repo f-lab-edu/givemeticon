@@ -661,7 +661,7 @@ class CouponMqPublisherTest {
             assertEquals(ACCEPTED,retry.status());assertEquals(rejected.attemptId(),retry.attemptId());
             assertNotEquals(rejected.correlationId(),retry.correlationId());
             idle(owner);until(()->owner.pendingCount()==0);
-            assertEquals(100,scope.slots.availablePermits());assertEquals(2,sent.size());
+            until(()->scope.slots.availablePermits()==100);assertEquals(100,scope.slots.availablePermits());assertEquals(2,sent.size());
             assertFalse(sent.get(0).getFuture().complete(new CorrelationData.Confirm(true,null)));
             assertEquals(100,scope.slots.availablePermits());
             verify(template,times(2)).execute(any(org.springframework.amqp.rabbit.core.ChannelCallback.class));
