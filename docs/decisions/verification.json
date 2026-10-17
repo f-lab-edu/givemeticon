@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "relative_links_checked": 107,
+  "repo_sources_checked": 43,
+  "local_sources_checked": 19,
+  "issue_rows": 77,
+  "prs": 107,
+  "commit_metadata_rows": 446,
+  "business_source_changes": 0,
+  "checks": "links, fences, whitespace, JSON counts, source/prefix hashes, commit metadata hash, source diff, original HEAD/tracked changes",
+  "errors": [],
+  "business_tests_run": false,
+  "agents_started": false,
+  "remote_writes": false,
+  "local_git_sources_checked": 3,
+  "code_sha": "3d070719bb3270e767b98423ee11a69f0e5426ff"
+}

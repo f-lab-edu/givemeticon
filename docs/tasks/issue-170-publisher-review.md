@@ -56,12 +56,10 @@ Boot 관리 최소 `spring-rabbit` 한 의존성만 추가했다. 실제 depende
 
 구현 중 기본 test279건/실패0·새 MQ30건(Protocol17/Publisher13, 프로세스 한도 회귀 추가 전)을 확인했고 strict time 수정 후 Protocol17도 통과했다. 최종 정확 SHA에서 기본 회귀 실행 결과·커밋별 SHA·로그/보고서 hash는 원본 프로젝트의 별도 Builder 인계에 남긴다. 이전 tree 결과를 최종 SHA 결과로 가장하지 않는다. 전체 suite를 이유 없이 반복하지 않는다.
 
-## 남은 단계·PR 초안
+## 검증 범위 밖
 
 이번은 #170 핵심 unit slice다. 공개 v2/API 인증·HTTP 매핑·control/readiness 트랜잭션·consumer 가용성/topology·실제 broker/MySQL·장애/부하·동조건 성능·독립 Verifier 결과는 남는다. callback memory/unknown lifecycle을 실제 Spring transport와 고정 runtime에서 다시 확인해야 한다. #170을 닫지 않는다. #177 실행/보존 gate나 V1/stock/Kafka/락을 변경하지 않는다.
 
-PR 제목 초안: `feat: implement coupon MQ canonical protocol and bounded publisher core`.
-본문 초안: #167에서 승인한 vector4개와 wire 검증을 구현하고 persistent/mandatory/correlated-confirm 결과 분류·미확정100건 한계를 추가합니다. timeout/late callback은 최초 결과를 바꾸지 않으며 미확정 slot을 유지합니다. 기본 publisher bean은 비활성이며 공개 API/readiness/DB/consumer는 연결하지 않습니다. JDK17 단위·기본 회귀와 실제 dependency resolution을 기록했으며 실제 broker/장애/성능 PASS가 아닙니다. Verifier 결과 후 Architect가 정확 SHA와 원격 처리 범위를 판단합니다.
 
 ## r2 FAIL 수정·검증
 
@@ -71,8 +69,6 @@ PR 제목 초안: `feat: implement coupon MQ canonical protocol and bounded publ
 
 수정 전 재현은 기본 health·송신 전 분류·close 재시도 3건의 assertion FAIL이다. health true override는 PASS다. 최종 JDK17 기본 test 결과와 정확 SHA는 Builder r2 인계에 기록한다. protocol/vector/의존성은 불변이므로 해시/registry/dependency/이전 변이는 별도 반복하지 않았다. 앞선 r1 결과는 그 SHA의 근거로만 참조한다. 현재 core는 비활성이며 동기 transport의 전체 시간·실제 지연 close/잔여 callback memory·broker 내구성·API/readiness/DB 통합은 여전히 미검증이다.
 
-r2 PR 제목 초안: `fix: preserve V1 health and classify coupon publisher send failures`.
-본문 초안: 기본 Rabbit health를 비활성화하고 실제 패키징 설정 회귀를 추가합니다. 실제 RabbitTemplate action 진입 전 실패만 NOT_SENT로 슬롯을 반환하며, 발행 후 불확실 결과는 CHECKING으로 유지합니다. 전용 transport 종료 실패 뒤 명시 재정리와 capacity 로그를 보완합니다. 이번은 #170 비활성 core 수정이며 독립 Verifier 결과와 실제 runtime 검증 전 이슈를 닫지 않습니다.
 
 ## r3 — MAJOR-3 합성 nack 분류
 

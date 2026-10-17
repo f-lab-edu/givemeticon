@@ -1,17 +1,15 @@
 # Codex / Claude Code 멀티 에이전트 실행
 
-설치·설정 위치: `/private/tmp/givemeticon-agent-orchestrator` worktree, `chore/agent-orchestrator-workflow` 브랜치.
-루트 저장소의 develop 체크아웃과 기존 미추적 파일은 그대로 보존했다. 이 브랜치가 반영된 다른 체크아웃에서도 아래 명령을 사용할 수 있다. 설정에는 절대 경로나 계정 자격 증명을 커밋하지 않는다.
+프로젝트의 격리된 작업 checkout 루트에서 실행한다. 설정에는 절대 경로나 계정 자격 증명을 커밋하지 않는다.
 
 ## 설치 및 시작
 
 ```sh
-cd /private/tmp/givemeticon-agent-orchestrator
 sh scripts/agent-orchestrator/install.sh
 sh scripts/agent-orchestrator/ao daemon
 ```
 
-첫 명령은 이미 완료했다. 설치 스크립트는 공식 macOS arm64 v0.14.2 ZIP의 SHA-256을 확인한다. npm / Homebrew 전역 설치, 전역 PATH 변경, 관리자 권한은 사용하지 않는다. 데몬은 foreground에서 실행되며 다른 터미널에서 명령을 수행한다. `~/.ao` 대신 이 checkout의 `.agent-orchestrator/local/`을 사용한다. 포트는 `127.0.0.1:3147`이다.
+설치 스크립트는 공식 macOS arm64 v0.14.2 ZIP의 SHA-256을 확인한다. npm / Homebrew 전역 설치, 전역 PATH 변경, 관리자 권한은 사용하지 않는다. 데몬은 foreground에서 실행되며 다른 터미널에서 명령을 수행한다. `~/.ao` 대신 이 checkout의 `.agent-orchestrator/local/`을 사용한다. 포트는 `127.0.0.1:3147`이다.
 
 ```sh
 sh scripts/agent-orchestrator/ao status --json
@@ -35,7 +33,7 @@ sh scripts/agent-orchestrator/ao stop
 
 ## 프로젝트 설정
 
-공식 최신 설정은 SQLite와 typed API를 사용한다. `.agent-orchestrator/project.json`이 재현 가능한 설정 원본이다. 최초 등록은 GitHub 연결 승인을 받은 후 아래 명령으로 한다. 이번 작업트리는 이미 등록했다.
+공식 최신 설정은 SQLite와 typed API를 사용한다. `.agent-orchestrator/project.json`이 재현 가능한 설정 원본이다. 최초 등록은 GitHub 연결 승인을 받은 후 아래 명령으로 한다. 프로젝트 등록 상태는 해당 checkout의 daemon에서 확인한다.
 
 ```sh
 python3 scripts/agent-orchestrator/workflow.py register \
@@ -46,7 +44,7 @@ python3 scripts/agent-orchestrator/workflow.py register \
 
 ## 실제 개발 작업
 
-이번 설치 작업에서는 쿠폰 비즈니스 코드를 수정하지 않는다. `run`은 이후 별도로 승인한 선착순 쿠폰 이슈 전용이며 필수 검증 6개를 모두 요구한다. 도구 자체 점검은 `smoke`와 단위 테스트로 수행한다. task 파일에는 실제 Issue URL 또는 번호, 목표·비목표·수용 기준·허용 파일/명령·테스트 자원·사전 승인 범위를 적는다.
+`run`은 이후 별도로 승인한 선착순 쿠폰 이슈 전용이며 필수 검증 6개를 모두 요구한다. 도구 자체 점검은 `smoke`와 단위 테스트로 수행한다. task 파일에는 실제 Issue URL 또는 번호, 목표·비목표·수용 기준·허용 파일/명령·테스트 자원·사전 승인 범위를 적는다.
 
 ```sh
 python3 scripts/agent-orchestrator/workflow.py run \
@@ -71,7 +69,7 @@ sh scripts/agent-orchestrator/ao session ls
 sh scripts/agent-orchestrator/ao session get <session-id>
 ```
 
-역할 controller는 종료 시 `exit-agent`로 멈춘다. 작업트리·커밋·기록은 삭제하지 않는다. 장기 사용 시 증거를 보존한 뒤 사람이 AO 정리 기능을 실행한다. Docker 자원 자동 정리는 프로젝트에서 껐으며, 별도 승인한 테스트 자원만 정리한다.
+역할 controller는 종료 시 `exit-agent`로 멈춘다. 작업트리·커밋·기록은 삭제하지 않는다. 런타임 응답·대화·인계는 임시 상태이며 영구 문서로 복사하거나 커밋하지 않는다. 장기 사용 시 실제 검증 증거를 보존한 뒤 사람이 AO 정리 기능을 실행한다. Docker 자원 자동 정리는 프로젝트에서 껐으며, 별도 승인한 테스트 자원만 정리한다.
 
 쿠폰 검증 항목과 기존 Docker/k6 진입점은 [실행 계약](../../../agents/ORCHESTRATION.md), 설치·실측 결과는 [검증 보고서](review.md)를 참고한다.
 

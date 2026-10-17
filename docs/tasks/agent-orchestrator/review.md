@@ -4,8 +4,6 @@
 
 macOS arm64 환경에 공식 Agent Orchestrator를 프로젝트 내부 설치하고 Codex / Claude Code의 구독 인증으로 역할별 모델과 순차 인계를 검증했다. 쿠폰 비즈니스 코드, 테스트, DB schema / transaction / lock / event 구조는 변경하지 않았다. 따라서 새 ADR은 없다.
 
-작업 위치는 `/private/tmp/givemeticon-agent-orchestrator`, 브랜치는 `chore/agent-orchestrator-workflow`다. 시작 기준은 `1ba7c24f8d20df7bf46f4df099143dd5b450fc84`였다. 다른 프로세스가 루트 체크아웃을 develop으로 바꾸고 `df8ba13044fd66879a70b7c39af080e5f74331ff`로 fast-forward한 것을 확인해, 그 상태를 보존하고 설정 변경만 별도 worktree로 이동했다. 이 작업 브랜치도 같은 base로 fast-forward했다. 기존 루트 미추적 파일은 이동·편집·커밋하지 않았다.
-
 ## 설치 실측
 
 | 항목 | 결과 |
@@ -50,7 +48,7 @@ macOS arm64 환경에 공식 Agent Orchestrator를 프로젝트 내부 설치하
 - Verifier evidence는 해당 stage directory에 대한 bare filename임을 명확히 했다. 기존 develop에서도 무시되는 `build/` 아래에 증거를 저장한다.
 - 기존 app directory가 있어도 checksum을 확인한 pinned ZIP을 다시 추출한다. 잘못된 ZIP은 덮어쓰거나 신뢰하지 않고 실패시킨다.
 - `KeyboardInterrupt`도 INCOMPLETE 증거를 남긴다.
-- 명령 단위 독립 재검토와 최종 Architect 승인은 커밋된 구현을 대상으로 수행하고 `.agent-orchestrator/local/`의 최종 인계에 대상 SHA와 실제 결과를 남긴다.
+- 명령 단위 재검토 전의 정적 검토는 INCOMPLETE이며, 실제 실행한 검사와 구분한다.
 
 선택형 검증 세트를 추가하라는 제안은 적용하지 않았다. 이 프로젝트의 `run`은 쿠폰 이슈 전용이며 사용자가 요구한 6개 검증을 모두 요구한다. 다른 도메인용 범용 검증 설정을 도입할 필요가 없다. 도구 자체 검증은 별도 `smoke`와 단위 테스트 경로를 사용한다.
 
@@ -58,4 +56,4 @@ macOS arm64 환경에 공식 Agent Orchestrator를 프로젝트 내부 설치하
 
 모델 인계와 제어 경로를 확인했지만 실제 쿠폰 이슈의 구현·커밋·6개 검증·원격 publish 전체를 이번에 실행한 것은 아니다. 모델/역할 지침은 OS 강제 격리를 대체하지 않는다. Controller는 권한 요청을 자동 승인하지 않으며, 중단 후 복구 판단은 Architect가 한다. 서비스 부하·복구 안전성은 다음 쿠폰 이슈의 지정 환경에서 검증해야 한다.
 
-PR merge / auto-merge 명령은 없다. GitHub push/PR 생성은 별도 사전 승인된 실행의 `--publish-approved`에만 연결한다. 후기 상태와 정확 구현 SHA·다음 담당자 프롬프트는 최종 인계에 기록한다.
+PR merge / auto-merge 명령은 없다. GitHub push/PR 생성은 별도 사전 승인된 실행의 `--publish-approved`에만 연결한다. 인계 payload는 임시 런타임 상태로만 전달한다.
