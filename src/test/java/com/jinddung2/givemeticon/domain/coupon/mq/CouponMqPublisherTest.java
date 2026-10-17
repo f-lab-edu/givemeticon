@@ -103,7 +103,7 @@ class CouponMqPublisherTest {
         capture();var first=publisher.publish(body(),7,91,"exchange","key");var second=publisher.publish(body(),7,91,"exchange","key");
         assertEquals(first.attemptId(),second.attemptId());assertNotEquals(first.correlationId(),second.correlationId());
         returned.get().returnedMessage(returnFor(sent.get(0)));assertEquals(2,publisher.pendingCount());
-        sent.get(1).getFuture().complete(new CorrelationData.Confirm(true,null));assertEquals(1,publisher.pendingCount());
+        sent.get(1).getFuture().complete(new CorrelationData.Confirm(true,null));until(()->publisher.pendingCount()==1);assertEquals(1,publisher.pendingCount());
         sent.get(0).setReturned(returnFor(sent.get(0)));sent.get(0).getFuture().complete(new CorrelationData.Confirm(true,null));idle(publisher);until(()->publisher.pendingCount()==0);assertEquals(0,publisher.pendingCount());
         returned.get().returnedMessage(returnFor(sent.get(0)));idle(publisher);until(()->publisher.pendingCount()==0);assertEquals(0,publisher.pendingCount());
         assertEquals(CHECKING,first.status());assertEquals(CHECKING,second.status());
