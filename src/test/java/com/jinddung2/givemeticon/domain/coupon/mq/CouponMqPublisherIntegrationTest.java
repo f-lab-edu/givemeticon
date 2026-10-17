@@ -44,6 +44,15 @@ class CouponMqPublisherIntegrationTest {
     private static final int RELAY_PORT = 25673;
     private static final String HOST = "127.0.0.1";
     private final List<Owner> owners = new ArrayList<>();
+    private final List<Relay> relays = new ArrayList<>();
+    private final Object registration = new Object();
+    private final List<Thread> fixtureWorkers = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private volatile boolean stopRequested;
+    private volatile boolean requiresProcessExit;
+    private volatile String phaseFailure;
+    private String caseOutcome;
+    private final List<String> transportFailures = new ArrayList<>();
+    private Connection observerConnection;
     private final List<Long> deliveries = new ArrayList<>();
     private final List<String> witnessed = new ArrayList<>();
     private Path evidence;
@@ -72,13 +81,17 @@ class CouponMqPublisherIntegrationTest {
         publisherLog.setLevel(ch.qos.logback.classic.Level.INFO);
         springLog.setLevel(ch.qos.logback.classic.Level.OFF);
         clientLog.setLevel(ch.qos.logback.classic.Level.OFF);
+        String outcome = null;
         try {
             executeSlice();
-        } catch (Exception failure) {
-            fail("fixture failed (" + failure.getClass().getSimpleName() + "); runtime INCOMPLETE; no automatic rerun");
+        } catch (Throwable failure) {
+            outcome = caseOutcome == null ? "primary=" + classified("setup", failure) : caseOutcome;
         } finally {
             try {
                 if (evidence != null) for (String event : events) note(event);
+            } catch (Throwable failure) {
+                outcome = (outcome == null ? "primary=none" : outcome)
+                        + " cleanup=" + classified("event-export", failure);
             } finally {
                 publisherLog.detachAppender(appender);
                 appender.stop();
@@ -87,6 +100,7 @@ class CouponMqPublisherIntegrationTest {
                 clientLog.setLevel(clientLevel);
             }
         }
+        if (outcome != null) fail(outcome + "; runtime INCOMPLETE; no automatic rerun");
     }
 
     private void executeSlice() throws Exception {
@@ -111,8 +125,12 @@ class CouponMqPublisherIntegrationTest {
         assertEquals("5.17.1", ConnectionFactory.class.getPackage().getImplementationVersion());
         note("versions spring-rabbit=3.0.8 spring-amqp=3.0.8 amqp-client=5.17.1 spring-core="
                 + org.springframework.core.SpringVersion.getVersion());
-        try (Connection connection = raw(BROKER_PORT).newConnection("coupon-it-observer-" + run);
-             Channel channel = connection.createChannel()) {
+        String primary = null;
+        List<String> cleanupFailures;
+        try {
+            observerConnection = raw(BROKER_PORT).newConnection("coupon-it-observer-" + run);
+            Channel channel = observerConnection.createChannel();
+            Connection connection = observerConnection;
             assertEquals("4.3.0", connection.getServerProperties().get("version").toString());
             observer = channel;
             channel.exchangeDeclare(exchange, "direct", true);
@@ -122,30 +140,52 @@ class CouponMqPublisherIntegrationTest {
             assertEquals(0, channel.queueDeclarePassive(queue).getMessageCount());
             note("P0 topology=durable-direct/quorum/SAC heartbeat=" + connection.getHeartbeat()
                     + " channel_max=" + connection.getChannelMax() + " frame_max=" + connection.getFrameMax());
-            try {
-                phase("P1", this::routed);
-                phase("P2", this::returned);
-                phase("P3", this::lateConfirm);
-                phase("P4", this::connectionLoss);
-                phase("P5", this::preSendFailure);
-                assertEquals(9, invocations);
-            } finally {
-                // Inventory before acknowledging, including unexpected ready messages on failures.
-                GetResponse extra;
-                boolean unmatched = false;
-                while ((extra = channel.basicGet(queue, false)) != null) {
-                    unmatched = true;
-                    deliveries.add(extra.getEnvelope().getDeliveryTag());
-                    note("UNMATCHED correlation=" + extra.getProps().getCorrelationId()
-                            + " body_sha256=" + CouponMqProtocol.sha256(extra.getBody()));
-                    if (deliveries.size() > 12) fail("fixture inventory exceeded publish bound");
-                }
-                note("inventory witnessed=" + witnessed + " unacked=" + deliveries.size());
-                for (Owner owner : owners) owner.close();
-                for (long delivery : deliveries) channel.basicAck(delivery, false);
-                assertFalse(unmatched, "unmatched fixture messages; retain evidence and stop");
+            phase("P1", this::routed);
+            phase("P2", this::returned);
+            phase("P3", this::lateConfirm);
+            phase("P4", this::connectionLoss);
+            phase("P5", this::preSendFailure);
+            assertEquals(9, invocations);
+        } catch (Throwable failure) {
+            primary = phaseFailure == null ? classified("case", failure) : phaseFailure;
+        } finally {
+            List<org.junit.jupiter.api.function.Executable> cleanup = new ArrayList<>();
+            synchronized (registration) {
+                for (Owner owner : owners) cleanup.add(owner::close);
+                for (Relay relay : relays) cleanup.add(relay::close);
             }
+            cleanupFailures = finishFixture(this::inventory, cleanup, () -> {
+                for (long delivery : deliveries) observer.basicAck(delivery, false);
+            });
+            // Abort is transport-only, including when a phase could not be joined. Never
+            // resume normal shared-channel work in that case; controller must confirm JVM exit.
+            if (observerConnection != null)
+                attemptCleanup("observer-abort", () -> observerConnection.abort(1000), cleanupFailures);
+            if (requiresProcessExit || !workersStopped())
+                cleanupFailures.add("INCOMPLETE:controller-confirmed JVM exit required");
         }
+        String outcome = failureSummary(primary, cleanupFailures);
+        try { note(outcome); }
+        catch (IOException failure) { cleanupFailures.add(classified("outcome-evidence", failure)); }
+        if (primary != null || !cleanupFailures.isEmpty()) {
+            caseOutcome = failureSummary(primary, cleanupFailures);
+            fail(caseOutcome);
+        }
+    }
+
+    private void inventory() throws Exception {
+        if (observer == null) return;
+        GetResponse extra;
+        boolean unmatched = false;
+        while ((extra = observer.basicGet(queue, false)) != null) {
+            unmatched = true;
+            deliveries.add(extra.getEnvelope().getDeliveryTag());
+            note("UNMATCHED correlation=" + extra.getProps().getCorrelationId()
+                    + " body_sha256=" + CouponMqProtocol.sha256(extra.getBody()));
+            if (deliveries.size() > 12) fail("fixture inventory exceeded publish bound");
+        }
+        note("inventory witnessed=" + witnessed + " unacked=" + deliveries.size());
+        assertFalse(unmatched, "unmatched fixture messages; retain evidence and stop");
     }
 
     private void routed() throws Exception {
@@ -178,7 +218,7 @@ class CouponMqPublisherIntegrationTest {
     }
 
     private void lateConfirm() throws Exception {
-        try (Relay relay = new Relay()) {
+        try (Relay relay = relay()) {
             Owner owner = owner(RELAY_PORT);
             int baseline = owner.slots().availablePermits();
             warm(owner, baseline);
@@ -205,7 +245,7 @@ class CouponMqPublisherIntegrationTest {
     }
 
     private void connectionLoss() throws Exception {
-        try (Relay relay = new Relay()) {
+        try (Relay relay = relay()) {
             Owner owner = owner(RELAY_PORT);
             int baseline = owner.slots().availablePermits();
             warm(owner, baseline);
@@ -314,6 +354,7 @@ class CouponMqPublisherIntegrationTest {
     }
 
     private CouponMqPublisher.Result publish(Owner owner, String key) throws Exception {
+        assertFalse(stopRequested, "watchdog stopped subsequent publishes");
         assertTrue(++invocations <= 12, "publish invocation budget exceeded");
         var result = owner.publisher.publish(body, 7, 91, exchange, key);
         note("caller correlation=" + result.correlationId() + " status=" + result.status() + " reason=" + result.reason());
@@ -321,9 +362,18 @@ class CouponMqPublisherIntegrationTest {
     }
 
     private Owner owner(int port) throws Exception {
-        Owner owner = new Owner(port);
-        owners.add(owner);
-        return owner;
+        assertFalse(stopRequested, "watchdog stopped owner creation");
+        return new Owner(port);
+    }
+
+    private Relay relay() throws IOException {
+        Relay relay = new Relay(); // Unbound; register before any transport activity.
+        synchronized (registration) {
+            assertFalse(stopRequested, "watchdog stopped relay creation");
+            relays.add(relay);
+        }
+        relay.open(); // A concurrent disconnect closes the registered listener, including before bind.
+        return relay;
     }
 
     private ConnectionFactory raw(int port) {
@@ -360,6 +410,10 @@ class CouponMqPublisherIntegrationTest {
                 return correlation;
             });
             publisher = new CouponMqPublisher(template, factory, Duration.ofSeconds(1));
+            synchronized (registration) {
+                assertFalse(stopRequested, "watchdog stopped owner registration");
+                owners.add(this);
+            }
             assertEquals(0, opened.get(), "construction must not open a connection");
             assertTrue(factory.isPublisherConfirms());
             assertTrue(factory.isPublisherReturns());
@@ -402,8 +456,9 @@ class CouponMqPublisherIntegrationTest {
     }
 
     private void settled(Owner owner, int baseline) throws Exception {
-        await(() -> owner.publisher.activeTaskCount() == 0 && owner.publisher.pendingCount() == 0);
-        assertEquals(baseline, owner.slots().availablePermits());
+        Semaphore slots = owner.slots();
+        awaitSettlement(owner.publisher::activeTaskCount, owner.publisher::pendingCount, slots, baseline);
+        assertEquals(baseline, slots.availablePermits());
         note("settled active_tasks=0 pending=0 available_slots=" + baseline);
     }
 
@@ -418,10 +473,269 @@ class CouponMqPublisherIntegrationTest {
         assertTrue(condition.getAsBoolean(), "bounded observation failed");
     }
 
+    private static void awaitSettlement(java.util.function.IntSupplier active,
+                                        java.util.function.IntSupplier pending, Semaphore slots, int baseline) throws Exception {
+        await(() -> active.getAsInt() == 0 && pending.getAsInt() == 0
+                && slots.availablePermits() == baseline);
+    }
+
     private void phase(String name, org.junit.jupiter.api.function.Executable action) throws Exception {
         note(name + " begin");
-        assertTimeoutPreemptively(Duration.ofSeconds(30), action, name + " watchdog: stop, preserve evidence, no rerun");
+        runPhase(name, action, Duration.ofSeconds(30), Duration.ofSeconds(5), this::stopTransports);
         note(name + " complete");
+    }
+
+    private void runPhase(String name, org.junit.jupiter.api.function.Executable action,
+                          Duration budget, Duration terminationBudget, Runnable stopTransports) {
+        assertFalse(stopRequested, "no later phases after watchdog");
+        AtomicReference<String> failure = new AtomicReference<>();
+        Thread worker = fixtureWorker("phase-" + name, () -> {
+            try { action.execute(); }
+            catch (Throwable error) { failure.set(classified(name, error)); }
+        });
+        if (!join(worker, budget) || Thread.currentThread().isInterrupted()) {
+            synchronized (registration) { stopRequested = true; }
+            worker.interrupt();
+            stopTransports.run(); // Only owned transports; no inventory/ACK or quota reset.
+            boolean terminated = waitForStopped(terminationBudget);
+            if (!terminated) requiresProcessExit = true;
+            phaseFailure = name + ":WATCHDOG phase_terminated=" + terminated
+                    + "; runtime INCOMPLETE" + (terminated ? "" : "; controller-confirmed JVM exit required");
+            fail(phaseFailure);
+        }
+        if (failure.get() != null) {
+            phaseFailure = failure.get();
+            fail(phaseFailure);
+        }
+    }
+
+    private Thread fixtureWorker(String location, Runnable action) {
+        Thread worker = new Thread(action, "coupon-it-" + location);
+        worker.setDaemon(true);
+        fixtureWorkers.add(worker);
+        worker.start();
+        return worker;
+    }
+
+    private static boolean join(Thread worker, Duration budget) {
+        long deadline = System.nanoTime() + budget.toNanos();
+        boolean interrupted = Thread.interrupted();
+        try {
+            while (worker.isAlive()) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) return false;
+                try { TimeUnit.NANOSECONDS.timedJoin(worker, remaining); }
+                catch (InterruptedException ignored) { interrupted = true; }
+            }
+            return true;
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
+    }
+
+    private boolean workersStopped() {
+        if (fixtureWorkers.stream().anyMatch(Thread::isAlive)) return false;
+        synchronized (registration) {
+            return owners.stream().allMatch(owner -> owner.publisher.activeTaskCount() == 0)
+                    && relays.stream().allMatch(relay -> relay.threads.stream().noneMatch(Thread::isAlive));
+        }
+    }
+
+    private boolean waitForStopped(Duration budget) {
+        long deadline = System.nanoTime() + budget.toNanos();
+        boolean interrupted = Thread.interrupted();
+        try {
+            while (!workersStopped() && System.nanoTime() < deadline) {
+                try { Thread.sleep(10); }
+                catch (InterruptedException ignored) { interrupted = true; }
+            }
+            return workersStopped();
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
+    }
+
+    private void stopTransports() {
+        List<String> failures = new ArrayList<>();
+        List<Relay> relaySnapshot;
+        List<Owner> ownerSnapshot;
+        synchronized (registration) {
+            relaySnapshot = List.copyOf(relays);
+            ownerSnapshot = List.copyOf(owners);
+        }
+        for (int i = 0; i < relaySnapshot.size(); i++)
+            attemptCleanup("stop-relay-" + i, relaySnapshot.get(i)::disconnect, failures);
+        // close() retires the publisher and requests asynchronous factory cleanup.
+        // Do not wait on Owner.close() here; the phase may be inside it already.
+        for (int i = 0; i < ownerSnapshot.size(); i++)
+            attemptCleanup("stop-owner-" + i, ownerSnapshot.get(i).publisher::close, failures);
+        if (observerConnection != null)
+            attemptCleanup("stop-observer", () -> observerConnection.abort(1000), failures);
+        transportFailures.addAll(failures);
+        events.add("watchdog transport_cleanup=" + failures);
+    }
+
+    private List<String> finishFixture(org.junit.jupiter.api.function.Executable inventory,
+                                       List<org.junit.jupiter.api.function.Executable> cleanup,
+                                       org.junit.jupiter.api.function.Executable acknowledge) {
+        List<String> failures = new ArrayList<>(transportFailures);
+        if (!requiresProcessExit && workersStopped()) attemptCleanup("inventory", inventory, failures);
+        else failures.add("inventory:NOT_RUN_UNTERMINATED_WORKER");
+        // Inventory failure or an earlier close failure never skips another registered owner.
+        for (int i = 0; i < cleanup.size(); i++) attemptCleanup("owner-or-relay-" + i, cleanup.get(i), failures);
+        if (!requiresProcessExit && workersStopped() && failures.isEmpty()) attemptCleanup("acknowledge", acknowledge, failures);
+        if (requiresProcessExit || !workersStopped()) failures.add("INCOMPLETE:controller-confirmed JVM exit required");
+        return failures;
+    }
+
+    private void attemptCleanup(String location, org.junit.jupiter.api.function.Executable action, List<String> failures) {
+        AtomicReference<String> failure = new AtomicReference<>();
+        Thread worker = fixtureWorker("cleanup-" + location, () -> {
+            try { action.execute(); }
+            catch (Throwable error) { failure.set(classified(location, error)); }
+        });
+        if (!join(worker, Duration.ofSeconds(6))) {
+            worker.interrupt();
+            requiresProcessExit = true;
+            failures.add(location + ":UNTERMINATED_WORKER");
+        } else if (failure.get() != null) failures.add(failure.get());
+    }
+
+    private static String classified(String location, Throwable failure) {
+        // Never attach causes, exception messages, or suppressed credential-bearing failures.
+        return location + ":" + failure.getClass().getSimpleName();
+    }
+
+    private static String failureSummary(String primary, List<String> cleanup) {
+        return "primary=" + (primary == null ? "none" : primary) + " cleanup=" + cleanup;
+    }
+
+    @Test
+    @Timeout(10)
+    void resourceFreeSettlementWaitsForPermit() throws Exception {
+        Semaphore permits = new Semaphore(0); // Local fixture only, never Publisher's shared slots.
+        var countsObserved = new java.util.concurrent.CountDownLatch(1);
+        var finished = new java.util.concurrent.CountDownLatch(1);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Thread worker = fixtureWorker("settlement-regression", () -> {
+            try {
+                awaitSettlement(() -> 0, () -> { countsObserved.countDown(); return 0; }, permits, 1);
+                assertEquals(1, permits.availablePermits());
+            } catch (Throwable error) { failure.set(error); }
+            finally { finished.countDown(); }
+        });
+        try {
+            assertTrue(countsObserved.await(1, TimeUnit.SECONDS));
+            assertFalse(finished.await(100, TimeUnit.MILLISECONDS), "zero counters alone must not settle");
+        } finally {
+            permits.release();
+            assertTrue(join(worker, Duration.ofSeconds(2)));
+        }
+        assertEquals(0, finished.getCount());
+        assertNull(failure.get());
+    }
+
+    @Test
+    @Timeout(10)
+    void resourceFreeWatchdogWaitsForWorkerTermination() {
+        var started = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var order = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        try {
+            assertThrows(AssertionError.class, () -> runPhase("regression", () -> {
+                started.countDown();
+                awaitIgnoringInterrupts(release);
+                order.add("worker-exit");
+            }, Duration.ofMillis(20), Duration.ofSeconds(2), () -> {
+                assertTrue(stopRequested);
+                try { assertTrue(started.await(1, TimeUnit.SECONDS)); }
+                catch (InterruptedException error) { throw new AssertionError("startup interrupted"); }
+                order.add("stop-transport");
+                release.countDown();
+            }));
+            assertTrue(workersStopped());
+            assertTrue(phaseFailure.contains("phase_terminated=true"));
+            assertThrows(AssertionError.class, () -> runPhase("later", () -> fail("must not run"),
+                    Duration.ofMillis(20), Duration.ofMillis(20), () -> { }));
+            assertTrue(finishFixture(() -> order.add("inventory"), List.of(() -> order.add("cleanup")),
+                    () -> order.add("ack")).isEmpty());
+            assertEquals(List.of("stop-transport", "worker-exit", "inventory", "cleanup", "ack"), order);
+        } finally {
+            release.countDown();
+            assertTrue(waitForStopped(Duration.ofSeconds(2)));
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void resourceFreeUnterminatedWorkerSkipsInventory() {
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var attempted = new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            assertThrows(AssertionError.class, () -> runPhase("stuck", () -> awaitIgnoringInterrupts(release),
+                    Duration.ofMillis(20), Duration.ofMillis(20), () -> { }));
+            assertFalse(workersStopped());
+            var failures = finishFixture(() -> fail("inventory must not run"),
+                    List.of(() -> attempted.incrementAndGet(), () -> attempted.incrementAndGet()),
+                    () -> fail("ack must not run"));
+            assertEquals(2, attempted.get());
+            assertTrue(failures.contains("inventory:NOT_RUN_UNTERMINATED_WORKER"));
+            assertTrue(failures.contains("INCOMPLETE:controller-confirmed JVM exit required"));
+        } finally {
+            release.countDown();
+            assertTrue(waitForStopped(Duration.ofSeconds(2)));
+        }
+        var afterExit = finishFixture(() -> fail("late exit must not restore inventory"), List.of(),
+                () -> fail("late exit must not restore acknowledgement"));
+        assertTrue(afterExit.contains("inventory:NOT_RUN_UNTERMINATED_WORKER"));
+        assertTrue(afterExit.contains("INCOMPLETE:controller-confirmed JVM exit required"));
+    }
+
+    @Test
+    @Timeout(10)
+    void resourceFreeCleanupPreservesPrimaryAndAttemptsAll() {
+        var attempted = new java.util.concurrent.atomic.AtomicInteger();
+        String primary = classified("P3", new IOException("password=secret-primary"));
+        var failures = finishFixture(() -> { throw new IOException("password=secret-inventory"); }, List.of(
+                () -> { attempted.incrementAndGet(); throw new AssertionError("password=secret-owner"); },
+                () -> attempted.incrementAndGet(),
+                () -> { attempted.incrementAndGet(); throw new IllegalStateException("secret-last"); }
+        ), () -> fail("failed inventory must not acknowledge"));
+        assertEquals(3, attempted.get());
+        assertEquals(List.of("inventory:IOException", "owner-or-relay-0:AssertionError",
+                "owner-or-relay-2:IllegalStateException"), failures);
+        String outcome = failureSummary(primary, failures);
+        assertTrue(outcome.startsWith("primary=P3:IOException cleanup="));
+        assertFalse(outcome.contains("password"));
+        assertFalse(outcome.contains("secret"));
+        assertTrue(workersStopped());
+    }
+
+    @Test
+    @Timeout(15)
+    void resourceFreeCleanupWorkerTimeoutSkipsAcknowledgement() {
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var attempted = new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            var failures = finishFixture(() -> attempted.incrementAndGet(), List.of(
+                    () -> awaitIgnoringInterrupts(release), () -> attempted.incrementAndGet()),
+                    () -> fail("unterminated cleanup must not acknowledge"));
+            assertEquals(2, attempted.get());
+            assertTrue(failures.contains("owner-or-relay-0:UNTERMINATED_WORKER"));
+            assertTrue(failures.contains("INCOMPLETE:controller-confirmed JVM exit required"));
+        } finally {
+            release.countDown();
+            assertTrue(waitForStopped(Duration.ofSeconds(2)));
+        }
+    }
+
+    private static void awaitIgnoringInterrupts(java.util.concurrent.CountDownLatch release) {
+        boolean interrupted = false;
+        while (release.getCount() != 0) {
+            try { release.await(); }
+            catch (InterruptedException ignored) { interrupted = true; }
+        }
+        if (interrupted) Thread.currentThread().interrupt();
     }
 
     private static String required(String name) {
@@ -447,12 +761,16 @@ class CouponMqPublisherIntegrationTest {
         volatile boolean stopped;
         boolean held;
 
-        Relay() throws IOException {
+        Relay() throws IOException { }
+
+        void open() throws IOException {
             listener.setReuseAddress(true);
             listener.bind(new InetSocketAddress(HOST, RELAY_PORT), 1);
             start(() -> {
                 client = listener.accept();
+                if (stopped) { client.close(); return; }
                 broker = new Socket();
+                if (stopped) { client.close(); broker.close(); return; }
                 broker.connect(new InetSocketAddress(HOST, BROKER_PORT), 1000);
                 start(() -> pump(client, broker, false));
                 pump(broker, client, true);
