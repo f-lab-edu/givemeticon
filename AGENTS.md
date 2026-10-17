@@ -41,7 +41,7 @@ Duplication is acceptable when removing it would require a speculative abstracti
 
 ## Evidence and Documentation
 
-- Keep only durable common development rules in this file. Put task status, architecture decisions, model/CLI settings, and execution history in their dedicated documents.
+- Keep only durable common development rules in this file. Keep role and model/CLI settings in the existing agent configuration. Use GitHub Issues and PRs as the source of task history.
 - Start context recovery at `docs/decisions/README.md` when available. Check the date, target SHA, scope, and superseding decisions before applying an old document.
 - Distinguish code found, test code present, historical execution reports, and independently executed verification. Design acceptance, mock/unit PASS, integration, recovery, and performance evidence are separate.
 - Do not infer completion from Issue closure, PR merge, or CI success alone. Record exact SHA, commands, environment, evidence paths, skipped checks, and limitations.
@@ -51,6 +51,23 @@ Duplication is acceptable when removing it would require a speculative abstracti
 - Use only authorized test resources. Do not start load, provision services, change billing, or stop unrelated processes outside the approved scope.
 - Use a separate branch/worktree. Do not directly edit or push develop/main, merge PRs, or enable automatic merging.
 - Preserve other contributors' changes. Do not amend, reset, rebase, delete, or overwrite existing work without authorization.
+
+## Documentation Policy
+
+This policy applies equally to Architect, Builder, and Verifier. Unless the user explicitly requests otherwise, create or update permanent documentation only for:
+
+- Technical decisions: the problem, alternatives considered, selection rationale, and trade-offs.
+- Tests and verification actually executed: purpose, environment, execution conditions, results, and confirmed failure causes. Mark an unknown cause as unconfirmed.
+- Performance measurements actually executed: environment, metrics, results, and the basis for comparison.
+
+Do not create permanent records of agent conversations or handoff processes, routine progress, duplicate code-change summaries, task history already in GitHub Issues/PRs, general project analysis, or unnecessary reports.
+
+- Update the relevant existing document before creating a new one. Keep only the decision or verification evidence needed; link to the Issue/PR instead of copying its history.
+- Write or update an ADR only when an important design decision is made or changed. A task completion or routine implementation does not require an ADR.
+- Record test results only for checks actually run, with the target SHA and scope. Missing or unexecuted required checks mean INCOMPLETE, never PASS. Report omissions in the task response/PR; do not create a separate document for them.
+- Keep agent-to-agent payloads and temporary handoff files in untracked, ignored runtime storage or a temporary directory. Do not commit, publish, or copy them into permanent documentation.
+- Do not delete existing records without explicit authorization. This policy governs new records and updates; it does not authorize historical cleanup.
+- User-requested changes to these shared rules and existing role/configuration instructions are allowed. They do not require a new policy report or ADR.
 
 ## Operating Rules
 - Keep changes small and traceable.
@@ -67,7 +84,7 @@ Duplication is acceptable when removing it would require a speculative abstracti
 ## Shared Ownership and Handoff Rules
 - Read the assigned role file in `agents/` and `agents/HANDOFF.md`. An assignment does not expand authorization.
 - Keep role-specific behavior and model/CLI configuration outside this common rules file.
-- Complete each task with a handoff file, code SHA, next owner, and a ready-to-use prompt. A written handoff does not mean another CLI was actually launched or messaged.
+- Pass the target code SHA, next owner, and actionable instructions through the runtime response or a temporary handoff. Do not create a permanent handoff document. A written payload does not prove another CLI was launched or messaged.
 
 ## Cost Rules
 - Do not scan the whole repository unless required.
@@ -80,15 +97,15 @@ Before implementation:
 
 1. Reuse the relevant Issue or prepare an Issue draft; a documentation-only investigation need not create a remote Issue
 2. Generate Branch Name
-3. Create Implementation Plan
+3. Prepare the implementation plan in the Issue/PR or temporary runtime context; do not create a duplicate plan document
 
 After implementation:
 
-1. Generate Review Result
+1. Put the review result in the task response/PR; retain only actual verification evidence under the documentation policy
 2. Generate Commit Message
 3. Prepare a Pull Request draft; remote writes require authorization for that task
 
-Generate ADR when:
+Generate or update an ADR only for an important design decision made or changed in areas such as:
 
 - Database schema changes
 - Transaction strategy changes
