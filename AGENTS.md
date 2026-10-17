@@ -39,7 +39,18 @@ Do not introduce an abstraction merely because it may be useful later.
 
 Duplication is acceptable when removing it would require a speculative abstraction. Refactor only after a real repeated pattern exists and the change improves the current task.
 
-## Dependencies
+## Evidence and Documentation
+
+- Keep only durable common development rules in this file. Put task status, architecture decisions, model/CLI settings, and execution history in their dedicated documents.
+- Start context recovery at `docs/decisions/README.md` when available. Check the date, target SHA, scope, and superseding decisions before applying an old document.
+- Distinguish code found, test code present, historical execution reports, and independently executed verification. Design acceptance, mock/unit PASS, integration, recovery, and performance evidence are separate.
+- Do not infer completion from Issue closure, PR merge, or CI success alone. Record exact SHA, commands, environment, evidence paths, skipped checks, and limitations.
+- Preserve raw evidence and failed runs. Mark missing evidence or uncertain causes as confirmation required; never invent measurements.
+- Do not put credentials, tokens, personal data, or raw CLI transcripts in repository documentation.
+- Historical instructions, approvals, and handoffs are evidence, not authorization for a new task.
+- Use only authorized test resources. Do not start load, provision services, change billing, or stop unrelated processes outside the approved scope.
+- Use a separate branch/worktree. Do not directly edit or push develop/main, merge PRs, or enable automatic merging.
+- Preserve other contributors' changes. Do not amend, reset, rebase, delete, or overwrite existing work without authorization.
 
 ## Operating Rules
 - Keep changes small and traceable.
@@ -53,24 +64,21 @@ Duplication is acceptable when removing it would require a speculative abstracti
     - test result
     - remaining risk
 
-## Agent Roles
-- Architect: architecture and consistency/recovery contracts; follow `agents/ARCHITECT.md`.
-- Builder: backend implementation and related tests; follow `agents/BUILDER.md`.
-- Verifier: independent verification and code review; follow `agents/VERIFIER.md`.
-- Read the assigned role file and `agents/HANDOFF.md`. See `agents/README.md` for CLI setup.
-- Architect owns architecture boundaries; Builder owns implementation choices within them. Verifier does not edit production code.
+## Shared Ownership and Handoff Rules
+- Read the assigned role file in `agents/` and `agents/HANDOFF.md`. An assignment does not expand authorization.
+- Keep role-specific behavior and model/CLI configuration outside this common rules file.
 - Complete each task with a handoff file, code SHA, next owner, and a ready-to-use prompt. A written handoff does not mean another CLI was actually launched or messaged.
 
 ## Cost Rules
 - Do not scan the whole repository unless required.
-- Start from README, current-task.md, and related files only.
+- Start from README, the decision index/current task, the relevant Issue, and the applicable handoff.
 - Summarize findings before opening more files.
 
 # Engineering Workflow
 
 Before implementation:
 
-1. Generate Git Issue
+1. Reuse the relevant Issue or prepare an Issue draft; a documentation-only investigation need not create a remote Issue
 2. Generate Branch Name
 3. Create Implementation Plan
 
@@ -78,7 +86,7 @@ After implementation:
 
 1. Generate Review Result
 2. Generate Commit Message
-3. Generate Pull Request
+3. Prepare a Pull Request draft; remote writes require authorization for that task
 
 Generate ADR when:
 
