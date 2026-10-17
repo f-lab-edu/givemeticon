@@ -626,6 +626,53 @@ class CouponMqPublisherTest {
         }
     }
 
+    @Test void lifecycleTaskExitBeforeWorkerHandoffRejectsWithoutSendingAndAllowsExplicitRetry() throws Exception {
+        var exited=new java.util.concurrent.CountDownLatch(1);
+        var release=new java.util.concurrent.CountDownLatch(1);
+        var worker=new AtomicReference<Thread>();
+        var controlled=new java.util.concurrent.ThreadPoolExecutor(0,1,1,java.util.concurrent.TimeUnit.MILLISECONDS,
+                new java.util.concurrent.SynchronousQueue<Runnable>(),new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()) {
+            @Override protected void afterExecute(Runnable task,Throwable error) {
+                worker.set(Thread.currentThread());exited.countDown();
+                try { assertTrue(release.await(5,java.util.concurrent.TimeUnit.SECONDS)); }
+                catch(InterruptedException e) { Thread.currentThread().interrupt();throw new AssertionError(e); }
+            }
+        };
+        var owner=new CouponMqPublisher(template,factory,Duration.ZERO,Duration.ofSeconds(1),Duration.ofMillis(50),controlled,scope.cleaners,scope.slots);
+        capture();
+        doAnswer(inv->{CorrelationData c=inv.getArgument(5);sent.add(c);
+            c.getFuture().complete(new CorrelationData.Confirm(true,null));return null;
+        }).when(template).doSend(any(com.rabbitmq.client.Channel.class),anyString(),anyString(),any(Message.class),eq(true),any(CorrelationData.class));
+        try {
+            byte[] bytes=body();
+            var first=owner.publish(bytes,7,91,"exchange","key");
+            assertEquals(ACCEPTED,first.status());
+            assertTrue(exited.await(3,java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(0,owner.activeTaskCount());assertEquals(0,owner.pendingCount());
+            assertEquals(100,scope.slots.availablePermits());assertEquals(1,controlled.getActiveCount());
+            var rejected=owner.publish(bytes,7,91,"exchange","key");
+            assertEquals(NOT_SENT,rejected.status());assertEquals(CouponMqPublisher.Reason.WORKER_CAPACITY,rejected.reason());
+            assertEquals(first.attemptId(),rejected.attemptId());assertNotEquals(first.correlationId(),rejected.correlationId());
+            verify(template,times(1)).execute(any(org.springframework.amqp.rabbit.core.ChannelCallback.class));
+            verify(template,times(1)).doSend(any(com.rabbitmq.client.Channel.class),anyString(),anyString(),any(Message.class),eq(true),any(CorrelationData.class));
+            assertEquals(0,owner.activeTaskCount());assertEquals(0,owner.pendingCount());assertEquals(100,scope.slots.availablePermits());
+            // Let this test worker retire naturally before retrying, with no sleep or handoff race.
+            Thread firstWorker=worker.get();release.countDown();firstWorker.join(5000);assertFalse(firstWorker.isAlive());
+            var retry=owner.publish(bytes,7,91,"exchange","key");
+            assertEquals(ACCEPTED,retry.status());assertEquals(rejected.attemptId(),retry.attemptId());
+            assertNotEquals(rejected.correlationId(),retry.correlationId());
+            idle(owner);until(()->owner.pendingCount()==0);
+            assertEquals(100,scope.slots.availablePermits());assertEquals(2,sent.size());
+            assertFalse(sent.get(0).getFuture().complete(new CorrelationData.Confirm(true,null)));
+            assertEquals(100,scope.slots.availablePermits());
+            verify(template,times(2)).execute(any(org.springframework.amqp.rabbit.core.ChannelCallback.class));
+            verify(template,times(2)).doSend(any(com.rabbitmq.client.Channel.class),anyString(),anyString(),any(Message.class),eq(true),any(CorrelationData.class));
+        } finally {
+            release.countDown();owner.close();owner.observeCleanup();controlled.shutdownNow();
+            assertTrue(controlled.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS));
+        }
+    }
+
     @Test void lifecycleAcceptedButNotStartedTaskCanBeProvenUnsentAfterClose() throws Exception {
         var entered=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);
         var controlled=new java.util.concurrent.ThreadPoolExecutor(0,1,1,java.util.concurrent.TimeUnit.SECONDS,
