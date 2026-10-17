@@ -28,11 +28,11 @@
 ## develop 구현과 미연결 부분
 
 - [Protocol](../../src/main/java/com/jinddung2/givemeticon/domain/coupon/mq/CouponMqProtocol.java): canonical encoding/hash, strict 입력·4096 bytes 제한.
-- [Publisher](../../src/main/java/com/jinddung2/givemeticon/domain/coupon/mq/CouponMqPublisher.java): process 공유 미확정100·confirm 최대1초·confirm/return/nack 분류. 주석이 명시적으로 `Not a bean`이다.
+- [Publisher](../../src/main/java/com/jinddung2/givemeticon/domain/coupon/mq/CouponMqPublisher.java): process 공유 미확정100·confirm 최대1초·confirm/return/nack 분류. Bean/API/listener에 연결하지 않는 비활성 core다.
 - 운영 소스·리소스 검색에서 MQ용 인증 API, Bean wiring, Rabbit Listener, attempt/control DDL은 찾지 못했다. V1 접수 API를 MQ API로 설명하면 틀린다.
-- 현행 core는 send 중 synchronized(p)를 잡고 close의 factory.destroy 반환 뒤 pending을 일괄 해제한다. 아래 로컬 보강이 바꾸려는 부분이다.
+- PR183의 send monitor 점유·destroy 반환 뒤 pending 일괄 해제 규칙은 아래 transport 소유권 결정으로 대체한다.
 
-## 로컬에만 있는 보강 후보
+## 보강 출처와 채택 범위
 
 **`b806db259013bbbebaded41ae46d3b7de09a8a1c`**, fix/issue-170-transport-lifecycle는 local Git object로 존재하고 develop ancestor가 아니다. 조회한 PR 목록에 이 후보 PR은 없다. 로컬 Verifier 인계·Claude 대화는311건 기본 test(Publisher43)·변이10종 탐지·고정 원문 해시16/16의 **mock transport 한정 PASS**를 보고한다. 이번 조사에서 재실행하지 않았다.
 
@@ -40,8 +40,8 @@ NIO 전환은 보류하고 기존 transport를 제한하는 대안을 택했다.
 
 native TCP/handshake/RPC/checkout/close 제한과 caller3초는 DNS/TLS/웹/GC/로그 I/O까지 포함한 HTTP SLA가 아니다. 초기 검증은 별도 허가한 literal IP endpoint로 한정한다는 과거 범위가 있다.
 
-잔여 MINOR: worker 전환 경계의 일시적 조기 거부 가능성(미재현 추론), 공유 cleanup1의 가용성 비용, 물리 로그 순서와 seq 차이. 최신 base 통합·정확 SHA 검토·활성화 판단은 Architect 몫이다. 관찰한 출처 해시는 [source manifest](source-manifest.json)의 `local_sources`와 `local_git_sources`에 있다. 원본 로컬 `docs/tasks/handoffs/issue-170/issue-170-transport-lifecycle-verifier.md`는 고유 검증 근거를 포함하므로 이번 정리에서 보존했다.
+2026-10-17에는 후보의 두 구현·시험 커밋만 선별 통합하고 [ADR-004 소유권 결정](../adr/ADR-004-rabbitmq-implementation-contract.md#inactive-transport-ownership--2026-10-17)을 채택한다. worker task 종료와 다음 handoff 사이의 조기 거부는 NOT_SENT/WORKER_CAPACITY·send0·slot1회 반환이며 후속 API retryable503 근거다. 공유 cleanup1 정지는 다른 owner의 NOT_STARTED를 만들 수 있다. 로그는 correlation별 seq로 대조하고 물리 행 순서·전역 순서를 약속하지 않는다. 세 비용을 없애기 위한 풀·대기열·로그 프레임워크 변경은 하지 않는다. 현재 SHA의 실행 결과와 독립 검증은 런타임 응답으로 별도 전달하며 과거 PASS를 재사용하지 않는다. 관찰한 출처 해시는 [source manifest](source-manifest.json)의 `local_sources`와 `local_git_sources`에 있다. 원본 로컬 `docs/tasks/handoffs/issue-170/issue-170-transport-lifecycle-verifier.md`는 고유 검증 근거를 포함하므로 이번 정리에서 보존했다.
 
 ## 문서 드리프트
 
-ADR-004 표제의 candidate awaiting review는 #182 수용 이전 문구다. 맨 끝의 destroy 성공 후 잔여 slot 정리는 merged core 계약이고, 로컬 lifecycle 후보는 이를 대체하려 한다. 문서의 모든 최신 문구가 구현됐다고도, 문서 전체가 무효라고도 단정하지 않는다. PR·실제 SHA별로 판단한다.
+ADR-004 표제의 candidate awaiting review는 #182 수용 이전 문구다. 기존 destroy 성공 후 잔여 slot 정리는 2026-10-17 소유권 결정으로 대체됐다. destroy 반환·실패·5초 관측 timeout은 unknown 해제 근거가 아니며 taskDone && definite일 때만 개별 반환한다. unknown의 JVM 수명 점유·worker16/소유100 소진 비용을 수용한다. close는 영구 admission 차단이며 ATTEMPT_RETURNED는 물리 종료 증명이 아니고 STALLED는 관측일 뿐이다. FAILED/NOT_STARTED만 명시 재시도한다. 활성화의 단일 owner·외부 프로세스 종료 확인·새 readiness는 별도 gate다. 문서의 모든 최신 문구가 구현됐다고도, 문서 전체가 무효라고도 단정하지 않는다. PR·실제 SHA별로 판단한다.
