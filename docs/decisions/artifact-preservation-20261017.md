@@ -18,7 +18,7 @@
 - 원본 `artifact-manifest.json`: 각각 89 / 8 / 382개 선언 파일의 크기·해시 일치. 이 manifest 자체의 수집 범위는 제한적이며, 별도 전체 파일 목록을 보존 manifest에 기록했다.
 - `checked-sha.txt`는 API의 각 run `head_sha`와 일치: `b1e08f7d0093c9431f735f8b21639c19e9186229`, `0c59657c92c33e61168a573feeafe72d84a4ce1c`, `6d81826f4da9876c201e5129a8cde76eb4399973`.
 - 원본은 모두 `redaction_applied=true`, 합성 격리 실행 증거다. 알려진 GitHub/OpenAI/Anthropic 토큰·개인키 패턴 검사에서 일치 없음. 이 검사가 모든 민감정보의 부재를 증명하지는 않는다.
-- 이전 [run 37586432949](https://github.com/f-lab-edu/givemeticon/actions/runs/37586432949)의 artifact API는 현재 빈 목록이다. 해당 원본을 이번에 다운로드하거나 복원했다고 주장하지 않는다. 과거 로컬 보존 보고는 [로컬 맥락](local-only-context.md)과 구분한다.
+- 이전 [run 37586432949](https://github.com/f-lab-edu/givemeticon/actions/runs/37586432949)의 artifact API는 현재 빈 목록이다. 해당 원본을 이번에 다운로드하거나 복원했다고 주장하지 않는다. 과거 로컬 보존 보고는 [baseline 진단](../experiments/baseline-10k-diagnostic.md)과 원본 로컬 #177 검증 기록에 한정하며 이번 다운로드 결과와 구분한다.
 
 재확인 예:
 

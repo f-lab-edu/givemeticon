@@ -31,3 +31,5 @@
 과거4,688ms→145ms는 이번 배치 구조의 전후 실측이 아니다. 현재 조건의 규모·운영 인덱스/EXPLAIN·반복 수·원본 로그·부하 영향은 **확인 필요**다. 기존 측정 자료는 변경하지 않았다.
 
 ADR-005와 issue-184-review의 inline 증감·메타 오류 원본 rollback 설명은 #185 시점이다. 현재 #184 본문·#186/#188·실제 코드가 후속 계약이다. 과거 문서를 삭제하거나 그때의 독립 검증을 현행 snapshot 검증으로 재명명하지 않는다.
+
+로컬 후보 검증 출처는 [source manifest](source-manifest.json)의 관찰 당시 로컬 해시와 원본 `docs/tasks/handoffs/issue-184/issue-184-verifier.md`다. 과거 inline 단계의 독립302 unit/18 MySQL 결과를 현행 주기 snapshot의 독립 검증으로 전환하지 않는다.

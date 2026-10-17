@@ -34,13 +34,13 @@
 
 ## 로컬에만 있는 보강 후보
 
-**`b806db259013bbbebaded41ae46d3b7de09a8a1c`**, fix/issue-170-transport-lifecycle는 local Git object로 존재하고 develop ancestor가 아니다. 조회한 PR 목록에 이 후보 PR은 없다. 로컬 Verifier 인계·Claude 대화는311건 기본 test·변이10종의 **mock transport 한정 PASS**를 보고한다. 이번 조사에서 재실행하지 않았다.
+**`b806db259013bbbebaded41ae46d3b7de09a8a1c`**, fix/issue-170-transport-lifecycle는 local Git object로 존재하고 develop ancestor가 아니다. 조회한 PR 목록에 이 후보 PR은 없다. 로컬 Verifier 인계·Claude 대화는311건 기본 test(Publisher43)·변이10종 탐지·고정 원문 해시16/16의 **mock transport 한정 PASS**를 보고한다. 이번 조사에서 재실행하지 않았다.
 
-worker16/queue0, caller3초·confirm1초, process100, callback monitor 점유 해소, taskDone && definite인 경우만 slot 반환, cleanup worker1/queue0·관측5초를 적용한 후보다. destroy 반환/예외/관측 timeout은 물리 종료·미저장 증거가 아니므로 unknown을 일괄 반환하지 않는다. 소유권 보전 대신 process 수명 동안 용량을 소모하고 외부 프로세스 종료 확인이 필요하다는 가용성 비용을 택했다.
+NIO 전환은 보류하고 기존 transport를 제한하는 대안을 택했다. worker16/queue0, caller3초·confirm1초, process100, callback monitor 점유 해소, taskDone && definite인 경우만 slot 반환, cleanup worker1/queue0·관측5초를 적용한 후보다. destroy 반환/예외/관측 timeout은 물리 종료·미저장 증거가 아니므로 unknown을 일괄 반환하지 않는다. 소유권 보전 대신 process 수명 동안 용량을 소모하고 외부 프로세스 종료 확인이 필요하다는 가용성 비용을 택했다.
 
 native TCP/handshake/RPC/checkout/close 제한과 caller3초는 DNS/TLS/웹/GC/로그 I/O까지 포함한 HTTP SLA가 아니다. 초기 검증은 별도 허가한 literal IP endpoint로 한정한다는 과거 범위가 있다.
 
-잔여 MINOR: worker 전환 경계의 일시적 조기 거부 가능성(미재현 추론), 공유 cleanup1의 가용성 비용, 물리 로그 순서와 seq 차이. 최신 base 통합·정확 SHA 검토·활성화 판단은 Architect 몫이다. [로컬 맥락](local-only-context.md)에 출처를 분리했다.
+잔여 MINOR: worker 전환 경계의 일시적 조기 거부 가능성(미재현 추론), 공유 cleanup1의 가용성 비용, 물리 로그 순서와 seq 차이. 최신 base 통합·정확 SHA 검토·활성화 판단은 Architect 몫이다. 관찰한 출처 해시는 [source manifest](source-manifest.json)의 `local_sources`와 `local_git_sources`에 있다. 원본 로컬 `docs/tasks/handoffs/issue-170/issue-170-transport-lifecycle-verifier.md`는 고유 검증 근거를 포함하므로 이번 정리에서 보존했다.
 
 ## 문서 드리프트
 

@@ -43,3 +43,65 @@
 
 ### 표기 정정 (분석기 `overall_unconfirmed_members` 명칭)
 `overall_unconfirmed=0`은 **DB 대조 기준으로만** 의미가 있다(필드명을 `db_reconciliation_unconfirmed_members(...)`로 제한). 클라이언트 관점은 별도 필드 `db_final_but_client_unconfirmed`(full-20000 = 19건)로 구분한다. 회원별 strict 180초 관측은 계속 **미검증**. 원조건 반복의 11.0%(1,100/10,000)와 ENDED 제외 100%는 서로 다른 지표이며 분리 유지한다.
+
+## Hosted 측정·검증 근거 (2026-10-11 기록에서 통합)
+
+다음은 당시 실행한 측정의 조건·수치·한계이며 이번 정리에서 부하나 테스트를 재실행하지 않았다. 기존 진행률 보고서의 측정 절을 통합했다. 후속 run 상태·보존 원본은 [baseline 근거](../decisions/baseline-and-evidence.md)와 [artifact 무결성](../decisions/artifact-preservation-20261017.md)을 따른다.
+
+### 3.1 최초 hosted baseline: 목표 부하 생성 미달
+
+[run 37586432949](https://github.com/f-lab-edu/givemeticon/actions/runs/37586432949), SHA `1e268d9`. 명목 목표는 10초 동안 첫 요청 10,000건이며 실제 경계 예약을 포함한 수요는 10,001건이다. 아래 비율은 **10,001건**을 분모로 계산했다. 중복 요청은 별도 분모다.
+
+| 지표 | stock | V1 |
+|---|---:|---:|
+| 전송된 첫 요청 | 2,029 | 4,843 |
+| 실제 예약 수요 대비 전송률 | 20.29% | 48.43% |
+| 미전송(dropped iterations) | 7,972 | 5,158 |
+| 미전송 비율 | 79.71% | 51.57% |
+| 별도 중복 POST | 203 | 485 |
+
+원 workflow 실패는 실제 부하 계약 차이를 검출한 comparator의 exit 1이다. 이후 추가한 generation gate가 당시 workflow를 종료시킨 것으로 기록하지 않는다. 미전송은 서비스에 도달한 요청이 아니므로 서비스 처리 실패율과 합치지 않는다. 정합성 관찰은 보존하되, 목표 부하 충족이나 동일 부하 비교 PASS로 인정하지 않는다.
+
+### 3.2 작은 profile B 보정: 실행·계측 가능성 확인
+
+[run 38096702816](https://github.com/f-lab-edu/givemeticon/actions/runs/38096702816), 실제 SHA `b1e08f7d0093c9431f735f8b21639c19e9186229`, workflow success. **예열 없는 100rps×2초, 경로별 새 fixture, 단일 실행**이다.
+
+| 지표 | stock | V1 |
+|---|---:|---:|
+| 첫 요청 | 201 (창 안 200 + 경계 1) | 201 (동일) |
+| 순차 중복 POST | 21 | 21 |
+| dropped iterations | 0 | 0 |
+| 실제 VU 최대 | 184 | 84 |
+| 첫 요청 결과 | HTTP 200 90건 / 429 111건 | 201건 모두 DB ISSUED |
+| 최종 DB 발급 | 98건 | 201건 |
+| 초과 발급 / 중복 발급 관찰 | 0 / 0 | 0 / 0 |
+| DB 발급됐으나 클라이언트가 200을 못 본 요청 | 8건 | 이 실행의 201건은 모두 발급 확인 |
+| 응답 지연 | 성공 응답 p95 약 5.09초 | 접수 응답 p95 약 1.11초 |
+
+이 결과는 stock의 대기·429와 클라이언트 응답/DB 결과 차이를 드러낸다. 다만 cold JVM, 단일 실행, 앱 CPU 제한, 아래 recovery 설정 차이가 있어 구조별 개선율이나 락의 단독 원인을 확정할 수 없다. V1의 201건 발급도 10k 처리 능력이나 RabbitMQ 성능 증거가 아니다.
+
+실제 Linux에서 확인한 자원 제한은 앱 각 0.55 CPU/768 MiB, MySQL 1 CPU/1,024 MiB, Redis 각 0.05 CPU/64 MiB, k6 0.75 CPU/3,072 MiB다. observer 공유 scope는 0.25 CPU/512 MiB/swap 0으로 확인했다. broker 빈 슬롯과 host 여유를 포함한 계획 예산은 3.95 CPU/9,088 MiB이며, broker를 실행·검증했다는 뜻은 아니다.
+
+생성기 메모리 표본 peak는 stock 약 70 MiB, V1 약 80.7 MiB였다. 이는 live 표본 기준 하한이고, 이 값을 VU 수에 선형 외삽해 10k 이상 수용 가능하다고 판단하지 않는다. artifact는 141/141 체크섬 일치, redacted 수집 성공, 소유 컨테이너 down/remove exit 0/0으로 대조됐다.
+
+### 3.3 GET 관찰과 수치 정정
+
+- 유휴 GET: `n=40`, p95 11ms, 오류 0. 작은 표본의 유휴 provisional 입력이다.
+- 실제 POST와 겹친 GET: `n=1`, 170ms. 부하 중 지연 분포 확보로 인정하지 않는다.
+- 보정 모드 SLO 판정은 `NOT_APPLICABLE(calibration)`이다. 회원별 180초 관찰 SLO PASS는 없다.
+- stock 락 acquired/rejected 및 평균 hold 표는 before meter 부재를 0으로 가정해야 계산된다. 과거 artifact에는 필요한 수집 시점 provenance가 없어 **조건부 수동 추론값**으로만 보존한다. 기본 재분석은 MISSING이다.
+- 이전의 `untimed 0/0`, 즉 timer 밖 예외 0이라는 표현은 철회했다. 현재 판정은 **UNKNOWN**이다. HTTP 429 111건 같은 독립적인 클라이언트 관찰과 구분한다.
+- 과거 cold run은 stock recovery가 설정상 활성(default true), V1은 `coupon-admission`에서 비활성이었다. 실제 recovery 호출이나 성능 영향은 미확정이다. 동일 조건이라는 표현은 workload/cap 범위에 한정한다.
+
+정정 근거: [Verifier 분석기 수정 ec04d68](https://github.com/f-lab-edu/givemeticon/blob/0c3d48ec126f01b7a27fdc5b9c87c01e7c8b528e/docs/experiments/calibration-run-38096702816-verifier-review.md) 및 PR #181의 통합 이력. 원본 artifact는 수정하지 않고 재분석을 별도 보존했다.
+
+## 5. 테스트 증거의 범위
+
+| 대상 SHA | 확인 범위 | 한계 |
+|---|---|---|
+| PR #180 `3989547` | 독립 Gradle 251건 실패/오류/skip 0, Python·redaction 회귀 | package 검증. 실제 보정은 주석 자식 `b1e08f7`의 hosted run |
+| PR #181 `0c3d48e` | Builder Gradle 254건 실패/오류/skip 0, Python 20파일 159건, stub 48·guard 13 | Builder의 해당 parent 증거. 새 SHA 전체 검증으로 옮기지 않음 |
+| PR #181 `87b68bd` | 전체 label 시리즈 대조 회귀, 독립 Python/delta 검증, Reviewer 지적 없음 | 해당 보고 시점의 실제 Linux 조건 endpoint·등록/예열 성공은 미검증 |
+| 당시 로컬 `0c59657` | 당시 Builder의 주석 한 줄/나머지 tree 동일성 확인 | 이 표는 10월11일 점검 당시의 검증 범위다. 후속 실제 run 38137748465의 FAILURE와 artifact는 위 baseline 근거를 따른다. |
+
+테스트 통과율과 프로젝트 완성도는 다른 지표다. 특히 현재 테스트 수를 RabbitMQ 전달 보장·장애 복구 완료의 근거로 쓰지 않는다.

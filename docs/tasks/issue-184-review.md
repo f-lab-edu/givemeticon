@@ -5,6 +5,8 @@
 - base: cf49788269fe8cfc03a9ca160c87dcabde82494c (origin/develop)
 - 검토 성격: 작성자의 자체 리뷰와 실행 검증. 독립 Verifier CLI/모델의 PASS가 아님.
 
+기록 대상 code SHA: `cca09d3868c3baeef706c66b47ad75ee8b085e95`.이 기록은 PR #185의 inline 카운터 방식에 대한 과거 검증이다. 현재 주기 집계의 결정과 테스트 범위는 [인기순 결정](../decisions/popular-snapshot.md)을 따른다.
+
 ## 변경 이유와 경계
 취소 시 집계 미감소, 취소 후 재추가 거절, 원본/메타 별도 커밋, 동시 최초 INSERT 경합을 고친다. Controller/Facade/API 응답·인기순 SELECT·성능 측정 코드는 변경하지 않는다. 목록 반환에서 실제 item_id가 매핑되지 않던 item_ud 오타는 같은 좋아요 Mapper에서 수정하고 실제 DB 조회로 검증한다.
 
@@ -56,6 +58,8 @@ docker run --name givemeticon-favorite-184-test --label givemeticon.task=issue-1
 ./gradlew test -x copyFiles --no-daemon
 ./gradlew integrationTest --tests '*ItemFavoriteMySQLIntegrationTest' -x copyFiles --no-daemon
 ```
+
+유지보수 보정 SQL을 실제 두 번 실행해 멱등성·0건 집계·view_count 보존을 확인했다. 대상 소스 해시는 `evidence/issue-184/source-sha256.json`에 보존하며 당시 실행 Mapper 리소스와 소스를 대조했다.
 
 ## 잔여 위험·미검증
 - 실제 운영 스키마/기존 FK·인덱스·NULL/중복 데이터 미확인. 로컬 givemeticon DB에는 item_favorite 자체가 없어서 운영 테이블 DDL을 추정하지 않았다. 기존 테이블이 없는 환경에서 전체 Flyway 초기 구축을 해결하는 PR이 아니다.

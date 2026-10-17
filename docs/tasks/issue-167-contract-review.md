@@ -1,4 +1,4 @@
-# #167 RabbitMQ 계약 검토 후보
+# RabbitMQ API·wire·readiness 계약
 
 상태: `428d1a7`의 Verifier r2 PASS(설계 문서 한정, 조건부)를 바탕으로 한 마감 수정 후보. 이번 두 경로 delta의 Verifier 3회차 독립 검토 대기. 기준 develop `1f8d5560eb93a42305ea806b823765c2ff963143`, 브랜치 `docs/issue-167-contract-resolution-r3`. 생산 코드·DDL 적용·broker/MySQL 실행·성능 PASS가 아니다. #169는 `c10a920ad744b7765eec62a6e67aa31b95bf8932`로 MERGED이며 재사용하지 않는다.
 
@@ -206,44 +206,6 @@ Verifier 2회차는 이 Builder 대조와 별개로 r2 지시의 공식 SAC/conf
 | Q3 실행 정책 | [ADR-004 초기 정책 단일 표](../adr/ADR-004-rabbitmq-implementation-contract.md#initial-execution-policies--2026-10-14)의 선택값 | #170 설정 증거·#172 실효 override/경계 검사; 설정값/관측값 별도 열 |
 
 새 미정/권고값으로 읽지 않는다. 선택은 runtime PASS가 아니며 이 마감 delta의 설계 적합성은 Verifier 3회차 대기다. 접수/발급은 같은 행사 잠금을 공유한다. #172/#173은 각각 행사 잠금 대기·트랜잭션 시간·batch 크기·backlog/drain을 관측하고 수단 없으면 MISSING, broker 병목 단정 금지다. 같은 잠금 순서는 전체 시스템 deadlock 불가능의 증명이 아니다. 새 락/샤딩/튜닝 없음.
-
-## 원격 이슈 본문 수정 초안 (미게시)
-
-### #170 producer
-
-```text
-#167 독립 설계 검토·Architect 수용에 의존합니다. #166/#177 baseline/하니스 전체 완료는 코드 작성 선행 조건에서 제외합니다. V1 경로·측정 기준 commit 보존, 비교/운영 전환 전 baseline·실행 환경 검증은 필요합니다.
-AC: 인증 event/member/attempt·전송 재시도 동일 attempt·별도 correlation, persistent/mandatory/correlated confirm, return 없는 positive confirm만202 ACCEPTED. return/명시 broker basic.nack·발행 전 거부503, framework 합성 nack·불확실 publish는 동일 handle CHECKING. 합성 nack은 단독 slot 반환 금지, 관측된 return/확정 결과 보존·명시 transport 정리 성공 뒤 잔여 slot 반환. r2의 API/wire·canonical vector 및 ADR-004 초기 정책 표를 따릅니다. HTTP202/2xx 단독 성공 집계 금지·status=ACCEPTED만 client 저장 확인 분모입니다. MQ body4096 포함/4097 거부(AMQP properties 별도), 앱당100 모든 행사 합계·timeout 후 미확정 추적을 검증합니다.
-startup/restart fail-closed, topology/listener→readiness 트랜잭션의 event/control 잠금·DB시각/설정 재검사·markOpen/token/unpause 원자 commit→API 활성화. rollback·CLOSED 재OPEN 금지, 기존 V1 전이는 유지합니다. 확인된 immutable snapshot은 refresh DB 실패로2초 만료 안 함. 알려진 drift 차단, consumer pause만으로 readiness 무효화 안 함. 요청별 DB/outbox·동기 payload 충돌409 보장 없음.
-F1/F2/F3·callback 원순서/late/unknown·로그 공백, broker/client digest·실제 resolution, V1 회귀·독립 통합 검증이 필요합니다. 문서 PASS를 런타임 PASS로 쓰지 않습니다.
-```
-
-### #171 consumer
-
-```text
-#167 설계 수용·producer 계약에 의존하며 V1 보존. event 전용 quorum+SAC, 공정성은 최초 커밋된 유효 DB rank입니다.
-행사 잠금 아래 shared pause/provenance·기존 attempt/hash·application 확인, 유효 PENDING admission+MAPPED 또는 정의된 명시 null-token REJECTED/OPEN_PROOF_MISSING만 원자 commit 후 개별 ACK. ACK≠발급 완료. 최종 발급/재고/tier/award 원자 처리는 기존 DB worker 담당이며 CLOSED 유효 backlog도 PENDING→ISSUED/SOLD_OUT 수렴입니다.
-단일 attempt outcome·논리 PK·mapped_member_id FK(event_id,mapped_member_id)·명시 NULL/CHECK. REJECTED는 trusted 신규/일치 version/준비·pause=false/DB 가능/명시 null token의 단일 reason OPEN_PROOF_MISSING, mapping/token NULL입니다. 정상 producer는 non-null이라 이 경로 없음; 누락/형식 오류/drift는 parking이며 DB 실패는 retry입니다. F3의 통제 broker A·정상 새 B와 F6 최초 outcome 경합을 검사합니다. application_id/parent 복합 인덱스 초안은 대체됐습니다. 최초 결과·payload 충돌 parking·거절 뒤 새 유효 시도·인증 조회, child index/FK 비용·음성 DDL 검사를 포함합니다.
-F6: 나머지 제약이 유효하고 대응 application 없는 REJECTED(mapping=NULL, token=NULL, reason=OPEN_PROOF_MISSING) INSERT 성공·application/rank/award 생성0. mapping non-null/token non-null/reason NULL/미지원 reason은 각각 하나만 바꾸어 거부하며 다른 제약의 우연한 실패에 기대지 않습니다. 기존 MAPPED NULL/오소유/미존재 application/unknown outcome/동일 키 경합 시험 유지. 고정 MySQL·실제 DDL·제약 활성화 증거로 확인하고 문서 PASS를 SQL 실행 PASS로 쓰지 않습니다.
-ADR-004 초기 정책 표, 공유 pause·앱별 DB health/재개, F2~F6/F9·rollback ACK0·commit/ACK crash·PENDING 복구·V1 회귀의 독립 RabbitMQ/MySQL 검증 필요. 최소7일·drain/export·참조 보호, 자동 cleanup/cascade/award 삭제 없음.
-```
-
-### #172 장애 복구
-
-```text
-#167 설계 수용과 producer/consumer 구현에 의존. F1/F4/F5/F7~F10을 고정 broker/client/MySQL·하니스 SHA에서 검증합니다.
-일시 장애는 unacked·batch 후속 commit 차단·bounded backoff/중단, 무한 requeue 금지. poison/충돌은 durable parking·공유 pause·명시 조사/재개. DLX 장애·delivery-limit·부분 batch·실효 timeout 전후·consumer cancel/channel close·DB flap/SAC failover를 포함합니다.
-commit→ACK crash 및 replay routed confirm→parking ACK crash는 중복 수렴·최초 outcome/rank 보존. queue와 DB PENDING 양쪽 drain·최종 인증 조회 필요. 원 enqueue 복원 약속 없음·rank/당첨 변화 기록.
-broker nack과 framework 합성 nack 출처·종료 중 callback/명시 정리 경계를 구분하고, confirmed 관측 합집합·unknown·parking/DB ID 대조, 비원자 snapshot/계측 공백/로그 누락 구분. 미해소 ID를 남기고 유실0/최종완료 PASS 금지. 단일 노드 restart≠복제 node-loss 증거. ADR-004 초기 정책 표·실효 override/경계 및 #172/#173 접수/발급 행사 잠금 대기·트랜잭션 시간·batch/backlog/drain을 관측하고 수단 없으면 MISSING, broker 병목 단정 금지. runbook·정확 실행 증거 필요.
-```
-
-## 자체 리뷰·PR 초안
-
-허용 문서만 바꾸며 원본 dirty 번역 ADR·역할·staged 이동/삭제·#177 증거는 가져오지 않는다. src/build/의존성/script/migration/.github 불변. r2의 선택 계약·초기 설정값과 실행 관측 미완료를 구분했다. 실제 구현·SQL·호환성·장애·측정은 미검증이며 r2의 조건부 PASS를 유지하며 이번 마감 delta의 독립 Verifier 3회차 판정이 남는다.
-
-PR 제목: `docs: reconcile issue 167 RabbitMQ contracts and implementation acceptance criteria`.
-
-본문 초안: ADR-004·#171 정정을 맞춰 admission commit→ACK→기존 발급 worker, CLOSED backlog, snapshot/readiness, 소유 FK·보존을 정리합니다. r2에서 수용한 API/message/readiness와 AC↔후속 이슈↔fault matrix, #170/#171/#172 본문 수정 초안을 제공합니다. baseline을 비교/전환 조건으로 분리하며 생산 변경·새 실행·성능 주장은 없습니다. 마감 delta의 독립 Verifier 3회차 검토 뒤 Architect가 정확 SHA의 PR·이슈 처리를 담당합니다.
 
 ## 2026-10-15 — nack 출처 보완 (#170 MAJOR-3)
 

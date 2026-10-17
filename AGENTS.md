@@ -54,11 +54,12 @@ Duplication is acceptable when removing it would require a speculative abstracti
 
 ## Documentation Policy
 
-This policy applies equally to Architect, Builder, and Verifier. Unless the user explicitly requests otherwise, create or update permanent documentation only for:
+This policy applies equally to Architect, Builder, and Verifier. Unless the user explicitly requests otherwise, create or update permanent documentation only for the following four categories:
 
 - Technical decisions: the problem, alternatives considered, selection rationale, and trade-offs.
 - Tests and verification actually executed: purpose, environment, execution conditions, results, and confirmed failure causes. Mark an unknown cause as unconfirmed.
 - Performance measurements actually executed: environment, metrics, results, and the basis for comparison.
+- Essential project execution documentation/configuration and agent operating rules, including README, AGENTS.md, role instructions, and required runbooks.
 
 Do not create permanent records of agent conversations or handoff processes, routine progress, duplicate code-change summaries, task history already in GitHub Issues/PRs, general project analysis, or unnecessary reports.
 
@@ -66,7 +67,7 @@ Do not create permanent records of agent conversations or handoff processes, rou
 - Write or update an ADR only when an important design decision is made or changed. A task completion or routine implementation does not require an ADR.
 - Record test results only for checks actually run, with the target SHA and scope. Missing or unexecuted required checks mean INCOMPLETE, never PASS. Report omissions in the task response/PR; do not create a separate document for them.
 - Keep agent-to-agent payloads and temporary handoff files in untracked, ignored runtime storage or a temporary directory. Do not commit, publish, or copy them into permanent documentation.
-- Do not delete existing records without explicit authorization. This policy governs new records and updates; it does not authorize historical cleanup.
+- Delete existing records only within an explicitly authorized cleanup scope, after checking references and preserving unique decisions and actual verification/performance evidence in the relevant existing document. Keep historical ADRs that explain a current decision. Do not delete source evidence or test results.
 - User-requested changes to these shared rules and existing role/configuration instructions are allowed. They do not require a new policy report or ADR.
 
 ## Operating Rules

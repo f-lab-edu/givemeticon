@@ -29,9 +29,9 @@
 
 OPEN Draft [#178](https://github.com/f-lab-edu/givemeticon/pull/178)/[#179](https://github.com/f-lab-edu/givemeticon/pull/179)/[#180](https://github.com/f-lab-edu/givemeticon/pull/180)/[#181](https://github.com/f-lab-edu/givemeticon/pull/181)의 원격 head는1e268d9/4618b82/3989547/87b68bd다. develop에 들어 있다고 가정하지 않는다. #181 로컬 보존 후보8c6e693·safety 후보6307eb0는 모두 별도 local commit이며 develop ancestor가 아니다.
 
-6307eb0의 로컬 검토는 **5/200 스모크를 exit0으로 처리해 다음10k 단계를 허용하는 MAJOR**를 보고한다. MySQL3306의 모든 binding이 의도한 loopback/port인지 검사할 위치도 지정돼 있다. drop 누락을0으로 취급하는 표기, 조회하지 않은 요청을 timeout으로 기록, baseline 사후 생존/한도 검사, 오류 시 증거 부재가 남는다. 이는 develop의 현재 활성 workflow 결함이라는 뜻은 아니다. develop tracked Actions는 ci/cd/sonar3개이며 hosted workload workflow는 없다.
+6307eb0의 로컬 검토는 **5/200 스모크를 exit0으로 처리해 다음10k 단계를 허용하는 MAJOR**를 보고한다. 실행 경계 검토는 MAJOR1·MINOR5를 보고했다. MySQL3306의 모든 binding이 의도한 loopback/port인지 DB 쓰기·k6 이전에 검사해야 하며 verify-calibration-caps만 보강하면 baseline 진입점을 놓친다. drop 누락을0으로 취급하는 표기, 조회하지 않은 요청을 timeout으로 기록, baseline 사후 생존/한도 검사, 오류 시 증거 부재가 남는다. 이는 develop의 현재 활성 workflow 결함이라는 뜻은 아니다. develop tracked Actions는 ci/cd/sonar3개이며 hosted workload workflow는 없다.
 
-출처는 [로컬 맥락](local-only-context.md)과 #177 인계다. 이번에 합성 재현을 반복하지 않았다. 후속 수정·분석 정독 완료 증거는 확인하지 못했다.
+출처 해시는 [source manifest](source-manifest.json)에 있고, 원본 로컬 #177 execution-boundary-verifier·harness-safety-verifier 기록은 실제 검증 근거가 있어 보존한다. 이번에 합성 재현을 반복하지 않았다. 후속 수정·분석 정독 완료 증거는 확인하지 못했다.
 
 ## 시간 민감한 증거
 
@@ -46,3 +46,5 @@ OPEN Draft [#178](https://github.com/f-lab-edu/givemeticon/pull/178)/[#179](http
 최초 맥락 조사에서는 로컬 인계의 10월16일 원격 영구 보존 목표에 대한 완료 commit 연결을 찾지 못했다. 이후 사용자의 보존 지시로 위 3개 원본 ZIP을 다운로드해 이 문서 브랜치에 보관하고 GitHub digest·내부 checksum·run SHA를 대조했다. [2026-10-17 보존 결과](artifact-preservation-20261017.md)를 따른다. 원본 덮어쓰기·Actions trigger·retry·기한 변경은 하지 않았다.
 
 재개 전 환경·owner·포트·credential·생성/관측 gate·분석 코드를 확인하고 정확 SHA의 검증과 해당 실행 권한을 확정한다. baseline 전체 완료는 #170/#171 코드 작성의 선행 조건은 아니지만 #173 비교·운영 전환에는 필요하다.
+
+8c6e693 보존 후보의 소규모 shell/policy PASS와 6307eb0 safety 후보의 검토는 실행 승인·분석 코드 정독 완료와 별개다. 원본 로컬 #177 인계·테스트 로그를 삭제하거나 이번 정리의 새 PASS로 옮기지 않는다. 과거 72시간·quota 예약·1회 실행 허가는 새 실행 권한이 아니다.

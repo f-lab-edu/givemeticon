@@ -1,57 +1,13 @@
-# RabbitMQ migration — evidence index
+# RabbitMQ 결정·검증 근거
 
-Status: in progress; no final architecture/performance approval. Original mandate expired2026-10-10T06:28:11Z incomplete. Human resumed the existing scope2026-10-10T14:27:10Z (ca0a8c52); no new72h deadline was specified. Expired workflow disabled; continuation ends at project completion or subsequent human stop/change. Current checkpoint: [STATUS](../agent-run/STATUS.md).
+작업 상태와 이력은 [Issue](https://github.com/f-lab-edu/givemeticon/issues)·[PR](https://github.com/f-lab-edu/givemeticon/pulls)을 기준으로 한다. 이 색인은 결정·검증 자료만 연결한다.
 
-## Scope and decisions
-- [ADR-001](../adr/ADR-001-baseline.md): V1/stock separation, load denominators, resource conditions, diagnostic limits.
-- [ADR-002](../adr/ADR-002-distributed-lock.md): preserve existing lock until verified replacement and caller audit.
-- [ADR-003](../adr/ADR-003-rabbitmq.md): historical review/attempt contracts; superseded ordering sections are explicit in ADR-004.
-- [ADR-004](../adr/ADR-004-rabbitmq-implementation-contract.md): selected quorum/SAC/committed processing rank, confirms, admission/issuance boundaries, remaining tests.
+- [ADR-001](../adr/ADR-001-baseline.md): V1/stock 구분, 분모·자원·관측·비교 조건.
+- [ADR-002](../adr/ADR-002-distributed-lock.md): 대체 경로 검증과 caller 감사 전 기존 락 보존.
+- [ADR-003](../adr/ADR-003-rabbitmq.md): 과거 검토·대안. 순서·복구 계약의 대체 범위는 ADR-004를 따른다.
+- [ADR-004](../adr/ADR-004-rabbitmq-implementation-contract.md): quorum/SAC·DB commit 순번·confirm/ACK·실패·보존 계약.
+- [상세 wire·readiness 계약](../tasks/issue-167-contract-review.md), [기준 소스 해시](../tasks/issue-167-contract-sources.json).
+- [전달·최종 상태의 분모](RABBITMQ_DELIVERY_ACCOUNTING.md).
+- [실제 baseline 진단](../experiments/baseline-10k-diagnostic.md), [측정의 한계](../decisions/baseline-and-evidence.md), [보존 ZIP 무결성](../decisions/artifact-preservation-20261017.md).
 
-## Work sequence
-| Scope | Issue | Evidence / PR | Status |
-|---|---|---|---|
-| Original preparation | [164](https://github.com/f-lab-edu/givemeticon/issues/164) | [165](https://github.com/f-lab-edu/givemeticon/pull/165), head89a5df1 | ARCHITECT APPROVED, documentation only; unmerged |
-| Isolated comparable baseline | [166](https://github.com/f-lab-edu/givemeticon/issues/166) | Verifier new environment | In progress |
-| Architecture contract | [167](https://github.com/f-lab-edu/givemeticon/issues/167) | [169](https://github.com/f-lab-edu/givemeticon/pull/169) | #169 MERGED; #167 reconciliation awaiting Verifier |
-| Reproducible harness | [168](https://github.com/f-lab-edu/givemeticon/issues/168) | [176](https://github.com/f-lab-edu/givemeticon/pull/176) | ARCHITECT APPROVED d4855a5, packaging only; unmerged |
-| Producer | [170](https://github.com/f-lab-edu/givemeticon/issues/170) | Pending | Design gate; baseline for comparison/rollout, not code writing |
-| Consumer consistency | [171](https://github.com/f-lab-edu/givemeticon/issues/171) | Pending | Depends on contract |
-| Retry/DLQ/faults | [172](https://github.com/f-lab-edu/givemeticon/issues/172) | Pending | Depends on consumer |
-| Batch/load comparison | [173](https://github.com/f-lab-edu/givemeticon/issues/173) | Pending | Valid baseline and implementation needed |
-| Obsolete cleanup | [174](https://github.com/f-lab-edu/givemeticon/issues/174) | Pending | Replacement verification first |
-| Portfolio report | [175](https://github.com/f-lab-edu/givemeticon/issues/175) | This index | Final evidence incomplete |
-
-## Existing measurements, not before/after proof
-Base b941a04; detailed Verifier diagnostic in harness PR176 and ADR-001. Original uncapped stock1000/high500 runs admitted1050/10001 and1100/10000; other members got ENDED. Success-only admission p95 approximately594ms and975ms. These do not establish100% final outcome for all offered members. Expanded-stock run sent9874 rather than target10000, had128 dropped iterations and19 client timeouts with final DB ISSUED. Memory pressure and missing Hikari samples prevent causal attribution. No RabbitMQ performance number exists yet. No equal-budget comparison exists yet. UPDATE timestamps are not commit/client-observed latency.
-
-## Failed assumptions and corrections
-- Latest V1 is not the legacy Redisson stock path; API/business differences must be stated.
-- Most fast ENDED responses cannot establish durable-admission latency for all10000.
-- Same-host UTC does not establish zero clock error.
-- Low sampled CPU/pool values with missing samples do not establish absence of saturation.
-- Local clean worktree did not guarantee tracked config; ignored dummy settings were missing from90d2e12. Packaging uses tracked replacement880aaef and fresh-checkout checks.
-- Strict original enqueue rank was not proven for all recovery cases. Selected contract is committed DB rank, with explicit recovery fairness trade-off.
-
-## Final report checklist
-1. Final architecture — selected, not implemented/approved yet.
-2. Existing bottleneck — not causally established yet.
-3. RabbitMQ rationale — explicit experiment goal and durable burst buffer hypothesis; performance benefit unproven.
-4. Before/after metrics — not available.
-5. Consistency — existing diagnostic checks only; RabbitMQ tests pending.
-6. Recovery — RabbitMQ fault matrix pending.
-7. Issues — above.
-8. PRs and approvals — #165/#176 scoped ARCHITECT APPROVED, unmerged. #169 docs is MERGED (c10a920); #167 reconciliation awaits Verifier; #178 hosted harness remains unapproved; #178 run37586432949 failed its generation gate. No baseline PASS.
-9. ADRs — above.
-10. Removed legacy paths — none.
-11. Technical debt — environment reproducibility, observation coverage, queue/client compatibility, recovery fairness, evidence packaging.
-12. Portfolio story — preserve decisions and failed hypotheses; do not turn the chosen technology into a fabricated bottleneck narrative.
-13. Unverified — strict final SLO,50k/100k, equal-budget comparisons, RabbitMQ loss/duplicate/failure guarantees, cleanup safety.
-
-## Resumed hosted evidence — 2026-10-10
-PR178 head1e268d9/run37586432949: archived166 checksum files verified by Architect and independently by Verifier. Stock2029 first requests/dropped7972; V1 4843/dropped5158. 10k target unmet. App cgroup throttling observed; generator cgroup missing and causal bottleneck unresolved. Stock lock rejections and client/DB divergence are observations, not proof RabbitMQ improves them. Source: RESEARCH/ISSUE_177_RUN_37586432949_verifier/VERIFIER_REVIEW.md in Buzz workspace. Next profile must budget broker upfront; baseline leaves that slot idle for fixed-allocation comparison, separately disclose utilized resources. No automatic rerun/cap relaxation.
-
-
-## #167 contract reconciliation — 2026-10-13
-
-[Current contract/AC review](../tasks/issue-167-contract-review.md) links API/message/readiness, ACK/recovery, schema/retention and #170/#171/#172 body drafts. [Source hashes](../tasks/issue-167-contract-sources.json) refer to develop1f8d556; exact local candidate SHAs are in the external Builder handoff. Baseline/harness completion is not a gate for design reconciliation or producer/consumer code writing. Runtime/fault/performance evidence remains pending. Historical measurements and #177 evidence are unchanged; implementation issues are not closed.
+측정값을 다른 SHA·환경의 검증으로 옮기지 않는다. fast ENDED·success-only latency·DB UPDATE 시각은 각각 내구 접수·전체 분모·commit/client 완료의 증거가 아니다. 결측 CPU/pool 표본과 자원 상한 미강제 진단으로 병목을 단정하지 않는다. confirmed/unknown·queue/DB PENDING 양쪽과 최초 신청 전체 분모를 관측한다. 동일 예산의 RabbitMQ 전후 비교·실제 장애 행렬 실행은 이 설계 문서만으로 입증되지 않는다.
