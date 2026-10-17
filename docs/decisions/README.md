@@ -21,13 +21,14 @@
 | [Issue–코드 대조](issue-code-audit.md) | 전체 Issue 조사 범위, 주요 AC 대조, PR/Commit·문서 불일치 |
 | [로컬 전용 맥락](local-only-context.md) | CLI 대화·미추적 인계·미게시 후보·미해결 지적 |
 | [GitHub 목록](github-inventory.json) / [출처 manifest](source-manifest.json) / [문서 검사](verification.json) | 상태 스냅샷·원문 해시·출처 범위·검사 결과 |
+| [#177 artifact 보존](artifact-preservation-20261017.md) | 후속 원본 ZIP·GitHub digest·내부 checksum 검증과 영구 보관 |
 | [작업 인계](context-recovery-handoff.md) | 조사 계획·검사·다음 담당자 프롬프트 |
 
 기존 ADR와 architecture 문서는 다시 쓰거나 삭제하지 않았다. 그 문서의 “현재/최신/미병합/검토 대기”는 작성 시점의 상태일 수 있다. 이 색인은 후속 PR과 코드에 의한 대체 관계를 보충한다.
 
 ## 다음 우선순위
 
-1. **#177 증거 보존 확인**: artifact가 10월18~19일 만료된다. 로컬 보존본·checksum·원격 영구 보존을 먼저 대조한다. workflow 재실행이나 원본 덮어쓰기는 하지 않는다.
+1. **#177 증거 보존**: 후속 작업으로 만료 예정 ZIP 3개와 원본 메타데이터·해시를 보존했다. [보존 결과](artifact-preservation-20261017.md)를 먼저 확인한다. workflow 재실행이나 원본 덮어쓰기는 하지 않는다.
 2. **#170 후보 Architect 검토**: `b806db2`의 한정 PASS와 MINOR 3건, 최신 develop 통합·ADR 충돌을 확인한다. 통합한 새 SHA의 검토가 필요하다.
 3. **#170 잔여 연결 → #171 → #172**: 인증 API/readiness/attempt 조회·실제 transport 검증을 나누고, Consumer/DDL/commit 후 ACK와 장애·parking 검증을 진행한다. 이 조사는 새 실행 권한을 부여하지 않는다.
 4. **#177 하니스 경계·분석 정독**: `6307eb0`의 MAJOR·MySQL binding gate 누락을 처리한다. 원격 Draft #181과 로컬 `8c6e693`는 별개다. baseline 미완료가 #170/#171 코드 작성의 차단 조건은 아니다.
