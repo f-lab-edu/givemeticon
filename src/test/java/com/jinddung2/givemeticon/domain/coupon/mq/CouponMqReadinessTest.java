@@ -99,4 +99,37 @@ class CouponMqReadinessTest {
         assertEquals(List.of("begin","rollback"),evidence);
     }
 
+    @Test void readinessReasonsDoNotExposeSnapshotsOrChangeNotReadyDriftSemantics() {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(CouponMqReadinessService.class);
+        var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();logger.addAppender(logs);
+        var topology=mock(CouponMqConfiguration.class);var consumer=mock(CouponMqConsumer.class);var transaction=mock(CouponMqReadinessTransactionService.class);
+        var readiness=new CouponMqReadinessService(7,topology,mock(RabbitAdmin.class),consumer,transaction);
+        try {
+            readiness.refresh();verifyNoInteractions(transaction);
+            when(consumer.registered()).thenReturn(true);when(transaction.initialize(7,true,true)).thenThrow(new CouponMqReadinessTransactionService.NotReady());
+            readiness.refresh();assertThrows(org.springframework.web.server.ResponseStatusException.class,()->readiness.snapshot(7));
+            var snapshot=new CouponMqReadinessTransactionService.Snapshot(7,"secret-version","secret-token",false);
+            doReturn(snapshot).when(transaction).initialize(7,true,true);readiness.refresh();assertSame(snapshot,readiness.snapshot(7));
+            doThrow(new DataAccessResourceFailureException("secret-password")).when(transaction).initialize(7,true,true);readiness.refresh();assertSame(snapshot,readiness.snapshot(7));
+            doThrow(new CouponMqReadinessTransactionService.Drift()).when(transaction).initialize(7,true,true);readiness.refresh();
+            assertThrows(org.springframework.web.server.ResponseStatusException.class,()->readiness.snapshot(7));
+            String text=logs.list.stream().map(e->e.getFormattedMessage()).collect(java.util.stream.Collectors.joining("\n"));
+            for(String reason:List.of("WAITING_FOR_REGISTRATION","INITIALIZATION_NOT_READY","SNAPSHOT_ESTABLISHED","INITIALIZATION_EXCEPTION","SNAPSHOT_DRIFT"))assertTrue(text.contains(reason),reason);
+            assertFalse(text.contains("secret-"));assertTrue(logs.list.stream().allMatch(e->e.getThrowableProxy()==null));
+            verify(transaction,times(4)).initialize(7,true,true);
+        } finally {logger.detachAppender(logs);logs.stop();}
+    }
+    @Test void topologyUnavailableAndDriftRemainFailClosedWithSafeReasons() {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(CouponMqReadinessService.class);
+        var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();logger.addAppender(logs);
+        var topology=mock(CouponMqConfiguration.class);var consumer=mock(CouponMqConsumer.class);var transaction=mock(CouponMqReadinessTransactionService.class);
+        var readiness=new CouponMqReadinessService(7,topology,mock(RabbitAdmin.class),consumer,transaction);
+        try {
+            when(topology.verifyTopology(any())).thenThrow(new IllegalStateException("secret-message")).thenThrow(new CouponMqReadinessTransactionService.Drift());
+            readiness.refresh();readiness.refresh();readiness.refresh();verify(topology,times(2)).verifyTopology(any());verifyNoInteractions(transaction);
+            String text=logs.list.stream().map(e->e.getFormattedMessage()).collect(java.util.stream.Collectors.joining("\n"));
+            assertTrue(text.contains("TOPOLOGY_UNAVAILABLE"));assertTrue(text.contains("TOPOLOGY_DRIFT"));assertFalse(text.contains("secret-message"));
+        } finally {logger.detachAppender(logs);logs.stop();}
+    }
+
 }

@@ -20,6 +20,29 @@ import java.nio.charset.StandardCharsets;
 @Configuration
 @Profile("coupon-mq")
 public class CouponMqConfiguration {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(CouponMqConfiguration.class);
+    private final java.util.Map<String,String> diagnosticStates = new java.util.HashMap<>();
+    private final java.util.Map<String,Long> diagnosticTimes = new java.util.HashMap<>();
+    private final java.util.Map<String,Integer> diagnosticSuppressed = new java.util.HashMap<>();
+    long diagnosticNow() { return System.nanoTime(); }
+    void diagnostic(String phase, String reason, Throwable failure, String state) {
+        try {
+            synchronized (diagnosticStates) {
+                long now = diagnosticNow();
+                String kind = failure == null ? "none" : failure.getClass().getName();
+                String value = reason + "|" + kind + "|" + state;
+                if (value.equals(diagnosticStates.get(phase))
+                        && now - diagnosticTimes.get(phase) < java.util.concurrent.TimeUnit.SECONDS.toNanos(30)) {
+                    diagnosticSuppressed.merge(phase, 1, Integer::sum); return;
+                }
+                int suppressed = diagnosticSuppressed.getOrDefault(phase, 0);
+                diagnosticStates.put(phase, value); diagnosticTimes.put(phase, now); diagnosticSuppressed.put(phase, 0);
+                LOG.info("coupon_mq diagnostic event={} pid={} phase={} reason={} failure_class={} state={} suppressed={}",
+                        eventId, ProcessHandle.current().pid(), phase, reason, kind, state, suppressed);
+            }
+        } catch (RuntimeException ignored) { /* Observation must not affect business behavior. */ }
+    }
+
     @Value("${coupon.mq.event-id}") private long eventId;
     @Value("${coupon.mq.host}") private String host;
     @Value("${coupon.mq.port}") private int port;
@@ -85,7 +108,7 @@ public class CouponMqConfiguration {
             for (Throwable cause = failed; cause != null; cause = cause.getCause()) {
                 if (cause instanceof com.rabbitmq.client.ShutdownSignalException shutdown
                         && shutdown.getReason() instanceof com.rabbitmq.client.AMQP.Channel.Close close
-                        && close.getReplyCode() == 406) throw new CouponMqReadinessTransactionService.Drift();
+                        && close.getReplyCode() == 406) { diagnostic("rejection", "AMQP_406", failed, "rejected=true"); throw new CouponMqReadinessTransactionService.Drift(); }
             }
             throw failed;
         }
@@ -101,7 +124,7 @@ public class CouponMqConfiguration {
         admin.declareBinding(new Binding(parking(eventId), Binding.DestinationType.QUEUE, dlx, "park", null));
         admin.declareQueue(new Queue(queue(eventId), true, false, false, mainArgs));
         admin.declareBinding(new Binding(queue(eventId), Binding.DestinationType.QUEUE, exchange, "admit", null));
-        if (!"4.3.6".equals(get("overview").path("rabbitmq_version").asText())) throw new CouponMqReadinessTransactionService.Drift();
+        if (!"4.3.6".equals(get("overview").path("rabbitmq_version").asText())) { diagnostic("version", "VERSION_MISMATCH", null, "rejected=true"); throw new CouponMqReadinessTransactionService.Drift(); }
         String base = "queues/" + segment(vhost) + "/";
         JsonNode main = get(base + segment(queue(eventId))), parking = get(base + segment(parking(eventId)));
         checkQueue(main, mainArgs); checkQueue(parking, parkingArgs);
@@ -110,23 +133,24 @@ public class CouponMqConfiguration {
                 "overflow", "reject-publish", "delivery-limit", 20, "max-length", 150000,
                 "delayed-retry-type", "disabled", "consumer-timeout", 1800000));
         if (!expectedPolicy.equals(main.path("effective_policy_definition"))
-                || !parking.path("effective_policy_definition").isEmpty()) throw new CouponMqReadinessTransactionService.Drift();
+                || !parking.path("effective_policy_definition").isEmpty()) { diagnostic("policy", "EFFECTIVE_POLICY_MISMATCH", null, "rejected=true"); throw new CouponMqReadinessTransactionService.Drift(); }
         verifyBinding(exchange, queue(eventId), "admit"); verifyBinding(dlx, parking(eventId), "park");
         if (!parking.path("messages").isIntegralNumber() || parking.path("messages").asLong() < 0)
-            throw new CouponMqReadinessTransactionService.NotReady();
+            { diagnostic("parking", "PARKING_COUNT_INVALID", null, "rejected=true"); throw new CouponMqReadinessTransactionService.NotReady(); }
         return parking.path("messages").asLong();
     }
     private void checkQueue(JsonNode queue, Map<String,Object> args) {
         if (!queue.path("durable").asBoolean() || queue.path("auto_delete").asBoolean()
                 || queue.path("exclusive").asBoolean() || !"quorum".equals(queue.path("type").asText())
-                || !new ObjectMapper().valueToTree(args).equals(queue.path("arguments"))
-                || !queue.path("operator_policy").asText("").isEmpty()) throw new CouponMqReadinessTransactionService.Drift();
+                ) { diagnostic("queue_attributes", "QUEUE_ATTRIBUTES_MISMATCH", null, "rejected=true"); throw new CouponMqReadinessTransactionService.Drift(); }
+        if (!new ObjectMapper().valueToTree(args).equals(queue.path("arguments"))) { diagnostic("queue_arguments", "QUEUE_ARGUMENTS_MISMATCH", null, "rejected=true"); throw new CouponMqReadinessTransactionService.Drift(); }
+        if (!queue.path("operator_policy").asText("").isEmpty()) { diagnostic("operator_policy", "OPERATOR_POLICY_MISMATCH", null, "rejected=true"); throw new CouponMqReadinessTransactionService.Drift(); }
     }
     private void verifyBinding(String exchange, String queue, String key) {
         JsonNode bindings = get("exchanges/" + segment(vhost) + "/" + segment(exchange) + "/bindings/source");
         if (!bindings.isArray() || bindings.size() != 1 || !queue.equals(bindings.get(0).path("destination").asText())
                 || !"queue".equals(bindings.get(0).path("destination_type").asText())
-                || !key.equals(bindings.get(0).path("routing_key").asText())) throw new CouponMqReadinessTransactionService.Drift();
+                || !key.equals(bindings.get(0).path("routing_key").asText())) { diagnostic("binding", "BINDING_MISMATCH", null, "rejected=true"); throw new CouponMqReadinessTransactionService.Drift(); }
     }
     private JsonNode get(String path) {
         return management.getForObject(URI.create(managementUrl + "/api/" + path), JsonNode.class);

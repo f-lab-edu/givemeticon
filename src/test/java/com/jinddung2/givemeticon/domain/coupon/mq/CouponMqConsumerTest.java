@@ -123,4 +123,41 @@ class CouponMqConsumerTest {
         }
     }
 
+    @Test void swallowedHealthAndStartExceptionsHaveSafeReasonsWithoutChangingCalls() {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(CouponMqConsumer.class);
+        var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();logger.addAppender(logs);
+        var container=mock(SimpleMessageListenerContainer.class);
+        try(var consumer=new Consumer(admission,readiness)) {
+            consumer.attach(container);consumer.topologyVerified(true);
+            when(readiness.healthy(7)).thenThrow(new DataAccessResourceFailureException("secret-health-password"));
+            consumer.supervise();verify(container,never()).start();verify(readiness).healthy(7);
+            doReturn(true).when(readiness).healthy(7);doThrow(new IllegalStateException("secret-start-token")).when(container).start();
+            consumer.supervise();verify(container).start();assertFalse(consumer.registered());
+            when(container.isRunning()).thenReturn(true);when(container.getActiveConsumerCount()).thenReturn(1);
+            assertTrue(consumer.registered());verifyNoInteractions(channel);
+            String text=logs.list.stream().map(e->e.getFormattedMessage()).collect(java.util.stream.Collectors.joining("\n"));
+            for(String reason:List.of("HEALTH_EXCEPTION","HEALTH_FALSE","REGISTRATION_ATTEMPT","START_EXCEPTION","active=1"))assertTrue(text.contains(reason),reason);
+            assertFalse(text.contains("secret-"));assertTrue(logs.list.stream().allMatch(e->e.getThrowableProxy()==null));
+        } finally {logger.detachAppender(logs);logs.stop();}
+    }
+    @Test void diagnosticsSuppressRepeatsRemindAtThirtySecondsAndCannotBreakBusiness() {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(CouponMqConsumer.class);
+        var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();logger.addAppender(logs);
+        class DiagnosticConsumer extends Consumer {
+            long diagnosticTime=1;boolean fail;
+            DiagnosticConsumer(){super(CouponMqConsumerTest.this.admission,CouponMqConsumerTest.this.readiness);}
+            @Override long diagnosticNow(){if(fail)throw new IllegalStateException("secret-clock");return diagnosticTime;}
+        }
+        try(var consumer=new DiagnosticConsumer()) {
+            consumer.diagnostic("health","HEALTH_FALSE",null,"healthy=false");
+            for(int i=0;i<10;i++)consumer.diagnostic("health","HEALTH_FALSE",null,"healthy=false");
+            assertEquals(1,logs.list.size());consumer.diagnosticTime+=TimeUnit.SECONDS.toNanos(30);
+            consumer.diagnostic("health","HEALTH_FALSE",null,"healthy=false");assertEquals(2,logs.list.size());
+            assertTrue(logs.list.get(1).getFormattedMessage().contains("suppressed=10"));
+            consumer.diagnostic("health","HEALTH_TRUE",null,"healthy=true");assertEquals(3,logs.list.size());
+            consumer.fail=true;assertDoesNotThrow(()->consumer.diagnostic("health","HEALTH_FALSE",null,"healthy=false"));
+            var container=mock(SimpleMessageListenerContainer.class);consumer.attach(container);assertDoesNotThrow(consumer::supervise);verify(container,never()).start();
+        } finally {logger.detachAppender(logs);logs.stop();}
+    }
+
 }

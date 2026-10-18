@@ -18,6 +18,28 @@ import org.springframework.scheduling.annotation.Scheduled;
 /** One event/channel buffer, prefetch 50; flush is scheduled from the first delivery, not the last. */
 public class CouponMqConsumer implements ChannelAwareMessageListener, AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(CouponMqConsumer.class);
+    private final java.util.Map<String,String> diagnosticStates = new java.util.HashMap<>();
+    private final java.util.Map<String,Long> diagnosticTimes = new java.util.HashMap<>();
+    private final java.util.Map<String,Integer> diagnosticSuppressed = new java.util.HashMap<>();
+    long diagnosticNow() { return System.nanoTime(); }
+    void diagnostic(String phase, String reason, Throwable failure, String state) {
+        try {
+            synchronized (diagnosticStates) {
+                long now = diagnosticNow();
+                String kind = failure == null ? "none" : failure.getClass().getName();
+                String value = reason + "|" + kind + "|" + state;
+                if (value.equals(diagnosticStates.get(phase))
+                        && now - diagnosticTimes.get(phase) < java.util.concurrent.TimeUnit.SECONDS.toNanos(30)) {
+                    diagnosticSuppressed.merge(phase, 1, Integer::sum); return;
+                }
+                int suppressed = diagnosticSuppressed.getOrDefault(phase, 0);
+                diagnosticStates.put(phase, value); diagnosticTimes.put(phase, now); diagnosticSuppressed.put(phase, 0);
+                LOG.info("coupon_mq diagnostic event={} pid={} phase={} reason={} failure_class={} state={} suppressed={}",
+                        eventId, ProcessHandle.current().pid(), phase, reason, kind, state, suppressed);
+            }
+        } catch (RuntimeException ignored) { /* Observation must not affect business behavior. */ }
+    }
+
     private static final long[] BACKOFF = {250, 1000, 2000, 5000};
     private final long eventId;
     private final CouponMqAdmissionTransactionService admission;
@@ -42,7 +64,7 @@ public class CouponMqConsumer implements ChannelAwareMessageListener, AutoClosea
         this.eventId = eventId; this.admission = admission; this.readiness = readiness;
     }
     void topologyVerified(boolean verified) { topologyReady = verified; }
-    void attach(SimpleMessageListenerContainer container) { this.container = container; }
+    void attach(SimpleMessageListenerContainer container) { this.container = container; observeRegistration("attach", "ATTACHED", null); }
     @Override public synchronized void onMessage(Message message, Channel deliveredChannel) {
         if (closed || stopped) return; // Held unacked until the supervisor closes this channel.
         if (channel != null && channel != deliveredChannel) { stopProcessing(); return; }
@@ -111,32 +133,42 @@ public class CouponMqConsumer implements ChannelAwareMessageListener, AutoClosea
     }
     public synchronized void parkDetected() { if (!stopped) stopProcessing(); }
 
+    private void observeRegistration(String phase, String reason, Throwable failure) {
+        try {
+            boolean running = container != null && container.isRunning();
+            int count = container == null ? 0 : container.getActiveConsumerCount();
+            diagnostic(phase, reason, failure, "running=" + running + ",active=" + count);
+        } catch (RuntimeException ignored) { /* Diagnostic getters cannot change supervision. */ }
+    }
+
     /** No container recovery loop: health supervision owns every initial start/restart. */
     @Scheduled(fixedDelay = 1000)
     public void supervise() {
         if (closed || container == null || !supervising.compareAndSet(false, true)) return;
         try {
-            if (!topologyReady) { if (!stopped) stopProcessing(); if (container.isRunning()) container.stop(); return; }
-            if (!stopped && !container.isRunning()) stopProcessing();
-            if (!stopped) return;
+            if (!topologyReady) { diagnostic("topology", "TOPOLOGY_BLOCKED", null, "ready=false"); if (!stopped) stopProcessing(); if (container.isRunning()) container.stop(); return; }
+            if (!stopped && !container.isRunning()) { diagnostic("registration_loss", "REGISTRATION_LOST", null, "running=false"); stopProcessing(); }
+            if (!stopped) { observeRegistration("registration_observation", "OBSERVED", null); return; }
             if (container.isRunning()) container.stop();
             long now = now();
             if (startedOnce && (now - lastHealth < TimeUnit.SECONDS.toNanos(5))) return;
             lastHealth = now;
             boolean healthy;
             try { healthy = readiness.healthy(eventId); }
-            catch (RuntimeException failure) { healthy = false; }
-            if (!healthy) { healthyChecks = 0; return; }
+            catch (RuntimeException failure) { diagnostic("health_exception", "HEALTH_EXCEPTION", failure, "healthy=false"); healthy = false; }
+            if (!healthy) { diagnostic("health", "HEALTH_FALSE", null, "healthy=false"); healthyChecks = 0; return; }
+            diagnostic("health", "HEALTH_TRUE", null, "healthy=true");
             healthyChecks++;
             if (startedOnce && (healthyChecks < 3 || now - stoppedAt < TimeUnit.SECONDS.toNanos(30))) return;
             synchronized (this) {
                 pending.clear(); channel = null; stopped = false; startedOnce = true;
             }
-            try { container.start(); }
-            catch (RuntimeException failure) { stopProcessing(); }
+            observeRegistration("registration_attempt", "REGISTRATION_ATTEMPT", null);
+            try { container.start(); observeRegistration("registration_return", "START_RETURN", null); }
+            catch (RuntimeException failure) { observeRegistration("registration_return", "START_EXCEPTION", failure); stopProcessing(); }
         } finally { supervising.set(false); }
     }
-    boolean registered() { return container != null && container.isRunning() && container.getActiveConsumerCount() > 0; }
+    boolean registered() { boolean value = container != null && container.isRunning() && container.getActiveConsumerCount() > 0; observeRegistration("registration_observation", "OBSERVED", null); return value; }
     @Override public synchronized void close() {
         closed = true; stopProcessing(); flushes.shutdownNow();
     }

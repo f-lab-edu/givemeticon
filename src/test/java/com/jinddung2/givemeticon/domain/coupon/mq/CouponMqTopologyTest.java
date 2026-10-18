@@ -68,4 +68,34 @@ class CouponMqTopologyTest {
         }
     }
 
+    @Test void queueRejectionReasonsRemainStaticAndThrowOriginalDriftType()throws Exception {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(CouponMqConfiguration.class);
+        var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();logger.addAppender(logs);
+        try {
+            Map<String,Object> expected=Map.of("x-queue-type","quorum");
+            for(String change:List.of("attributes","arguments","operator")) {
+                var node=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(queue(expected,Map.of()));
+                if(change.equals("attributes"))node.put("durable",false);
+                if(change.equals("arguments"))node.putObject("arguments").put("secret-password","never-log");
+                if(change.equals("operator"))node.put("operator_policy","secret-token");
+                assertThrows(CouponMqReadinessTransactionService.Drift.class,()->ReflectionTestUtils.invokeMethod(configuration,"checkQueue",node,expected));
+            }
+            String text=logs.list.stream().map(e->e.getFormattedMessage()).collect(java.util.stream.Collectors.joining("\n"));
+            for(String reason:List.of("QUEUE_ATTRIBUTES_MISMATCH","QUEUE_ARGUMENTS_MISMATCH","OPERATOR_POLICY_MISMATCH"))assertTrue(text.contains(reason));
+            assertFalse(text.contains("secret-"));assertFalse(text.contains("never-log"));
+        } finally {logger.detachAppender(logs);logs.stop();}
+    }
+    @Test void amqp406IsDiagnosedWithoutLoggingServerTextOrChangingException() {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(CouponMqConfiguration.class);
+        var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();logger.addAppender(logs);
+        try {
+            var close=new com.rabbitmq.client.AMQP.Channel.Close.Builder().replyCode(406).replyText("secret-server-message").classId(50).methodId(10).build();
+            var shutdown=new com.rabbitmq.client.ShutdownSignalException(false,false,close,null);
+            doThrow(new org.springframework.amqp.AmqpIOException(new java.io.IOException(shutdown))).when(admin).declareExchange(any());
+            assertThrows(CouponMqReadinessTransactionService.Drift.class,()->configuration.verifyTopology(admin));
+            assertTrue(logs.list.stream().anyMatch(e->e.getFormattedMessage().contains("AMQP_406")));
+            assertTrue(logs.list.stream().noneMatch(e->e.getFormattedMessage().contains("secret-server-message")||e.getThrowableProxy()!=null));
+        } finally {logger.detachAppender(logs);logs.stop();}
+    }
+
 }
