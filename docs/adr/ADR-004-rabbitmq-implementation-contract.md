@@ -176,3 +176,10 @@ canonical hash는 수신 원문이 아닌 검증·정규화한 지원 필드를 
 close는 신규 admission을 영구 차단하고 공유 cleanup worker1·대기열0에서 owner별 진행 시도 ID를 공유한다. 동시·재진입 close는 중복 실행하지 않는다. 최대5초 관측의 STALLED는 취소·완료가 아니며 FAILED/NOT_STARTED만 명시 재시도한다. 정상 destroy는 ATTEMPT_RETURNED일 뿐 물리 종료 증거가 아니다. [Spring RabbitUtils v3.0.8](https://github.com/spring-projects/spring-amqp/blob/v3.0.8/spring-rabbit/src/main/java/org/springframework/amqp/rabbit/connection/RabbitUtils.java)의 close 예외 무시까지 고려해 destroy 반환·실패·관측 timeout으로 unknown을 일괄 해제하지 않는다. 늦은 확정 결과와 task 종료가 함께 확인된 slot만 개별 반환한다.
 
 unknown은 늦은 확정이 없으면 JVM 수명 동안100 공유 용량을 점유한다. worker16 정지 또는 quota100 소진은 가용성 상실을 만들 수 있다. 공유 cleanup1이 막히면 다른 owner는 NOT_STARTED가 될 수 있다. 풀·대기열 확장이나 새 owner/세대·재OPEN·quota 초기화·TTL·자동 재발행으로 우회하지 않는다. 활성화 단계의 단일 owner 구성·외부 프로세스 종료 확인·새 readiness 및 unknown 대조는 별도 설계와 실행 증거가 필요하다. 실제 broker/socket/DB·복구·내구성·성능은 미검증이며 wire·좁은 OPEN_PROOF_MISSING·DB commit 뒤 ACK·공정성·readiness 계약은 바꾸지 않는다.
+
+
+## Active broker patch decision — 2026-10-18
+
+This supersedes the active 4.3.0 candidate/pin above; historical registry and execution statements retain their original scope. Select exactly RabbitMQ **4.3.6-management**, linux/arm64/v8 pin `rabbitmq@sha256:de03afc2c596b635196692c18425149f1e85d13ba8c1990c1a78684f693dc459`. Readiness rejects every other version, including 4.3.0; retain `delayed-retry-type=disabled` and all quorum/SAC/policy checks.
+
+[4.3.1 release notes](https://github.com/rabbitmq/rabbitmq-server/releases/tag/v4.3.1) and [upstream fix #16395](https://github.com/rabbitmq/rabbitmq-server/pull/16395) identify the omitted delayed-retry policy registration fix. Choose the later [4.3.6 maintenance release](https://github.com/rabbitmq/rabbitmq-server/releases/tag/v4.3.6), containing that fix, over 4.3.1. This includes additional maintenance changes requiring actual compatibility validation. The previous provisioning HTTP400 is consistent with that upstream issue, but its original response body was not captured, so its precise cause remains unconfirmed. This selection does not establish integration, recovery or performance PASS.

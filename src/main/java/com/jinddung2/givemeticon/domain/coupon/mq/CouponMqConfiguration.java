@@ -101,7 +101,7 @@ public class CouponMqConfiguration {
         admin.declareBinding(new Binding(parking(eventId), Binding.DestinationType.QUEUE, dlx, "park", null));
         admin.declareQueue(new Queue(queue(eventId), true, false, false, mainArgs));
         admin.declareBinding(new Binding(queue(eventId), Binding.DestinationType.QUEUE, exchange, "admit", null));
-        if (!"4.3.0".equals(get("overview").path("rabbitmq_version").asText())) throw new CouponMqReadinessTransactionService.Drift();
+        if (!"4.3.6".equals(get("overview").path("rabbitmq_version").asText())) throw new CouponMqReadinessTransactionService.Drift();
         String base = "queues/" + segment(vhost) + "/";
         JsonNode main = get(base + segment(queue(eventId))), parking = get(base + segment(parking(eventId)));
         checkQueue(main, mainArgs); checkQueue(parking, parkingArgs);

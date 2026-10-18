@@ -146,7 +146,7 @@ class CouponMqPublisherIntegrationTest {
             observerConnection = raw(BROKER_PORT).newConnection("coupon-it-observer-" + run);
             Channel channel = observerConnection.createChannel();
             Connection connection = observerConnection;
-            assertEquals("4.3.0", connection.getServerProperties().get("version").toString());
+            assertEquals("4.3.6", connection.getServerProperties().get("version").toString());
             observer = channel;
             channel.exchangeDeclare(exchange, "direct", true);
             channel.queueDeclare(queue, true, false, false,
