@@ -1,0 +1,144 @@
+# Use only with the explicit live base files and scripts/local/coupon-mq-compose.sh.
+x-mq-app: &mq-app
+  image: eclipse-temurin@sha256:aac96640e2d5a7ce4d4b53626f042a6fe1f22283511618587dcfc47765a74f43
+  platform: linux/arm64
+  pull_policy: never
+  profiles: [coupon-mq-app]
+  restart: "no"
+  cpus: 0.75
+  mem_limit: 512m
+  memswap_limit: 512m
+  pids_limit: 256
+  networks: [coupon-mq]
+  env_file:
+    - path: ${MQ_PRIVATE_DIR:-/nonexistent}/apps.env
+      required: false
+  volumes:
+    - type: bind
+      source: ${MQ_APP_JAR:-/nonexistent/coupon-mq-app.jar}
+      target: /opt/coupon/app.jar
+      read_only: true
+      bind:
+        create_host_path: false
+  command:
+    - java
+    - -Xmx256m
+    - -XX:MaxMetaspaceSize=128m
+    - -XX:ReservedCodeCacheSize=32m
+    - -Xss256k
+    - -jar
+    - /opt/coupon/app.jar
+    - --server.address=0.0.0.0
+    - --server.port=8080
+    - --spring.profiles.active=coupon-mq
+    - --spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+    - --spring.datasource.hikari.maximum-pool-size=20
+    - --spring.datasource.hikari.connection-timeout=1000
+    - --coupon.issue-worker.enabled=false
+    - --coupon.issue-worker.mode=disabled
+    - --coupon.stock-metrics.enabled=false
+    - --management.health.mail.enabled=false
+    - --spring.mail.host=127.0.0.1
+    - --spring.mail.port=1
+    - --bootstrap.server=127.0.0.1:1
+    - --mail.title.certification=synthetic
+    - --mail.domain.name=http://127.0.0.1:1
+    - --oauth.kakao.client-id=synthetic
+    - --oauth.kakao.url.auth=http://127.0.0.1:1
+    - --oauth.kakao.url.api=http://127.0.0.1:1
+    - --oauth.naver.client-id=synthetic
+    - --oauth.naver.client-secret=synthetic
+    - --oauth.naver.url.auth=http://127.0.0.1:1
+    - --oauth.naver.url.api=http://127.0.0.1:1
+
+services:
+  mq-rabbit:
+    image: rabbitmq@sha256:de03afc2c596b635196692c18425149f1e85d13ba8c1990c1a78684f693dc459
+    platform: linux/arm64
+    pull_policy: never
+    restart: "no"
+    cpus: 1
+    mem_limit: 1024m
+    memswap_limit: 1024m
+    pids_limit: 256
+    environment:
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: +S 2:2 +SDcpu 1 +SDio 1 -rabbit vm_memory_high_watermark '{absolute,536870912}'
+    env_file:
+      - path: ${MQ_PRIVATE_DIR:-/nonexistent}/rabbit.env
+        required: false
+    ports: ["127.0.0.1:35672:5672", "127.0.0.1:35673:15672"]
+    volumes: [coupon-mq-rabbit:/var/lib/rabbitmq]
+    networks: [coupon-mq]
+    labels:
+      ao.session: ${MQ_AO_SESSION:-unassigned}
+      coupon.mq.local: "true"
+  mq-mysql:
+    image: mysql@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
+    platform: linux/arm64
+    pull_policy: never
+    profiles: [coupon-mq-app]
+    restart: "no"
+    cpus: 1
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 256
+    command: [--innodb-buffer-pool-size=134217728, --max-connections=60]
+    env_file:
+      - path: ${MQ_PRIVATE_DIR:-/nonexistent}/mysql.env
+        required: false
+    volumes: [coupon-mq-mysql:/var/lib/mysql]
+    networks: [coupon-mq]
+    labels:
+      ao.session: ${MQ_AO_SESSION:-unassigned}
+      coupon.mq.local: "true"
+  mq-redis:
+    image: redis@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7
+    platform: linux/arm64
+    pull_policy: never
+    profiles: [coupon-mq-app]
+    restart: "no"
+    cpus: 0.25
+    mem_limit: 128m
+    memswap_limit: 128m
+    pids_limit: 128
+    command: [redis-server, --appendonly, "yes", --maxmemory, 96mb, --maxmemory-policy, noeviction]
+    volumes: [coupon-mq-redis:/data]
+    networks: [coupon-mq]
+    labels:
+      ao.session: ${MQ_AO_SESSION:-unassigned}
+      coupon.mq.local: "true"
+  mq-app-a:
+    <<: *mq-app
+    ports: ["127.0.0.1:35801:8080"]
+    labels:
+      ao.session: ${MQ_AO_SESSION:-unassigned}
+      coupon.mq.local: "true"
+  mq-app-b:
+    <<: *mq-app
+    ports: ["127.0.0.1:35802:8080"]
+    labels:
+      ao.session: ${MQ_AO_SESSION:-unassigned}
+      coupon.mq.local: "true"
+
+networks:
+  coupon-mq:
+    driver: bridge
+    internal: false
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
+    labels:
+      ao.session: ${MQ_AO_SESSION:-unassigned}
+      coupon.mq.local: "true"
+volumes:
+  coupon-mq-rabbit:
+    labels:
+      ao.session: ${MQ_AO_SESSION:-unassigned}
+      coupon.mq.local: "true"
+  coupon-mq-mysql:
+    labels:
+      ao.session: ${MQ_AO_SESSION:-unassigned}
+      coupon.mq.local: "true"
+  coupon-mq-redis:
+    labels:
+      ao.session: ${MQ_AO_SESSION:-unassigned}
+      coupon.mq.local: "true"
