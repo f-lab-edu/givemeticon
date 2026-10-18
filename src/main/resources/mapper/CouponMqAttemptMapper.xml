@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponMqAttemptMapper">
+    <select id="find" resultType="com.jinddung2.givemeticon.domain.coupon.mq.CouponMqAttempt">
+        SELECT event_id, member_id, attempt_id, payload_hash, config_version, open_token,
+               outcome, mapped_member_id, rejection_reason, created_at
+        FROM coupon_mq_attempt WHERE event_id = #{eventId} AND member_id = #{memberId} AND attempt_id = #{attemptId}
+    </select>
+    <insert id="insert">
+        INSERT INTO coupon_mq_attempt(event_id, member_id, attempt_id, payload_hash, config_version,
+                                      open_token, outcome, mapped_member_id, rejection_reason)
+        VALUES (#{eventId}, #{memberId}, #{attemptId}, #{payloadHash}, #{configVersion},
+                #{openToken}, #{outcome}, #{mappedMemberId}, #{rejectionReason})
+    </insert>
+</mapper>
