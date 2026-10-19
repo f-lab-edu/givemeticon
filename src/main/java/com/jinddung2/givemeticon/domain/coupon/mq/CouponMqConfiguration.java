@@ -132,11 +132,17 @@ public class CouponMqConfiguration {
                 "dead-letter-exchange", dlx, "dead-letter-routing-key", "park", "dead-letter-strategy", "at-least-once",
                 "overflow", "reject-publish", "delivery-limit", 20, "max-length", 150000,
                 "delayed-retry-type", "disabled", "consumer-timeout", 1800000));
-        if (!expectedPolicy.equals(main.path("effective_policy_definition"))
-                || !parking.path("effective_policy_definition").isEmpty()) {
+        JsonNode mainPolicy = main.path("effective_policy_definition"), parkingPolicy = parking.path("effective_policy_definition");
+        if ((!mainPolicy.isMissingNode() && (!mainPolicy.isObject() || !expectedPolicy.equals(mainPolicy)))
+                || (!parkingPolicy.isMissingNode() && (!parkingPolicy.isObject() || !parkingPolicy.isEmpty()))) {
             try { diagnostic("policy", "EFFECTIVE_POLICY_MISMATCH", null, policyDiagnosticState(main, parking, expectedPolicy)); }
             catch (RuntimeException ignored) { /* Formatting cannot replace the original Drift. */ }
             throw new CouponMqReadinessTransactionService.Drift();
+        }
+        if (mainPolicy.isMissingNode() || parkingPolicy.isMissingNode()) {
+            try { diagnostic("policy", "EFFECTIVE_POLICY_PREPARATION_INCOMPLETE", null, policyDiagnosticState(main, parking, expectedPolicy)); }
+            catch (RuntimeException ignored) { /* Formatting cannot replace the original NotReady. */ }
+            throw new CouponMqReadinessTransactionService.NotReady();
         }
         verifyBinding(exchange, queue(eventId), "admit"); verifyBinding(dlx, parking(eventId), "park");
         if (!parking.path("messages").isIntegralNumber() || parking.path("messages").asLong() < 0)
@@ -147,7 +153,8 @@ public class CouponMqConfiguration {
         var json = new ObjectMapper();
         var state = json.createObjectNode();
         state.put("main_match", expected.equals(main.path("effective_policy_definition")));
-        state.put("parking_empty", parking.path("effective_policy_definition").isEmpty());
+        state.put("parking_empty", parking.path("effective_policy_definition").isObject()
+                && parking.path("effective_policy_definition").isEmpty());
         state.set("expected_policy", expected);
         state.set("main", policyProjection(main, "main", queue(eventId), expected, json));
         state.set("parking", policyProjection(parking, "parking", parking(eventId), expected, json));

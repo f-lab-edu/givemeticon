@@ -132,6 +132,12 @@ canonical hash는 수신 원문이 아닌 검증·정규화한 지원 필드를 
 
 접수/발급은 같은 행사 행 잠금을 공유한다. #172/#173은 각각 잠금 대기·트랜잭션 시간·batch 크기·backlog/drain을 관측하고 측정 수단 없으면 MISSING으로 기록한다. broker 병목으로 단정하거나 시스템 전체 교착 불가능을 약속하지 않는다. 새 락/샤딩/튜닝 없음.
 
+#### Effective-policy observation completeness — 2026-10-19
+
+#170/#171/#172 readiness distinguishes an absent whole `effective_policy_definition` field from an observed conflict. Validate both already-fetched queue responses first: every present main policy must be an object exactly equal to the eight configured fields, and every present parking policy must be an empty object. Present null, arrays, scalars, missing inner keys, extra keys or unequal values remain `Drift`, including when the other queue's field is absent. Only if no present conflict exists does a strictly absent whole field produce preparation-incomplete `NotReady`. Existing refresh retries unavailable topology and blocks ingress in the meantime, including for previously verified readiness; true drift remains sticky. No extra management reads, coercion, token rotation, latch reset or deadline extension is introduced.
+
+Treating absence as permanent drift was the previous behavior; treating it as an empty/valid policy would admit unverified topology. The selected distinction preserves exact conflict rejection while allowing later complete observations to recover through the existing readiness path. Both applications were observed rejecting absent fields after broker restart; RabbitMQ's reason for omitting them remains unconfirmed. Availability can remain blocked indefinitely while metadata is absent, rather than accepting unverified policy. Required regressions cover missing-main/parking/both, present-conflict precedence in both orientations, strict types and inner-key equality, persistent unavailability, initial and previously verified recovery, sticky true drift, and diagnostic-format failures that preserve classification.
+
 ### Initial execution policies — 2026-10-14
 
 | 항목 | 선택된 초기 설정값 | 분류·근거/실효 확인 |

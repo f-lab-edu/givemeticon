@@ -144,4 +144,61 @@ class CouponMqTopologyTest {
         }
     }
 
+    void expectPolicies(MockRestServiceServer server, String mainPolicy, String parkingPolicy, boolean bindings) throws Exception {
+        server.expect(anything()).andRespond(withSuccess("{\"rabbitmq_version\":\"4.3.6\"}",MediaType.APPLICATION_JSON));
+        var main=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(queue(Map.of("x-queue-type","quorum","x-single-active-consumer",true),policy()));
+        var parking=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(queue(Map.of("x-queue-type","quorum","x-delivery-limit",-1,"x-max-length",150000,"x-overflow","reject-publish"),Map.of()));
+        if(mainPolicy==null)main.remove("effective_policy_definition");else main.set("effective_policy_definition",json.readTree(mainPolicy));
+        if(parkingPolicy==null)parking.remove("effective_policy_definition");else parking.set("effective_policy_definition",json.readTree(parkingPolicy));
+        server.expect(anything()).andRespond(withSuccess(main.toString(),MediaType.APPLICATION_JSON));
+        server.expect(anything()).andRespond(withSuccess(parking.toString(),MediaType.APPLICATION_JSON));
+        if(bindings)for(var pair:List.of(new String[]{"coupon.mq.7","coupon.mq.7.main","admit"},new String[]{"coupon.mq.7.dlx","coupon.mq.7.parking","park"}))
+            server.expect(requestTo("http://127.0.0.1:29999/api/exchanges/isolated/"+pair[0]+"/bindings/source"))
+                .andRespond(withSuccess(json.writeValueAsString(List.of(Map.of("destination",pair[1],"destination_type","queue","routing_key",pair[2]))),MediaType.APPLICATION_JSON));
+    }
+    @Test void onlyAbsentWholePolicyFieldsArePreparationIncomplete() throws Exception {
+        for(String[] pair:new String[][]{{null,"{}"},{json.writeValueAsString(policy()),null},{null,null}}) {
+            var server=server();expectPolicies(server,pair[0],pair[1],false);
+            assertThrows(CouponMqReadinessTransactionService.NotReady.class,()->configuration.verifyTopology(admin));server.verify();
+        }
+    }
+    @Test void presentInvalidPolicyAlwaysWinsOverTheOtherMissingField() throws Exception {
+        for(String invalid:List.of("null","[]","true","0","\"secret\"","{}","{\"delivery-limit\":20}")) {
+            var server=server();expectPolicies(server,invalid,null,false);
+            assertThrows(CouponMqReadinessTransactionService.Drift.class,()->configuration.verifyTopology(admin));server.verify();
+        }
+        for(String invalid:List.of("null","[]","false","0","\"secret\"","{\"delivery-limit\":20}")) {
+            var server=server();expectPolicies(server,null,invalid,false);
+            assertThrows(CouponMqReadinessTransactionService.Drift.class,()->configuration.verifyTopology(admin));server.verify();
+        }
+        for(String invalid:List.of("null","[]","true","0","\"secret\"")) {
+            var server=server();expectPolicies(server,json.writeValueAsString(policy()),invalid,false);
+            assertThrows(CouponMqReadinessTransactionService.Drift.class,()->configuration.verifyTopology(admin));server.verify();
+        }
+        for(String key:policy().keySet()) {
+            var incomplete=new HashMap<>(policy());incomplete.remove(key);var server=server();expectPolicies(server,json.writeValueAsString(incomplete),null,false);
+            assertThrows(CouponMqReadinessTransactionService.Drift.class,()->configuration.verifyTopology(admin));server.verify();
+        }
+        for(Object value:List.of(20.0,"20",19)) {
+            var conflict=new HashMap<>(policy());conflict.put("delivery-limit",value);var server=server();expectPolicies(server,json.writeValueAsString(conflict),null,false);
+            assertThrows(CouponMqReadinessTransactionService.Drift.class,()->configuration.verifyTopology(admin));server.verify();
+        }
+        var extra=new HashMap<>(policy());extra.put("unexpected",true);var server=server();expectPolicies(server,json.writeValueAsString(extra),null,false);
+        assertThrows(CouponMqReadinessTransactionService.Drift.class,()->configuration.verifyTopology(admin));server.verify();
+    }
+    @Test void missingPolicyHasDistinctBoundedReasonAndFormattingCannotReplaceNotReady() throws Exception {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(CouponMqConfiguration.class);
+        var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();logger.addAppender(logs);
+        try {
+            var server=server();expectPolicies(server,null,"{}",false);
+            assertThrows(CouponMqReadinessTransactionService.NotReady.class,()->configuration.verifyTopology(admin));server.verify();
+            String text=logs.list.stream().map(e->e.getFormattedMessage()).collect(java.util.stream.Collectors.joining("\n"));
+            assertTrue(text.contains("EFFECTIVE_POLICY_PREPARATION_INCOMPLETE"));assertFalse(text.contains("EFFECTIVE_POLICY_MISMATCH"));
+            assertTrue(text.contains("\"present\":false"));assertTrue(text.length()<5000);assertTrue(logs.list.stream().allMatch(e->e.getThrowableProxy()==null));
+            server=server();expectPolicies(server,null,"{}",false);var failing=spy(configuration);
+            doThrow(new IllegalStateException("secret-format-error")).when(failing).policyDiagnosticState(any(),any(),any());
+            assertThrows(CouponMqReadinessTransactionService.NotReady.class,()->failing.verifyTopology(admin));server.verify();
+        } finally {logger.detachAppender(logs);logs.stop();}
+    }
+
 }

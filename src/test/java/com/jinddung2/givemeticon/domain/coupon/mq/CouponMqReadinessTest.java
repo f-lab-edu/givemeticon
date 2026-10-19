@@ -141,4 +141,43 @@ class CouponMqReadinessTest {
         assertThrows(org.springframework.web.server.ResponseStatusException.class,()->readiness.snapshot(7));
     }
 
+    @Test void realMissingPoliciesRemainUnavailableAndRecoverInitiallyAndAfterVerification() throws Exception {
+        for(boolean previouslyVerified:List.of(false,true)) {
+            var fixture=new CouponMqTopologyTest();var server=fixture.server();
+            var consumer=mock(CouponMqConsumer.class);when(consumer.registered()).thenReturn(true);
+            var transaction=mock(CouponMqReadinessTransactionService.class);
+            var snapshot=new CouponMqReadinessTransactionService.Snapshot(7,"a".repeat(64),UUID.randomUUID().toString(),false);
+            when(transaction.initialize(7,true,true)).thenReturn(snapshot);
+            var readiness=new CouponMqReadinessService(7,fixture.configuration,fixture.admin,consumer,transaction);
+            if(previouslyVerified) {
+                fixture.expectPolicies(server,fixture.json.writeValueAsString(fixture.policy()),"{}",true);
+                readiness.refresh();assertSame(snapshot,readiness.snapshot(7));server.verify();server.reset();
+            }
+            int callsBefore=previouslyVerified?1:0;
+            for(String[] pair:new String[][]{{null,"{}"},{fixture.json.writeValueAsString(fixture.policy()),null},{null,null}}) {
+                fixture.expectPolicies(server,pair[0],pair[1],false);readiness.refresh();
+                assertThrows(org.springframework.web.server.ResponseStatusException.class,()->readiness.snapshot(7));
+                server.verify();server.reset();verify(transaction,times(callsBefore)).initialize(anyLong(),anyBoolean(),anyBoolean());
+            }
+            verify(consumer,times(3)).topologyVerified(false);verify(consumer,never()).parkDetected();verify(transaction,never()).pause(anyLong());
+            fixture.expectPolicies(server,fixture.json.writeValueAsString(fixture.policy()),"{}",true);
+            readiness.refresh();assertSame(snapshot,readiness.snapshot(7));server.verify();
+            verify(transaction,times(callsBefore+1)).initialize(7,true,true);
+            verify(consumer,times(callsBefore+1)).topologyVerified(true);
+        }
+    }
+    @Test void realPresentConflictWithMissingCounterpartIsStickyAfterLaterValidMetadata() throws Exception {
+        var fixture=new CouponMqTopologyTest();var server=fixture.server();var configuration=spy(fixture.configuration);
+        var consumer=mock(CouponMqConsumer.class);when(consumer.registered()).thenReturn(true);var transaction=mock(CouponMqReadinessTransactionService.class);
+        var snapshot=new CouponMqReadinessTransactionService.Snapshot(7,"a".repeat(64),UUID.randomUUID().toString(),false);when(transaction.initialize(7,true,true)).thenReturn(snapshot);
+        var readiness=new CouponMqReadinessService(7,configuration,fixture.admin,consumer,transaction);
+        fixture.expectPolicies(server,fixture.json.writeValueAsString(fixture.policy()),"{}",true);readiness.refresh();assertSame(snapshot,readiness.snapshot(7));server.verify();server.reset();
+        fixture.expectPolicies(server,null,"null",false);readiness.refresh();server.verify();server.reset();
+        readiness.refresh();verify(configuration,times(2)).verifyTopology(fixture.admin);verify(consumer).topologyVerified(false);
+        fixture.expectPolicies(server,fixture.json.writeValueAsString(fixture.policy()),"{}",true);
+        assertEquals(0,configuration.verifyTopology(fixture.admin));server.verify();server.reset();
+        readiness.refresh();verify(configuration,times(3)).verifyTopology(fixture.admin);verify(transaction,times(1)).initialize(7,true,true);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,()->readiness.snapshot(7));
+    }
+
 }
