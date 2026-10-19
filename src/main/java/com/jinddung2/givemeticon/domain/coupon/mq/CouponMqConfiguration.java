@@ -133,11 +133,59 @@ public class CouponMqConfiguration {
                 "overflow", "reject-publish", "delivery-limit", 20, "max-length", 150000,
                 "delayed-retry-type", "disabled", "consumer-timeout", 1800000));
         if (!expectedPolicy.equals(main.path("effective_policy_definition"))
-                || !parking.path("effective_policy_definition").isEmpty()) { diagnostic("policy", "EFFECTIVE_POLICY_MISMATCH", null, "rejected=true"); throw new CouponMqReadinessTransactionService.Drift(); }
+                || !parking.path("effective_policy_definition").isEmpty()) {
+            try { diagnostic("policy", "EFFECTIVE_POLICY_MISMATCH", null, policyDiagnosticState(main, parking, expectedPolicy)); }
+            catch (RuntimeException ignored) { /* Formatting cannot replace the original Drift. */ }
+            throw new CouponMqReadinessTransactionService.Drift();
+        }
         verifyBinding(exchange, queue(eventId), "admit"); verifyBinding(dlx, parking(eventId), "park");
         if (!parking.path("messages").isIntegralNumber() || parking.path("messages").asLong() < 0)
             { diagnostic("parking", "PARKING_COUNT_INVALID", null, "rejected=true"); throw new CouponMqReadinessTransactionService.NotReady(); }
         return parking.path("messages").asLong();
+    }
+    String policyDiagnosticState(JsonNode main, JsonNode parking, JsonNode expected) {
+        var json = new ObjectMapper();
+        var state = json.createObjectNode();
+        state.put("main_match", expected.equals(main.path("effective_policy_definition")));
+        state.put("parking_empty", parking.path("effective_policy_definition").isEmpty());
+        state.set("expected_policy", expected);
+        state.set("main", policyProjection(main, "main", queue(eventId), expected, json));
+        state.set("parking", policyProjection(parking, "parking", parking(eventId), expected, json));
+        String value = state.toString();
+        return value.length() <= 4096 ? value : "{\"projection\":\"UNKNOWN\",\"reason\":\"POLICY_PROJECTION_BOUND\"}";
+    }
+    private JsonNode policyProjection(JsonNode queue, String role, String name, JsonNode expected, ObjectMapper json) {
+        var result = json.createObjectNode(); result.put("role", role); result.put("name", name);
+        var actual = queue.path("effective_policy_definition");
+        var policy = result.putObject("effective_policy_definition");
+        policy.put("present", !actual.isMissingNode()); policy.put("type", actual.getNodeType().name());
+        if (actual.isContainerNode()) policy.put("count", actual.size());
+        if (actual.isObject()) {
+            int extra = 0; var names = actual.fieldNames();
+            while (names.hasNext()) if (!expected.has(names.next())) extra++;
+            policy.put("unexpected_key_count", extra);
+            var fields = policy.putObject("fields"); var keys = expected.fieldNames();
+            while (keys.hasNext()) {
+                String key = keys.next(); var value = actual.path(key); var field = fields.putObject(key);
+                field.put("present", !value.isMissingNode()); field.put("type", value.getNodeType().name());
+                if (value.isNull() || value.isBoolean()) field.set("value", value);
+                else if (value.isTextual()) {
+                    if (value.equals(expected.path(key))) field.put("value", value.textValue());
+                    else { field.put("value", "[REDACTED]"); field.put("length", value.textValue().length()); }
+                } else if (value.isNumber()) {
+                    String number = value.asText();
+                    if (number.length() <= 32) field.set("value", value);
+                    else { field.put("value", "[BOUNDED]"); field.put("length", number.length()); }
+                } else if (value.isContainerNode()) field.put("count", value.size());
+            }
+        } else if (actual.isTextual()) { policy.put("value", "[REDACTED]"); policy.put("length", actual.textValue().length()); }
+        else if (actual.isBoolean() || actual.isNull()) policy.set("value", actual);
+        else if (actual.isNumber()) {
+            String number = actual.asText();
+            if (number.length() <= 32) policy.set("value", actual);
+            else { policy.put("value", "[BOUNDED]"); policy.put("length", number.length()); }
+        }
+        return result;
     }
     private void checkQueue(JsonNode queue, Map<String,Object> args) {
         if (!queue.path("durable").asBoolean() || queue.path("auto_delete").asBoolean()

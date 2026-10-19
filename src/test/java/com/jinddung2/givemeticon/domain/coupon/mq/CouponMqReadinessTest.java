@@ -132,4 +132,13 @@ class CouponMqReadinessTest {
         } finally {logger.detachAppender(logs);logs.stop();}
     }
 
+    @Test void observedPolicyDriftRemainsStickyEvenAfterLaterTopologyWouldMatch() {
+        var topology=mock(CouponMqConfiguration.class);var admin=mock(RabbitAdmin.class);var consumer=mock(CouponMqConsumer.class);var transaction=mock(CouponMqReadinessTransactionService.class);
+        when(consumer.registered()).thenReturn(true);var snapshot=new CouponMqReadinessTransactionService.Snapshot(7,"a".repeat(64),UUID.randomUUID().toString(),false);
+        when(transaction.initialize(7,true,true)).thenReturn(snapshot);when(topology.verifyTopology(admin)).thenReturn(0L).thenThrow(new CouponMqReadinessTransactionService.Drift()).thenReturn(0L);
+        var readiness=new CouponMqReadinessService(7,topology,admin,consumer,transaction);readiness.refresh();assertSame(snapshot,readiness.snapshot(7));
+        readiness.refresh();readiness.refresh();verify(topology,times(2)).verifyTopology(admin);verify(consumer).topologyVerified(false);verify(transaction,times(1)).initialize(7,true,true);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,()->readiness.snapshot(7));
+    }
+
 }

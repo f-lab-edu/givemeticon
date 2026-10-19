@@ -98,4 +98,50 @@ class CouponMqTopologyTest {
         } finally {logger.detachAppender(logs);logs.stop();}
     }
 
+    @Test void policyProjectionDistinguishesMissingNullEmptyTypesAndConflictWithoutDumpingValues()throws Exception {
+        var main=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(queue(Map.of("x-queue-type","quorum","x-single-active-consumer",true),Map.of()));
+        var parking=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(queue(Map.of("x-queue-type","quorum"),Map.of()));
+        var expected=json.valueToTree(policy());
+        for (String shape:List.of("missing","null","empty","string","array","conflict")) {
+            if(shape.equals("missing"))main.remove("effective_policy_definition");
+            if(shape.equals("null"))main.putNull("effective_policy_definition");
+            if(shape.equals("empty"))main.putObject("effective_policy_definition");
+            if(shape.equals("string"))main.put("effective_policy_definition","secret-password");
+            if(shape.equals("array"))main.putArray("effective_policy_definition").add("secret-password");
+            if(shape.equals("conflict"))main.set("effective_policy_definition",json.valueToTree(Map.of("delivery-limit",19,"secret-key","secret-password")));
+            parking.set("effective_policy_definition",main.path("effective_policy_definition"));
+            if(shape.equals("missing"))parking.remove("effective_policy_definition");
+            String text=configuration.policyDiagnosticState(main,parking,expected);assertTrue(text.length()<=4096);assertFalse(text.contains("secret-password"));assertFalse(text.contains("secret-key"));
+            var projected=json.readTree(text);var actual=projected.path("main").path("effective_policy_definition");
+            assertEquals(!shape.equals("missing"),actual.path("present").asBoolean());
+            String type=switch(shape){case "missing"->"MISSING";case "null"->"NULL";case "string"->"STRING";case "array"->"ARRAY";default->"OBJECT";};
+            assertEquals(type,actual.path("type").asText());assertFalse(projected.path("main_match").asBoolean());
+            if(type.equals("OBJECT"))assertEquals(8,actual.path("fields").size());
+            if(shape.equals("empty"))assertEquals(0,actual.path("count").asInt());
+            if(shape.equals("conflict")){assertEquals(1,actual.path("unexpected_key_count").asInt());assertEquals(19,actual.path("fields").path("delivery-limit").path("value").asInt());}
+        }
+    }
+    @Test void policyProjectionBoundsStringsAndNestedDataAndRetainsExpectedPolicy()throws Exception {
+        var main=json.createObjectNode();var actual=main.putObject("effective_policy_definition");
+        for(String key:policy().keySet())actual.put(key,"secret".repeat(10000));
+        actual.putObject("secret-extra").put("password","secret");
+        var parking=json.createObjectNode();parking.putArray("effective_policy_definition").add("secret".repeat(10000));
+        String text=configuration.policyDiagnosticState(main,parking,json.valueToTree(policy()));
+        assertTrue(text.length()<=4096);assertFalse(text.contains("secret"));var projected=json.readTree(text);
+        assertEquals(json.valueToTree(policy()),projected.path("expected_policy"));
+        assertEquals(1,projected.path("main").path("effective_policy_definition").path("unexpected_key_count").asInt());
+        assertEquals("ARRAY",projected.path("parking").path("effective_policy_definition").path("type").asText());
+    }
+    @Test void mismatchUsesOnlyFetchedResponsesAndFormattingFailureStillThrowsDrift()throws Exception {
+        for(boolean formattingFailure:List.of(false,true)) {
+            var original=new CouponMqConfiguration();ReflectionTestUtils.setField(original,"eventId",7L);ReflectionTestUtils.setField(original,"vhost","isolated");ReflectionTestUtils.setField(original,"managementUrl","http://127.0.0.1:29999");ReflectionTestUtils.setField(original,"username","fixture");ReflectionTestUtils.setField(original,"password","fixture");var c=spy(original);
+            if(formattingFailure)doThrow(new IllegalStateException("secret-format-error")).when(c).policyDiagnosticState(any(),any(),any());
+            var server=MockRestServiceServer.bindTo((RestTemplate)ReflectionTestUtils.getField(c,"management")).build();
+            server.expect(anything()).andRespond(withSuccess("{\"rabbitmq_version\":\"4.3.6\"}",MediaType.APPLICATION_JSON));
+            server.expect(anything()).andRespond(withSuccess(queue(Map.of("x-queue-type","quorum","x-single-active-consumer",true),Map.of()),MediaType.APPLICATION_JSON));
+            server.expect(anything()).andRespond(withSuccess(queue(Map.of("x-queue-type","quorum","x-delivery-limit",-1,"x-max-length",150000,"x-overflow","reject-publish"),Map.of()),MediaType.APPLICATION_JSON));
+            assertThrows(CouponMqReadinessTransactionService.Drift.class,()->c.verifyTopology(admin));server.verify();
+        }
+    }
+
 }
