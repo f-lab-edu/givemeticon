@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponMqControlMapper">
+    <select id="findForUpdate" resultType="com.jinddung2.givemeticon.domain.coupon.mq.CouponMqControl">
+        SELECT event_id, config_version, open_token, verified_at, ingest_paused
+        FROM coupon_mq_control WHERE event_id = #{eventId} FOR UPDATE
+    </select>
+    <insert id="insert">
+        INSERT INTO coupon_mq_control(event_id, config_version, ingest_paused)
+        VALUES (#{eventId}, #{configVersion}, TRUE)
+    </insert>
+    <update id="establishOpen">
+        UPDATE coupon_mq_control SET open_token = #{token}, verified_at = UTC_TIMESTAMP(6), ingest_paused = FALSE
+        WHERE event_id = #{eventId} AND open_token IS NULL AND verified_at IS NULL
+    </update>
+    <update id="pause">
+        UPDATE coupon_mq_control SET ingest_paused = TRUE WHERE event_id = #{eventId}
+    </update>
+</mapper>

@@ -82,6 +82,19 @@ public final class CouponMqProtocol {
         if(canonical.length>4096) throw invalid();
         return canonical;
     }
+    record Payload(long eventId, int memberId, String attemptId, String configVersion, String openToken) { }
+    static Payload payload(byte[] wire) {
+        ObjectNode in = read(canonicalPayload(wire), PAYLOAD);
+        return new Payload(in.get("eventId").longValue(), in.get("memberId").intValue(),
+                in.get("attemptId").textValue(), in.get("configVersion").textValue(),
+                in.get("openToken").isNull() ? null : in.get("openToken").textValue());
+    }
+    static byte[] payload(long eventId, int memberId, String attemptId, String version, String token) {
+        ObjectNode out = MAPPER.createObjectNode();
+        out.put("schemaVersion", 1); out.put("eventId", eventId); out.put("memberId", memberId);
+        out.put("attemptId", attemptId); out.put("configVersion", version); out.put("openToken", token);
+        return canonicalPayload(bytes(out));
+    }
     static String attemptId(byte[] canonical) { return string(read(canonical,PAYLOAD),"attemptId"); }
     public static String sha256(byte[] canonical) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical)); }

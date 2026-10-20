@@ -132,6 +132,12 @@ canonical hash는 수신 원문이 아닌 검증·정규화한 지원 필드를 
 
 접수/발급은 같은 행사 행 잠금을 공유한다. #172/#173은 각각 잠금 대기·트랜잭션 시간·batch 크기·backlog/drain을 관측하고 측정 수단 없으면 MISSING으로 기록한다. broker 병목으로 단정하거나 시스템 전체 교착 불가능을 약속하지 않는다. 새 락/샤딩/튜닝 없음.
 
+#### Effective-policy observation completeness — 2026-10-19
+
+#170/#171/#172 readiness distinguishes an absent whole `effective_policy_definition` field from an observed conflict. Validate both already-fetched queue responses first: every present main policy must be an object exactly equal to the eight configured fields, and every present parking policy must be an empty object. Present null, arrays, scalars, missing inner keys, extra keys or unequal values remain `Drift`, including when the other queue's field is absent. Only if no present conflict exists does a strictly absent whole field produce preparation-incomplete `NotReady`. Existing refresh retries unavailable topology and blocks ingress in the meantime, including for previously verified readiness; true drift remains sticky. No extra management reads, coercion, token rotation, latch reset or deadline extension is introduced.
+
+Treating absence as permanent drift was the previous behavior; treating it as an empty/valid policy would admit unverified topology. The selected distinction preserves exact conflict rejection while allowing later complete observations to recover through the existing readiness path. Both applications were observed rejecting absent fields after broker restart; RabbitMQ's reason for omitting them remains unconfirmed. Availability can remain blocked indefinitely while metadata is absent, rather than accepting unverified policy. Required regressions cover missing-main/parking/both, present-conflict precedence in both orientations, strict types and inner-key equality, persistent unavailability, initial and previously verified recovery, sticky true drift, and diagnostic-format failures that preserve classification.
+
 ### Initial execution policies — 2026-10-14
 
 | 항목 | 선택된 초기 설정값 | 분류·근거/실효 확인 |
@@ -176,3 +182,10 @@ canonical hash는 수신 원문이 아닌 검증·정규화한 지원 필드를 
 close는 신규 admission을 영구 차단하고 공유 cleanup worker1·대기열0에서 owner별 진행 시도 ID를 공유한다. 동시·재진입 close는 중복 실행하지 않는다. 최대5초 관측의 STALLED는 취소·완료가 아니며 FAILED/NOT_STARTED만 명시 재시도한다. 정상 destroy는 ATTEMPT_RETURNED일 뿐 물리 종료 증거가 아니다. [Spring RabbitUtils v3.0.8](https://github.com/spring-projects/spring-amqp/blob/v3.0.8/spring-rabbit/src/main/java/org/springframework/amqp/rabbit/connection/RabbitUtils.java)의 close 예외 무시까지 고려해 destroy 반환·실패·관측 timeout으로 unknown을 일괄 해제하지 않는다. 늦은 확정 결과와 task 종료가 함께 확인된 slot만 개별 반환한다.
 
 unknown은 늦은 확정이 없으면 JVM 수명 동안100 공유 용량을 점유한다. worker16 정지 또는 quota100 소진은 가용성 상실을 만들 수 있다. 공유 cleanup1이 막히면 다른 owner는 NOT_STARTED가 될 수 있다. 풀·대기열 확장이나 새 owner/세대·재OPEN·quota 초기화·TTL·자동 재발행으로 우회하지 않는다. 활성화 단계의 단일 owner 구성·외부 프로세스 종료 확인·새 readiness 및 unknown 대조는 별도 설계와 실행 증거가 필요하다. 실제 broker/socket/DB·복구·내구성·성능은 미검증이며 wire·좁은 OPEN_PROOF_MISSING·DB commit 뒤 ACK·공정성·readiness 계약은 바꾸지 않는다.
+
+
+## Active broker patch decision — 2026-10-18
+
+This supersedes the active 4.3.0 candidate/pin above; historical registry and execution statements retain their original scope. Select exactly RabbitMQ **4.3.6-management**, linux/arm64/v8 pin `rabbitmq@sha256:de03afc2c596b635196692c18425149f1e85d13ba8c1990c1a78684f693dc459`. Readiness rejects every other version, including 4.3.0; retain `delayed-retry-type=disabled` and all quorum/SAC/policy checks.
+
+[4.3.1 release notes](https://github.com/rabbitmq/rabbitmq-server/releases/tag/v4.3.1) and [upstream fix #16395](https://github.com/rabbitmq/rabbitmq-server/pull/16395) identify the omitted delayed-retry policy registration fix. Choose the later [4.3.6 maintenance release](https://github.com/rabbitmq/rabbitmq-server/releases/tag/v4.3.6), containing that fix, over 4.3.1. This includes additional maintenance changes requiring actual compatibility validation. The previous provisioning HTTP400 is consistent with that upstream issue, but its original response body was not captured, so its precise cause remains unconfirmed. This selection does not establish integration, recovery or performance PASS.
