@@ -7,6 +7,7 @@ import com.jinddung2.givemeticon.domain.coupon.domain.CouponEventStatus;
 import com.jinddung2.givemeticon.domain.coupon.exception.CouponEventNotFoundException;
 import com.jinddung2.givemeticon.domain.coupon.exception.CouponEventNotOpenException;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponApplicationMapper;
+import com.jinddung2.givemeticon.domain.coupon.mapper.CouponEventAdmissionCounterMapper;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponEventMapper;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 묶음 접수 경로의 트랜잭션 경계다. 행사 행을 한 번 잠근 뒤, 후보 회원 전원을 한 재확인 SELECT로,
+ * 묶음 접수 경로의 트랜잭션 경계다. 접수 순번 카운터 행(coupon_event_admission_counter)을 한 번 잠근 뒤, 후보 회원 전원을 한 재확인 SELECT로,
  * 신규 회원 전원을 연속 순번과 함께 한 다중 VALUES INSERT로 저장하고 커밋한다.
  *
  * 잠금·재확인·순번 증가·다건 insert·커밋을 하나의 MySQL 트랜잭션으로 묶는다는 점과, 행사 시작 시각·
@@ -32,6 +33,7 @@ import java.util.Map;
 public class CouponBatchAdmissionTransactionService {
 
     private final CouponEventMapper couponEventMapper;
+    private final CouponEventAdmissionCounterMapper admissionCounterMapper;
     private final CouponApplicationMapper couponApplicationMapper;
     private final CouponAdmissionTransactionTimers timers;
     private final CouponEventClosureCache closureCache;
@@ -44,11 +46,13 @@ public class CouponBatchAdmissionTransactionService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public CouponBatchAdmissionResult acceptBatch(long eventId, List<Integer> distinctMemberIdsInOrder) {
         Timer.Sample transactionSample = timers.startTransactionTimer();
-        CouponEvent event = couponEventMapper.findByIdForUpdate(eventId)
-                .orElseThrow(CouponEventNotFoundException::new);
+        long lastSequence = admissionCounterMapper.findByEventIdForUpdate(eventId)
+                .orElseThrow(() -> counterMissing(eventId));
         timers.registerTransactionTimers(transactionSample);
+        CouponEvent event = couponEventMapper.findById(eventId)
+                .orElseThrow(CouponEventNotFoundException::new);
 
-        // 행사 행을 잠근 뒤 묶음 후보 전원을 한 번에 재확인한다. 같은 묶음·다른 묶음·다른 앱에서
+        // 카운터 행을 잠근 뒤 묶음 후보 전원을 한 번에 재확인한다. 같은 묶음·다른 묶음·다른 앱에서
         // 이미 커밋된 회원은 여기서 발견되어 새 순번을 소비하지 않는다.
         Map<Integer, CouponApplication> resolved = new HashMap<>();
         for (CouponApplication application : couponApplicationMapper.findByEventIdAndMemberIds(eventId, distinctMemberIdsInOrder)) {
@@ -70,25 +74,52 @@ public class CouponBatchAdmissionTransactionService {
                 if (event.getStatus() == CouponEventStatus.CLOSED) {
                     closureCache.markClosed(event.getId());
                 }
-                CouponEventNotOpenException notOpen = new CouponEventNotOpenException();
-                for (Integer memberId : newMemberIds) {
-                    failures.put(memberId, notOpen);
-                }
+                failAll(newMemberIds, failures);
             } else {
-                insertNewApplications(event, newMemberIds, resolved);
+                insertNewApplications(event, lastSequence, newMemberIds, resolved, failures);
             }
         }
         return new CouponBatchAdmissionResult(resolved, failures);
     }
 
-    private void insertNewApplications(CouponEvent event, List<Integer> newMemberIds,
-                                        Map<Integer, CouponApplication> resolved) {
-        if (event.getStatus() == CouponEventStatus.SCHEDULED
-                && couponEventMapper.markOpen(event.getId()) != 1) {
-            throw new IllegalStateException("coupon event status changed while locked: " + event.getId());
+    private RuntimeException counterMissing(long eventId) {
+        // 카운터 행은 자동으로 만들지 않는다. 행사가 없으면 기존처럼 NotFound, 행사만 있으면 설정 오류다.
+        if (couponEventMapper.findById(eventId).isEmpty()) {
+            return new CouponEventNotFoundException();
+        }
+        return new IllegalStateException("coupon_event_admission_counter row is missing: eventId=" + eventId);
+    }
+
+    private void failAll(List<Integer> memberIds, Map<Integer, RuntimeException> failures) {
+        CouponEventNotOpenException notOpen = new CouponEventNotOpenException();
+        for (Integer memberId : memberIds) {
+            failures.put(memberId, notOpen);
+        }
+    }
+
+    private void insertNewApplications(CouponEvent event, long baseSequence, List<Integer> candidateMemberIds,
+                                       Map<Integer, CouponApplication> resolved,
+                                       Map<Integer, RuntimeException> failures) {
+        // 접수 측 마감(ADR-006 D1): 순번은 total_quantity까지만 배정한다. 넘는 후보는 신청을 만들지 않고 ENDED로 처리한다.
+        long capacity = Math.max(0L, event.getTotalQuantity() - baseSequence);
+        if (capacity == 0) {
+            // 카운터를 잠근 뒤 읽은 값이 이미 total 이상이다(다른 트랜잭션이 커밋한 값). 이 거절 경로에서 기록해도 된다.
+            closureCache.markClosed(event.getId());
+            failAll(candidateMemberIds, failures);
+            return;
+        }
+        List<Integer> newMemberIds = candidateMemberIds.size() <= capacity
+                ? candidateMemberIds
+                : candidateMemberIds.subList(0, (int) capacity);
+        if (newMemberIds.size() < candidateMemberIds.size()) {
+            failAll(candidateMemberIds.subList(newMemberIds.size(), candidateMemberIds.size()), failures);
         }
 
-        long baseSequence = event.getNextAcceptanceSequence();
+        if (event.getStatus() == CouponEventStatus.SCHEDULED && !openScheduledEvent(event)) {
+            failAll(newMemberIds, failures);
+            return;
+        }
+
         List<CouponApplication> newApplications = new ArrayList<>(newMemberIds.size());
         for (int i = 0; i < newMemberIds.size(); i++) {
             newApplications.add(CouponApplication.pending(event.getId(), newMemberIds.get(i), baseSequence + i + 1));
@@ -101,12 +132,37 @@ public class CouponBatchAdmissionTransactionService {
         }
 
         long newNextSequence = baseSequence + newApplications.size();
-        if (couponEventMapper.updateNextAcceptanceSequence(event.getId(), newNextSequence) != 1) {
+        if (admissionCounterMapper.updateNextAcceptanceSequence(event.getId(), newNextSequence) != 1) {
             throw new IllegalStateException("coupon event sequence update failed: " + event.getId());
+        }
+        if (newNextSequence >= event.getTotalQuantity()) {
+            // 이 트랜잭션이 마지막 순번을 배정했다. 커밋 뒤에만 마감으로 기록한다(롤백되면 기록하지 않는다).
+            closureCache.markClosedAfterCommit(event.getId());
         }
 
         for (CouponApplication application : newApplications) {
             resolved.put(application.getMemberId(), application);
         }
+    }
+
+    /**
+     * SCHEDULED → OPEN. 잠금 없이 읽은 SCHEDULED가 오래됐을 수 있다(MQ 준비 상태 트랜잭션이 event를 잠그고 먼저 OPEN으로
+     * 전이할 수 있다). markOpen이 0행이면 행사를 다시 읽어 OPEN이면 true(계속), CLOSED이면 false(ENDED)를 돌려준다.
+     */
+    private boolean openScheduledEvent(CouponEvent event) {
+        if (couponEventMapper.markOpen(event.getId()) == 1) {
+            return true;
+        }
+        CouponEvent current = couponEventMapper.findById(event.getId())
+                .orElseThrow(CouponEventNotFoundException::new);
+        if (current.getStatus() == CouponEventStatus.CLOSED) {
+            closureCache.markClosed(event.getId());
+            return false;
+        }
+        if (current.getStatus() != CouponEventStatus.OPEN) {
+            throw new IllegalStateException("coupon event status changed unexpectedly: " + event.getId()
+                    + " status=" + current.getStatus());
+        }
+        return true;
     }
 }

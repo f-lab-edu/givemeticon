@@ -648,7 +648,7 @@ class CouponEventCounterSplitIntegrationTest {
         }
     }
 
-    /** 행사와 그 접수 카운터 행을 만든다. 카운터 테이블이 아직 없는 구조(구현 전)에서는 행사만 만든다. */
+    /** 행사와 그 접수 카운터 행을 만든다(행사를 만드는 쪽이 카운터 행도 함께 만든다는 ADR-006 구현 원칙). */
     private static long createEvent(String status, int total, int high) throws SQLException {
         try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
              Statement statement = connection.createStatement()) {
@@ -661,20 +661,9 @@ class CouponEventCounterSplitIntegrationTest {
                 keys.next();
                 eventId = keys.getLong(1);
             }
-            if (counterTableExists(connection)) {
-                statement.executeUpdate("INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) VALUES ("
-                        + eventId + ", 0)");
-            }
+            statement.executeUpdate("INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) VALUES ("
+                    + eventId + ", 0)");
             return eventId;
-        }
-    }
-
-    private static boolean counterTableExists(Connection connection) throws SQLException {
-        try (Statement statement = connection.createStatement();
-             ResultSet rs = statement.executeQuery("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='"
-                     + SCHEMA + "' AND table_name='coupon_event_admission_counter'")) {
-            rs.next();
-            return rs.getInt(1) == 1;
         }
     }
 
@@ -683,10 +672,8 @@ class CouponEventCounterSplitIntegrationTest {
              Statement statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO coupon_application (public_request_id, event_id, member_id, acceptance_sequence, "
                     + "status) VALUES ('" + UUID.randomUUID() + "', " + eventId + ", " + memberId + ", " + sequence + ", 'PENDING')");
-            if (counterTableExists(connection)) {
-                statement.executeUpdate("UPDATE coupon_event_admission_counter SET next_acceptance_sequence = " + sequence
-                        + " WHERE event_id=" + eventId);
-            }
+            statement.executeUpdate("UPDATE coupon_event_admission_counter SET next_acceptance_sequence = " + sequence
+                    + " WHERE event_id=" + eventId);
         }
     }
 

@@ -16,7 +16,6 @@ public class CouponEvent {
     private int highQuantity;
     private int highPoints;
     private int normalPoints;
-    private long nextAcceptanceSequence;
     private int issuedQuantity;
     private LocalDateTime settingsLockedAt;
     private LocalDateTime createdAt;

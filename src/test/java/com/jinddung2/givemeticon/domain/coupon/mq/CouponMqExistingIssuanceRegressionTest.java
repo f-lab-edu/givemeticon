@@ -14,14 +14,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CouponMqExistingIssuanceRegressionTest {
     final CouponEventMapper events=mock(CouponEventMapper.class);
+    final CouponEventAdmissionCounterMapper counters=mock(CouponEventAdmissionCounterMapper.class);
     final CouponApplicationMapper applications=mock(CouponApplicationMapper.class);
     final CouponAwardMapper awards=mock(CouponAwardMapper.class);
     @Test void unchangedV1StillRejectsNewClosedAdmissions() {
         var event=CouponMqAdmissionTransactionServiceTest.event(CouponEventStatus.CLOSED);
-        when(events.findByIdForUpdate(7)).thenReturn(Optional.of(event));
-        var service=new CouponBatchAdmissionTransactionService(events,applications,mock(CouponAdmissionTransactionTimers.class),mock(CouponEventClosureCache.class));
+        when(events.findById(7)).thenReturn(Optional.of(event));
+        when(counters.findByEventIdForUpdate(7)).thenReturn(Optional.of(0L));
+        var service=new CouponBatchAdmissionTransactionService(events,counters,applications,mock(CouponAdmissionTransactionTimers.class),mock(CouponEventClosureCache.class));
         var result=service.acceptBatch(7,List.of(3));
-        verify(applications,never()).insertBatch(anyList());verify(events,never()).updateNextAcceptanceSequence(anyLong(),anyLong());
+        verify(applications,never()).insertBatch(anyList());verify(counters,never()).updateNextAcceptanceSequence(anyLong(),anyLong());
         assertNotNull(result);
     }
     @Test void unchangedWorkerDrainsClosedExcessPendingToSoldOutWithoutAwardOrStock() {

@@ -13,19 +13,21 @@ import static org.mockito.Mockito.*;
 
 class CouponMqAdmissionTransactionServiceTest {
     final CouponEventMapper events = mock(CouponEventMapper.class);
+    final CouponEventAdmissionCounterMapper counters = mock(CouponEventAdmissionCounterMapper.class);
     final CouponMqControlMapper controls = mock(CouponMqControlMapper.class);
     final CouponMqAttemptMapper attempts = mock(CouponMqAttemptMapper.class);
     final CouponApplicationMapper applications = mock(CouponApplicationMapper.class);
-    final CouponMqAdmissionTransactionService service = new CouponMqAdmissionTransactionService(events, controls, attempts, applications);
+    final CouponMqAdmissionTransactionService service = new CouponMqAdmissionTransactionService(events, counters, controls, attempts, applications);
     final String token = UUID.randomUUID().toString(), attempt = UUID.randomUUID().toString();
     CouponEvent event;
     String version;
     @BeforeEach void setup() {
         event = event(CouponEventStatus.OPEN); version = CouponMqControl.version(event);
-        when(events.findByIdForUpdate(7)).thenReturn(Optional.of(event));
+        when(events.findById(7)).thenReturn(Optional.of(event));
+        when(counters.findByEventIdForUpdate(7)).thenReturn(Optional.of(0L));
         when(controls.findForUpdate(7)).thenReturn(Optional.of(new CouponMqControl(7, version, token, LocalDateTime.now(), false)));
         when(controls.pause(7)).thenReturn(1); when(applications.insert(any())).thenReturn(1); when(attempts.insert(any())).thenReturn(1);
-        when(events.updateNextAcceptanceSequence(eq(7L), anyLong())).thenReturn(1);
+        when(counters.updateNextAcceptanceSequence(eq(7L), anyLong())).thenReturn(1);
     }
     static CouponEvent event(CouponEventStatus status) {
         var e = new CouponEvent();
@@ -51,7 +53,7 @@ class CouponMqAdmissionTransactionServiceTest {
         service.accept(7, List.of(message(null)));
         verify(attempts).insert(argThat(a->a.getOutcome().equals("REJECTED") && a.getMappedMemberId()==null
             && a.getOpenToken()==null && a.getRejectionReason().equals("OPEN_PROOF_MISSING")));
-        verifyNoInteractions(applications); verify(events, never()).updateNextAcceptanceSequence(anyLong(),anyLong());
+        verifyNoInteractions(applications); verify(counters, never()).updateNextAcceptanceSequence(anyLong(),anyLong());
     }
     @Test void duplicateSameHashReusesFirstOutcomeBeforeCurrentEligibility() {
         Message message = message(token); var payload = CouponMqProtocol.payload(message.getBody());
@@ -84,11 +86,25 @@ class CouponMqAdmissionTransactionServiceTest {
     @Test void existingApplicationGetsMappedWithoutNewRank() {
         when(applications.findByEventIdAndMemberId(7,3)).thenReturn(Optional.of(CouponApplication.pending(7,3,40)));
         service.accept(7,List.of(message(token)));
-        verify(applications,never()).insert(any()); verify(events,never()).updateNextAcceptanceSequence(anyLong(),anyLong());
+        verify(applications,never()).insert(any()); verify(counters,never()).updateNextAcceptanceSequence(anyLong(),anyLong());
         verify(attempts).insert(any());
     }
-    @Test void lockOrderEventThenControl() {
-        service.accept(7,List.of(message(null))); var order=inOrder(events,controls);
-        order.verify(events).findByIdForUpdate(7); order.verify(controls).findForUpdate(7);
+    @Test void lockOrderCounterThenControlWithoutLockingEvent() {
+        service.accept(7,List.of(message(null))); var order=inOrder(counters,controls);
+        order.verify(counters).findByEventIdForUpdate(7); order.verify(controls).findForUpdate(7);
+        verify(events,never()).findByIdForUpdate(anyLong());
+    }
+    @Test void admissionAfterCloseDoesNotApplyV1TotalQuantityClosure() {
+        ReflectionTestUtils.setField(event,"status",CouponEventStatus.CLOSED);
+        when(counters.findByEventIdForUpdate(7)).thenReturn(Optional.of(100L)); // already at total_quantity (100)
+        var result = service.accept(7, List.of(message(token)));
+        assertEquals(List.of(CouponMqAdmissionTransactionService.Action.ACK), result.actions());
+        verify(applications).insert(argThat(a->a.getAcceptanceSequence()==101 && a.getStatus()==CouponApplicationStatus.PENDING));
+        verify(counters).updateNextAcceptanceSequence(7L,101L);
+    }
+    @Test void missingCounterRowIsAConfigurationError() {
+        when(counters.findByEventIdForUpdate(7)).thenReturn(Optional.empty());
+        assertThrows(IllegalStateException.class,()->service.accept(7,List.of(message(token))));
+        verifyNoInteractions(attempts,applications);
     }
 }

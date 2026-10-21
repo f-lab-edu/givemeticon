@@ -26,7 +26,7 @@ import java.util.Optional;
  * 않았다(docs/coupon/08-redemption-validation.md §0 참고).
  *
  * 발급/접수와 달리 이 트랜잭션은 coupon_event 행을 잠그지 않는다 - 여러 신청이 공유하는 순번
- * 카운터(coupon_event.next_acceptance_sequence/issued_quantity) 같은 공유 자원을 갱신하지
+ * 카운터(coupon_event_admission_counter.next_acceptance_sequence/coupon_event.issued_quantity) 같은 공유 자원을 갱신하지
  * 않고, 회원 한 명의 쿠폰 한 장(coupon_award 한 행)만 갱신하기 때문이다. 동시성 방어는 그
  * 행 하나에 대한 조건부 UPDATE(WHERE status='ISSUED')만으로 충분하다 - InnoDB가 같은 행을
  * 대상으로 한 UPDATE를 자동으로 직렬화한다.

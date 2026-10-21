@@ -31,6 +31,10 @@ class CouponAdmissionTimingInterceptorTest {
 
     private static final String LOCK_SELECT_ID =
             "com.jinddung2.givemeticon.domain.coupon.mapper.CouponEventMapper.findByIdForUpdate";
+    private static final String COUNTER_LOCK_SELECT_ID =
+            "com.jinddung2.givemeticon.domain.coupon.mapper.CouponEventAdmissionCounterMapper.findByEventIdForUpdate";
+    private static final String READINESS_TX =
+            "com.jinddung2.givemeticon.domain.coupon.mq.CouponMqReadinessTransactionService.initialize";
     private static final String ADMISSION_TX =
             "com.jinddung2.givemeticon.domain.coupon.service.CouponBatchAdmissionTransactionService.acceptBatch";
     private static final String ISSUANCE_TX =
@@ -54,11 +58,24 @@ class CouponAdmissionTimingInterceptorTest {
     void admissionCaller() throws Throwable {
         TransactionSynchronizationManager.setCurrentTransactionName(ADMISSION_TX);
 
-        interceptor.intercept(invocation(LOCK_SELECT_ID, false));
+        interceptor.intercept(invocation(COUNTER_LOCK_SELECT_ID, false));
 
         assertThat(count("admission", "success")).isEqualTo(1);
         assertThat(count("issuance", "success")).isZero();
         assertThat(timingContext.lockQueryCompletedNanosOrZero()).isNotZero();
+    }
+
+    @Test
+    @DisplayName("접수 외 트랜잭션(MQ 준비 상태 등)의 coupon_event 잠금은 caller=other이며 접수 지표와 기준 시각을 오염시키지 않는다")
+    void otherCallerForEventLockOutsideIssuance() throws Throwable {
+        TransactionSynchronizationManager.setCurrentTransactionName(READINESS_TX);
+
+        interceptor.intercept(invocation(LOCK_SELECT_ID, false));
+
+        assertThat(count("other", "success")).isEqualTo(1);
+        assertThat(count("admission", "success")).isZero();
+        assertThat(count("issuance", "success")).isZero();
+        assertThat(timingContext.lockQueryCompletedNanosOrZero()).isZero();
     }
 
     @Test

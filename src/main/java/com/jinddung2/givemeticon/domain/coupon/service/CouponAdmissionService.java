@@ -23,17 +23,18 @@ public class CouponAdmissionService {
     private final CouponExistingApplicationLookupBatcher existingApplicationLookupBatcher;
 
     /**
-     * 종료된 행사 빠른 응답: 이 인스턴스가 이미 종료(CLOSED)를 실제로 확인한 적이 있는 행사면
+     * 종료된 행사 빠른 응답: 이 인스턴스가 이미 마감(coupon_event CLOSED, 또는 접수 순번이 total_quantity에 도달 - ADR-006)을
+     * 실제로 확인한 적이 있는 행사면
      * (CouponEventClosureCache) 접수 큐/잠금 트랜잭션을 거치지 않고 응답한다. 진행 중인 행사,
      * 그리고 이 인스턴스가 아직 종료를 발견하지 못한 행사는 이 분기를 타지 않고 항상 기존 잠금
-     * 트랜잭션(또는 묶음 큐)으로 가서 시작 시간·상태·중복을 다시 검증한다 - 그 트랜잭션이 실제로
-     * CLOSED를 읽어내면 그때 캐시를 채운다(CouponAdmissionTransactionService/
+     * 트랜잭션(또는 묶음 큐)으로 가서 시작 시간·상태·중복·순번을 다시 검증한다 - 그 트랜잭션이 실제로
+     * 마감을 확인하면 그때 캐시를 채운다(CouponAdmissionTransactionService/
      * CouponBatchAdmissionTransactionService 참고).
      *
      * 캐시부터 읽고 기존 접수 조회를 그다음에 하는 순서가 중요하다(반대로 하면 안 된다): 캐시가
-     * true라는 것은 그 시점 이전에 종료가 이미 커밋됐다는 뜻이고, 종료는 터미널 상태에 insert는
-     * 항상 행사 행 잠금을 먼저 잡고 상태를 재검증하므로 그 이후로는 같은 행사에 새 접수가 생길 수
-     * 없다 - 즉 종료 시점 이전에 이미 커밋된 접수가 있다면 이 순서의 기존 접수 조회(캐시 확인
+     * true라는 것은 그 시점 이전에 마감이 이미 커밋됐다는 뜻이고, 마감은 터미널 상태이며 V1 insert는
+     * 항상 접수 카운터 행 잠금 아래에서 상태와 다음 순번(> total_quantity면 거절)을 재검증하므로 그 이후로는
+     * 같은 행사에 V1 신규 접수가 생길 수 없다(ADR-006 D1; MQ 접수는 이 보장의 대상이 아니다) - 즉 종료 시점 이전에 이미 커밋된 접수가 있다면 이 순서의 기존 접수 조회(캐시 확인
      * 다음, 그래서 종료 시점보다 반드시 늦게 실행됨)가 항상 그 접수를 본다. 반대로 기존 접수
      * 조회를 먼저 하고 캐시를 나중에 확인하면, "조회는 비어 있었지만 그 직후 다른 앱이 같은
      * 회원의 접수를 커밋하고 행사가 종료된" 경우 그 오래된(stale) "없음" 결과를 그대로 믿고
