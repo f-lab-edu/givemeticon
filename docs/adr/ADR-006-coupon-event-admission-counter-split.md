@@ -1,10 +1,10 @@
 # ADR-006 — coupon_event 접수 카운터 분리
 
-Status: Proposed (결정 필요 항목 있음, 구현 전)
+Status: Accepted (구현 전, 2026-10-21 사용자 결정)
 
-작성: 2026-10-21, 기준 SHA `afb0ff5` (branch `feat/coupon-event-lock-split`). 코드 읽기와 문서 조사만 수행했다. 코드·SQL·스크립트·설정은 바꾸지 않았고 DB·앱·부하도 실행하지 않았다. 아래 "확인 필요"는 이 단계에서 확인하지 못한 항목이다.
+작성: 2026-10-21. 초안 `f3553b0`(기준 `afb0ff5`)에 사용자 결정 D1~D4와 구현 원칙을 반영했다. 이후 `origin/develop`(`fdabd7a`, #193)를 병합(`9b362c5`)해 MQ 접수/준비 코드와 `V20261018` 마이그레이션이 이 브랜치에 들어왔다. 이 문서는 코드·SQL·스크립트·설정을 바꾸지 않았고 DB·앱·부하도 실행하지 않았다. 아래 "확인 필요"는 이 단계에서 확인하지 못한 항목이다. "사용자 결정"으로 표시한 항목은 사용자가 정한 것이며 이 문서가 바꾸지 않는다.
 
-MQ 접수/준비 코드(`CouponMqAdmissionTransactionService`, `CouponMqReadinessTransactionService`, `CouponMqControl`)와 `coupon_mq_*` DDL은 이 브랜치에 없다. `feat/issue-170-171-mq-admission`(`8e75f75`)에만 있다. 이 문서에서 `MQ브랜치:`로 표기한 근거는 그 브랜치의 파일이며 이 SHA에서 실행·시험한 것이 아니다.
+경로 표기: `mq/`는 `src/main/java/com/jinddung2/givemeticon/domain/coupon/mq/`다. 서비스·매퍼·도메인 파일은 `src/main/java/com/jinddung2/givemeticon/domain/coupon/` 아래 파일명으로 적는다. MQ 파일은 초안이 인용한 `feat/issue-170-171-mq-admission`(`8e75f75`)의 같은 파일과 병합 후에도 동일함을 확인했다(`CouponMqAdmissionTransactionService`, `CouponMqReadinessTransactionService`, `CouponMqControl`, `CouponMqAdmissionService`, `CouponMqConsumer`, `V20261018` 마이그레이션 모두 diff 없음). 그래서 초안의 줄 번호가 이 브랜치에서도 유효하다.
 
 ## Context / Problem
 
@@ -13,7 +13,7 @@ MQ 접수/준비 코드(`CouponMqAdmissionTransactionService`, `CouponMqReadines
 - 대기 배수(잠금 SELECT(admission) 평균 ÷ (잠금 후 작업 평균 + 커밋 평균)): e0-a(발급 워커 켬) 평균 1.335(0.823~2.202), e0-b 1.041(0.871~1.266). 발급 워커를 끈 e1-no-issue는 0.22(0.161~0.293). e1 범위는 e0-a·e0-b 범위와 겹치지 않는다(측정 문서 관찰 1).
 - 잠금 SELECT(admission) 평균: e0-a 13.496ms, e1-no-issue 1.756ms.
 - Hikari pending>0 표본은 모든 그룹에서 0이었다.
-- 위 값은 사실 비교이고, 측정 문서는 해석을 싣지 않는다. 발급 워커 유무에 따라 접수 잠금 대기가 달라졌다는 해석은 이 ADR의 해석이다.
+- 위 값은 사실 비교이고 측정 문서는 해석을 싣지 않는다. 발급 워커 유무에 따라 접수 잠금 대기가 달라졌다는 해석은 이 ADR의 해석이다.
 - 한계: 발급 쪽 `caller=issuance` 잠금 SELECT 값은 측정 문서 결과표에 없다(발급 워커끼리의 경합 크기는 확인 필요). 진단 등급이며 그룹당 run이 3~5개다.
 
 구조: `coupon_event` 한 행을 접수(`next_acceptance_sequence`)와 발급(`issued_quantity`, `status`, `closed_at`)이 모두 `SELECT ... FOR UPDATE`로 잠근다. 앱 2대 기준 접수 플러시 스레드와 발급 워커가 같은 행을 두고 경쟁한다.
@@ -36,10 +36,10 @@ MQ 접수/준비 코드(`CouponMqAdmissionTransactionService`, `CouponMqReadines
 | V1 묶음 접수 | CouponBatchAdmissionTransactionService.java:47,87,104 | 같음 | status, db_now/starts_at(:67), next_acceptance_sequence(:91) |
 | V1 단건 발급 | CouponEventIssuanceTransactionService.java:51,91 | findByIdForUpdate, increment | total(:64), high_quantity(:80), points(:83) |
 | V1 묶음 발급 | CouponEventIssuanceBatchTransactionService.java:66,122 | findByIdForUpdate, incrementBy | total(:78), high_quantity(:106), points(:109) |
-| MQ 접수 | MQ브랜치:CouponMqAdmissionTransactionService.java:32,71 | findByIdForUpdate, updateNext | next_acceptance_sequence(:36), 설정 컬럼(:57 `CouponMqControl.version`), status(:62) |
-| MQ 준비 상태 | MQ브랜치:CouponMqReadinessTransactionService.java:26,43,55,61 | findByIdForUpdate, markOpen | 설정 컬럼(:29), status(:32,:37,:43), 존재 여부(:55,:61) |
+| MQ 접수 | mq/CouponMqAdmissionTransactionService.java:32,71 | findByIdForUpdate, updateNext | next_acceptance_sequence(:36), 설정 컬럼(:57 `CouponMqControl.version`), status(:62) |
+| MQ 준비 상태 | mq/CouponMqReadinessTransactionService.java:26,43,55,61 | findByIdForUpdate, markOpen | 설정 컬럼(:29), status(:32,:37,:43), 존재 여부(:55,:61) |
 
-전체 표(상태 판단, closure cache, 직접 SQL, 스키마, 스크립트)는 아래 "영향 범위 상세"에 있다. 호출 서비스는 사전 조사의 6개가 맞고 누락은 없다. 단, 마지막 2개는 이 브랜치에 없다.
+호출 서비스는 사전 조사의 6개가 맞고 누락은 없다. 전체 표(상태 판단, closure cache, 직접 SQL, 스키마, 스크립트)는 "영향 범위 상세"에 있다.
 
 ## Constraints / Considered Options
 
@@ -47,195 +47,219 @@ MQ 접수/준비 코드(`CouponMqAdmissionTransactionService`, `CouponMqReadines
 
 1. 불변식(아래 "불변식")을 유지한다. 특히 순번 유일·연속, 초과 발급 0, 등급=순번 규칙.
 2. ADR-002: 기존 분산 락 경로는 별도 baseline 실험 대상으로 보존한다. 이 변경은 Redisson 락 경로를 건드리지 않는다.
-3. ADR-004 / RABBITMQ_DELIVERY_ACCOUNTING.md: CLOSED 이후 도착한 유효한 MQ 백로그는 PENDING으로 접수된 뒤 기존 발급 워커가 SOLD_OUT으로 처리한다(ADR-004 :51, ACCOUNTING :8). 새 락/샤딩을 넣지 않는다는 ADR-004 :133 문구는 MQ 연결 단계의 범위 선언이며, 이 ADR이 그 범위를 바꾼다. ADR-004의 해당 문장과의 관계는 "Trade-offs"에 적는다.
+3. ADR-004 / RABBITMQ_DELIVERY_ACCOUNTING.md: CLOSED 이후 도착한 유효한 MQ 백로그는 PENDING으로 접수된 뒤 기존 발급 워커가 SOLD_OUT으로 처리한다(ADR-004 :51, ACCOUNTING :8). 새 락/샤딩을 넣지 않는다는 ADR-004 :133 문구는 MQ 연결 단계의 범위 선언이며, 이 ADR이 그 범위를 바꾼다("Trade-offs" 참고).
 4. READ COMMITTED 유지(모든 접수·발급 트랜잭션이 `Isolation.READ_COMMITTED`).
 
 ### 대안
 
 **① 접수 순번 행 분리.** 새 테이블에 행사별 접수 카운터 행을 두고 접수는 그 행만 FOR UPDATE.
-- 효과: 접수↔발급의 행 잠금 공유가 사라진다. 단 아래 "C-4 외래키" 조건이 충족될 때만 그렇다.
-- 정합성 위험: 접수의 `status`/`CLOSED` 읽기가 잠금 없는 읽기가 된다(C-3).
-- 변경 범위: 새 테이블·Flyway·매퍼 2개 메서드, 접수 서비스 3곳(V1 단건/묶음, MQ), 계측 인터셉터, 스크립트 약 9개.
+- 효과: 접수↔발급의 행 잠금 공유가 사라진다. 단 외래키 조건(D4)이 충족될 때만 그렇다.
+- 정합성 위험: 접수의 status 읽기가 잠금 없는 읽기가 된다(D1 논증이 이를 닫는다).
+- 변경 범위: 새 테이블·Flyway·매퍼 메서드, 접수 서비스 3곳(V1 단건/묶음, MQ), 계측 인터셉터, 스크립트 9개.
 - MQ 경로: MQ 접수는 카운터 행 + 기존 `coupon_mq_control` 행을 잠근다. MQ 준비 상태 트랜잭션은 카운터를 쓰지 않는다.
 
 **② 발급의 coupon_event 잠금 범위 축소.** 선행 `FOR UPDATE` 대신 마지막 조건부 UPDATE만 사용.
-- 효과: 발급이 event 행을 잡는 시간이 트랜잭션 끝부분으로 줄고, PENDING이 없는 빈 폴링은 event 행을 잡지 않는다(측정 문서: 빈 폴링도 행사 행 잠금을 먼저 잡는다). 그러나 `UPDATE`도 커밋까지 배타 잠금을 유지하므로 접수의 `FOR UPDATE`와의 경합은 남는다. 접수 트랜잭션이 event 행을 `FOR UPDATE` 동안 발급의 UPDATE가 대기하고, 반대도 같다.
-- 정합성 위험: 현재 두 앱 발급 워커의 순서 직렬화는 event 행 잠금이 맡는다(CouponEventIssuanceTransactionService.java:51-57, 주석 :54-56). 이를 없애면 `findFirstPendingForUpdate`/`findPendingForUpdate`의 PENDING 행 잠금(CouponApplicationMapper.xml:54-72, ORDER BY acceptance_sequence)이 유일한 직렬화 수단이 된다. 두 워커가 같은 첫 PENDING 행에서 대기하므로 순서는 유지될 것으로 보이나, RC에서의 대기 후 재평가 동작, 묶음 LIMIT과 부분 겹침, 데드락 가능성은 이 단계에서 확인하지 못했다(확인 필요, 실제 MySQL 시험 필요).
-- 변경 범위: 발급 서비스 2곳, 쿼리 수정. 테이블 변경 없음.
-- MQ 경로: 영향 없음(발급 워커는 MQ와 공유).
+- 효과: 발급이 event 행을 잡는 시간이 트랜잭션 끝부분으로 줄고 빈 폴링은 event 행을 잡지 않는다. 그러나 `UPDATE`도 커밋까지 배타 잠금을 유지하므로 접수의 `FOR UPDATE`와의 경합은 남는다.
+- 정합성 위험: 현재 두 앱 발급 워커의 순서 직렬화는 event 행 잠금이 맡는다(CouponEventIssuanceTransactionService.java:51-57, 주석 :54-56). 이를 없애면 PENDING 행 잠금(CouponApplicationMapper.xml:54-72, ORDER BY acceptance_sequence)이 유일한 직렬화 수단이 된다. RC에서의 대기 후 재평가 동작, 묶음 LIMIT과 부분 겹침, 데드락 가능성은 확인하지 못했다(확인 필요).
+- 변경 범위: 발급 서비스 2곳. 테이블 변경 없음. MQ 경로: 영향 없음.
+- 이번 범위에서 채택하지 않았다(①이 접수↔발급 경합을 직접 겨냥한다).
 
 **③ 발급 워커 단일화.** 분산 락으로 앱 1대에서만 발급. 경쟁자 4→3.
-- 효과: 발급 트랜잭션끼리의 경합이 사라진다. 접수↔발급 경합은 그대로다. 측정된 경합(발급 유무에 따른 접수 대기 변화)을 직접 줄이지 않는다.
-- ADR-002와의 관계: ADR-002는 stock 경로의 Redisson 락을 제거하지 않는다는 결정이다. 프로젝트에는 ShedLock 의존성이 없고(grep 확인), 기존 `@DistributedLock`(Redisson AOP)은 `CreateCouponFacade` 등 stock/포인트 경로에 있다. 단일화에 기존 `@DistributedLock`을 재사용하면 ADR-002가 보존한 락 인프라를 새 경로에서 쓰게 되어 "락 경로 제거 판단 유보"와 모순되지 않지만, 락 보유 앱 장애 시 발급 지연·리스 만료 중 이중 실행(정합성은 DB 잠금이 여전히 보장)을 새로 다뤄야 한다. 새 의존성(ShedLock)을 추가하는 것은 이 범위의 필요를 넘는다.
-- 정합성 위험: 낮다(DB 잠금이 그대로 있다). 가용성 위험이 늘어난다.
-- MQ 경로: 영향 없음.
+- 효과: 발급끼리의 경합만 줄고 접수↔발급 경합은 그대로다.
+- ADR-002와의 관계: ADR-002는 stock 경로의 Redisson 락을 제거하지 않는다는 결정이다. 프로젝트에는 ShedLock 의존성이 없고(grep 확인) 기존 `@DistributedLock`(Redisson AOP)은 `CreateCouponFacade` 등 stock/포인트 경로에 있다. 단일화에 이를 재사용하면 ADR-002와 모순되지 않지만 락 보유 앱 장애 시 발급 지연과 리스 만료 중 이중 실행(정합성은 DB 잠금이 보장)을 새로 다뤄야 한다.
+- **사용자 결정(D3): 이번 범위에서 제외한다.** 효과를 분리해서 측정하기 위함이다.
 
 **④ 접수 측 마감.** 접수 순번이 `total_quantity`에 도달하면 접수 쪽이 스스로 마감 판단.
-- 효과: 마감 이후 요청이 접수 트랜잭션까지 가지 않고 빠르게 거절된다. 측정되지 않았다(수치 없음).
-- 정합성 위험: 응답 계약 변경(D1).
-- 변경 범위: 카운터 행에 마감 표시 1개 필요(C-1), 접수 서비스, 응답 의미.
-- MQ 경로: 아래 D1에서 분석. 요약하면 V1 접수에만 적용 가능하고 MQ 접수에 적용하면 ADR-004 계약과 충돌한다.
+- **사용자 결정(D1): V1 접수(단건·묶음)에만 도입한다.** MQ 접수에는 적용하지 않는다(ADR-004 계약, 아래 Decision의 D1).
 
 ## Decision / Why
 
-(제안. 승인 전. 결정 필요 항목은 D에 분리했다.)
+### 사용자 결정 요약
 
-### C-1. ① 채택: 카운터 테이블
+| 항목 | 사용자 결정 |
+|---|---|
+| ① | 카운터 테이블 `coupon_event_admission_counter(event_id PK, next_acceptance_sequence)`를 채택한다. V1 접수(단건·묶음)와 MQ 접수는 카운터 행을 `FOR UPDATE`로 잠그고, `status`·`starts_at_utc`·`total_quantity`는 잠금 없는 읽기로 쓴다. 발급 경로는 지금처럼 `coupon_event`를 잠그고 `issued_quantity`·`status`·`closed_at`을 갱신한다. |
+| D1 | 접수 측 마감을 V1 접수에만 도입. MQ 접수에는 적용하지 않는다. |
+| D2 | `coupon_event.next_acceptance_sequence`는 사용 중단 후 보존. 컬럼 제거는 후속 변경. |
+| D3 | 발급 워커 단일화는 이번 범위에서 제외. |
+| D4 | `coupon_application.event_id`와 `coupon_mq_attempt.event_id`의 FK 대상을 카운터 테이블로 재지정. |
 
-- 테이블 `coupon_event_admission_counter(event_id BIGINT PK, next_acceptance_sequence BIGINT NOT NULL)`. `event_id`에 FK(대상은 D4에서 결정). `CHECK (next_acceptance_sequence >= 0)` 정도의 방어만 둔다.
-- 다른 컬럼은 필요 없다. `updated_at`은 현재 접수마다 `coupon_event.updated_at`을 갱신하지만(CouponEventMapper.xml:24-26) 이 값을 읽는 코드는 찾지 못했다(`updated_at`은 SELECT 목록에만 있음, 확인 범위: src/main, sql, scripts). 카운터에는 두지 않는다.
-- D1을 도입하면 마감 표시 컬럼(예: `admission_closed_at`)이 하나 필요하다. D1 미도입 시 추가하지 않는다.
-- V1 접수(단건·묶음)와 MQ 접수는 `findByIdForUpdate` 대신 카운터 행 `FOR UPDATE`를 잡는다. `status`, `starts_at_utc`, `total_quantity`, `db_now`는 잠금 없는 읽기(신규 `findById`, `db_now` 포함)로 읽는다. 같은 트랜잭션 안의 문장이므로 추가 커넥션은 쓰지 않는다. `CouponEventClosureCache.java:17-20`이 "락 없는 SELECT를 모든 요청에 얹으면 커넥션 부담이 늘어 실측됨"이라고 쓴 것은 요청마다 별도 커넥션으로 조회하는 경우이며, 여기서는 해당하지 않는다(확인 필요: 단건 경로는 요청마다 1문장 추가).
-- 발급 경로는 지금처럼 `coupon_event`를 잠그고 `issued_quantity`, `status`, `closed_at`을 갱신한다.
-- 잠금 순서 규칙: 접수 = 카운터 → (필요 시 event UPDATE `markOpen`) / MQ 접수 = 카운터 → `coupon_mq_control` / MQ 준비 = event → control / 발급 = event. 서로 역방향 조합이 없어 순환이 생기지 않는다. 단 D4에서 FK를 그대로 두면 이 규칙이 깨진다(C-4).
+### C-1. 카운터 테이블
 
-### C-2. 불변식에 대한 영향
+- `coupon_event_admission_counter(event_id BIGINT PK, next_acceptance_sequence BIGINT NOT NULL)`. `event_id`는 `coupon_event(id)`를 참조한다. `CHECK (next_acceptance_sequence >= 0)` 정도의 방어만 둔다.
+- 다른 컬럼은 필요 없다. D1은 마감을 카운터 값(`next_acceptance_sequence >= total_quantity`)으로 판단하므로 마감 표시 컬럼이 없다. `updated_at`은 현재 접수마다 `coupon_event.updated_at`을 갱신하지만(CouponEventMapper.xml:24-26) 이 값을 읽는 코드는 찾지 못했다(`updated_at`은 SELECT 목록에만 있음, 확인 범위: src/main, sql, scripts). 카운터에는 두지 않는다. 접수가 `coupon_event.updated_at`을 더는 갱신하지 않는다는 변경이 따라온다.
+- 접수는 `findByIdForUpdate` 대신 카운터 행 `FOR UPDATE`를 먼저 잡고, 이어서 신규 `findById`(잠금 없음, `db_now` 포함)로 `status`·`starts_at_utc`·`total_quantity`를 읽는다. 같은 트랜잭션 안의 문장이라 추가 커넥션은 쓰지 않는다. ClosureCache.java:17-20이 우려한 "요청마다 별도 조회로 커넥션 부담"은 해당하지 않는다(단건 경로는 요청마다 SELECT 1문장 추가, 확인 필요).
+- 잠금 순서 규칙: V1 접수 = 카운터 → (필요 시 event UPDATE `markOpen`) / MQ 접수 = 카운터 → `coupon_mq_control` / MQ 준비 = event → control / 발급 = event. 서로 역방향 조합이 없어 순환이 생기지 않는다. D4가 이 규칙을 성립시키는 전제다(아래).
 
-아래 "불변식" 표 기준: 1, 3, 4, 5는 변하지 않는다(카운터 갱신과 application INSERT가 같은 트랜잭션이고 잠금 행만 바뀐다). 2는 근거가 "접수 대기 후 발급 시작"에서 "커밋 순서=순번 순서"로 바뀐다. 6과 7은 C-3에서 다룬다.
+### D1. V1 접수 측 마감 (사용자 결정)
 
-### C-3. 핵심 논증 검증: 접수가 오래된 CLOSED/OPEN을 읽어도 정합성이 깨지지 않는가
+**규칙.** V1 접수는 카운터 행을 잠근 뒤 기존 신청 확인 → `다음 순번 = 카운터 + 1`을 계산한다. 새 신청이 필요한데 `다음 순번 > total_quantity`이면 새 신청을 만들지 않고 ENDED로 처리하며 이때 `CouponEventClosureCache.markClosed`를 기록한다. 기존 신청자는 지금처럼 ENDED 대신 기존 결과를 받는다(CouponAdmissionTransactionService.java:41-43, CouponBatchAdmissionTransactionService.java:53-63의 순서 유지). ENDED 응답은 기존 `CouponEventNotOpenException` 경로를 재사용한다. 묶음 접수에서 순번이 경계를 넘으면 `total_quantity`까지만 순번을 배정하고 나머지 신규 후보는 같은 방식으로 ENDED를 받는다(이 분할 규칙은 구현 시 단위·통합 테스트로 고정한다).
 
-제안된 논증은 대부분 코드와 맞고, 한 곳은 약해진다.
+**논증 (코드 근거).**
+1. CLOSED는 `issued_quantity == total_quantity`일 때만 설정된다. 증가 UPDATE의 WHERE가 `issued_quantity < total`(또는 `+ delta <= total`)이고(CouponEventMapper.xml:47,62), CASE가 증가된 값으로 평가되어 `issued_quantity >= total`일 때 CLOSED가 된다(:43-44,58-59, 주석 :29-39). CLOSED를 설정하는 다른 코드는 없다(시험 스크립트의 직접 UPDATE 제외).
+2. 그 시점에 접수 순번은 이미 `total` 이상이다. 발급은 `acceptance_sequence <= total`인 신청만 발급하고(CouponEventIssuanceTransactionService.java:64,80, Batch:78,106) 가장 앞선 PENDING부터 처리하며(CouponApplicationMapper.xml:54-72) 순번에 빈틈이 없으므로(불변식 1) `issued == total`이면 순번 1..total이 모두 커밋되어 있다.
+3. V1 접수는 카운터 행 잠금 아래에서 `다음 순번 > total`이면 거절하므로, V1이 만드는 순번은 1..total뿐이다. CLOSED 이후 커밋되는 V1 신청은 있을 수 없다. CLOSED 커밋 시점에 이미 카운터 잠금을 쥔 V1 트랜잭션이 있어도, 그 트랜잭션은 순번 `total`을 커밋한 트랜잭션이 잠금을 푼 뒤에 잠금을 얻었으므로(CLOSED의 선행 조건) 카운터 값 ≥ `total`을 읽고 신청을 만들지 않는다.
+4. 따라서 CouponAdmissionService.java:33-47 주석이 종료 캐시의 근거로 쓰는 "캐시 true ⇒ 그 이후 같은 행사에 새 접수가 생길 수 없다"는 보장이 카운터 분리 후에도 V1 신청에 대해 유지된다. 마감 시점은 CLOSED(발급 완료)에서 "카운터가 `total`에 도달"로 앞당겨진다. 캐시 기록은 거절 경로에서 커밋된 카운터 값을 관측했을 때만 한다. 마지막 순번(`total`)을 배정하는 트랜잭션이 커밋 전에 기록하면 롤백 시 캐시가 거짓이 되므로 하지 않는다. 이 해석에 맞춰 ClosureCache의 클래스 설명("CLOSED가 실제 관측될 때만", :9-20)과 `markClosed` 호출 조건(현재 `status == CLOSED`일 때만, 단건 :50-51, 묶음 :70-71)을 고쳐야 한다.
+5. 이 규칙은 잠금 없는 `status` 읽기의 오래된 CLOSED 문제도 닫는다. V1 접수가 `status`를 오래된 값(OPEN)으로 읽어도 `issued == total`이면 카운터 ≥ `total`이므로 카운터 검사가 거절한다. `status`는 SCHEDULED/OPEN/CLOSED 단방향 전이이고(CANCELLED/DRAFT를 설정하는 코드는 찾지 못했다) 시작 시각 판정은 `db_now`(문장 시점의 DB 시각)를 쓰므로 오래된 값이 문제 되지 않는다.
 
-**맞는 부분**
-1. CLOSED는 `incrementIssuedQuantity*AndMaybeClose`에서만 설정된다(CouponEventMapper.xml:43,58; 코드의 다른 설정 지점 없음, 시험 스크립트의 직접 UPDATE 제외). 설정 시점은 `issued_quantity`가 `total_quantity`에 도달할 때다.
-2. 발급은 `acceptance_sequence <= total_quantity`인 신청만 발급하고(IssuanceTransactionService.java:64,80; Batch:78) 가장 앞선 PENDING부터 처리한다(CouponApplicationMapper.xml:54-72). 순번은 빈틈이 없으므로(불변식 1) `issued_quantity == total`이면 순번 1..total이 모두 커밋되어 있다. 따라서 CLOSED 시점의 `next_acceptance_sequence >= total_quantity`다.
-3. 그러므로 CLOSED 커밋 뒤에 커밋되는 어떤 접수도 순번이 `total_quantity`보다 크다. 발급 워커는 이를 SOLD_OUT으로 처리한다(:64, :78). 재고·등급·award에 영향이 없다. 현재도 CLOSED 전에 total을 넘어 접수된 신청이 같은 경로로 SOLD_OUT 된다.
-4. 상태 전이는 SCHEDULED→OPEN→CLOSED 단방향이다(CANCELLED/DRAFT를 설정하는 코드는 찾지 못했다). 오래된 읽기는 과거 상태일 뿐이며 시작 시각 판정은 `db_now`(문장 시점의 DB 시각)를 쓰므로 오래되지 않는다.
-5. 순번 할당과 커밋이 카운터 행 배타 잠금 아래 한 트랜잭션이므로 순번 N+1이 N보다 먼저 커밋될 수 없다.
+**동작 변경(명시).** V1에서 순번이 `total`을 넘는 요청은 SOLD_OUT 대신 ENDED(409, CouponEventNotOpenException 경로)를 받는다. 이 요청은 신청 행이 만들어지지 않는다. 마감 이후 요청이 접수 트랜잭션까지 가지 않고 캐시에서 빠르게 거절된다(측정된 효과 없음).
 
-**코드와 맞지 않거나 약해지는 부분**
-- (a) `markOpen`의 `!= 1` 예외. 잠금 없이 읽은 SCHEDULED가 오래된 값이면 `markOpen`(WHERE status='SCHEDULED')이 0행을 반환하고 현재 코드는 예외를 던진다(CouponAdmissionTransactionService.java:57-59, Batch:86-89). 카운터를 먼저 잡은 뒤 읽으면 V1 접수끼리는 직렬화되지만, MQ 준비 상태 트랜잭션은 카운터를 잡지 않고 `markOpen`을 호출하므로(MQ브랜치:ReadinessTransactionService.java:43) 경쟁이 가능하다. 구현 시 `markOpen`이 0행이면 상태를 다시 읽는 처리가 필요하다.
-- (b) "CLOSED 뒤 새 접수 불가" 보장이 사라진다. 이 가정이 코드 주석으로 명시되어 있다. CouponAdmissionService.java:33-47 주석은 "종료는 터미널 상태이고 insert는 항상 행사 행 잠금을 먼저 잡고 상태를 재검증하므로 종료 이후 같은 행사에 새 접수가 생길 수 없다"를 `ENDED` 응답의 근거로 쓴다. 제안 구조에서는 잠금 없는 읽기 이후 CLOSED가 커밋되면 그 접수가 CLOSED 이후에 커밋될 수 있다. 결과는 같은 회원이 `ENDED`를 받은 뒤 조회하면 SOLD_OUT 신청이 존재하는 경우가 생기는 것이다. 정합성(award·재고)은 유지되지만 응답 의미의 보장은 "ENDED면 이후 어떤 신청도 생기지 않는다"에서 "ENDED면 이후 생기는 신청은 순번>total이며 SOLD_OUT뿐"으로 약해진다. 허용할지는 사용자 판단이다(D1과 함께 검토).
-- (c) 기존 검증 스크립트 불일치. scripts/coupon-admission/validate-two-processes.sh:226-247(검사 8)은 별도 트랜잭션이 event 행을 FOR UPDATE로 잡고 CLOSED로 바꾸는 동안 들어온 요청이 대기했다가 409를 받는지 확인한다. 잠금 없는 읽기에서는 대기하지 않고 OPEN을 읽어 접수한다. 이 검사는 새 계약에 맞게 다시 쓰거나 폐기해야 한다.
-- (d) 발급 쪽 영향 없음: 발급 워커는 event를 잠그므로 오래된 값을 읽지 않는다.
+**MQ 접수에는 적용하지 않는다(사용자 결정, ADR-004 계약).** MQ 접수는 CLOSED 이후에도 유효한 백로그를 PENDING으로 접수해야 한다(ADR-004 :51; mq/CouponMqAdmissionTransactionService.java:62가 OPEN과 CLOSED를 모두 허용하고 :66-75가 PENDING을 삽입한다). 이미 broker 확인된 입력이 접수되지 못하면 ADR-004 계약과 충돌하므로 MQ 접수는 `다음 순번 > total` 검사를 하지 않는다. 그 순번 > total 신청은 기존 발급 워커가 SOLD_OUT 처리한다(IssuanceTransactionService.java:64, Batch:78). MQ API의 사전 ENDED(mq/CouponMqAdmissionService.java:27)는 CLOSED 스냅샷 기준이라 D1과 별개다.
 
-완화(미채택, 기록): 마감을 커밋하는 마지막 발급 트랜잭션이 카운터 행도 잠가 경계를 닫는 방법이 있다. 이는 event → 카운터 순서로 접수의 카운터 → event(`markOpen`) 순서와 반대여서 순환 가능성을 새로 만든다. `markOpen`과 마감이 같은 행사에서 동시에 일어나지 않는 것으로 보이나(SCHEDULED vs OPEN) 확인하지 못했다(확인 필요).
+**논증이 성립하지 않는 경우(반례 탐색).** V1 신청에 한정한 논증을 깨는 사례는 찾지 못했다. 다만 적용 범위를 정하는 경계가 있다.
+- L1. 같은 행사를 V1과 MQ가 함께 쓰는 경우, MQ는 마감 이후에도 신청을 만들 수 있으므로 "V1이 ENDED를 준 회원이 이후 신청을 갖지 않는다"는 보장은 V1 경로 안에서만 성립한다. 카운터는 공유되므로 MQ가 순번을 올리면 V1은 더 일찍 거절한다. 두 경로가 한 행사에 동시에 쓰이는 것이 허용되는지는 확인하지 못했다(확인 필요).
+- L2. D1 배포 이전에 만들어진 신청(순번 > total인 SOLD_OUT 포함)이 있을 수 있으므로 발급 워커의 SOLD_OUT 분기(:64, :78)는 지워서는 안 된다(MQ도 쓴다).
+- L3. `total_quantity`가 불변이라는 가정에 의존한다. 이를 수정하는 코드는 찾지 못했고 MQ의 config version 해시가 total을 포함한다(mq/CouponMqControl.java:25-27).
+- L4. 스크립트가 `UPDATE coupon_event SET status/next_acceptance_sequence`를 직접 바꾸는 시험(scripts/coupon-admission/validate-two-processes.sh:183,232 등)은 논증 밖이다.
+- L5. 측정 설계: 발급을 끈 e1-no-issue는 지금까지 모든 요청이 접수되었다(측정 문서 :49,:125). D1 이후에는 접수가 `total`에서 멈추고 나머지가 ENDED가 되므로 e1의 부하 구성이 달라진다("Validation Evidence"의 series3 조건).
 
-### C-4. 제안과 맞지 않는 사항 — 외래키 공유 잠금 (결정 필요, D4)
+### D2. next_acceptance_sequence 컬럼 (사용자 결정: 사용 중단 후 보존)
 
-`coupon_application.event_id`는 `coupon_event(id)`를 참조한다(V20260920__add_coupon_event_admission_ledger.sql:36). MySQL 문서는 외래키 검사가 필요한 INSERT/UPDATE/DELETE가 검사하는 레코드에 공유 레코드 잠금을 건다고 하며 격리 수준 조건을 두지 않는다(https://dev.mysql.com/doc/refman/8.0/en/innodb-locks-set.html, 2026-10-21 조회). 따라서 접수의 `coupon_application` INSERT는 `coupon_event` 부모 행에 S 잠금을 요청하고, 발급이 `FOR UPDATE`로 잡은 X 잠금과 충돌한다. 발급의 `FOR UPDATE`도 커밋 전 접수가 쥔 S 잠금을 기다린다.
+- 마이그레이션 시 값을 카운터 행으로 복사하고, 이후 코드는 이 컬럼을 읽지도 쓰지도 않는다. `findByIdForUpdate`의 SELECT 목록(CouponEventMapper.xml:8)과 `CouponEvent.nextAcceptanceSequence`(CouponEvent.java:19), `updateNextAcceptanceSequence`(:22-27)가 정리 대상이다.
+- 컬럼은 **deprecated이며 값이 갱신되지 않는다.** 마이그레이션에서 컬럼 COMMENT로 이를 명시한다(COMMENT만 바꾸는 ALTER가 재구성 없이 끝나는지는 확인 필요. 확인되지 않으면 이 ADR의 명시로 갈음한다). 컬럼 제거는 후속 변경이다.
+- 롤백: 모든 앱을 멈춘 상태에서 카운터 값을 컬럼에 되복사(`UPDATE coupon_event e JOIN coupon_event_admission_counter c ... SET e.next_acceptance_sequence = c.next_acceptance_sequence`)하면 이전 바이너리로 복귀할 수 있다. FK 재지정(D4)은 별도로 되돌려야 한다.
+- 위험: 동결된 값을 읽는 스크립트가 조용히 오래된 값을 본다. 읽는 곳은 구현 범위의 스크립트 표(`next_acceptance_sequence` 열)에 있고 모두 카운터를 읽도록 바꾼다.
+- 새 바이너리와 이전 바이너리를 동시에 구동하지 않는다. 두 쪽이 서로 다른 행(카운터 / event)으로 순번을 할당해 같은 순번을 만들 수 있다. UNIQUE(event_id, acceptance_sequence)(V20260920:35)가 중복을 막아 오류로 드러나지만 접수 실패가 된다. 배포 순서는 이전 바이너리 전체 정지 → 마이그레이션 → 새 바이너리다.
 
-즉 ①만으로는 대기 위치가 `SELECT FOR UPDATE`에서 INSERT로 옮겨질 뿐이며, 그 대기 동안 카운터 행 잠금이 풀리지 않아 접수 전체가 발급 트랜잭션 뒤에 줄을 서는 구조가 된다. 현재보다 나빠질 가능성도 배제할 수 없다. 이 설명은 문서와 코드 DDL에서 도출한 것이며 이 저장소에서 MySQL로 재현하지 않았다(확인 필요, 구현 첫 단계의 2-세션 시험으로 확인).
+### D3. 발급 워커 단일화 (사용자 결정: 제외)
 
-같은 문제가 MQ 쪽에도 있다: `coupon_mq_attempt`가 `coupon_event(id)`를 참조하고(MQ브랜치:V20261018__add_coupon_mq_control_and_attempt.sql:26), MQ 접수가 attempt를 INSERT한다(MQ브랜치:CouponMqAdmissionTransactionService.java:76). FK를 바꾸지 않으면 MQ 접수는 `카운터 → control → event(S)` 순서가 되고, MQ 준비 상태(`event → control`)와 순환할 수 있다(접수가 control X 보유 중 event S 대기, 준비가 event X 보유 중 control X 대기).
+이번 범위에서 제외한다. 효과를 분리해서 측정하기 위함이다(series3에서 ①+D1의 효과만 본다). 발급 워커는 지금처럼 앱마다 행사별로 드레인한다(CouponEventIssuanceWorker.java, 행사당 앱 하나의 draining 집합).
 
-## 결정 필요 항목
+### D4. 외래키 재지정 (사용자 결정)
 
-사용자가 결정한다. 아래는 선택지와 영향이며 이 ADR은 결정하지 않는다.
+**문제.** `coupon_application.event_id`는 `coupon_event(id)`를 참조한다(V20260920:36). MySQL 문서는 외래키 검사가 필요한 INSERT/UPDATE/DELETE가 검사하는 레코드에 공유 레코드 잠금을 건다고 하며 격리 수준 조건을 두지 않는다(https://dev.mysql.com/doc/refman/8.0/en/innodb-locks-set.html, 2026-10-21 조회). 따라서 접수의 `coupon_application` INSERT는 `coupon_event` 부모 행에 S 잠금을 요청하고 발급이 `FOR UPDATE`로 잡은 X 잠금과 충돌한다. 카운터 분리만으로는 대기 위치가 `SELECT FOR UPDATE`에서 INSERT로 옮겨질 뿐일 수 있다. 이 설명은 문서와 DDL에서 도출한 것이며 이 저장소에서 MySQL로 재현하지 않았다(확인 필요, 검증 계획의 첫 항목).
 
-### D1. ④ 접수 측 마감 도입 여부
+**결정.** `coupon_application.event_id`(V20260920:36)와 `coupon_mq_attempt.event_id`(V20261018:26)의 FK 참조 대상을 `coupon_event_admission_counter(event_id)`로 바꾼다. 카운터 테이블은 `event_id`로 `coupon_event(id)`를 참조한다.
 
-**도입 시**
-- 순번이 `total`에 도달한 뒤의 V1 요청은 SOLD_OUT 대신 ENDED를 받는다(동작 변경). 마감 이후 요청이 접수 트랜잭션까지 가지 않아 빠르게 거절된다(측정된 효과 없음).
-- 카운터 행에 마감 표시 컬럼이 필요하다. `coupon_event.status`는 계속 발급이 소유한다(접수가 CLOSED를 쓰면 발급 소유 컬럼 경합이 생긴다).
-- 경계 요청 처리(순번이 total을 넘는 묶음에서 일부만 접수할지)를 정해야 한다.
-- 동작 변경 범위는 V1 접수 응답(SOLD_OUT→ENDED)과 C-3(b)의 ENDED 의미 약화가 겹친다.
-- MQ: MQ 접수는 CLOSED 이후에도 유효한 백로그를 PENDING으로 접수해야 한다(ADR-004 :51; MQ브랜치:CouponMqAdmissionTransactionService.java:62가 OPEN과 CLOSED를 모두 허용). ④를 MQ 접수에 적용하면 이미 broker 확인(confirm)된 입력이 접수되지 못해 ADR-004 계약("confirmed input이 SOLD_OUT 또는 terminal rejection에 도달해야 한다")과 충돌한다. 따라서 ④는 V1 접수에만 적용할 수 있고, MQ 접수는 마감 표시를 무시해야 한다. MQ API 쪽 사전 ENDED(MQ브랜치:CouponMqAdmissionService.java:27)는 CLOSED 스냅샷 기준이라 ④의 마감 표시와 별개다.
+**논증.** 접수(V1·MQ)는 항상 카운터 행을 `FOR UPDATE`로 먼저 잡는다. 그 뒤 INSERT가 FK 검사로 요구하는 공유 잠금은 같은 트랜잭션이 이미 배타 잠금으로 쥔 카운터 행에 걸리므로 충돌하지 않는다. 발급은 카운터 행을 잠그지 않으므로 접수와 발급은 더 이상 같은 행을 두고 경합하지 않는다. 이 논증은 "coupon_application과 coupon_mq_attempt에 INSERT하는 모든 경로가 카운터 잠금을 먼저 잡는다"에 의존한다. 이 두 테이블에 INSERT하는 코드는 V1 단건·묶음 접수(CouponAdmissionTransactionService.java:68, CouponBatchAdmissionTransactionService.java:97)와 MQ 접수(mq/CouponMqAdmissionTransactionService.java:70,76)뿐이다(grep 확인).
 
-**미도입 시**: 현재 동작(SOLD_OUT) 유지. 컬럼 추가 없음. C-3(b)의 약화는 stale 읽기 창에서만 남는다.
+**coupon_award 등 발급 쪽은 바꾸지 않는다.** `coupon_award`는 `coupon_event`를 참조하는 FK가 없다(event_id는 일반 컬럼이며 UNIQUE(event_id, member_id)와 KEY만 있다, V20260923:15,18). `coupon_award.application_id` FK는 `coupon_application`을 참조한다(:16). 발급 트랜잭션은 이미 `coupon_event` 배타 잠금과 대상 PENDING 신청 행 잠금을 쥔 채 award를 INSERT하므로 FK 검사의 공유 잠금이 자기 트랜잭션의 잠금과 겹쳐 충돌하지 않는다. 발급의 `UPDATE coupon_application`(상태 변경)은 FK 컬럼을 바꾸지 않으므로 부모 검사를 요구하지 않는 것으로 보인다(확인 필요, 검증 계획의 첫 항목에서 함께 확인한다).
 
-### D2. `coupon_event.next_acceptance_sequence` 컬럼 처리
+**`coupon_event`를 참조하는 FK (모든 마이그레이션 조사 결과).**
 
-| | (i) 즉시 제거 | (ii) 사용 중단 후 보존 |
-|---|---|---|
-| 방법 | 같은 마이그레이션에서 카운터로 값을 복사한 뒤 컬럼 DROP | 컬럼을 두고 코드가 쓰지 않음(마지막 값에서 동결) |
-| 롤백 | 이전 바이너리는 컬럼이 없어 즉시 실패. 복구하려면 역마이그레이션(컬럼 재추가 + 카운터 값 복사)이 필요하고 자동화된 경로가 없다 | 앱 전체 정지 후 카운터 값을 컬럼에 복사(`UPDATE ... JOIN`)하면 이전 바이너리로 복귀 가능 |
-| 위험 | 이 컬럼을 읽는 스크립트가 즉시 실패해 드러남(좋은 점) | 동결 값을 읽는 코드/스크립트가 조용히 오래된 값을 보고함. 읽는 곳: scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh:248, scripts/coupon-admission/run-admission-loadtest.sh:123,174, 검증 스크립트 다수 |
-| 메모 | MySQL 8.0에서 DROP COLUMN의 INSTANT 가능 여부는 서버 패치 버전에 의존(확인 필요) | 이후 정리용 제거 마이그레이션이 한 번 더 필요 |
+| 자식 테이블.컬럼 | 제약 | 참조 대상 | 위치 | 처리 |
+|---|---|---|---|---|
+| coupon_application.event_id | fk_coupon_application_event | coupon_event(id) | V20260920:36 | **변경** → 카운터(event_id) |
+| coupon_mq_attempt.event_id | fk_coupon_mq_attempt_event | coupon_event(id) | V20261018:26 | **변경** → 카운터(event_id) |
+| coupon_mq_control.event_id | fk_coupon_mq_control_event | coupon_event(id) | V20261018:7 | 유지. control의 INSERT는 MQ 준비 상태 트랜잭션에서만 일어나고(mq/CouponMqReadinessTransactionService.java:39) 그 트랜잭션은 이미 event 배타 잠금을 쥔다. 접수는 control을 SELECT FOR UPDATE/UPDATE(pause)만 하며 FK 컬럼을 바꾸지 않는다(src/main/resources/mapper/CouponMqControlMapper.xml) |
+| (참고) 카운터 테이블 신설 FK | - | coupon_event(id) | 새 마이그레이션 | 신설 |
 
-두 안 모두: 새 바이너리와 이전 바이너리를 동시에 구동하면 두 쪽이 서로 다른 행(카운터 / event)으로 순번을 따로 할당해 같은 순번을 만들 수 있다. UNIQUE(event_id, acceptance_sequence)(V20260920:35)가 중복을 막아 오류로 드러나지만 접수 실패가 된다. 따라서 배포는 이전 바이너리 전체 정지 → 마이그레이션 → 새 바이너리 순서여야 한다.
+`coupon_event`를 참조하지 않는 FK(참고, 변경 없음): `coupon_mq_attempt (event_id, mapped_member_id)` → `coupon_application(event_id, member_id)`(V20261018:27-28), `coupon_award.application_id` → `coupon_application(id)`(V20260923:16), `coupon_award_earn_history.coupon_award_id` → `coupon_award(id)`(V20260923_2:26).
 
-### D3. ③ 발급 워커 단일화를 이번 범위에 포함할지
+**잔여 경합(알려진 것).** `coupon_mq_attempt`의 `(event_id, mapped_member_id)` → `coupon_application` FK는 attempt INSERT 때 해당 application 행에 S 잠금을 건다. 이미 접수된 회원의 재시도 attempt가 발급이 X로 잡은 그 PENDING 신청 행과 부딪힐 수 있다. 행사 전체가 아니라 그 신청 행 하나의 경합이다. 이 ADR은 바꾸지 않고 검증 계획에서 관찰한다.
 
-기본 제안은 포함하지 않는다. 이유: ①이 효과를 내는지를 측정에서 분리해 보기 위해서다. ③은 발급끼리의 경합만 줄이며(앱 2대 기준 경쟁자 4→3) 측정된 접수↔발급 경합을 직접 줄이지 않는다. 포함하려면 단일화 방식(기존 `@DistributedLock` 재사용 vs 새 의존성)과 락 보유 앱 장애 시 지연을 정해야 한다.
+**DDL.** 문서상 FK 추가는 `foreign_key_checks`가 꺼져 있을 때만 INPLACE(메타데이터만, 동시 DML 허용)이고, 켜져 있으면 COPY다. DROP FK는 INPLACE다(https://dev.mysql.com/doc/refman/8.0/en/innodb-online-ddl-operations.html, 2026-10-21 조회). 검사를 끄고 추가하면 검증이 생략되므로 마이그레이션이 고아 행 0건을 조회로 확인한다(백필 덕에 `coupon_application.event_id`가 모두 카운터에 존재해야 한다). 운영 테이블 크기에서의 잠금 영향은 확인하지 못했다(확인 필요).
 
-### D4. (이 조사에서 추가) 외래키 처리 — 선택하지 않으면 ①의 효과가 없을 수 있음
+### 구현 원칙 (사용자 결정)
 
-| | (a) FK 재지정: `coupon_application.event_id`(그리고 MQ의 `coupon_mq_attempt.event_id`)를 카운터 `event_id`로 | (b) FK 삭제 |
-|---|---|---|
-| 잠금 | 부모 S 잠금이 카운터 행에 걸린다. 접수는 이미 그 행을 X로 쥐고 있어 충돌하지 않는다 | 부모 잠금 없음 |
-| 무결성 | 유지(카운터 행은 event FK로 연결, 카운터 행이 없는 event에는 접수 불가) | 사라짐. event 존재 보장은 코드가 `findById`로 확인(이미 확인함) |
-| DDL | 문서상 FK 추가는 `foreign_key_checks=0`일 때만 INPLACE(메타데이터만, 동시 DML 허용), 켜져 있으면 COPY(https://dev.mysql.com/doc/refman/8.0/en/innodb-online-ddl-operations.html, 2026-10-21 조회). 검증 생략이 되므로 별도 검증 쿼리 필요 | DROP FK는 INPLACE |
-| MQ | MQ브랜치 DDL의 FK도 함께 바꿔야 함(다른 브랜치) | 같음 |
+1. **카운터 행 생성.** 운영 코드에는 `coupon_event` INSERT가 없다(src/main에서 확인되지 않음, src/test에도 없음).
+   (1) 마이그레이션에서 기존 행사 전부에 카운터 행을 만든다.
+   (2) 행사를 만드는 부하·검증 스크립트(구현 범위의 스크립트 표)에서 카운터 행도 함께 만든다. 테스트 픽스처 중에 `coupon_event`를 INSERT하는 것은 현재 없다(`grep coupon_event src/test` 결과 없음). 새 통합 테스트가 행사를 만들 때 카운터 행도 만든다.
+   (3) 접수 시 카운터 행이 없으면 자동 생성하지 않고 설정 오류로 실패시킨다. MQ 쪽은 consumer가 미분류 영구 실패를 durable pause와 parking으로 처리하므로(mq/CouponMqConsumer.java:85-93) 카운터 부재를 readiness 단계(`initialize`)에서 `NotReady`/`Drift`로 먼저 드러내는 것이 바람직하다(구현 시 결정, 확인 필요).
+2. **마이그레이션 파일.** 이름은 V20261018 이후 순서가 되도록 `V20261022__split_coupon_event_admission_counter.sql`로 한다. Flyway의 `out-of-order`가 꺼져 있어(application.yml:19-27에 설정 없음) 이미 적용된 버전보다 낮은 마이그레이션이 뒤늦게 들어오면 검증이 실패한다. V20261018은 이미 이 브랜치에 있으므로 병합 순서 문제는 없다.
+3. **`markOpen`이 0행이면 예외 대신 상태를 다시 읽어 판단한다.** V1 접수가 잠금 없이 읽은 SCHEDULED가 오래되면(MQ 준비 상태 트랜잭션이 먼저 OPEN으로 커밋) `markOpen`(WHERE status='SCHEDULED')이 0행을 반환하고 현재 코드는 예외를 던진다(CouponAdmissionTransactionService.java:57-59, CouponBatchAdmissionTransactionService.java:86-89). MQ 준비 상태는 event를 `FOR UPDATE`로 잡은 뒤 `markOpen`을 호출하므로(mq/CouponMqReadinessTransactionService.java:26,43) 0행이 생기지 않는다. 재조회 결과가 OPEN이면 계속하고, CLOSED이면 ENDED, 그 밖이면 예외다. `markOpen`은 행사당 한 번만 의미가 있다(`status='SCHEDULED'` 조건, CouponEventMapper.xml:19). 발급이 아직 대상으로 삼을 PENDING이 없는 시점의 일이라 발급과의 경합 영향은 사실상 없다(`findDistinctPendingEventIds`가 PENDING이 있는 행사만 고른다, CouponApplicationMapper.xml:74-76).
+4. **계측 연속성.** `CouponAdmissionTimingInterceptor`(LOCK_SELECT_ID는 현재 `CouponEventMapper.findByIdForUpdate` 하나, :35-36)가 새 카운터 잠금 쿼리도 계측하도록 바꾼다. 지표 이름 `coupon.admission.select_for_update`와 `caller=admission` 태그를 유지해 series2와 비교 가능하게 한다. 발급 쪽은 기존대로 `coupon_event` 잠금을 `caller=issuance`로 기록한다. 현재 판별은 트랜잭션 이름의 `.CouponEventIssuance` 포함 여부뿐이라(:70-75) 발급이 아닌 `findByIdForUpdate`는 모두 `admission`으로 기록된다. 병합으로 들어온 MQ 준비 상태 트랜잭션의 event 잠금이 같은 태그를 받지 않도록 카운터 잠금만 `admission`으로 두는 구분이 필요하다(구현 시 결정, 확인 필요).
+5. **마이그레이션 목록을 나열하는 스크립트 9개**를 아래 표대로 갱신한다.
 
-위 둘 다 `coupon_application` 운영 테이블 DDL이다. 유지(FK 그대로)는 선택지가 아니다(C-4).
+## 구현 범위
 
-## 영향 범위 상세
+### 코드·SQL
+- 새 Flyway 파일 `V20261022__split_coupon_event_admission_counter.sql`: 카운터 테이블 생성 → 기존 행사 백필(`next_acceptance_sequence` 복사) → `coupon_application`·`coupon_mq_attempt` FK 재지정 → `coupon_event.next_acceptance_sequence` COMMENT(D2) → 백필 검증 쿼리.
+- 신규 매퍼: 카운터 `findForUpdate`/`update`, `CouponEventMapper.findById`(잠금 없음, `db_now` 포함). 접수 서비스 3곳(V1 단건·묶음, MQ)의 잠금 대상 교체, V1 접수에 D1 규칙, `markOpen` 0행 처리. `CouponEvent`·`findByIdForUpdate` SELECT 목록에서 `next_acceptance_sequence` 제거.
+- 인터셉터 확장(구현 원칙 4), ClosureCache 설명과 `markClosed` 호출 조건(D1 논증 4).
+- `V20261022`가 `coupon_mq_attempt`를 바꾸므로, `V20261018`을 적용하지 않는 기존 스크립트 DB에서는 실패한다. 스크립트가 `V20261018`도 적용하거나, MQ attempt FK 변경을 별도 마이그레이션으로 분리해야 한다(구현 시 결정, 확인 필요).
 
-### 상태 판단과 종료 캐시
-- `CouponEvent.canOpenAtDatabaseTime()` 정의 CouponEvent.java:28-31. 호출: 단건 접수 :47, 묶음 접수 :67, MQ 준비 상태 MQ브랜치:ReadinessTransactionService.java:37.
-- `getStatus() == CLOSED`: 단건 접수 :50, 묶음 접수 :70, MQ 준비 MQ브랜치:ReadinessTransactionService.java:32. `getStatus() == SCHEDULED`: 단건 :56, 묶음 :86, MQ 준비 :43. MQ 접수 MQ브랜치:CouponMqAdmissionTransactionService.java:62는 OPEN/CLOSED만 허용.
-- `CouponEventClosureCache.markClosed` 호출처는 2곳: 단건 접수 :51, 묶음 접수 :71(MQ에는 없음). `isKnownClosed` 호출처: CouponAdmissionService.java:50.
-- 계측: CouponAdmissionTimingInterceptor.java:35-36은 `CouponEventMapper.findByIdForUpdate` 하나만 대상으로 하고, 호출자(admission/issuance)를 트랜잭션 이름의 `.CouponEventIssuance` 포함 여부로 가른다(:70-75). 카운터 잠금 쿼리는 이 필터에 걸리지 않아 series3에서 `coupon.admission.select_for_update{caller=admission}`가 사라진다. 테스트: CouponAdmissionTimingInterceptorTest.java:33, CouponIssuanceMetricsTest.java:91,108.
+### 시험 코드
+- `scripts/coupon-admission/validate-two-processes.sh` **검사 8**(:226-247)을 새 계약에 맞게 바꾼다. 현재 검사 8은 별도 트랜잭션이 event 행을 `FOR UPDATE`로 잡고 CLOSED로 바꾸는 동안 들어온 요청이 대기했다가 409를 받는지 본다. 잠금 없는 읽기에서는 대기하지 않으므로 의미가 달라진다. 새 검사는 "카운터가 `total`에 도달한 뒤 요청이 ENDED(409)를 받고 신청 행이 생기지 않는다"를 본다.
+- 단위 테스트(mock 기반)가 `findByIdForUpdate`·`updateNextAcceptanceSequence`·`markOpen`을 쓰는 곳: CouponMqAdmissionTransactionServiceTest, CouponMqExistingIssuanceRegressionTest, CouponMqReadinessTest, CouponAdmissionTimingInterceptorTest, CouponIssuanceMetricsTest.
+- `coupon_event`를 다루는 실제 MySQL 통합 테스트는 지금 없다(`grep coupon_event src/test` 결과 없음. V1 접수·발급은 셸 스크립트로만 검증되어 왔다). 새로 작성한다.
 
-### 직접 조회하는 다른 SQL
-- sql/coupon-mq/post-deploy/verify-consistency.sql:32 — id, status, total_quantity, issued_quantity만 읽음(영향 없음).
-- 다른 매퍼 XML에는 `coupon_event` 참조 없음. `CouponMqControl.version`이 쓰는 컬럼(MQ브랜치:CouponMqControl.java:20-34)은 id, public_id, starts_at_utc, total/high_quantity, high/normal_points, settings_locked_at이며 `next_acceptance_sequence`·`issued_quantity`·`status`는 쓰지 않는다. 카운터 분리가 config version을 바꾸지 않는다.
-- CouponAwardRedemptionService.java:28-29는 주석만 이 컬럼을 언급하고 코드는 event를 잠그지 않는다.
+### 스크립트 표 (마이그레이션 직접 적용 9개)
 
-### 스키마
-- coupon_event: V20260920__add_coupon_event_admission_ledger.sql:1-21(`next_acceptance_sequence` :10). coupon_application: :23-39, FK :36, UNIQUE :33-35.
-- 테스트 스키마 src/test/resources/coupon-test-schema.sql에는 `coupon_event`가 없다(coupon_stock, coupon, coupon_issue_request만). 통합 테스트는 실제 MySQL(localhost:3306, profile local)과 Flyway를 쓴다(CouponIssuanceTransactionRegressionTest.java:44-58). 새 Flyway 파일은 별도 test 스키마 변경 없이 적용된다.
-- Flyway: application.yml:19-27 `enabled: true`, `baseline-on-migrate: true`. `out-of-order` 설정은 없다(기본 거부).
-- application-mysql-loadtest.yml:16-17은 `flyway.enabled: false`다(부하 시험은 스크립트가 SQL을 직접 적용).
-- MQ브랜치:V20261018__add_coupon_mq_control_and_attempt.sql: FK :7(control→event), :26(attempt→event), :27-28(attempt→application).
+| # | 파일 | 마이그레이션 적용 줄 | 행사 INSERT | `next_acceptance_sequence` 사용 |
+|---|---|---|---|---|
+| 1 | scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh | 77-79 | 134 | 248 (읽기) |
+| 2 | scripts/coupon-admission/run-admission-loadtest.sh | 48 | 114 | 123, 174 (읽기) |
+| 3 | scripts/coupon-admission/validate-two-processes.sh | 46 | 82 | 183, 232 (설정), 208 (읽기), 검사 8 :226-247 |
+| 4 | scripts/coupon-admission/validate-two-processes-batch.sh | 52 | 90 | 197 (설정), 229 (읽기) |
+| 5 | scripts/coupon-issuance/validate-two-processes.sh | 39-40 | 77 | 없음 |
+| 6 | scripts/coupon-issuance/validate-two-processes-batch.sh | 44-45 | 86 | 없음 |
+| 7 | scripts/coupon-e2e/validate-two-processes.sh | 52-54 | 92 | 없음 |
+| 8 | scripts/coupon-redemption/validate-two-processes.sh | 43-45 | 82 | 없음 |
+| 9 | scripts/verifier-isolated/test-infra-security.py | 139-140, 394-395 | 없음 | 없음 |
 
-### 스크립트 (마이그레이션 직접 적용·행사 생성)
-사전 조사의 "run-integrated-loadtest.sh 67~70행"은 이 SHA에서 77~79행이다(V20260920, V20260923, V20260923_2를 나열 적용). 같은 방식으로 SQL 파일을 직접 적용하는 곳: scripts/coupon-admission/run-admission-loadtest.sh:48, validate-two-processes.sh:46, validate-two-processes-batch.sh:52, scripts/coupon-issuance/validate-two-processes.sh:39-40, validate-two-processes-batch.sh:44-45, scripts/coupon-e2e/validate-two-processes.sh:52-54, scripts/coupon-redemption/validate-two-processes.sh:43-45, scripts/verifier-isolated/test-infra-security.py:139-140,394-395. 행사를 직접 INSERT하는 곳: run-integrated-loadtest.sh:134, run-admission-loadtest.sh:114, admission validate :82/(batch):90, issuance :77/(batch):86, e2e :92, redemption :82. `next_acceptance_sequence`를 직접 설정·읽는 곳: admission validate-two-processes.sh:183,208,232, batch :197,229, run-admission-loadtest.sh:123,174, run-integrated-loadtest.sh:248.
+1~8번은 `docker exec ... < 마이그레이션.sql`로 파일을 직접 적용하므로 새 파일(그리고 위 `V20261018` 문제)을 추가하고, 행사 INSERT 뒤에 카운터 행 INSERT를 더한다. 사전 조사의 "67~70행"은 이 SHA에서 77~79행이다. 9번은 임시 저장소를 만들어 마이그레이션 파일명 3개를 `SELECT 1;`로 채워 넣고 runner를 복사해 쓴다(:132-145, :388-400). runner가 새 파일을 참조하면 이 목록에도 새 파일명을 추가해야 시험이 통과한다. 이 파일은 2단계 회귀 확인에서 28개 시험이 통과했다.
 
 ## 불변식
 
 | # | 성질 | 코드 근거 | 상태 |
 |---|---|---|---|
-| 1 | 행사별 `acceptance_sequence`는 유일하고 커밋 순서대로 1부터 빈틈없이 증가 | UNIQUE(event_id, acceptance_sequence) V20260920:35. 순번은 event 행 FOR UPDATE 아래에서 계산(단건 :36,:62-68; 묶음 :47,:91-105; MQ MQ브랜치:AdmissionTransactionService.java:32,:36,:69-72). 카운터 갱신과 INSERT가 한 트랜잭션이라 롤백 시 함께 되돌아감. application DELETE 코드는 없음(grep) | 확인됨(코드). 롤백 시 순번 0 유지는 scripts/coupon-admission/validate-two-processes-batch.sh:229가 검사하나 이번에 실행하지 않음 |
+| 1 | 행사별 `acceptance_sequence`는 유일하고 커밋 순서대로 1부터 빈틈없이 증가 | UNIQUE(event_id, acceptance_sequence) V20260920:35. 순번은 event 행 FOR UPDATE 아래에서 계산(단건 :36,:62-68; 묶음 :47,:91-105; MQ mq/CouponMqAdmissionTransactionService.java:32,:36,:69-72). 카운터 갱신과 INSERT가 한 트랜잭션이라 롤백 시 함께 되돌아감. application DELETE 코드는 없음(grep) | 확인됨(코드). 롤백 시 순번 0 유지는 scripts/coupon-admission/validate-two-processes-batch.sh:229가 검사하나 이번에 실행하지 않음 |
 | 2 | 발급은 순번 순서로 처리되고 워커가 N+1을 보면서 N을 못 보는 일이 없음 | 발급은 가장 앞선 PENDING부터(단건 :57, ORDER BY acceptance_sequence ASC CouponApplicationMapper.xml:54-62; 묶음 :69, :64-72) | 확인됨. 설명은 아래 |
 | 3 | 발급 수량은 total을 넘지 않음 | 조건부 UPDATE `issued_quantity < total` / `+ delta <= total` CouponEventMapper.xml:47,62. 영향 행 수 !=1이면 예외·롤백(단건 :91-93, 묶음 :122-126). CHECK V20260920:20. 순번>total은 SOLD_OUT(:64, :78) | 확인됨(코드) |
 | 4 | 등급은 순번으로 결정(1~high_quantity는 HIGH) | 단건 :80-82, 묶음 :106-108 | 확인됨 |
-| 5 | (event, member)당 신청 1건, 신청당 발급 1건 | UNIQUE(event_id, member_id) V20260920:34; coupon_award UNIQUE(application_id) V20260923:14, UNIQUE(event_id, member_id) :15 | 확인됨(DDL). MQ attempt 경로의 member 중복은 MQ브랜치 CouponMqAdmissionTransactionService.java:67-74가 기존 application 확인 |
-| 6 | CLOSED는 발급 수량이 total에 도달할 때 한 번만, 이후 V1 접수는 ENDED | CASE가 증가 후 값으로 평가됨(CouponEventMapper.xml:43-44,58-59, 주석 :29-39). 이후 증가는 WHERE로 불가(:47,:62). V1 접수 CLOSED 거절: 단건 :47-54, 묶음 :67-76. 기존 신청자는 ENDED 대신 기존 결과(CouponAdmissionService.java:50-66) | 확인됨. 단 "이후 접수 불가"는 C-3(b)에서 약해짐 |
-| 7 | MQ 계약: CLOSED 뒤 도착한 유효 백로그는 PENDING 접수 → 발급 워커가 SOLD_OUT | MQ브랜치:CouponMqAdmissionTransactionService.java:62(OPEN/CLOSED 허용), :66-75(PENDING 삽입), 기존 발급 워커의 SOLD_OUT 처리(위 :64,:78). ADR-004 :51, ACCOUNTING :8 | 코드로 확인(MQ브랜치). 실제 지연 drain 실행 근거는 이 조사에서 확인하지 못함(확인 필요) |
-| 8 | 발급 완료 award와 application 상태가 같은 트랜잭션 | 단건 :86-96, 묶음 :114-131 | 확인됨(추가) |
+| 5 | (event, member)당 신청 1건, 신청당 발급 1건 | UNIQUE(event_id, member_id) V20260920:34; coupon_award UNIQUE(application_id) V20260923:14, UNIQUE(event_id, member_id) :15 | 확인됨(DDL). MQ attempt 경로의 member 중복은 mq/CouponMqAdmissionTransactionService.java:67-74가 기존 application 확인 |
+| 6 | CLOSED는 발급 수량이 total에 도달할 때 한 번만, 이후 V1 접수는 ENDED | CASE가 증가 후 값으로 평가됨(CouponEventMapper.xml:43-44,58-59). 이후 증가는 WHERE로 불가(:47,:62). V1 접수 CLOSED 거절: 단건 :47-54, 묶음 :67-76. 기존 신청자는 ENDED 대신 기존 결과(CouponAdmissionService.java:50-66) | 확인됨. D1 이후: 마감 시점이 "카운터 ≥ total"로 앞당겨지고 V1 신청의 "마감 이후 새 접수 없음"이 D1 논증 3~4로 유지됨. V1에서 순번>total 신청(SOLD_OUT)은 새로 생기지 않음 |
+| 7 | MQ 계약: CLOSED 뒤 도착한 유효 백로그는 PENDING 접수 → 발급 워커가 SOLD_OUT | mq/CouponMqAdmissionTransactionService.java:62(OPEN/CLOSED 허용), :66-75(PENDING 삽입), 기존 발급 워커의 SOLD_OUT 처리(:64,:78). ADR-004 :51, ACCOUNTING :8 | 코드로 확인. D1은 MQ에 적용하지 않으므로 유지됨. 실제 지연 drain 실행 근거는 이 조사에서 확인하지 못함(확인 필요) |
+| 8 | 발급 완료 award와 application 상태가 같은 트랜잭션 | 단건 :86-96, 묶음 :114-131 | 확인됨 |
 
-**불변식 2를 READ COMMITTED에서 보장하는 이유.** 접수 트랜잭션은 순번을 계산하고 INSERT하는 동안 event 행(분리 후에는 카운터 행)의 배타 잠금을 커밋까지 쥔다. 다음 접수 트랜잭션은 그 잠금을 얻어야 순번 N+1을 계산하므로 N+1이 N보다 먼저 커밋될 수 없다. RC에서 잠금 읽기는 최신 커밋 값을 읽고, 일반 SELECT는 문장 시작 시점의 커밋 값을 읽는다. 어떤 시점의 읽기도 "커밋된 순번의 접두사"를 본다. 따라서 발급 워커가 N+1을 보면 N도 이미 커밋되어 보인다. 이 성질은 접수가 어느 행을 잠그든 같은 행을 잠그는 한 유지된다. 분리 후에는 발급이 접수 완료를 기다리지 않고 현재 커밋된 접두사만 처리하므로 일부 순번을 아직 못 보는 것은 가능하나 순서 역전은 없다. 이 설명은 코드와 InnoDB 동작 문서에서 도출한 것이며 이 저장소에서 별도 시험으로 재현하지 않았다.
+**불변식 2를 READ COMMITTED에서 보장하는 이유.** 접수 트랜잭션은 순번을 계산하고 INSERT하는 동안 event 행(분리 후에는 카운터 행)의 배타 잠금을 커밋까지 쥔다. 다음 접수 트랜잭션은 그 잠금을 얻어야 순번 N+1을 계산하므로 N+1이 N보다 먼저 커밋될 수 없다. RC에서 잠금 읽기는 최신 커밋 값을 읽고 일반 SELECT는 문장 시작 시점의 커밋 값을 읽는다. 어떤 시점의 읽기도 "커밋된 순번의 접두사"를 본다. 따라서 발급 워커가 N+1을 보면 N도 이미 커밋되어 보인다. 이 성질은 접수가 어느 행을 잠그든 같은 행을 잠그는 한 유지된다(카운터 분리 후에도 V1과 MQ가 같은 카운터 행을 잠근다). 분리 후에는 발급이 접수 완료를 기다리지 않고 현재 커밋된 접두사만 처리하므로 일부 순번을 아직 못 보는 것은 가능하나 순서 역전은 없다. 이 설명은 코드와 InnoDB 동작 문서에서 도출한 것이며 이 저장소에서 별도 시험으로 재현하지 않았다.
 
-확인 필요 항목 정리: (1) 불변식 7의 지연 drain 실행 증거. (2) ②의 두 앱 워커 직렬화 동작. (3) C-4의 FK S 잠금 재현. (4) 운영 행사 생성 경로(코드 내 INSERT 없음). (5) MySQL 패치 버전(INSTANT DROP 여부). (6) 발급 쪽 잠금 대기 크기(series2에 없음).
+확인 필요 항목: (1) 불변식 7의 지연 drain 실행 증거. (2) D4 FK 공유 잠금과 발급의 `UPDATE coupon_application`이 부모 검사를 요구하지 않는지. (3) 운영 행사 생성 경로(코드 내 INSERT 없음). (4) COMMENT 변경과 FK DDL의 운영 테이블 영향. (5) 발급 쪽 잠금 대기 크기(series2에 없음). (6) V1과 MQ가 한 행사를 함께 쓸 수 있는지(D1 L1).
+
+## 영향 범위 상세
+
+### 상태 판단과 종료 캐시
+- `CouponEvent.canOpenAtDatabaseTime()` 정의 CouponEvent.java:28-31. 호출: 단건 접수 :47, 묶음 접수 :67, MQ 준비 상태 mq/CouponMqReadinessTransactionService.java:37.
+- `getStatus() == CLOSED`: 단건 접수 :50, 묶음 접수 :70, MQ 준비 mq/CouponMqReadinessTransactionService.java:32. `getStatus() == SCHEDULED`: 단건 :56, 묶음 :86, MQ 준비 :43. MQ 접수 mq/CouponMqAdmissionTransactionService.java:62는 OPEN/CLOSED만 허용.
+- `CouponEventClosureCache.markClosed` 호출처는 2곳: 단건 접수 :51, 묶음 접수 :71(MQ에는 없음). `isKnownClosed` 호출처: CouponAdmissionService.java:50.
+- MQ 준비 상태는 갱신 주기마다 `initialize`(mq/CouponMqReadinessService.java:75)와 정지 중 `healthy`(mq/CouponMqConsumer.java:157)로 event를 `FOR UPDATE`한다(갱신 주기 1초는 ADR-004 :146). 이 잠금은 카운터 분리 후에도 발급과 경합한다(범위 밖, 관찰 항목).
+- 계측: CouponAdmissionTimingInterceptor.java:35-36은 `CouponEventMapper.findByIdForUpdate` 하나만 대상으로 하고 호출자를 트랜잭션 이름의 `.CouponEventIssuance` 포함 여부로 가른다(:70-75). 테스트: CouponAdmissionTimingInterceptorTest.java:33, CouponIssuanceMetricsTest.java:91,108.
+
+### 직접 조회하는 다른 SQL
+- sql/coupon-mq/post-deploy/verify-consistency.sql:32 — id, status, total_quantity, issued_quantity만 읽음(영향 없음).
+- 다른 매퍼 XML에는 `coupon_event` 참조 없음. `CouponMqControl.version`이 쓰는 컬럼(mq/CouponMqControl.java:20-34)은 id, public_id, starts_at_utc, total/high_quantity, high/normal_points, settings_locked_at이며 `next_acceptance_sequence`·`issued_quantity`·`status`는 쓰지 않는다. 카운터 분리가 config version을 바꾸지 않는다.
+- CouponAwardRedemptionService.java:28-29는 주석만 이 컬럼을 언급하고 코드는 event를 잠그지 않는다.
+
+### 스키마
+- coupon_event: V20260920__add_coupon_event_admission_ledger.sql:1-21(`next_acceptance_sequence` :10). coupon_application: :23-39, FK :36, UNIQUE :33-35.
+- 테스트 스키마 src/test/resources/coupon-test-schema.sql에는 `coupon_event`가 없다. 통합 테스트는 실제 MySQL(localhost:3306, profile local)과 Flyway를 쓴다(CouponIssuanceTransactionRegressionTest.java:44-58). 기본 `test` 태스크는 `integration` 태그 테스트를 제외하며(build.gradle:69-77) 별도 `integrationTest` 태스크로 실행한다(:79-87).
+- Flyway: application.yml:19-27 `enabled: true`, `baseline-on-migrate: true`. `out-of-order` 설정은 없다. application-mysql-loadtest.yml:16-17은 `flyway.enabled: false`다(부하 시험은 스크립트가 SQL을 직접 적용).
+- V20261018__add_coupon_mq_control_and_attempt.sql: FK :7(control→event), :26(attempt→event), :27-28(attempt→application).
 
 ## Trade-offs / Consequences
 
 - 얻는 것(가설): 접수가 event 행 대신 카운터 행만 잠그므로 접수↔발급 행 잠금 공유가 사라진다. 효과의 크기는 측정하지 않았다.
-- 비용: (1) 접수 트랜잭션에 쓰는 행이 하나 늘고 매 접수마다 일반 SELECT 한 문장이 추가된다. (2) CLOSED 판정 보장이 C-3(b)처럼 약해진다. (3) 계측 인터셉터·스크립트·FK·MQ DDL 조정이 따라온다. (4) 접수끼리의 경합은 남는다. e1-no-issue의 대기 배수 0.161~0.293이 접수끼리만 경쟁할 때의 관측값이다.
-- 새 카운터 행도 핫 행이다. 접수끼리 직렬화는 그대로다.
-- ADR-004 :133 "새 락/샤딩/튜닝 없음"은 #172/#173 시험 범위 선언이었다. 이 ADR이 이를 바꾸려면 ADR-004의 해당 절을 갱신해야 한다(결정이 승인될 때 함께 처리, 이번에는 수정하지 않음).
-- 이 구조는 일반화된 락 분리가 아니다. 접수 순번이라는 한 값을 별도 행으로 옮기는 것뿐이다.
-
-## 마이그레이션 계획
-
-- Flyway 파일: 기존 규칙은 `V<yyyymmdd>[_n]__snake_case.sql`(예: V20260923_2__add_coupon_award_redemption.sql). 제안: `V20261021__add_coupon_event_admission_counter.sql`(구현 날짜에 맞춰 조정). MQ브랜치의 `V20261018`보다 반드시 커야 한다. Flyway는 `out-of-order`가 꺼져 있어 이미 적용된 버전보다 낮은 마이그레이션이 뒤늦게 들어오면 검증 실패한다. 병합 순서 조율이 필요하다.
-- 내용(스케치, 파일 아님):
-  1. 카운터 테이블 생성(FK 대상은 D4).
-  2. 기존 행사 백필: `INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) SELECT id, next_acceptance_sequence FROM coupon_event`.
-  3. D4(a)면 `coupon_application`(그리고 MQ attempt) FK 재지정, D2 처리.
-  4. 백필 후 검증: 카운터 값 = `MAX(acceptance_sequence)` (신청 없는 행사는 0).
-- 백필은 이전 바이너리가 멈춘 뒤에만 의미가 있다(D2 하단).
-- 행사 생성 시 카운터 행: 이 저장소에 `coupon_event`를 INSERT하는 운영 코드는 없다(src/main에서 확인되지 않음). 행사는 스크립트나 외부 경로로 만들어진다(운영 경로는 확인 필요). 제안: 생성 경로가 같은 트랜잭션에서 카운터 행을 INSERT하고, 접수는 카운터 행이 없으면 거절(fail-closed)한다. 대안은 `AFTER INSERT` 트리거인데 숨은 동작을 만든다. 미결정 항목으로 두고 구현 전에 정한다.
-- 스크립트: 위 "스크립트" 절의 모든 마이그레이션 적용 목록과 행사 INSERT에 새 파일/카운터 INSERT를 추가해야 한다. 미갱신 시 부하 시험과 검증 스크립트가 카운터 테이블 없이 실행되어 실패한다.
-- 계측: 인터셉터 `LOCK_SELECT_ID` 대상에 카운터 잠금 쿼리를 추가하고 caller 판별을 유지해 series2와 같은 이름의 지표로 비교 가능하게 한다.
+- 비용: (1) 접수 트랜잭션에 쓰는 행이 하나 늘고 매 접수마다 일반 SELECT 한 문장이 추가된다. (2) `coupon_application`·`coupon_mq_attempt` FK 변경이 운영 테이블 DDL이다. (3) 계측 인터셉터·스크립트 9개·단위 테스트 5개 조정이 따라온다. (4) 접수끼리의 경합은 남는다. e1-no-issue의 대기 배수 0.161~0.293이 접수끼리만 경쟁할 때의 관측값이다. 새 카운터 행도 핫 행이다.
+- 동작 변경(D1): V1에서 순번이 `total`을 넘는 요청은 SOLD_OUT 대신 ENDED를 받고 신청 행이 만들어지지 않는다. V1 접수 건수는 `total`을 넘지 않는다.
+- ADR-001 결과 집계에 미치는 영향. ADR-001은 ENDED(접수 전 확정 거절)와 SOLD_OUT(접수 후 발급 결과)을 별도 집계하고 ENDED를 SOLD_OUT으로 재분류하지 않는다(ADR-001 :76-77). 과거 진단(stock 1000/high 500)은 admitted 1050/10001, SOLD_OUT 50 및 admitted 1100/10000, SOLD_OUT 100이었다(ADR-001 :60,:68). D1 이후 V1에서는 같은 조건에서 admitted가 정확히 `total`(1000)이고 SOLD_OUT 신청이 없으며 그만큼이 ENDED로 옮겨진다.
+  (a) D1 전후 결과를 비교할 때 이전의 SOLD_OUT과 새로운 ENDED를 합치거나 서로 같은 항목으로 비교하지 않는다(ADR-001 :77). 같은 분모(첫 요청 전체)에서 ISSUED/SOLD_OUT/ENDED 카테고리별로 보고한다.
+  (b) ADR-001 :78의 보고 항목("observed DB CLOSED transition and each app's first observed CLOSED/cache activation interval")에서 캐시 활성화가 이제 CLOSED 전이가 아니라 카운터 도달 시점에 일어난다. 접수 마감 시각(순번 `total` 신청의 `accepted_at`, V20260920:30)을 함께 보고해야 CLOSED 전이와 분리해서 해석할 수 있다.
+  (c) ADR-001 :78의 "unchanged V1"에는 더는 해당하지 않는다. 변경된 의미를 보고에 명시한다("disclose changed semantics").
+  (d) V1(ENDED, 신청 행 없음)과 MQ(CLOSED 이후에도 PENDING→SOLD_OUT, 신청 행 있음)의 같은 요청 구간이 서로 다른 결과 카테고리를 낸다. 이는 ADR-004 계약에서 오는 의도된 차이이며 같은 지표로 합산하지 않는다.
+- 이 변경은 ADR-004 :133 "새 락/샤딩/튜닝 없음"(#172/#173 시험 범위 선언)의 범위를 넘는다. 이 ADR의 접수 카운터 분리는 MQ 접수의 잠금 대상도 바꾸므로 #172/#173 비교 조건에 영향을 준다. ADR-004의 해당 절 갱신은 이번에 하지 않는다(구현·측정 시점에 맞춰 별도로 처리).
+- 이 구조는 일반화된 락 분리가 아니다. 접수 순번이라는 한 값을 별도 행으로 옮기고 접수 마감을 접수 쪽으로 옮기는 것뿐이다.
 
 ## Validation Evidence
 
-현재까지 이 ADR의 근거는 코드 읽기와 series2 측정 기록뿐이다. 구현·시험·재측정 증거는 없다. C-4의 FK 잠금은 문서에서 도출했을 뿐 실행 증거가 아니다.
+### 지금까지 실행한 것 (기준 갱신 후 회귀 확인)
+- 병합 `9b362c5`(origin/develop `fdabd7a`, 충돌 없음) 뒤 `./gradlew test --rerun-tasks`는 처음 테스트 컴파일 오류 2건(CouponMqExistingIssuanceRegressionTest.java:31,43; #193의 테스트가 이 브랜치 계측 커밋 `081f745`가 바꾼 발급 서비스 생성자 시그니처를 따르지 않음)으로 실패했다. 테스트 파일만 최소 수정(`CouponIssuanceTransactionTimers` 실제 객체 전달)한 `43f3203`에서 389개 테스트, 실패 0, 오류 0, 스킵 0이었다. 이 실행에는 `integration` 태그 테스트가 포함되지 않는다(build.gradle:69-77).
+- `scripts/verifier-isolated/test-infra-security.py` 28개, `test-analyze-bottleneck.py` 13개, `test-analyze-separated-v2.py` 4개 통과(`9b362c5` 기준).
+- 구현·실제 MySQL 시험·재측정 증거는 아직 없다. D4 FK 잠금 설명은 문서에서 도출했을 뿐 실행 증거가 아니다.
 
 ### 다음 단계에서 수행할 검증
-1. **FK 잠금 선행 시험**: 실제 MySQL에서 한 세션이 event를 `FOR UPDATE`로 잡은 채 다른 세션이 `coupon_application`을 INSERT할 때 대기하는지, D4 (a)/(b) 적용 시 대기가 사라지는지 확인한다.
-2. **실제 MySQL 통합 테스트**: 초과 발급 0, 순번 유일·연속, 등급 규칙, (event, member) 중복 0, 앱 2개를 흉내 낸 동시 접수·발급에서 위 성질 유지, `markOpen` 경쟁(V1 접수 vs MQ 준비), MQ 접수 경로의 기존 테스트 통과(MQ브랜치 병합 후), CLOSED 직전·직후 경계 접수(SOLD_OUT 처리 확인).
-3. **재측정(series3)**: series2와 같은 조건(RATE=1000, DURATION=10s, DUPLICATE_RATE=0.10, 묶음 접수/발급 사이즈 50, 재고 1000/500 등)으로 e0, e1-no-issue를 다시 측정하고 새 구조에서 발급 워커를 켠 상태의 대기 배수가 e1 수준(0.161~0.293)에 가까워지는지 비교한다. 진단 등급이며 run 수가 적다는 한계는 같다. 같은 지표 정의를 쓰려면 인터셉터 확장이 선행되어야 한다.
+1. **(C-2 첫 단계) FK 공유 잠금 재현 — 분리 전 현재 구조.** 2세션 MySQL 통합 테스트를 먼저 작성한다. 세션 A가 `coupon_event`를 `FOR UPDATE`로 잡은 상태에서 세션 B가 같은 행사의 `coupon_application`을 INSERT하면 대기하는지 확인한다(짧은 `innodb_lock_wait_timeout`으로 대기를 관찰). 같은 시나리오로 발급의 `UPDATE coupon_application` 상태 변경이 부모 검사의 공유 잠금을 요구하는지도 본다. 분리 후에는 같은 테스트로 "접수(카운터 잠금 + INSERT)가 대기하지 않음"을 확인한다. `@Tag("integration")`로 작성하고 `integrationTest` 태스크로 실행한다(기본 `test`에서는 제외됨).
+2. **접수 측 마감 경계 테스트.** `total` 직전·직후 동시 접수에서 순번 1..`total`만 생성되고 그 이후는 ENDED이며 SOLD_OUT 신청이 없다. 기존 신청자는 ENDED 대신 기존 결과를 받는다. 묶음이 경계를 가로지르는 경우 분할 규칙.
+3. **MQ 접수 계약.** MQ 접수는 마감 이후에도 기존 계약대로 PENDING→SOLD_OUT으로 처리되는지 기존 MQ 테스트(CouponMqAdmissionTransactionServiceTest, CouponMqExistingIssuanceRegressionTest 등)로 확인한다. 카운터를 공유하는 상태에서 V1과 MQ가 섞였을 때의 순번 연속성.
+4. **실제 MySQL 통합 테스트.** 초과 발급 0, 순번 유일·연속, 등급 규칙, (event, member) 중복 0, 앱 2개를 흉내 낸 동시 접수·발급에서 위 성질 유지, `markOpen` 경쟁(V1 접수 vs MQ 준비 상태), 카운터 행 부재 시 실패, CLOSED 직전·직후 경계 접수.
+5. **재측정(series3).** series2와 같은 조건(RATE=1000, DURATION=10s, DUPLICATE_RATE=0.10, 묶음 접수/발급 크기 50 등)으로 e0, e1-no-issue를 다시 측정하고 새 구조에서 발급 워커를 켠 상태의 대기 배수가 e1 수준(0.161~0.293)에 가까워지는지 비교한다. 단 D1 때문에 e1-no-issue(발급 꺼짐)는 접수가 `total`에서 멈추고 나머지가 ENDED가 되어 series2의 "모든 요청이 접수됨" 구성과 다르다. e0 자체도 `total` 이후 요청이 접수 트랜잭션 대신 캐시에서 거절되어 접수 트랜잭션 구성이 달라진다. 따라서 ①의 효과를 분리하려면 `total`이 요청 수보다 커서 D1이 발동하지 않는 조건(예: e4-stock20k의 `STOCK_TOTAL=20000`)에서 분리 전후를 비교하는 구성을 함께 둔다. 진단 등급이며 run 수가 적다는 한계는 같다. 같은 지표 정의를 쓰려면 인터셉터 확장(구현 원칙 4)이 선행되어야 한다.
 
 ## Revisit Condition
 
-- series3에서 e0 대기 배수가 개선되지 않을 때(범위가 series2 e0와 겹칠 때). 이 경우 FK 잠금 등 다른 경합 원인을 먼저 의심한다.
-- FK 선행 시험에서 D4 어느 쪽으로도 대기가 사라지지 않을 때.
-- MQ 계약(ADR-004)과 충돌이 발견될 때, 특히 D1에서 MQ 접수의 CLOSED 이후 접수가 막히는 경우.
-- C-3(b)의 ENDED 의미 약화가 클라이언트/집계(ADR-001 분모)에서 문제로 확인될 때.
+- series3에서 e0 대기 배수가 개선되지 않을 때(범위가 series2 e0와 겹칠 때). 이 경우 FK 잠금, MQ 준비 상태의 event 잠금(영향 범위 상세), 발급끼리의 경합을 먼저 의심한다.
+- FK 재현 시험에서 현재 구조의 대기가 관찰되지 않거나(D4 전제가 틀림), D4 적용 뒤에도 접수 INSERT가 발급과 대기할 때.
+- MQ 계약(ADR-004)과 충돌이 발견될 때.
+- D1 논증을 깨는 V1 사례가 발견될 때(CLOSED 이후 V1 신청이 커밋됨, 순번 > total인 V1 신청이 생김). 특히 V1과 MQ가 한 행사를 함께 쓰는 운영이 확인될 때(L1).
+- D1 이후 ENDED/SOLD_OUT 분리 집계(ADR-001)가 클라이언트나 분석 스크립트에서 문제로 확인될 때.
 - 행사 생성 경로에서 카운터 행 생성을 보장할 수 없을 때.
 - 발급끼리의 경합이 지배적인 것으로 확인되면 ②나 ③을 다시 검토한다.
