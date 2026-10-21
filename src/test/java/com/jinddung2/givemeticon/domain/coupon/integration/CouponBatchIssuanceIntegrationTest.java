@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("local")
 class CouponBatchIssuanceIntegrationTest {
 
-    private static final String URL = "jdbc:mysql://localhost:3306/givemeticon";
+    private static final String URL = System.getenv().getOrDefault("GIVEMETICON_IT_JDBC_URL", "jdbc:mysql://localhost:3306/givemeticon");
     private static final String USER = "root";
     private static final String PASSWORD = "jin19970418";
 

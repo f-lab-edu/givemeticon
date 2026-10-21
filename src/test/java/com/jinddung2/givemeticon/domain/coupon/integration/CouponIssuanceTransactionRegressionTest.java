@@ -55,7 +55,7 @@ import static org.mockito.Mockito.doThrow;
 @ActiveProfiles("local")
 class CouponIssuanceTransactionRegressionTest {
 
-    private static final String URL = "jdbc:mysql://localhost:3306/givemeticon";
+    private static final String URL = System.getenv().getOrDefault("GIVEMETICON_IT_JDBC_URL", "jdbc:mysql://localhost:3306/givemeticon");
     private static final String USER = "root";
     private static final String PASSWORD = "jin19970418";
 
