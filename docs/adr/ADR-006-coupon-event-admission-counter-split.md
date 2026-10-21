@@ -1,8 +1,8 @@
 # ADR-006 — coupon_event 접수 카운터 분리
 
-Status: Accepted (구현 전, 2026-10-21 사용자 결정)
+Status: Accepted (구현 완료, 재측정 전)
 
-작성: 2026-10-21. 초안 `f3553b0`(기준 `afb0ff5`)에 사용자 결정 D1~D4와 구현 원칙을 반영했다. 이후 `origin/develop`(`fdabd7a`, #193)를 병합(`9b362c5`)해 MQ 접수/준비 코드와 `V20261018` 마이그레이션이 이 브랜치에 들어왔다. 이 문서는 코드·SQL·스크립트·설정을 바꾸지 않았고 DB·앱·부하도 실행하지 않았다. 아래 "확인 필요"는 이 단계에서 확인하지 못한 항목이다. "사용자 결정"으로 표시한 항목은 사용자가 정한 것이며 이 문서가 바꾸지 않는다.
+작성: 2026-10-21(구현 완료 반영: 2026-10-22). 초안 `f3553b0`(기준 `afb0ff5`)에 사용자 결정 D1~D4와 구현 원칙을 반영했다. 이후 `origin/develop`(`fdabd7a`, #193)를 병합(`9b362c5`)해 MQ 접수/준비 코드와 `V20261018` 마이그레이션이 이 브랜치에 들어왔다. 이 문서는 코드·SQL·스크립트·설정을 바꾸지 않았고 DB·앱·부하도 실행하지 않았다. 아래 "확인 필요"는 이 단계에서 확인하지 못한 항목이다. "사용자 결정"으로 표시한 항목은 사용자가 정한 것이며 이 문서가 바꾸지 않는다.
 
 경로 표기: `mq/`는 `src/main/java/com/jinddung2/givemeticon/domain/coupon/mq/`다. 서비스·매퍼·도메인 파일은 `src/main/java/com/jinddung2/givemeticon/domain/coupon/` 아래 파일명으로 적는다. MQ 파일은 초안이 인용한 `feat/issue-170-171-mq-admission`(`8e75f75`)의 같은 파일과 병합 후에도 동일함을 확인했다(`CouponMqAdmissionTransactionService`, `CouponMqReadinessTransactionService`, `CouponMqControl`, `CouponMqAdmissionService`, `CouponMqConsumer`, `V20261018` 마이그레이션 모두 diff 없음). 그래서 초안의 줄 번호가 이 브랜치에서도 유효하다.
 
@@ -256,17 +256,62 @@ Status: Accepted (구현 전, 2026-10-21 사용자 결정)
 
 ## Validation Evidence
 
-### 지금까지 실행한 것 (기준 갱신 후 회귀 확인)
-- 병합 `9b362c5`(origin/develop `fdabd7a`, 충돌 없음) 뒤 `./gradlew test --rerun-tasks`는 처음 테스트 컴파일 오류 2건(CouponMqExistingIssuanceRegressionTest.java:31,43; #193의 테스트가 이 브랜치 계측 커밋 `081f745`가 바꾼 발급 서비스 생성자 시그니처를 따르지 않음)으로 실패했다. 테스트 파일만 최소 수정(`CouponIssuanceTransactionTimers` 실제 객체 전달)한 `43f3203`에서 389개 테스트, 실패 0, 오류 0, 스킵 0이었다. 이 실행에는 `integration` 태그 테스트가 포함되지 않는다(build.gradle:69-77).
-- `scripts/verifier-isolated/test-infra-security.py` 28개, `test-analyze-bottleneck.py` 13개, `test-analyze-separated-v2.py` 4개 통과(`9b362c5` 기준).
-- 구현·실제 MySQL 시험·재측정 증거는 아직 없다. D4 FK 잠금 설명은 문서에서 도출했을 뿐 실행 증거가 아니다.
+작성 기준: 구현 커밋 `809df90`(운영 코드) 이후 `a1315c0`까지의 브랜치. 아래는 실제로 실행한 검사만 적는다. 실행하지 못한 것은 "미실행"이며 PASS가 아니다.
 
-### 다음 단계에서 수행할 검증
-1. **(C-2 첫 단계) FK 공유 잠금 재현 — 실험용 스키마.** 구현 전에 `CouponEventLockHypothesisIntegrationTest`로 D4의 근거와 해결책을 확인한다. 운영 테이블을 쓰지 않고 전용 스키마(`givemeticon_lock_hypothesis`)의 최소 테이블(event/counter/application 구 FK·신 FK)에서 2세션으로 본다. 세션 A가 event 행을 `FOR UPDATE`(또는 `UPDATE`)로 잡은 상태에서 세션 B가 구 구조(부모=event)의 application을 INSERT하면 대기하고, 새 구조(카운터 `FOR UPDATE` + 카운터를 부모로 하는 application INSERT)에서는 대기하지 않으며, 접수끼리는 카운터 행에서 여전히 직렬화되는지 본다. `@Tag("integration")`이며 `integrationTest` 태스크로 실행한다(기본 `test`에서는 제외됨). 실제 운영 스키마에서의 확인(구현 후)은 아래 4번에 포함한다.
-2. **접수 측 마감 경계 테스트.** `total` 직전·직후 동시 접수에서 순번 1..`total`만 생성되고 그 이후는 ENDED이며 SOLD_OUT 신청이 없다. 기존 신청자는 ENDED 대신 기존 결과를 받는다. 묶음이 경계를 가로지르는 경우 분할 규칙.
-3. **MQ 접수 계약.** MQ 접수는 마감 이후에도 기존 계약대로 PENDING→SOLD_OUT으로 처리되는지 기존 MQ 테스트(CouponMqAdmissionTransactionServiceTest, CouponMqExistingIssuanceRegressionTest 등)로 확인한다. 카운터를 공유하는 상태에서 V1과 MQ가 섞였을 때의 순번 연속성.
-4. **실제 MySQL 통합 테스트.** 초과 발급 0, 순번 유일·연속, 등급 규칙, (event, member) 중복 0, 앱 2개를 흉내 낸 동시 접수·발급에서 위 성질 유지, `markOpen` 경쟁(V1 접수 vs MQ 준비 상태), 카운터 행 부재 시 실패, CLOSED 직전·직후 경계 접수.
-5. **재측정(series3).** 아래 3가지 비교로 교체한다. 진단 등급이며 run 수가 적다는 한계는 series2와 같다. 모든 비교는 같은 지표 정의(대기 배수)를 쓰므로 인터셉터 확장(구현 원칙 4)이 선행되어야 한다. 공통 조건은 series2와 같다(RATE=1000, DURATION=10s, DUPLICATE_RATE=0.10, 묶음 접수/발급 크기 50, 앱 2대). 기준선 수치는 측정 문서의 값만 쓴다.
+### 구현 커밋
+
+| SHA | 내용 |
+|---|---|
+| `9b362c5` | `origin/develop`(`fdabd7a`, #193) 병합 |
+| `43f3203` | 병합 후 테스트 컴파일 오류 정렬(발급 서비스 생성자에 계측 타이머 인자) |
+| `ad21de2` | 잠금 가설 재현 테스트(`CouponEventLockHypothesisIntegrationTest`, 전용 실험 스키마) |
+| `8086be2` | 구현 전 실패 테스트 T1~T7(`CouponEventCounterSplitIntegrationTest`) |
+| `4170c76` | 마이그레이션 `V20261022`, `V20261022_2` |
+| `809df90` | 운영 코드: 카운터 매퍼, V1 단건·묶음 접수, MQ 접수, 종료 캐시, 계측 인터셉터 |
+| `f25a937` | 마이그레이션 직접 적용 스크립트와 행사 생성 픽스처 |
+| `a1315c0` | **검증 환경용**: Spring 통합 테스트 5개 클래스가 `GIVEMETICON_IT_JDBC_URL`로 DB를 바꿀 수 있게 함. 운영 코드와 무관 |
+
+### 단위 테스트와 파이썬 테스트
+- `./gradlew test --rerun-tasks`: 392개 통과, 실패 0, 스킵 0(`integration` 태그 제외, build.gradle:69-77).
+- `test-infra-security.py` 28개, `test-analyze-bottleneck.py` 13개, `test-analyze-separated-v2.py` 4개 통과.
+
+### 잠금 가설과 T1~T7 (구현 전 실패 → 구현 후 통과)
+- `CouponEventLockHypothesisIntegrationTest` 시나리오 5개(MySQL 8.0.46, 전용 스키마): 구 FK는 발급의 `FOR UPDATE`/`UPDATE` 동안 접수 INSERT를 막고(1205 timeout, 약 2.0~2.1초), FK 부모를 카운터로 옮기면 막지 않으며(25~28ms), 접수끼리는 카운터에서 직렬화된다(1205). 구현 이전에 통과했고 구현 후에도 통과한다(가설 재현이며 구현 전후 비교가 아님).
+- `CouponEventCounterSplitIntegrationTest` T1~T7(전용 스키마, 실제 마이그레이션을 Flyway로 적용): 구현 전 T1·T2·T4(단건·묶음)는 카운터 테이블 부재로, T3(단건·묶음)는 "ENDED 70건·접수 30건"이 아니라 전원 접수(100건)로 실패했다. T5·T6·T6b·T7은 구현 전에도 통과했다. 구현 후 10개 모두 통과한다.
+- 비-Spring 통합 테스트 4개 클래스 28개 통과, 실패 0: `CouponEventCounterSplitIntegrationTest` 10, `CouponEventLockHypothesisIntegrationTest` 5, `CouponIssuanceMySQLIntegrationTest` 4, `CouponIssueRequestLedgerIntegrationTest` 9.
+
+### Spring 컨텍스트 통합 테스트 (전용 스키마 `givemeticon_it`)
+- 환경: 개발 DB의 `item_favorite` 등 레거시 테이블이 없어 `V20261015`에서 Flyway가 실패한다(아래). 그래서 `sql/schema/legacy-bootstrap.sql`(미추적 파일)을 빈 스키마 `givemeticon_it`에 적용한 뒤, `GIVEMETICON_IT_JDBC_URL`과 `SPRING_DATASOURCE_URL`을 같은 스키마로 지정해 5개 클래스만 실행했다. Flyway는 직접 실행하지 않았고 Spring 기동 때 `application.yml` 설정대로 적용됐다. 실행 시 JUnit 기본 타임아웃 90초를 시스템 속성(`-Djunit.jupiter.execution.timeout.default=90s`)으로 주었다(코드·설정 변경 없음). 첫 실행은 타임아웃 없이 한 테스트가 31분 넘게 멈춰 중단했다.
+- 결과: 21개 중 17개 통과, 4개 실패, 스킵 0. `CouponBatchIssuanceIntegrationTest` 4, `CouponIssuanceTransactionRegressionTest` 2, `CashPointEarnHistoryIntegrationTest` 3, `CashPointSpendIntegrationTest` 4는 모두 통과했고, `CouponAsyncIssuanceIntegrationTest`는 8개 중 4개가 실패했다.
+- Flyway 이력: 17행 모두 `success=1`이며 `V20261022`와 `V20261022_2`가 실제로 적용됐다.
+- FK(`SHOW CREATE TABLE`):
+  - `coupon_application`: `fk_coupon_application_counter FOREIGN KEY (event_id) REFERENCES coupon_event_admission_counter (event_id)`
+  - `coupon_mq_attempt`: `fk_coupon_mq_attempt_application FOREIGN KEY (event_id, mapped_member_id) REFERENCES coupon_application (event_id, member_id)`, `fk_coupon_mq_attempt_counter FOREIGN KEY (event_id) REFERENCES coupon_event_admission_counter (event_id)`
+  - `coupon_event_admission_counter`: `fk_coupon_event_admission_counter_event FOREIGN KEY (event_id) REFERENCES coupon_event (id)`
+- 검증 뒤 `givemeticon_it`를 DROP했고 남아 있지 않음을 확인했다.
+
+### `CouponAsyncIssuanceIntegrationTest` 실패 4개: ADR-006 이전부터 실패. 이번 검증에서 PASS가 아님
+1. 구현 이전 커밋 `43f3203`에서 같은 환경변수·같은 전용 스키마로 이 클래스를 실행했을 때 같은 4개가 같은 메시지로 실패했다.
+2. 이 클래스는 `coupon_stock` / `coupon_issue_request`와 Redisson 락을 쓰는 레거시 경로를 검증한다. ADR-006이 바꾼 클래스(카운터 매퍼, V1·MQ 접수 서비스, 종료 캐시, 인터셉터, `CouponEventMapper`)를 import하지도 호출하지도 않는다(import는 `CreateCouponFacade`, `CreateCouponRequestDto`, `CouponIssueRequest`, `CouponRequestStatus`, `CouponType`뿐이고 위 클래스 참조는 0건). `CreateCouponFacade`도 위 클래스를 참조하지 않는다. 다만 Spring 컨텍스트가 변경된 빈을 함께 로딩한다는 점은 같다.
+3. 확인된 원인 1건: 픽스처 `insertCoupon`(`CouponAsyncIssuanceIntegrationTest.java:121-125`)이 `coupon` INSERT에서 `is_used`를 생략한다. `legacy-bootstrap.sql`의 `coupon.is_used`에는 기본값이 없고, 테스트의 `CREATE TABLE IF NOT EXISTS`(`DEFAULT 0`)는 테이블이 이미 있어 적용되지 않는다. 운영 매퍼(`CouponMapper.xml`)는 `is_used`를 명시한다. 메시지: `SQLException: Field 'is_used' doesn't have a default value`(`:124`).
+4. 나머지 3개는 원인 미확인이다. `[접수 순서]`(`:262`)와 `[중복·초과 발급]`(`:220`)은 30초 안에 풀이 끝나지 않아 `awaitTermination`이 false였고, `[회귀]`는 90초 타임아웃이다. `drainAll`(같은 파일 `:106`~)은 반복 상한이 없어 레거시 처리가 진척 없이 true를 반환하면 무한 루프가 된다(처음 실행에서 31분 정지).
+
+### 미실행 (이번 변경과 무관한 사전 조건 부족. 미실행이며 PASS가 아님)
+- `ItemFavoriteMySQLIntegrationTest`: MySQL `127.0.0.1:13384` 필요.
+- `ItemFavoriteAggregationMySQLIntegrationTest`: MySQL `127.0.0.1:13385` 필요.
+- `CouponMqPublisherIntegrationTest.realBrokerPublisherSlice`: opt-in 전용 브로커(`127.0.0.1:25672`)와 `COUPON_MQ_IT_*` 승인 환경변수 필요(소스 `:123`로 확인한 것이며 실행으로 확인한 것은 아님).
+- 세 클래스 모두 변경 클래스(카운터 매퍼, 접수 서비스, 종료 캐시, 인터셉터, `coupon_event`, `V20261022`)를 참조하지 않는다.
+
+### 개발 DB(`givemeticon`) 영향과 환경 문제
+- 개발 DB는 검증 전후로 `flyway_schema_history` 11행, 13개 테이블의 행 수가 변하지 않았다. 전용 스키마 검증은 개발 DB에 마이그레이션을 적용하지 않았다.
+- 개발 DB에 `item_favorite` 등 레거시 테이블이 없는 것은 이 브랜치 이전부터 있던 환경 문제다(`V20261015`가 "legacy tables must already exist"를 전제). 과거 통합 테스트 재실행 중 이 마이그레이션이 실패해 개발 DB 이력에 실패 행이 한 번 남았고, 승인을 받아 그 1행만 삭제해 11행으로 되돌렸다.
+
+### 남은 검증 (미실행)
+- 접수 측 마감 경계와 MQ 계약 유지는 T3·T7로 확인했다. 앱 2대가 실제 프로세스로 동시에 도는 부하, `markOpen` 경쟁의 실제 MQ 준비 상태 트랜잭션과의 교차, 운영 규모 테이블에서의 FK DDL 영향은 확인하지 않았다.
+- 스크립트(`validate-two-processes*.sh`, 부하 스크립트)는 `bash -n` 문법 검사만 했고 실행하지 않았다.
+### 재측정 계획 (series3, 미실행)
+
+**재측정(series3).** 아래 3가지 비교로 한다. 진단 등급이며 run 수가 적다는 한계는 series2와 같다. 모든 비교는 같은 지표 정의(대기 배수)를 쓰므로 인터셉터 확장(구현 원칙 4)이 선행되어야 한다. 공통 조건은 series2와 같다(RATE=1000, DURATION=10s, DUPLICATE_RATE=0.10, 묶음 접수/발급 크기 50, 앱 2대). 기준선 수치는 측정 문서의 값만 쓴다.
    - **주 비교(① 효과).** `STOCK_TOTAL=20000, STOCK_HIGH=10000`에서 분리 전(series2 e4-stock20k, 대기 배수 평균 1.073(0.783~1.578), n=3)과 분리 후를 비교한다. 이 조건은 재고가 요청 수보다 커서 D1이 발동하지 않는다(전원 접수, 측정 문서 :51,:67). 따라서 ①의 효과만 분리해서 본다.
    - **기준선.** 분리 후 구조에서 `STOCK_TOTAL=20000` + `ISSUANCE_WORKER_ENABLED=false`(접수만 있는 조건)를 새로 측정한다. ①이 효과가 있다면 분리 후 e4(발급 켬)의 대기 배수가 이 기준선에 가까워져야 한다. 이 기준선은 구 e1-no-issue(0.161~0.293)와 재고 조건이 다르므로 그 수치와 직접 비교하지 않는다.
    - **합산 효과(①+D1).** `STOCK_TOTAL=1000`(e0) 조건에서 분리 전(series2 e0-a 1.335(0.823~2.202), e0-b 1.041(0.871~1.266))과 분리 후를 비교한다. D1로 결과 분류가 바뀐다(V1에서 SOLD_OUT→ENDED, 신청 행 없음). 대기 배수와 함께 결과 분류별(ISSUED/SOLD_OUT/ENDED) 건수와 지연을 따로 보고하고, 이전 SOLD_OUT과 새 ENDED를 합치지 않는다(Trade-offs의 ADR-001 항목).
