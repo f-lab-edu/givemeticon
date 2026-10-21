@@ -7,6 +7,7 @@
 | 원장·트랜잭션·기존 락 | [원장과 락](coupon-ledgers-and-locks.md), [기존 락 유지 ADR](../adr/ADR-002-distributed-lock.md) |
 | RabbitMQ 순서·ACK·복구 | [결정과 트레이드오프](rabbitmq-contract.md), [ADR-004](../adr/ADR-004-rabbitmq-implementation-contract.md) |
 | 측정 분모·비교 조건 | [baseline 계약](baseline-and-evidence.md), [실행 진단](../experiments/baseline-10k-diagnostic.md), [ADR-001](../adr/ADR-001-baseline.md) |
+| V1 접수 `coupon_event` 잠금 경합 측정 | [series2 측정 기록](../experiments/V1_LOCK_CONTENTION_SERIES2.md) (진단 등급, 주 비교 아님) |
 | 좋아요 집계의 결정 전환 | [주기 snapshot 결정](popular-snapshot.md), [과거 inline ADR-005](../adr/ADR-005-favorite-count-consistency.md) |
 | 원본 무결성 | [#177 보존 검사](artifact-preservation-20261017.md), [ZIP·파일별 해시](evidence/issue-177/preservation-manifest.json) |
 | 출처·과거 문서 검사 | [출처 해시](source-manifest.json), [최초 맥락 조사 검증](verification.json) |
