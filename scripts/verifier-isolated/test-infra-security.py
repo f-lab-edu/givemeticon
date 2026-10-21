@@ -34,6 +34,7 @@ elif a[0]=="exec" and "-i" in a:
   m=re.match(r"SELECT (\\d+)",line)
   seq=m.group(1) if m else "0"
   lock="performance_schema" in line
+  if "data_lock_waits" in line or "data_locks" in line: sys.exit(3)
   mode=os.environ.get("LOCK_MODE","ok") if lock else os.environ.get("DB_MODE","ok")
   if mode=="exit": sys.exit(0)
   if mode=="silent": continue
@@ -241,7 +242,7 @@ class SecurityTests(unittest.TestCase):
                 p.kill()
                 p.communicate()
         rows = self.lines("fast-mysql-locks.csv")
-        self.assertEqual(rows[0], "host_before_ms,host_after_ms,server_ms,row_lock_waits,row_lock_time_ms,data_lock_waits")
+        self.assertEqual(rows[0], "host_before_ms,host_after_ms,server_ms,row_lock_waits,row_lock_time_ms,row_lock_current_waits")
         self.assertTrue(rows[1].endswith(",1000,5,30,0"), rows[1])
 
     def test_lock_failure_does_not_stop_db_sampling(self):

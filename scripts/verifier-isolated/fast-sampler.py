@@ -8,7 +8,7 @@
   - 쿠폰 지표: 두 앱의 coupon_admission_*, coupon_issuance_* (히스토그램 _bucket 제외) 전 시리즈를 fast-coupon-prom.csv 로 기록
       host_ms,app,series,value   (series = 지표명{태그}, 예: caller/outcome 태그별 select_for_update _count/_sum/_max)
   - MySQL 락: fast-db.csv 세션과 분리된 별도 mysql 세션·스레드에서 Innodb_row_lock_waits/Innodb_row_lock_time(ms, 누적)/
-    performance_schema.data_lock_waits 건수를 fast-mysql-locks.csv 로 기록. 이 조회가 실패해도 fast-db.csv 기록은 계속된다.
+    Innodb_row_lock_current_waits(현재 행 잠금 대기 수, 상태 변수라 비용이 거의 없다)를 fast-mysql-locks.csv 로 기록. 이 조회가 실패해도 fast-db.csv 기록은 계속된다.
 SIGTERM 으로 종료한다. 비밀번호는 컨테이너 env 에서 읽어 인자/로그에 노출하지 않는다.
 """
 import csv, queue, re, signal, subprocess, sys, threading, time, urllib.request
@@ -117,16 +117,17 @@ def db_loop():
 def lock_loop():
     """InnoDB 락 지표 전용 스레드. fast-db.csv 세션과 별도의 mysql 프로세스를 쓰므로, 이 조회가 실패하거나
     (performance_schema 권한·버전 문제 등) 멈춰도 db_loop·prom_loop에 영향이 없다.
-    Innodb_row_lock_time은 밀리초 단위 누적값이다(차분은 분석 단계에서)."""
+    Innodb_row_lock_time은 밀리초 단위 누적값이다(차분은 분석 단계에서). 잠금 시스템 내부를 순회하는
+    performance_schema 테이블은 조회 비용이 잠금 경합을 키울 수 있어 읽지 않는다."""
     lock_tail = (", CAST(UNIX_TIMESTAMP(NOW(6))*1000 AS UNSIGNED), "
               "(SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_waits'), "
               "(SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_time'), "
-              "(SELECT COUNT(*) FROM performance_schema.data_lock_waits);\n")
+              "(SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_current_waits');\n")
     f = None; p = None
     seq = skipped = late_discarded = 0
     try:
         f = open(f"{run_dir}/fast-mysql-locks.csv", "w", newline=""); w = csv.writer(f)
-        w.writerow(["host_before_ms", "host_after_ms", "server_ms", "row_lock_waits", "row_lock_time_ms", "data_lock_waits"])
+        w.writerow(["host_before_ms", "host_after_ms", "server_ms", "row_lock_waits", "row_lock_time_ms", "row_lock_current_waits"])
         f.flush()
         p = subprocess.Popen(["docker", "exec", "-i", container, "sh", "-c",
                               'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot --unbuffered --batch --skip-column-names "$1"',
