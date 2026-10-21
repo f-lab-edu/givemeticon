@@ -137,6 +137,72 @@ class AnalyzeBottleneckTest(unittest.TestCase):
         summary = json.loads((out / "bottleneck-summary.json").read_text())
         self.assertEqual(summary["runs"][0]["env"]["monitor_lock_introspection"], "false")
 
+    def holder_run(self, name, post_ms, commit_ms, lock_ms, env_extra=""):
+        """잠금 후 작업·커밋·잠금 SELECT(admission) 평균이 각각 post_ms/commit_ms/lock_ms가 되는 단일 앱 픽스처."""
+        def one(base, ms, **labels):
+            lab = "".join(f',{k}="{v}"' for k, v in labels.items())
+            return (f'{base}_count{{application="x"{lab}}} 1\n{base}_sum{{application="x"{lab}}} {ms / 1000.0}\n')
+        text = (one("coupon_admission_post_lock_work_seconds", post_ms) + one("coupon_admission_commit_seconds", commit_ms)
+                + one("coupon_admission_select_for_update_seconds", lock_ms, caller="admission", outcome="success"))
+        return self.make_run(name, {"app1": ("", text)}, env_extra=env_extra)
+
+    def test_wait_multiple(self):
+        d = ab.analyze_run(str(self.holder_run("wm", 20, 5, 50)))["derived"]
+        self.assertAlmostEqual(d["lock_hold_ms"], 25.0)
+        self.assertAlmostEqual(d["wait_multiple"], 2.0)
+
+    def test_wait_multiple_null_when_no_holder(self):
+        d = ab.analyze_run(str(self.holder_run("wm0", 0, 0, 50)))["derived"]
+        self.assertEqual(d["lock_hold_ms"], 0)
+        self.assertIsNone(d["wait_multiple"])
+        self.assertIsNone(ab.analyze_run(str(self.make_run("empty", {"app1": ("", "")})))["derived"]["wait_multiple"])
+
+    def test_group_comparison_stats(self):
+        s1 = ab.group_stats([2.0, 3.0, 4.0])
+        self.assertEqual((s1["n"], s1["mean"], s1["stdev"], s1["min"], s1["max"]), (3, 3.0, 1.0, 2.0, 4.0))
+        s2 = ab.group_stats([10.0, 20.0, 30.0])
+        self.assertEqual((s2["mean"], s2["stdev"], s2["min"], s2["max"]), (20.0, 10.0, 10.0, 30.0))
+        self.assertIsNone(ab.group_stats([5.0])["stdev"])  # n=1
+        self.assertEqual(ab.group_stats([None, 4.0, 6.0])["n"], 2)  # 값 없는 run은 제외
+
+    def test_group_option_builds_j_table_and_legacy_usage_still_works(self):
+        a = [self.holder_run(f"a{i}", 20, 5, 50 * (i + 1)) for i in range(3)]   # 배수 2, 4, 6
+        b = [self.holder_run(f"b{i}", 10, 10, 20 * (i + 1)) for i in range(3)]  # 배수 1, 2, 3
+        out = self.dir / "grp"
+        proc = subprocess.run([sys.executable, "-B", str(ROOT / "analyze-bottleneck.py"), str(out),
+                               "--group", "ga", *map(str, a), "--group", "gb", *map(str, b)],
+                              capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        summary = json.loads((out / "bottleneck-summary.json").read_text())
+        mult_a = summary["groups"]["ga"]["stats"]["대기 배수"]
+        self.assertEqual((mult_a["mean"], mult_a["stdev"], mult_a["min"], mult_a["max"]), (4.0, 2.0, 2.0, 6.0))
+        mult_b = summary["groups"]["gb"]["stats"]["대기 배수"]
+        self.assertEqual((mult_b["mean"], mult_b["min"], mult_b["max"]), (2.0, 1.0, 3.0))
+        self.assertEqual(summary["groups"]["ga"]["values"]["대기 배수"], [2.0, 4.0, 6.0])
+        md = (out / "bottleneck-summary.md").read_text()
+        self.assertIn("## J. 조건 비교", md)
+        legacy = self.dir / "legacy"
+        proc = subprocess.run([sys.executable, "-B", str(ROOT / "analyze-bottleneck.py"), str(legacy), str(a[0]), str(b[0])],
+                              capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        legacy_md = (legacy / "bottleneck-summary.md").read_text()
+        self.assertIn("## I. run 비교", legacy_md)
+        self.assertNotIn("## J. 조건 비교", legacy_md)
+
+    def test_legacy_run_without_new_keys(self):
+        old = self.holder_run("old", 20, 5, 50)
+        new = self.holder_run("new", 20, 5, 50, env_extra="issuance_worker_enabled=false\nadmission_batch_size=100\nissuance_batch_size=25\n")
+        out = self.dir / "keys"
+        proc = subprocess.run([sys.executable, "-B", str(ROOT / "analyze-bottleneck.py"), str(out), str(old), str(new)],
+                              capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        md = (out / "bottleneck-summary.md").read_text()
+        old_row = [l for l in md.splitlines() if l.startswith("| old |")][0]
+        new_row = [l for l in md.splitlines() if l.startswith("| new |")][0]
+        self.assertEqual(old_row.count(ab.UNRECORDED), 3)
+        self.assertIn("| false | 100 | 25 |", new_row)
+        self.assertNotIn(ab.UNRECORDED, new_row)
+
 
 if __name__ == "__main__":
     unittest.main()

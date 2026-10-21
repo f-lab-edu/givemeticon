@@ -3,6 +3,8 @@
 발급 워커·MySQL 행 잠금 지표를 한 표로 정리한다. 계산만 하며 판단 문장은 출력하지 않는다.
 
 사용: analyze-bottleneck.py <출력 디렉터리> <run 디렉터리> [<run 디렉터리> ...]
+      analyze-bottleneck.py <출력 디렉터리> --group <라벨> <run 디렉터리>... [--group <라벨> <run 디렉터리>...]
+      (--group 형태는 그룹별 평균·표준편차·최소·최대를 담은 J 표를 만들고, run 수가 많아지는 I 표는 만들지 않는다)
 출력: <출력 디렉터리>/bottleneck-summary.json, bottleneck-summary.md
 입력(run 디렉터리): app{1,2}-{before,quiescent,after}.prom, fast-prom.csv, fast-mysql-locks.csv, mysql.csv, run.env
 
@@ -23,7 +25,9 @@ import sys
 # 실제 결과 파일(http_server_requests_seconds_count)에서 확인한 접수 POST 엔드포인트 라벨 값이다.
 ADMISSION_URI = "/test-support/coupon-events/{eventId}/applications"
 APPS = ("app1", "app2")
-ENV_KEYS = ("run_id", "kind", "rate", "duration", "monitor_lock_introspection")  # 출력 허용 키(비밀값 방지)
+ENV_KEYS = ("run_id", "kind", "rate", "duration", "monitor_lock_introspection",
+            "issuance_worker_enabled", "admission_batch_size", "issuance_batch_size")  # 출력 허용 키(비밀값 방지)
+UNRECORDED = "미기록(기본값으로 실행됨)"
 
 # 이름 -> (지표 기본 이름, 라벨 필터, 그룹 라벨, 단위 배율, 단위)
 SPECS = {
@@ -340,8 +344,40 @@ def analyze_run(run_dir):
     for name in ("hikari_acquire", "admission_batch_size", "issuance_batch_size", "existing_lookup_batch_size"):
         result["not_computed"].append({"metric": f"{name} p50/p95/p99", "reason": "_bucket 시리즈가 없어 평균(sum/count)만 계산"})
     result["timeseries"] = timeseries(run_dir, warnings)
+    result["derived"] = derive(result)
     result["warnings"] = warnings
     return result
+
+
+# ---------------------------------------------------------------- 파생 값(대기 배수 등)
+def ratio(num, den):
+    return (num / den) if (num is not None and den is not None and den > 0) else None
+
+
+def derive(run):
+    """잠금 보유 시간(잠금 후 작업 평균 + 커밋 평균), 대기 배수, InnoDB/앱 비율, 트랜잭션 수. 계산 불가면 None."""
+    m = run["metrics"]
+    post, commit = m["post_lock_work"]["combined"]["all"]["mean"], m["commit"]["combined"]["all"]["mean"]
+    lock_avg = m["lock_select"]["combined"]["caller=admission"]["mean"]
+    hold = (post + commit) if (post is not None and commit is not None) else None
+    innodb = (run["timeseries"]["mysql_locks"] or {}).get("avg_wait_ms")
+    issuance_groups = m["issuance_tx"]["combined"]["groups"]
+    return {
+        "lock_hold_ms": hold,
+        "wait_multiple": ratio(lock_avg, hold),
+        "innodb_avg_wait_ms": innodb,
+        "innodb_to_app_ratio": ratio(innodb, lock_avg),
+        "admission_tx_count": m["admission_tx"]["combined"]["all"]["count"],
+        "issuance_tx_count": sum(issuance_groups.get(k, {"count": 0})["count"] for k in ("committed", "empty")),
+    }
+
+
+def group_stats(values):
+    """None을 뺀 값의 평균·표본 표준편차·최소·최대. 값이 하나면 표준편차는 None."""
+    vals = [v for v in values if isinstance(v, (int, float))]
+    return {"n": len(vals), "mean": statistics.mean(vals) if vals else None,
+            "stdev": statistics.stdev(vals) if len(vals) >= 2 else None,
+            "min": min(vals) if vals else None, "max": max(vals) if vals else None}
 
 
 # ---------------------------------------------------------------- 표 구성
@@ -397,14 +433,85 @@ def comparison_rows(run):
     rows["잠금 1회당 평균 대기(ms)"] = lk.get("avg_wait_ms")
     rows["row_lock_current_waits 최대"] = lk.get("row_lock_current_waits_max")
     rows["Δinnodb_os_log_written"] = (run["timeseries"]["mysql_csv"] or {}).get("delta_innodb_os_log_written")
+    d = run["derived"]
+    rows["잠금 보유 시간(ms)"] = d["lock_hold_ms"]
+    rows["대기 배수"] = d["wait_multiple"]
+    rows["InnoDB/앱 비율"] = d["innodb_to_app_ratio"]
+    rows["접수 트랜잭션 수"] = d["admission_tx_count"]
+    rows["발급 트랜잭션 수(committed+empty)"] = d["issuance_tx_count"]
+    rows["접수 batch size 평균"] = run["metrics"]["admission_batch_size"]["combined"]["all"]["mean"]
     return rows
 
 
-def render_markdown(runs):
+J_ROWS = ("대기 배수", "잠금 SELECT (caller=admission) 평균(ms)", "잠금 보유 시간(ms)", "묶음 대기 평균(ms)", "묶음 대기 p95(ms)",
+          "http 접수 POST 전체 p95(ms)", "잠금 1회당 평균 대기(ms)", "접수 트랜잭션 수", "발급 트랜잭션 수(committed+empty)",
+          "접수 batch size 평균")
+
+
+def group_summary(runs, groups):
+    """groups: [(라벨, [run 라벨...])] -> {라벨: {"runs": [...], "stats": {행: group_stats}, "values": {행: [...]}}}"""
+    by_label = {r["label"]: r for r in runs}
+    out = {}
+    for name, labels in groups:
+        members = [by_label[l] for l in labels]
+        rows = [comparison_rows(r) for r in members]
+        values = {k: [row.get(k) for row in rows] for k in J_ROWS}
+        out[name] = {"runs": labels, "values": values, "stats": {k: group_stats(v) for k, v in values.items()},
+                     "conditions": {key: sorted({r["env"].get(key, UNRECORDED) for r in members})
+                                    for key in ("issuance_worker_enabled", "admission_batch_size", "issuance_batch_size")}
+                                   | {"stock_total": sorted({r["stock_total"] or "-" for r in members})}}
+    return out
+
+
+def render_j(runs, groups):
+    summary = group_summary(runs, groups)
+    names = list(summary)
+    out = ["## J. 조건 비교 (그룹별 run 값의 평균·표본 표준편차·최소·최대)", "",
+           "행 = 지표×통계, 열 = 그룹. n은 값이 있는 run 수다. 표준편차는 n이 2 이상일 때만 계산한다.", ""]
+    out.append(md_table(["그룹", "run 수", "STOCK_TOTAL", "issuance_worker_enabled", "admission_batch_size", "issuance_batch_size"],
+                        [[n, len(summary[n]["runs"]), ",".join(summary[n]["conditions"]["stock_total"]),
+                          ",".join(summary[n]["conditions"]["issuance_worker_enabled"]),
+                          ",".join(summary[n]["conditions"]["admission_batch_size"]),
+                          ",".join(summary[n]["conditions"]["issuance_batch_size"])] for n in names]))
+    rows = []
+    for key in J_ROWS:
+        for stat, title in (("mean", "평균"), ("stdev", "표준편차"), ("min", "최소"), ("max", "최대"), ("n", "n")):
+            rows.append([key, title] + [fmt(summary[n]["stats"][key][stat]) for n in names])
+    out += ["", md_table(["지표", "통계"] + names, rows), "", "### 대기 배수 run별 값", ""]
+    out.append(md_table(["그룹", "run별 값(실행 순서)"],
+                        [[n, ", ".join(fmt(v) for v in summary[n]["values"]["대기 배수"])] for n in names]))
+    out.append("")
+    return out
+
+
+def render_i(runs):
+    out = []
+    baseline = [r for r in runs if r["env"].get("monitor_lock_introspection") != "true"]
+    monitored = [r for r in runs if r["env"].get("monitor_lock_introspection") == "true"]
+    cols = baseline + monitored
+    per_run = {r["label"]: comparison_rows(r) for r in cols}
+    names = list(per_run[cols[0]["label"]]) if cols else []
+    headers = ["지표"] + [r["label"] for r in baseline] + ["baseline 평균", "baseline 표준편차"] + [r["label"] for r in monitored]
+    rows = []
+    for n in names:
+        base_vals = [per_run[r["label"]].get(n) for r in baseline]
+        nums = [v for v in base_vals if isinstance(v, (int, float))]
+        mean = statistics.mean(nums) if len(nums) == len(base_vals) and nums else None
+        sd = statistics.stdev(nums) if len(nums) == len(base_vals) and len(nums) >= 2 else None
+        rows.append([n] + [fmt(v) for v in base_vals] + [fmt(mean), fmt(sd)] + [fmt(per_run[r["label"]].get(n)) for r in monitored])
+    out += ["## I. run 비교 (baseline = monitor_lock_introspection≠true인 run, 별도 열은 평균에 섞지 않음)", "", md_table(headers, rows), ""]
+
+    return out
+
+
+def render_markdown(runs, groups=None):
     out = ["# 접수·발급 구간 분해 (계산 결과)", ""]
-    out.append(md_table(["run", "RATE", "DURATION", "STOCK_TOTAL", "monitor_lock_introspection"],
+    out.append(md_table(["run", "RATE", "DURATION", "STOCK_TOTAL", "monitor_lock_introspection",
+                         "issuance_worker_enabled", "admission_batch_size", "issuance_batch_size"],
                         [[r["label"], r["env"].get("rate", "-"), r["env"].get("duration", "-"), r["stock_total"] or "-",
-                          r["env"].get("monitor_lock_introspection", "-")] for r in runs]))
+                          r["env"].get("monitor_lock_introspection", "-"), r["env"].get("issuance_worker_enabled", UNRECORDED),
+                          r["env"].get("admission_batch_size", UNRECORDED), r["env"].get("issuance_batch_size", UNRECORDED)]
+                         for r in runs]))
     out += ["", "두 앱 합산 기준이며 모든 누적 지표는 (quiescent − before) 차분이다. 분위수 열의 `*`는 +Inf 구간에 걸려 "
             "바로 아래 유한 bucket 값을 쓴 경우다. 행마다 count의 단위가 다르다(http·묶음 대기·커넥션 획득은 요청/획득 1건, "
             "나머지 트랜잭션 계열은 플러시 1건). 커넥션 획득은 풀 전체의 획득 횟수다.", ""]
@@ -412,7 +519,17 @@ def render_markdown(runs):
         out += [f"## {r['label']}", "", "### F. 접수 시간 분해", ""]
         out.append(md_table(["구간", "count", "평균(ms)", "p50(ms)", "p95(ms)", "p99(ms)"],
                             [[t] + stat_cells(r["metrics"][m]["combined"][k]) for t, m, k in F_ROWS]))
-        out += ["", FIXED_NOTE, "", "#### http 접수 POST (status / outcome별)", ""]
+        d = r["derived"]
+        out += ["", FIXED_NOTE, "", "#### 잠금 대기 배수 (합산 기준)", ""]
+        out.append(md_table(["항목", "값"], [
+            ["잠금 보유 시간(ms) = 잠금 후 작업 평균 + 커밋 평균", fmt(d["lock_hold_ms"])],
+            ["대기 배수 = 잠금 SELECT(caller=admission) 평균 ÷ 잠금 보유 시간", fmt(d["wait_multiple"])],
+            ["InnoDB 잠금 1회당 평균 대기(ms, MySQL 기준)", fmt(d["innodb_avg_wait_ms"])],
+            ["InnoDB/앱 비율 = InnoDB 1회당 평균 대기 ÷ 잠금 SELECT(caller=admission) 평균", fmt(d["innodb_to_app_ratio"])],
+            ["접수 트랜잭션 수", fmt(d["admission_tx_count"])],
+            ["발급 트랜잭션 수 (committed + empty)", fmt(d["issuance_tx_count"])]]))
+        out += ["", "대기 배수는 잠금을 기다린 시간이 앞선 트랜잭션의 작업 시간의 몇 배인지를 나타낸다.", "",
+                "#### http 접수 POST (status / outcome별)", ""]
         out.append(md_table(["status|outcome", "count", "평균(ms)", "p50(ms)", "p95(ms)", "p99(ms)"],
                             [[g] + stat_cells(s) for g, s in r["metrics"]["http_admission_post"]["combined"]["groups"].items()]))
         out += ["", "#### 잠금 SELECT (caller|outcome별)", ""]
@@ -454,22 +571,11 @@ def render_markdown(runs):
         out.append(md_table(["지표", "app", "quiescent", "after"], ref_rows))
         out.append("")
 
-    # I. run 비교
-    baseline = [r for r in runs if r["env"].get("monitor_lock_introspection") != "true"]
-    monitored = [r for r in runs if r["env"].get("monitor_lock_introspection") == "true"]
-    cols = baseline + monitored
-    per_run = {r["label"]: comparison_rows(r) for r in cols}
-    names = list(per_run[cols[0]["label"]]) if cols else []
-    headers = ["지표"] + [r["label"] for r in baseline] + ["baseline 평균", "baseline 표준편차"] + [r["label"] for r in monitored]
-    rows = []
-    for n in names:
-        base_vals = [per_run[r["label"]].get(n) for r in baseline]
-        nums = [v for v in base_vals if isinstance(v, (int, float))]
-        mean = statistics.mean(nums) if len(nums) == len(base_vals) and nums else None
-        sd = statistics.stdev(nums) if len(nums) == len(base_vals) and len(nums) >= 2 else None
-        rows.append([n] + [fmt(v) for v in base_vals] + [fmt(mean), fmt(sd)] + [fmt(per_run[r["label"]].get(n)) for r in monitored])
-    out += ["## I. run 비교 (baseline = monitor_lock_introspection≠true인 run, 별도 열은 평균에 섞지 않음)", "", md_table(headers, rows), ""]
-
+    # I. run 비교 (그룹 모드에서는 run 수가 많아 J 표로 대체한다)
+    if groups is None:
+        out.extend(render_i(runs))
+    else:
+        out.extend(render_j(runs, groups))
     out += ["## 경고", ""]
     any_warning = False
     for r in runs:
@@ -489,19 +595,50 @@ def render_markdown(runs):
     return "\n".join(out) + "\n"
 
 
+def parse_groups(args):
+    """['--group', 'a', d1, d2, '--group', 'b', d3] -> [('a', [d1, d2]), ('b', [d3])]. 형식이 틀리면 None."""
+    groups = []
+    i = 0
+    while i < len(args):
+        if args[i] != "--group" or i + 1 >= len(args):
+            return None
+        label, i = args[i + 1], i + 2
+        dirs = []
+        while i < len(args) and args[i] != "--group":
+            dirs.append(args[i])
+            i += 1
+        if not dirs:
+            return None
+        groups.append((label, dirs))
+    return groups
+
+
 def main(argv):
     if len(argv) < 3:
         print(__doc__)
         return 2
-    out_dir, run_dirs = argv[1], argv[2:]
+    out_dir, rest = argv[1], argv[2:]
+    groups_spec = parse_groups(rest) if rest[0] == "--group" else None
+    if rest[0] == "--group" and groups_spec is None:
+        print("usage error: --group <라벨> <run 디렉터리>...", file=sys.stderr)
+        return 2
+    run_dirs = [d for _, dirs in groups_spec for d in dirs] if groups_spec else rest
     runs = [analyze_run(d) for d in run_dirs]
+    groups = None
+    if groups_spec:
+        labels_by_dir = {d: r["label"] for d, r in zip(run_dirs, runs)}
+        groups = [(name, [labels_by_dir[d] for d in dirs]) for name, dirs in groups_spec]
     os.makedirs(out_dir, exist_ok=True)
+    payload = {"runs": runs, "note": FIXED_NOTE}
+    if groups:
+        payload["groups"] = group_summary(runs, groups)
     with open(os.path.join(out_dir, "bottleneck-summary.json"), "w", encoding="utf-8") as f:
-        json.dump({"runs": runs, "note": FIXED_NOTE}, f, ensure_ascii=False, indent=2)
+        json.dump(payload, f, ensure_ascii=False, indent=2)
     with open(os.path.join(out_dir, "bottleneck-summary.md"), "w", encoding="utf-8") as f:
-        f.write(render_markdown(runs))
+        f.write(render_markdown(runs, groups))
     counts = {k: sum(len(r["warnings"][k]) for r in runs) for k in runs[0]["warnings"]} if runs else {}
-    print(json.dumps({"out_dir": out_dir, "runs": len(runs), "warning_counts": counts}, ensure_ascii=False))
+    print(json.dumps({"out_dir": out_dir, "runs": len(runs), "groups": [g for g, _ in (groups or [])],
+                      "warning_counts": counts}, ensure_ascii=False))
     return 0
 
 
