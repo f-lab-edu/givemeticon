@@ -31,6 +31,11 @@ graceful_stop=${GRACEFUL_STOP:-200s}
 run_count=${RUN_COUNT:-3}
 run_label=${RUN_LABEL:-integrated}
 diagnostics_enabled=${ADMISSION_DIAGNOSTICS_ENABLED:-false}
+# 아래 세 값의 기본값은 각 프로필 yml의 값과 같다(application-coupon-issuance.yml worker.enabled, application-coupon-admission-batch.yml
+# batch.size, application-coupon-issuance-batch.yml batch.size). 명령줄 인자는 프로필 yml보다 우선한다.
+issuance_worker_enabled=${ISSUANCE_WORKER_ENABLED:-true}
+admission_batch_size=${ADMISSION_BATCH_SIZE:-50}
+issuance_batch_size=${ISSUANCE_BATCH_SIZE:-50}
 stock_total=${STOCK_TOTAL:-100}
 stock_high=${STOCK_HIGH:-50}
 warmup_enabled=${WARMUP_ENABLED:-true}
@@ -42,6 +47,9 @@ active_profiles="$base_profile,coupon-admission,coupon-admission-test,coupon-adm
 [[ -n "${EXTRA_PROFILES:-}" ]] && active_profiles="$active_profiles,$EXTRA_PROFILES"
 
 [[ "$database" == givemeticon_coupon_admission_loadtest* ]] || { echo "refusing non-dedicated DB: $database" >&2; exit 2; }
+[[ "$issuance_worker_enabled" == true || "$issuance_worker_enabled" == false ]] || { echo "invalid ISSUANCE_WORKER_ENABLED: $issuance_worker_enabled" >&2; exit 2; }
+[[ "$admission_batch_size" =~ ^[1-9][0-9]*$ ]] || { echo "invalid ADMISSION_BATCH_SIZE: $admission_batch_size" >&2; exit 2; }
+[[ "$issuance_batch_size" =~ ^[1-9][0-9]*$ ]] || { echo "invalid ISSUANCE_BATCH_SIZE: $issuance_batch_size" >&2; exit 2; }
 [[ "${ALLOW_SHARED_MYSQL:-false}" == true || "$container" != givemeticon-mysql ]] || { echo "refusing shared givemeticon-mysql; set MYSQL_CONTAINER/MYSQL_HOST_PORT to an isolated instance" >&2; exit 2; }
 docker ps --format '{{.Names}}' | grep -qx "$container" || { echo "MySQL container is not running: $container" >&2; exit 2; }
 command -v k6 >/dev/null || { echo 'k6 is required' >&2; exit 2; }
@@ -82,6 +90,9 @@ start_app() {
     --server.port="$port" \
     --spring.profiles.active="$active_profiles" \
     --coupon.admission.diagnostics.enabled="$diagnostics_enabled" \
+    --coupon.event-issuance.worker.enabled="$issuance_worker_enabled" \
+    --coupon.admission.batch.size="$admission_batch_size" \
+    --coupon.event-issuance.batch.size="$issuance_batch_size" \
     ${extra_config_location:+--spring.config.additional-location="$extra_config_location"} \
     --spring.flyway.enabled=false >"$log" 2>&1 &
   echo $!
@@ -183,6 +194,8 @@ run_one() {
     "$run_id" "$kind" "$event_id" "$member_start" "$run_rate" "$run_duration" "$dup_rate" "$poll_budget" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$run_dir/run.env"
   # monitor-admission.sh는 이 값을 환경에서 상속해 읽는다(별도 인자 없음). 기본 true = 무거운 잠금 조회 포함.
   echo "monitor_lock_introspection=${MONITOR_LOCK_INTROSPECTION:-true}" >> "$run_dir/run.env"
+  printf 'issuance_worker_enabled=%s\nadmission_batch_size=%s\nissuance_batch_size=%s\n' \
+    "$issuance_worker_enabled" "$admission_batch_size" "$issuance_batch_size" >> "$run_dir/run.env"
   scrape_snapshot_with_retry "$run_dir" app1 "http://127.0.0.1:$port_a/actuator/prometheus" "$run_dir/app1-before.prom" || true
   scrape_snapshot_with_retry "$run_dir" app2 "http://127.0.0.1:$port_b/actuator/prometheus" "$run_dir/app2-before.prom" || true
 

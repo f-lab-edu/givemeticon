@@ -382,5 +382,82 @@ class SecurityTests(unittest.TestCase):
         # only data_lock_wait_rows is empty; every other column keeps its own value
         self.assertEqual(rows[1].split(",", 1)[1], "11,22,33,,44,55,66,77")
 
+    def make_runner_repo(self, gradle_exit=17):
+        """Copy of the integrated runner in a temp repo with fake gradle/k6/java/curl/sleep (no real docker, java or app)."""
+        import shutil
+        repo = self.path / "repo"
+        runner = repo / "scripts/coupon-integrated-loadtest/run-integrated-loadtest.sh"
+        runner.parent.mkdir(parents=True)
+        shutil.copyfile(ROOT.parent / "coupon-integrated-loadtest/run-integrated-loadtest.sh", runner)
+        migrations = repo / "src/main/resources/db/migration"
+        migrations.mkdir(parents=True)
+        for name in ("V20260920__add_coupon_event_admission_ledger.sql",
+                     "V20260923__add_coupon_award.sql", "V20260923_2__add_coupon_award_redemption.sql"):
+            (migrations / name).write_text("SELECT 1;")
+        (repo / "build/libs").mkdir(parents=True)
+        (repo / "build/libs/app.jar").write_text("")
+        gradle = repo / "gradlew"
+        gradle.write_text(f"#!/bin/sh\nexit {gradle_exit}\n")
+        gradle.chmod(0o755)
+        for name, body in (("k6", "#!/bin/sh\nexit 0\n"),
+                           ("java", '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$JAVA_CALLS"\n'),
+                           ("curl", "#!/bin/sh\nexit 22\n"),   # health check never passes -> runner stops right after launching the apps
+                           ("sleep", "#!/bin/sh\nexit 0\n")):
+            f = self.path / name
+            f.write_text(body)
+            f.chmod(0o755)
+        return repo, runner
+
+    def run_runner(self, repo, runner, **extra_env):
+        env = dict(self.env, MYSQL_CONTAINER="test-mysql", REPORT_ROOT=str(self.path / "results"),
+                   JAVA_CALLS=str(self.path / "java-calls"), **extra_env)
+        return subprocess.run(["bash", str(runner)], cwd=repo, stdin=subprocess.DEVNULL, env=env,
+                              capture_output=True, text=True)
+
+    def java_calls(self):
+        f = self.path / "java-calls"
+        return f.read_text().splitlines() if f.exists() else []
+
+    def test_runner_rejects_invalid_issuance_worker_flag(self):
+        repo, runner = self.make_runner_repo()
+        for value in ("False", "TRUE", "1", "yes"):
+            with self.subTest(value=value):
+                result = self.run_runner(repo, runner, ISSUANCE_WORKER_ENABLED=value)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(f"invalid ISSUANCE_WORKER_ENABLED: {value}", result.stderr)
+        self.assertEqual(self.java_calls(), [])
+        self.assertFalse(any(c[0] in ("exec", "run") for c in self.calls()), "validation must run before touching docker")
+
+    def test_runner_rejects_invalid_batch_size(self):
+        repo, runner = self.make_runner_repo()
+        for var, value in (("ADMISSION_BATCH_SIZE", "0"), ("ADMISSION_BATCH_SIZE", "abc"), ("ADMISSION_BATCH_SIZE", "-5"),
+                           ("ISSUANCE_BATCH_SIZE", "0"), ("ISSUANCE_BATCH_SIZE", "1.5")):
+            with self.subTest(var=var, value=value):
+                result = self.run_runner(repo, runner, **{var: value})
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(f"invalid {var}: {value}", result.stderr)
+        self.assertEqual(self.java_calls(), [])
+
+    def test_runner_passes_defaults(self):
+        repo, runner = self.make_runner_repo(gradle_exit=0)
+        result = self.run_runner(repo, runner)
+        self.assertEqual(result.returncode, 1, result.stderr)  # stops at "app A failed" because the fake health check fails
+        calls = self.java_calls()
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            for arg in ("--coupon.event-issuance.worker.enabled=true", "--coupon.admission.batch.size=50",
+                        "--coupon.event-issuance.batch.size=50", "--coupon.admission.diagnostics.enabled=false"):
+                self.assertIn(arg, call.split())
+        self.assertNotIn("sensitive-test-value", " ".join(calls))
+
+    def test_runner_passes_custom_knobs(self):
+        repo, runner = self.make_runner_repo(gradle_exit=0)
+        result = self.run_runner(repo, runner, ISSUANCE_WORKER_ENABLED="false", ADMISSION_BATCH_SIZE="100", ISSUANCE_BATCH_SIZE="25")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        for call in self.java_calls():
+            for arg in ("--coupon.event-issuance.worker.enabled=false", "--coupon.admission.batch.size=100",
+                        "--coupon.event-issuance.batch.size=25"):
+                self.assertIn(arg, call.split())
+
 if __name__ == "__main__":
     unittest.main()
