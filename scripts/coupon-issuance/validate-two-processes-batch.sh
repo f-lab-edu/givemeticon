@@ -43,6 +43,7 @@ mysql_exec_delimited() {
 docker exec "$mysql_container" mysql -uroot -p"$mysql_password" -e "DROP DATABASE IF EXISTS \`$database\`; CREATE DATABASE \`$database\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql"
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260923__add_coupon_award.sql"
+docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20261022__split_coupon_event_admission_counter.sql"
 
 ./gradlew bootJar >/dev/null
 jar_path=$(find "$repo_dir/build/libs" -maxdepth 1 -name '*.jar' ! -name '*plain*' | head -1)
@@ -83,7 +84,7 @@ echo "confirmed: single-row issuance service is not registered while batch is ac
 
 create_event() {
   local public_id=$1 total_quantity=$2 high_quantity=$3
-  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'SCHEDULED', UTC_TIMESTAMP(6), $total_quantity, $high_quantity, 10000, 5000, UTC_TIMESTAMP(6)); SELECT LAST_INSERT_ID();" | tail -1
+  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'SCHEDULED', UTC_TIMESTAMP(6), $total_quantity, $high_quantity, 10000, 5000, UTC_TIMESTAMP(6)); INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) VALUES (LAST_INSERT_ID(), 0); SELECT LAST_INSERT_ID();" | tail -1
 }
 
 post() {

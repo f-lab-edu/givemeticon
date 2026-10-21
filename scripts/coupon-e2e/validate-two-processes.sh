@@ -52,6 +52,7 @@ docker exec "$mysql_container" mysql -uroot -p"$mysql_password" -e "DROP DATABAS
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql"
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260923__add_coupon_award.sql"
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260923_2__add_coupon_award_redemption.sql"
+docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20261022__split_coupon_event_admission_counter.sql"
 
 for port in "$port_a" "$port_b"; do
   lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | xargs -r kill -9 2>/dev/null || true
@@ -89,7 +90,7 @@ curl --silent "http://localhost:$port_a/actuator/beans" | grep -q 'couponEventIs
 
 create_event() {
   local public_id=$1 total_quantity=$2 high_quantity=$3 high_points=$4 normal_points=$5
-  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'OPEN', UTC_TIMESTAMP(6), $total_quantity, $high_quantity, $high_points, $normal_points, UTC_TIMESTAMP(6)); SELECT LAST_INSERT_ID();"
+  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'OPEN', UTC_TIMESTAMP(6), $total_quantity, $high_quantity, $high_points, $normal_points, UTC_TIMESTAMP(6)); INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) VALUES (LAST_INSERT_ID(), 0); SELECT LAST_INSERT_ID();"
 }
 
 accept() {

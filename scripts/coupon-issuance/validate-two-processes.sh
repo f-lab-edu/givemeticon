@@ -38,6 +38,7 @@ mysql_exec() {
 docker exec "$mysql_container" mysql -uroot -p"$mysql_password" -e "DROP DATABASE IF EXISTS \`$database\`; CREATE DATABASE \`$database\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql"
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260923__add_coupon_award.sql"
+docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20261022__split_coupon_event_admission_counter.sql"
 
 start_app() {
   local port=$1 logfile=$2
@@ -74,7 +75,7 @@ echo "confirmed: old experimental issue workers are not registered alongside the
 
 create_event() {
   local public_id=$1 starts_at=$2 total_quantity=$3 high_quantity=$4 high_points=$5 normal_points=$6
-  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'SCHEDULED', $starts_at, $total_quantity, $high_quantity, $high_points, $normal_points, UTC_TIMESTAMP(6)); SELECT LAST_INSERT_ID();"
+  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'SCHEDULED', $starts_at, $total_quantity, $high_quantity, $high_points, $normal_points, UTC_TIMESTAMP(6)); INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) VALUES (LAST_INSERT_ID(), 0); SELECT LAST_INSERT_ID();"
 }
 
 post() {

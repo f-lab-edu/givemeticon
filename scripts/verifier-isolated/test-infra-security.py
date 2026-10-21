@@ -137,7 +137,8 @@ class SecurityTests(unittest.TestCase):
         migrations = repo / "src/main/resources/db/migration"
         migrations.mkdir(parents=True)
         for name in ("V20260920__add_coupon_event_admission_ledger.sql",
-                     "V20260923__add_coupon_award.sql", "V20260923_2__add_coupon_award_redemption.sql"):
+                     "V20260923__add_coupon_award.sql", "V20260923_2__add_coupon_award_redemption.sql",
+                     "V20261022__split_coupon_event_admission_counter.sql"):
             (migrations / name).write_text("SELECT 1;")
         for name, body in (("k6", "#!/bin/sh\nexit 0\n"),):
             f = self.path / name
@@ -154,7 +155,7 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(result.returncode, 17, result.stderr)
         self.assertNotIn("sensitive-test-value", json.dumps(self.calls()))
         sql_calls = [c for c in self.calls() if c[0] == "exec" and "sh" in c]
-        self.assertEqual(len(sql_calls), 4)
+        self.assertEqual(len(sql_calls), 5)  # drop/create database + the four coupon migrations
         for call in sql_calls:
             self.assertIn('export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"', " ".join(call))
 
@@ -392,7 +393,8 @@ class SecurityTests(unittest.TestCase):
         migrations = repo / "src/main/resources/db/migration"
         migrations.mkdir(parents=True)
         for name in ("V20260920__add_coupon_event_admission_ledger.sql",
-                     "V20260923__add_coupon_award.sql", "V20260923_2__add_coupon_award_redemption.sql"):
+                     "V20260923__add_coupon_award.sql", "V20260923_2__add_coupon_award_redemption.sql",
+                     "V20261022__split_coupon_event_admission_counter.sql"):
             (migrations / name).write_text("SELECT 1;")
         (repo / "build/libs").mkdir(parents=True)
         (repo / "build/libs/app.jar").write_text("")
@@ -475,9 +477,9 @@ class SecurityTests(unittest.TestCase):
         repo, runner = self.make_runner_repo(gradle_exit=0)
         curl = self.path / "curl"
         curl.write_text("#!/bin/sh\nexit 0\n")  # health check and snapshots succeed
-        mappers = repo / "src/main/resources/mapper"  # the runner copies these two files into the run's environment folder
+        mappers = repo / "src/main/resources/mapper"  # the runner copies these mapper files into the run's environment folder
         mappers.mkdir(parents=True)
-        for name in ("CouponEventMapper.xml", "CouponApplicationMapper.xml"):
+        for name in ("CouponEventMapper.xml", "CouponApplicationMapper.xml", "CouponEventAdmissionCounterMapper.xml"):
             (mappers / name).write_text("<mapper/>")
         for label, extra, expected in (("custom", dict(PRE_ALLOCATED_VUS="1000", MAX_VUS="2000"), ("1000", "2000")),
                                        ("default", {}, ("6500", "8000"))):

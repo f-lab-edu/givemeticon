@@ -50,6 +50,7 @@ mysql_status() {
 
 docker exec "$mysql_container" mysql -uroot -p"$mysql_password" -e "DROP DATABASE IF EXISTS \`$database\`; CREATE DATABASE \`$database\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql"
+docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20261022__split_coupon_event_admission_counter.sql"
 
 start_app() {
   local port=$1 logfile=$2 extra_args=${3:-}
@@ -87,7 +88,7 @@ echo "confirmed: single-path acceptor bean is not registered while batch.enabled
 
 create_event() {
   local public_id=$1 starts_at=$2
-  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'SCHEDULED', $starts_at, 100000, 50000, 10000, 5000, UTC_TIMESTAMP(6)); SELECT LAST_INSERT_ID();"
+  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'SCHEDULED', $starts_at, 100000, 50000, 10000, 5000, UTC_TIMESTAMP(6)); INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) VALUES (LAST_INSERT_ID(), 0); SELECT LAST_INSERT_ID();"
 }
 
 post() {
@@ -188,13 +189,14 @@ wait "${distinct_pids[@]}"
 distinct_stats=$(mysql_exec "SELECT COUNT(*), COUNT(DISTINCT acceptance_sequence), MIN(acceptance_sequence), MAX(acceptance_sequence) FROM coupon_application WHERE event_id=$event_distinct")
 check "4 distinct members get 30 unique contiguous sequences" "$([[ "$distinct_stats" == $'30\t30\t1\t30' ]] && echo 0 || echo 1)"
 
-# 5. 미확정 선행 트랜잭션이 행사 행을 잡으면 배치 플러시도 커밋될 때까지 대기한다.
+# 5. 미확정 선행 트랜잭션이 접수 카운터 행을 잡으면 배치 플러시도 커밋될 때까지 대기한다.
 event_block=$(create_event uncommitted-first "UTC_TIMESTAMP(6)" | tail -1)
 (
   docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" <<SQL
 START TRANSACTION;
-SELECT id FROM coupon_event WHERE id=$event_block FOR UPDATE;
-UPDATE coupon_event SET status='OPEN', next_acceptance_sequence=1 WHERE id=$event_block;
+SELECT event_id FROM coupon_event_admission_counter WHERE event_id=$event_block FOR UPDATE;
+UPDATE coupon_event SET status='OPEN' WHERE id=$event_block;
+UPDATE coupon_event_admission_counter SET next_acceptance_sequence=1 WHERE event_id=$event_block;
 INSERT INTO coupon_application (public_request_id,event_id,member_id,acceptance_sequence,status,accepted_at)
 VALUES ('manual-uncommitted-first',$event_block,41,1,'PENDING',UTC_TIMESTAMP(6));
 DO SLEEP(2);
@@ -226,7 +228,7 @@ wait "${rollback_pids[@]}"
 rollback_5xx=$(grep -lE '^5' "$rollback_codes_dir"/* | wc -l | tr -d ' ')
 mysql_exec "DROP TRIGGER coupon_application_fail_before_insert"
 check "6 all 10 requests in the failed batch see an error status" "$([[ "$rollback_5xx" == "10" ]] && echo 0 || echo 1)"
-check "6 batch rollback leaves sequence counter at 0" "$([[ "$(mysql_exec "SELECT next_acceptance_sequence FROM coupon_event WHERE id=$event_rollback")" == "0" ]] && echo 0 || echo 1)"
+check "6 batch rollback leaves sequence counter at 0" "$([[ "$(mysql_exec "SELECT next_acceptance_sequence FROM coupon_event_admission_counter WHERE event_id=$event_rollback")" == "0" ]] && echo 0 || echo 1)"
 check "6 batch rollback leaves zero application rows" "$([[ "$(mysql_exec "SELECT COUNT(*) FROM coupon_application WHERE event_id=$event_rollback")" == "0" ]] && echo 0 || echo 1)"
 
 # 7. 첫 응답을 버린 뒤 재요청해도 기존 접수번호가 반환된다.
@@ -341,7 +343,7 @@ wait_for_app "$port_d" "$log_dir/app-$port_d.log"
 (
   docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" <<SQL
 START TRANSACTION;
-SELECT id FROM coupon_event WHERE id=$event_checking FOR UPDATE;
+SELECT event_id FROM coupon_event_admission_counter WHERE event_id=$event_checking FOR UPDATE;
 DO SLEEP(3);
 COMMIT;
 SQL

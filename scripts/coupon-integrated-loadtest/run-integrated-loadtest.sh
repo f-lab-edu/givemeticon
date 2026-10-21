@@ -77,6 +77,7 @@ docker_mysql -e "DROP DATABASE IF EXISTS \`$database\`; CREATE DATABASE \`$datab
 docker_mysql "$database" < "$repo_dir/src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql"
 docker_mysql "$database" < "$repo_dir/src/main/resources/db/migration/V20260923__add_coupon_award.sql"
 docker_mysql "$database" < "$repo_dir/src/main/resources/db/migration/V20260923_2__add_coupon_award_redemption.sql"
+docker_mysql "$database" < "$repo_dir/src/main/resources/db/migration/V20261022__split_coupon_event_admission_counter.sql"
 
 ./gradlew bootJar >/dev/null
 jar_path=$(find "$repo_dir/build/libs" -maxdepth 1 -name '*.jar' ! -name '*plain*' | head -1)
@@ -128,10 +129,11 @@ wait_for_app "$port_b" || { echo "app B failed" >&2; exit 1; }
 } > "$bootstrap_dir/environment.txt"
 cp "$repo_dir/src/main/resources/mapper/CouponEventMapper.xml" "$bootstrap_dir/CouponEventMapper.xml"
 cp "$repo_dir/src/main/resources/mapper/CouponApplicationMapper.xml" "$bootstrap_dir/CouponApplicationMapper.xml"
+cp "$repo_dir/src/main/resources/mapper/CouponEventAdmissionCounterMapper.xml" "$bootstrap_dir/CouponEventAdmissionCounterMapper.xml"
 
 create_event() {
   local name=$1 total=$2 high=$3
-  mysql_exec "INSERT INTO coupon_event (public_id,status,starts_at_utc,total_quantity,high_quantity,high_points,normal_points,settings_locked_at) VALUES ('$name','SCHEDULED',UTC_TIMESTAMP(6),$total,$high,10000,5000,UTC_TIMESTAMP(6)); SELECT LAST_INSERT_ID();" | tail -1
+  mysql_exec "INSERT INTO coupon_event (public_id,status,starts_at_utc,total_quantity,high_quantity,high_points,normal_points,settings_locked_at) VALUES ('$name','SCHEDULED',UTC_TIMESTAMP(6),$total,$high,10000,5000,UTC_TIMESTAMP(6)); INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) VALUES (LAST_INSERT_ID(), 0); SELECT LAST_INSERT_ID();" | tail -1
 }
 
 scrape_snapshot_with_retry() {
@@ -245,7 +247,7 @@ run_one() {
     scrape_snapshot_with_retry "$run_dir" app2 "http://127.0.0.1:$port_b/actuator/prometheus" "$run_dir/app2-quiescent.prom" || true
 
     # 정리(cleanup)로 앱을 죽이기 전에 최종 DB 상태를 확보한다.
-    mysql_exec "SELECT 'event', id, status, next_acceptance_sequence, issued_quantity, total_quantity, high_quantity FROM coupon_event WHERE id=$event_id" > "$run_dir/event-final.tsv" || true
+    mysql_exec "SELECT 'event', id, status, (SELECT next_acceptance_sequence FROM coupon_event_admission_counter WHERE event_id=$event_id), issued_quantity, total_quantity, high_quantity FROM coupon_event WHERE id=$event_id" > "$run_dir/event-final.tsv" || true
     mysql_exec "SELECT status, COUNT(*) FROM coupon_application WHERE event_id=$event_id GROUP BY status" > "$run_dir/application-status-counts.tsv" || true
     mysql_exec "SELECT tier, COUNT(*), SUM(points) FROM coupon_award WHERE event_id=$event_id GROUP BY tier" > "$run_dir/award-tier-counts.tsv" || true
     mysql_exec "SELECT COUNT(*) FROM (SELECT application_id FROM coupon_award GROUP BY application_id HAVING COUNT(*)>1) d" > "$run_dir/duplicate-award-by-application.txt" || true

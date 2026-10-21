@@ -43,6 +43,7 @@ docker exec "$mysql_container" mysql -uroot -p"$mysql_password" -e "DROP DATABAS
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql"
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260923__add_coupon_award.sql"
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260923_2__add_coupon_award_redemption.sql"
+docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20261022__split_coupon_event_admission_counter.sql"
 
 start_app() {
   local port=$1 logfile=$2
@@ -79,7 +80,7 @@ wait_for_app "$port_b" "$log_dir/app-$port_b.log"
 
 create_event() {
   local public_id=$1
-  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'OPEN', UTC_TIMESTAMP(6), 100, 50, 10000, 5000, UTC_TIMESTAMP(6)); SELECT LAST_INSERT_ID();"
+  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'OPEN', UTC_TIMESTAMP(6), 100, 50, 10000, 5000, UTC_TIMESTAMP(6)); INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) VALUES (LAST_INSERT_ID(), 0); SELECT LAST_INSERT_ID();"
 }
 
 # 접수·발급은 7단계에서 이미 검증했으므로, 여기서는 이미 ISSUED로 확정된 신청·쿠폰 픽스처를

@@ -46,6 +46,7 @@ mysql_exec() {
 
 docker exec "$container" mysql -uroot -p"$mysql_password" -e "DROP DATABASE IF EXISTS \`$database\`; CREATE DATABASE \`$database\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 docker exec -i "$container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql"
+docker exec -i "$container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20261022__split_coupon_event_admission_counter.sql"
 # 발급 워커가 꺼져 있음을 DB에서도 검증하기 위한 빈 쿠폰 테이블. 접수 API는 이 테이블을 읽거나 쓰지 않는다.
 mysql_exec 'CREATE TABLE coupon (id BIGINT PRIMARY KEY AUTO_INCREMENT, application_id BIGINT NULL, created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6))'
 
@@ -111,7 +112,7 @@ cp "$repo_dir/src/main/resources/application-coupon-admission.yml" "$bootstrap_d
 
 create_event() {
   local name=$1
-  mysql_exec "INSERT INTO coupon_event (public_id,status,starts_at_utc,total_quantity,high_quantity,high_points,normal_points,settings_locked_at) VALUES ('$name','SCHEDULED',UTC_TIMESTAMP(6),20000,10000,10000,5000,UTC_TIMESTAMP(6)); SELECT LAST_INSERT_ID();" | tail -1
+  mysql_exec "INSERT INTO coupon_event (public_id,status,starts_at_utc,total_quantity,high_quantity,high_points,normal_points,settings_locked_at) VALUES ('$name','SCHEDULED',UTC_TIMESTAMP(6),20000,10000,10000,5000,UTC_TIMESTAMP(6)); INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) VALUES (LAST_INSERT_ID(), 0); SELECT LAST_INSERT_ID();" | tail -1
 }
 
 wait_for_quiescence() {
@@ -120,7 +121,7 @@ wait_for_quiescence() {
   local stable=0
   local previous_count=""
   while [[ $SECONDS -lt $deadline ]]; do
-    mysql_exec "SELECT COUNT(*), SUM(status='PENDING'), (SELECT next_acceptance_sequence FROM coupon_event WHERE id=$event_id) FROM coupon_application WHERE event_id=$event_id" >> "$run_dir/completion-poll.tsv"
+    mysql_exec "SELECT COUNT(*), SUM(status='PENDING'), (SELECT next_acceptance_sequence FROM coupon_event_admission_counter WHERE event_id=$event_id) FROM coupon_application WHERE event_id=$event_id" >> "$run_dir/completion-poll.tsv"
     active_a=$(curl --silent "http://127.0.0.1:$port_a/actuator/prometheus" | awk '$1 ~ /^hikaricp_connections_active(\\{| )/ {sum += $NF} END {print sum+0}')
     active_b=$(curl --silent "http://127.0.0.1:$port_b/actuator/prometheus" | awk '$1 ~ /^hikaricp_connections_active(\\{| )/ {sum += $NF} END {print sum+0}')
     pending_a=$(curl --silent "http://127.0.0.1:$port_a/actuator/prometheus" | awk '$1 ~ /^hikaricp_connections_pending(\\{| )/ {sum += $NF} END {print sum+0}')
@@ -171,7 +172,7 @@ run_one() {
   wait_for_quiescence "$event_id" "$run_dir" || true
   curl --silent "http://127.0.0.1:$port_a/actuator/prometheus" > "$run_dir/app1-quiescent.prom"
   curl --silent "http://127.0.0.1:$port_b/actuator/prometheus" > "$run_dir/app2-quiescent.prom"
-  mysql_exec "SELECT 'event', id, status, next_acceptance_sequence, issued_quantity FROM coupon_event WHERE id=$event_id; SELECT 'applications', COUNT(*), COUNT(DISTINCT member_id), COUNT(DISTINCT acceptance_sequence), MIN(acceptance_sequence), MAX(acceptance_sequence), SUM(status='PENDING'), SUM(status<>'PENDING') FROM coupon_application WHERE event_id=$event_id; SELECT 'duplicates_member', COUNT(*) FROM (SELECT member_id FROM coupon_application WHERE event_id=$event_id GROUP BY member_id HAVING COUNT(*) > 1) d; SELECT 'duplicates_sequence', COUNT(*) FROM (SELECT acceptance_sequence FROM coupon_application WHERE event_id=$event_id GROUP BY acceptance_sequence HAVING COUNT(*) > 1) d; SELECT 'coupon_rows', COUNT(*) FROM coupon; SELECT 'missing_sequence', COUNT(*) FROM (SELECT acceptance_sequence FROM coupon_application WHERE event_id=$event_id) a RIGHT JOIN (SELECT acceptance_sequence FROM coupon_application WHERE event_id=$event_id) b ON a.acceptance_sequence=b.acceptance_sequence WHERE FALSE;" > "$run_dir/consistency.tsv"
+  mysql_exec "SELECT 'event', id, status, (SELECT next_acceptance_sequence FROM coupon_event_admission_counter WHERE event_id=$event_id), issued_quantity FROM coupon_event WHERE id=$event_id; SELECT 'applications', COUNT(*), COUNT(DISTINCT member_id), COUNT(DISTINCT acceptance_sequence), MIN(acceptance_sequence), MAX(acceptance_sequence), SUM(status='PENDING'), SUM(status<>'PENDING') FROM coupon_application WHERE event_id=$event_id; SELECT 'duplicates_member', COUNT(*) FROM (SELECT member_id FROM coupon_application WHERE event_id=$event_id GROUP BY member_id HAVING COUNT(*) > 1) d; SELECT 'duplicates_sequence', COUNT(*) FROM (SELECT acceptance_sequence FROM coupon_application WHERE event_id=$event_id GROUP BY acceptance_sequence HAVING COUNT(*) > 1) d; SELECT 'coupon_rows', COUNT(*) FROM coupon; SELECT 'missing_sequence', COUNT(*) FROM (SELECT acceptance_sequence FROM coupon_application WHERE event_id=$event_id) a RIGHT JOIN (SELECT acceptance_sequence FROM coupon_application WHERE event_id=$event_id) b ON a.acceptance_sequence=b.acceptance_sequence WHERE FALSE;" > "$run_dir/consistency.tsv"
   mysql_exec "SELECT member_id, acceptance_sequence, status, public_request_id FROM coupon_application WHERE event_id=$event_id ORDER BY acceptance_sequence" > "$run_dir/applications.tsv"
   mysql_exec "SELECT COUNT(*) FROM coupon_application WHERE event_id=$event_id AND acceptance_sequence <> (SELECT COUNT(*) FROM coupon_application a2 WHERE a2.event_id=$event_id AND a2.acceptance_sequence <= coupon_application.acceptance_sequence)" > "$run_dir/non_contiguous_sequence_count.txt"
   date -u +%Y-%m-%dT%H:%M:%SZ > "$run_dir/finished-at-utc.txt"

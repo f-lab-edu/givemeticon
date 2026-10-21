@@ -44,6 +44,7 @@ mysql_exec() {
 
 docker exec "$mysql_container" mysql -uroot -p"$mysql_password" -e "DROP DATABASE IF EXISTS \`$database\`; CREATE DATABASE \`$database\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20260920__add_coupon_event_admission_ledger.sql"
+docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" < "$repo_dir/src/main/resources/db/migration/V20261022__split_coupon_event_admission_counter.sql"
 
 start_app() {
   local port=$1
@@ -79,7 +80,7 @@ wait_for_app "$port_b" "$log_dir/app-$port_b.log"
 create_event() {
   local public_id=$1
   local starts_at=$2
-  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'SCHEDULED', $starts_at, 100, 50, 10000, 5000, UTC_TIMESTAMP(6)); SELECT LAST_INSERT_ID();"
+  mysql_exec "INSERT INTO coupon_event (public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points, settings_locked_at) VALUES ('$public_id', 'SCHEDULED', $starts_at, 100, 50, 10000, 5000, UTC_TIMESTAMP(6)); INSERT INTO coupon_event_admission_counter (event_id, next_acceptance_sequence) VALUES (LAST_INSERT_ID(), 0); SELECT LAST_INSERT_ID();"
 }
 
 post() {
@@ -174,13 +175,14 @@ wait "$pid_a" "$pid_b"
 distinct_stats=$(mysql_exec "SELECT COUNT(*), COUNT(DISTINCT acceptance_sequence), MIN(acceptance_sequence), MAX(acceptance_sequence) FROM coupon_application WHERE event_id=$event_distinct")
 check "4 distinct members get 2 unique contiguous sequences" "$([[ "$distinct_stats" == $'2\t2\t1\t2' ]] && echo 0 || echo 1)"
 
-# 5. 미확정 선행 트랜잭션이 행사 행을 잡으면 뒤 요청은 커밋할 수 없다.
+# 5. 미확정 선행 트랜잭션이 접수 카운터 행을 잡으면 뒤 요청은 커밋할 수 없다.
 event_block=$(create_event uncommitted-first "UTC_TIMESTAMP(6)" | tail -1)
 (
   docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" <<SQL
 START TRANSACTION;
-SELECT id FROM coupon_event WHERE id=$event_block FOR UPDATE;
-UPDATE coupon_event SET status='OPEN', next_acceptance_sequence=1 WHERE id=$event_block;
+SELECT event_id FROM coupon_event_admission_counter WHERE event_id=$event_block FOR UPDATE;
+UPDATE coupon_event SET status='OPEN' WHERE id=$event_block;
+UPDATE coupon_event_admission_counter SET next_acceptance_sequence=1 WHERE event_id=$event_block;
 INSERT INTO coupon_application (public_request_id,event_id,member_id,acceptance_sequence,status,accepted_at)
 VALUES ('manual-uncommitted-first',$event_block,41,1,'PENDING',UTC_TIMESTAMP(6));
 DO SLEEP(2);
@@ -205,7 +207,7 @@ mysql_exec "CREATE TRIGGER coupon_application_fail_before_insert BEFORE INSERT O
 http_code=$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H 'X-Coupon-Admission-Test-Member: 999999' "http://localhost:$port_a/test-support/coupon-events/$event_rollback/applications")
 check "6 forced insert failure returns 500" "$([[ "$http_code" == "500" ]] && echo 0 || echo 1)"
 mysql_exec "DROP TRIGGER coupon_application_fail_before_insert"
-check "6 rollback leaves sequence counter at 0" "$([[ "$(mysql_exec "SELECT next_acceptance_sequence FROM coupon_event WHERE id=$event_rollback")" == "0" ]] && echo 0 || echo 1)"
+check "6 rollback leaves sequence counter at 0" "$([[ "$(mysql_exec "SELECT next_acceptance_sequence FROM coupon_event_admission_counter WHERE event_id=$event_rollback")" == "0" ]] && echo 0 || echo 1)"
 check "6 rollback leaves zero application rows" "$([[ "$(mysql_exec "SELECT COUNT(*) FROM coupon_application WHERE event_id=$event_rollback")" == "0" ]] && echo 0 || echo 1)"
 
 # 7. 첫 응답을 버린 뒤 재요청해도 기존 접수번호가 반환된다.
@@ -219,29 +221,34 @@ if require_field "7 retry response has a non-null requestId" "$recovered_id" \
   check "7 retry after lost response returns the committed requestId" "$([[ "$recovered_id" == "$stored" ]] && echo 0 || echo 1)"
 fi
 
-# 8. 종료 직전 동시 신청: 이 행사는 아직 어느 앱에서도 종료가 발견된 적이 없으므로(캐시 비어
-#    있음) 신규 신청은 항상 기존 잠금 트랜잭션 경로로 들어간다. 다른 트랜잭션이 행사 행을 잠근 채
-#    CLOSED로 전환하려는 동안(아직 커밋 전) 들어온 신청이 잠금 해제를 기다렸다가, 실제로 커밋된
-#    CLOSED를 다시 검증해 거절하는지 확인한다(빠른 경로 도입이 진행 중인 행사의 잠금 재검증을
-#    건너뛰게 만들지 않았다는 확인).
+# 8. 접수 측 마감 경계(ADR-006 D1): 이 행사는 아직 어느 앱에서도 마감이 발견된 적이 없으므로(캐시 비어 있음)
+#    신규 신청은 항상 접수 트랜잭션 경로로 들어간다. 다른 트랜잭션이 접수 카운터 행을 잠근 채 마지막 순번(= total_quantity)을
+#    배정하는 동안(아직 커밋 전) 들어온 신청이 잠금 해제를 기다렸다가, 커밋된 카운터 값이 total 이상임을 읽고 신청을
+#    만들지 않은 채 거절(409 ENDED)되는지 확인한다. 마감은 coupon_event의 CLOSED(발급 완료)보다 앞선다 - 이 시점의
+#    coupon_event는 아직 CLOSED가 아니다. (구 계약: 별도 트랜잭션이 coupon_event를 잠그고 CLOSED로 바꾸는 동안 기다렸다가
+#    커밋된 CLOSED를 재검증해 거절. 접수가 coupon_event를 잠그지 않게 되어 더는 성립하지 않는다.)
 event_close_race=$(create_event close-race "UTC_TIMESTAMP(6)" | tail -1)
 (
   docker exec -i "$mysql_container" mysql -uroot -p"$mysql_password" "$database" <<SQL
 START TRANSACTION;
-SELECT id FROM coupon_event WHERE id=$event_close_race FOR UPDATE;
-UPDATE coupon_event SET status='OPEN', next_acceptance_sequence=1 WHERE id=$event_close_race;
+SELECT event_id FROM coupon_event_admission_counter WHERE event_id=$event_close_race FOR UPDATE;
+UPDATE coupon_event SET status='OPEN' WHERE id=$event_close_race;
+UPDATE coupon_event_admission_counter SET next_acceptance_sequence=100 WHERE event_id=$event_close_race;
+INSERT INTO coupon_application (public_request_id,event_id,member_id,acceptance_sequence,status,accepted_at)
+VALUES ('manual-last-sequence',$event_close_race,60,100,'PENDING',UTC_TIMESTAMP(6));
 DO SLEEP(1);
-UPDATE coupon_event SET status='CLOSED', closed_at=UTC_TIMESTAMP(6) WHERE id=$event_close_race;
 COMMIT;
 SQL
 ) >"$log_dir/close-race-tx.log" 2>&1 & close_tx_pid=$!
 sleep 0.3
 http_code=$(curl --silent --output "$log_dir/close-race-during.json" --write-out '%{http_code}' -X POST -H 'X-Coupon-Admission-Test-Member: 61' "http://localhost:$port_a/test-support/coupon-events/$event_close_race/applications")
 wait "$close_tx_pid"
-check "8 request racing a not-yet-committed close still gets rejected once close commits (409)" \
+check "8 request racing a not-yet-committed last sequence is rejected once it commits (409 ENDED)" \
   "$([[ "$http_code" == "409" ]] && echo 0 || echo 1)"
 check "8 no application row is created for the rejected racing member" \
   "$([[ "$(mysql_exec "SELECT COUNT(*) FROM coupon_application WHERE event_id=$event_close_race AND member_id=61")" == "0" ]] && echo 0 || echo 1)"
+check "8 admission closed before coupon_event is CLOSED (counter reached total, status is not CLOSED)" \
+  "$([[ "$(mysql_exec "SELECT status FROM coupon_event WHERE id=$event_close_race")" != "CLOSED" ]] && echo 0 || echo 1)"
 
 # 9. 종료 후 재신청: 기존 신청자는 종료 후에도 기존 접수번호·상태를 그대로 돌려받고, 신청한 적
 #    없는 회원은(각 앱이 종료를 한 번 발견한 뒤부터는) 접수 큐/잠금 없이 즉시 ENDED로 응답하며
