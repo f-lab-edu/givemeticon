@@ -50,6 +50,7 @@ active_profiles="$base_profile,coupon-admission,coupon-admission-test,coupon-adm
 [[ "$issuance_worker_enabled" == true || "$issuance_worker_enabled" == false ]] || { echo "invalid ISSUANCE_WORKER_ENABLED: $issuance_worker_enabled" >&2; exit 2; }
 [[ "$admission_batch_size" =~ ^[1-9][0-9]*$ ]] || { echo "invalid ADMISSION_BATCH_SIZE: $admission_batch_size" >&2; exit 2; }
 [[ "$issuance_batch_size" =~ ^[1-9][0-9]*$ ]] || { echo "invalid ISSUANCE_BATCH_SIZE: $issuance_batch_size" >&2; exit 2; }
+[[ "$pre_vus" =~ ^[1-9][0-9]*$ && "$max_vus" =~ ^[1-9][0-9]*$ ]] && (( max_vus >= pre_vus )) || { echo "invalid PRE_ALLOCATED_VUS/MAX_VUS: $pre_vus/$max_vus" >&2; exit 2; }
 [[ "${ALLOW_SHARED_MYSQL:-false}" == true || "$container" != givemeticon-mysql ]] || { echo "refusing shared givemeticon-mysql; set MYSQL_CONTAINER/MYSQL_HOST_PORT to an isolated instance" >&2; exit 2; }
 docker ps --format '{{.Names}}' | grep -qx "$container" || { echo "MySQL container is not running: $container" >&2; exit 2; }
 command -v k6 >/dev/null || { echo 'k6 is required' >&2; exit 2; }
@@ -194,8 +195,8 @@ run_one() {
     "$run_id" "$kind" "$event_id" "$member_start" "$run_rate" "$run_duration" "$dup_rate" "$poll_budget" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$run_dir/run.env"
   # monitor-admission.sh는 이 값을 환경에서 상속해 읽는다(별도 인자 없음). 기본 true = 무거운 잠금 조회 포함.
   echo "monitor_lock_introspection=${MONITOR_LOCK_INTROSPECTION:-true}" >> "$run_dir/run.env"
-  printf 'issuance_worker_enabled=%s\nadmission_batch_size=%s\nissuance_batch_size=%s\n' \
-    "$issuance_worker_enabled" "$admission_batch_size" "$issuance_batch_size" >> "$run_dir/run.env"
+  printf 'issuance_worker_enabled=%s\nadmission_batch_size=%s\nissuance_batch_size=%s\npre_allocated_vus=%s\nmax_vus=%s\n' \
+    "$issuance_worker_enabled" "$admission_batch_size" "$issuance_batch_size" "$pre_vus" "$max_vus" >> "$run_dir/run.env"
   scrape_snapshot_with_retry "$run_dir" app1 "http://127.0.0.1:$port_a/actuator/prometheus" "$run_dir/app1-before.prom" || true
   scrape_snapshot_with_retry "$run_dir" app2 "http://127.0.0.1:$port_b/actuator/prometheus" "$run_dir/app2-before.prom" || true
 

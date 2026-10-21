@@ -410,7 +410,8 @@ class SecurityTests(unittest.TestCase):
 
     def run_runner(self, repo, runner, **extra_env):
         env = dict(self.env, MYSQL_CONTAINER="test-mysql", REPORT_ROOT=str(self.path / "results"),
-                   JAVA_CALLS=str(self.path / "java-calls"), **extra_env)
+                   JAVA_CALLS=str(self.path / "java-calls"))
+        env.update(extra_env)
         return subprocess.run(["bash", str(runner)], cwd=repo, stdin=subprocess.DEVNULL, env=env,
                               capture_output=True, text=True)
 
@@ -458,6 +459,38 @@ class SecurityTests(unittest.TestCase):
             for arg in ("--coupon.event-issuance.worker.enabled=false", "--coupon.admission.batch.size=100",
                         "--coupon.event-issuance.batch.size=25"):
                 self.assertIn(arg, call.split())
+
+    def test_runner_rejects_max_vus_below_preallocated(self):
+        repo, runner = self.make_runner_repo()
+        for pre, mx in (("2000", "1000"), ("abc", "2000"), ("1000", "0"), ("0", "10"), ("1.5", "10")):
+            with self.subTest(pre=pre, max=mx):
+                result = self.run_runner(repo, runner, PRE_ALLOCATED_VUS=pre, MAX_VUS=mx)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(f"invalid PRE_ALLOCATED_VUS/MAX_VUS: {pre}/{mx}", result.stderr)
+        self.assertEqual(self.java_calls(), [])
+        self.assertFalse(any(c[0] in ("exec", "run") for c in self.calls()), "validation must run before touching docker")
+
+    def test_runner_records_vus_in_run_env(self):
+        # Warmup only (RUN_COUNT=0) so no measurement loop (and no 300s quiescence wait) is reached; the warmup run writes run.env too.
+        repo, runner = self.make_runner_repo(gradle_exit=0)
+        curl = self.path / "curl"
+        curl.write_text("#!/bin/sh\nexit 0\n")  # health check and snapshots succeed
+        mappers = repo / "src/main/resources/mapper"  # the runner copies these two files into the run's environment folder
+        mappers.mkdir(parents=True)
+        for name in ("CouponEventMapper.xml", "CouponApplicationMapper.xml"):
+            (mappers / name).write_text("<mapper/>")
+        for label, extra, expected in (("custom", dict(PRE_ALLOCATED_VUS="1000", MAX_VUS="2000"), ("1000", "2000")),
+                                       ("default", {}, ("6500", "8000"))):
+            with self.subTest(label):
+                root = self.path / f"results-{label}"
+                result = self.run_runner(repo, runner, REPORT_ROOT=str(root), RUN_COUNT="0", WARMUP_ENABLED="true", **extra)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                envs = list((root / "runs").glob("warmup-*/run.env"))
+                self.assertEqual(len(envs), 1)
+                text = envs[0].read_text().splitlines()
+                self.assertIn(f"pre_allocated_vus={expected[0]}", text)
+                self.assertIn(f"max_vus={expected[1]}", text)
+                self.assertIn("issuance_worker_enabled=true", text)  # existing keys stay next to it
 
 if __name__ == "__main__":
     unittest.main()
