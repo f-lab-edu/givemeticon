@@ -11,7 +11,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent
 DOCKER = """#!/usr/bin/env python3
-import json, os, sys
+import json, os, re, sys, time
 a=sys.argv[1:]
 with open(os.environ["CALLS"], "a") as f: f.write(json.dumps(a)+"\\n")
 if a[0]=="inspect":
@@ -29,14 +29,18 @@ elif a[0]=="ps": print("test-mysql")
 elif a[0]=="exec" and "printenv" in a: print("sensitive-test-value")
 elif a[0]=="logs": print("ready for connections port: 3306  MySQL")
 elif a[0]=="exec" and "-i" in a:
+ first=True
  for line in sys.stdin:
-  if "performance_schema" in line:
-   mode=os.environ.get("LOCK_MODE","ok")
-   if mode=="exit": sys.exit(0)
-   if mode=="silent": continue
-   print("1000\\t5\\t30\\t0",flush=True)
-  elif os.environ.get("DB_MODE")=="silent": continue
-  else: print("1000\\t1\\t0\\t1",flush=True)
+  m=re.match(r"SELECT (\\d+)",line)
+  seq=m.group(1) if m else "0"
+  lock="performance_schema" in line
+  mode=os.environ.get("LOCK_MODE","ok") if lock else os.environ.get("DB_MODE","ok")
+  if mode=="exit": sys.exit(0)
+  if mode=="silent": continue
+  if mode=="late" and first: time.sleep(1.5)
+  first=False
+  stamp=str(int(time.time()*1000)) if mode=="late" else "1000"
+  print(seq+"\\t"+stamp+("\\t5\\t30\\t0" if lock else "\\t1\\t0\\t1"),flush=True)
 """
 
 class SecurityTests(unittest.TestCase):
@@ -280,6 +284,39 @@ class SecurityTests(unittest.TestCase):
                 p.kill()
                 p.communicate()
         self.assertEqual(len(self.lines("fast-db.csv")), 1)  # header only, no fabricated samples
+
+    def assert_pairs_within_request_window(self, name):
+        rows = [r.split(",") for r in self.lines(name)[1:]]
+        self.assertGreaterEqual(len(rows), 2, name)
+        for before, after, server, *_ in rows:
+            self.assertLessEqual(int(before), int(server), f"{name}: reply older than its request: {before},{server},{after}")
+            self.assertLessEqual(int(server), int(after), f"{name}: reply newer than its receipt: {before},{server},{after}")
+
+    def test_late_db_reply_is_not_paired_with_next_sample(self):
+        p = self.start_sampler(DB_MODE="late")
+        try:
+            self.wait_for(lambda: len(self.lines("fast-db.csv")) > 5, "DB samples not recorded")
+            rc, err = self.stop_sampler(p)
+            self.assertEqual(rc, 0, err)
+        finally:
+            if p.poll() is None:
+                p.kill()
+                p.communicate()
+        self.assert_pairs_within_request_window("fast-db.csv")
+        self.assertIn("db sampler: skipped=1 late_discarded=1", err)
+
+    def test_late_lock_reply_is_not_paired_with_next_sample(self):
+        p = self.start_sampler(LOCK_MODE="late")
+        try:
+            self.wait_for(lambda: len(self.lines("fast-mysql-locks.csv")) > 5, "lock samples not recorded")
+            rc, err = self.stop_sampler(p)
+            self.assertEqual(rc, 0, err)
+        finally:
+            if p.poll() is None:
+                p.kill()
+                p.communicate()
+        self.assert_pairs_within_request_window("fast-mysql-locks.csv")
+        self.assertIn("lock sampler: skipped=1 late_discarded=1", err)
 
 if __name__ == "__main__":
     unittest.main()

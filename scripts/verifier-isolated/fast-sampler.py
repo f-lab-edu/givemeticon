@@ -50,6 +50,26 @@ def prom_loop():
         stop.wait(max(0, interval - (time.time() - t0)))
     f.close(); cf.close()
 
+def wait_reply(lines, seq):
+    """현재 seq의 응답 줄을 최대 1초(전체) 기다린다. 첫 컬럼이 seq보다 작은 줄은 늦게 도착한 과거 응답이므로 버린다.
+    반환: (상태, seq를 뗀 필드 목록 또는 None, 버린 줄 수). 상태는 "ok" / "timeout" / "eof"."""
+    deadline = time.time() + 1.0
+    late = 0
+    while True:
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            return "timeout", None, late
+        try:
+            line = lines.get(timeout=remaining)
+        except queue.Empty:
+            return "timeout", None, late
+        if line is None:
+            return "eof", None, late
+        parts = line.rstrip("\n").split("\t")
+        if parts[0] == str(seq):
+            return "ok", parts[1:], late
+        late += 1
+
 def db_loop():
     # Resolve the password only inside the container, never in host argv/stdout.
     p = subprocess.Popen(["docker", "exec", "-i", container, "sh", "-c",
@@ -63,22 +83,25 @@ def db_loop():
         for l in p.stdout: lines.put(l)
         lines.put(None)
     threading.Thread(target=reader, daemon=True).start()
-    q = (f"SELECT CAST(UNIX_TIMESTAMP(NOW(6))*1000 AS UNSIGNED), IFNULL(SUM(status IN ('ISSUED','SOLD_OUT')),0), "
-         f"IFNULL(SUM(status IN ('PENDING','CHECKING')),0), COUNT(*) FROM coupon_application WHERE event_id={int(event_id)};\n")
+    # 쿼리마다 첫 컬럼에 seq를 넣어 응답을 요청과 짝짓는다(CSV에는 seq를 쓰지 않는다).
+    q_tail = (f", CAST(UNIX_TIMESTAMP(NOW(6))*1000 AS UNSIGNED), IFNULL(SUM(status IN ('ISSUED','SOLD_OUT')),0), "
+              f"IFNULL(SUM(status IN ('PENDING','CHECKING')),0), COUNT(*) FROM coupon_application WHERE event_id={int(event_id)};\n")
+    seq = skipped = late_discarded = 0
     f = open(f"{run_dir}/fast-db.csv", "w", newline=""); w = csv.writer(f)
     w.writerow(["host_before_ms", "host_after_ms", "server_ms", "final_visible", "unresolved", "total"])
     try:
         while not stop.is_set():
+            seq += 1
             t0 = time.time(); b = int(t0 * 1000)
-            p.stdin.write(q); p.stdin.flush()
-            try:
-                line = lines.get(timeout=1.0)
-            except queue.Empty:
-                continue  # 이 표본은 건너뛴다(값을 만들지 않는다)
-            if line is None:
+            p.stdin.write(f"SELECT {seq}{q_tail}"); p.stdin.flush()
+            status, parts, late = wait_reply(lines, seq)
+            late_discarded += late
+            if status == "timeout":
+                skipped += 1  # 이 표본은 건너뛴다(값을 만들지 않는다)
+                continue
+            if status == "eof":
                 print("db sampler stopped: mysql session ended", file=sys.stderr); break
             a = int(time.time() * 1000)
-            parts = line.strip().split("\t")
             if len(parts) == 4: w.writerow([b, a] + parts)
             f.flush()
             stop.wait(max(0, interval - (time.time() - t0)))
@@ -86,6 +109,7 @@ def db_loop():
         print(f"db sampler stopped: {type(e).__name__}", file=sys.stderr)
     finally:
         f.close()
+        print(f"db sampler: skipped={skipped} late_discarded={late_discarded}", file=sys.stderr)
         try: p.stdin.close()
         except (BrokenPipeError, ValueError): pass
         p.terminate()
@@ -94,11 +118,12 @@ def lock_loop():
     """InnoDB 락 지표 전용 스레드. fast-db.csv 세션과 별도의 mysql 프로세스를 쓰므로, 이 조회가 실패하거나
     (performance_schema 권한·버전 문제 등) 멈춰도 db_loop·prom_loop에 영향이 없다.
     Innodb_row_lock_time은 밀리초 단위 누적값이다(차분은 분석 단계에서)."""
-    lock_q = ("SELECT CAST(UNIX_TIMESTAMP(NOW(6))*1000 AS UNSIGNED), "
+    lock_tail = (", CAST(UNIX_TIMESTAMP(NOW(6))*1000 AS UNSIGNED), "
               "(SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_waits'), "
               "(SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_time'), "
               "(SELECT COUNT(*) FROM performance_schema.data_lock_waits);\n")
     f = None; p = None
+    seq = skipped = late_discarded = 0
     try:
         f = open(f"{run_dir}/fast-mysql-locks.csv", "w", newline=""); w = csv.writer(f)
         w.writerow(["host_before_ms", "host_after_ms", "server_ms", "row_lock_waits", "row_lock_time_ms", "data_lock_waits"])
@@ -113,16 +138,17 @@ def lock_loop():
             lines.put(None)  # EOF sentinel
         threading.Thread(target=reader, daemon=True).start()
         while not stop.is_set():
+            seq += 1
             t0 = time.time(); b = int(t0 * 1000)
-            p.stdin.write(lock_q); p.stdin.flush()
-            try:
-                line = lines.get(timeout=1.0)
-            except queue.Empty:
-                continue  # 응답이 없으면 이 표본은 건너뛴다(값을 만들지 않는다)
-            if line is None:
+            p.stdin.write(f"SELECT {seq}{lock_tail}"); p.stdin.flush()
+            status, parts, late = wait_reply(lines, seq)
+            late_discarded += late
+            if status == "timeout":
+                skipped += 1  # 응답이 없으면 이 표본은 건너뛴다(값을 만들지 않는다)
+                continue
+            if status == "eof":
                 print("lock sampler stopped: mysql session ended", file=sys.stderr); break
             a = int(time.time() * 1000)
-            parts = line.strip().split("\t")
             if len(parts) == 4: w.writerow([b, a] + parts)
             f.flush()
             stop.wait(max(0, interval - (time.time() - t0)))
@@ -130,6 +156,7 @@ def lock_loop():
         print(f"lock sampler stopped: {type(e).__name__}", file=sys.stderr)
     finally:
         if f is not None: f.close()
+        print(f"lock sampler: skipped={skipped} late_discarded={late_discarded}", file=sys.stderr)
         if p is not None:
             try: p.stdin.close()
             except Exception: pass
