@@ -309,6 +309,9 @@ class SecurityTests(unittest.TestCase):
                 p.communicate()
         self.assert_pairs_within_request_window("fast-db.csv")
         self.assertIn("db sampler: skipped=1 late_discarded=1", err)
+        # the log kept in the run directory must never carry the password or query text
+        self.assertNotIn("sensitive-test-value", err)
+        self.assertNotIn("SELECT", err)
 
     def test_late_lock_reply_is_not_paired_with_next_sample(self):
         p = self.start_sampler(LOCK_MODE="late")
@@ -322,6 +325,9 @@ class SecurityTests(unittest.TestCase):
                 p.communicate()
         self.assert_pairs_within_request_window("fast-mysql-locks.csv")
         self.assertIn("lock sampler: skipped=1 late_discarded=1", err)
+        # the log kept in the run directory must never carry the password or query text
+        self.assertNotIn("sensitive-test-value", err)
+        self.assertNotIn("SELECT", err)
 
     OLD_MONITOR_QUERY = (
         "export MYSQL_PWD=\"$MYSQL_ROOT_PASSWORD\"; exec mysql -uroot -Nse \"SELECT COUNT(*), SUM(status='PENDING') FROM "

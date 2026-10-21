@@ -207,7 +207,7 @@ run_one() {
   monitor_pid=$!
   fast_sampler_pid=''
   if [[ "$kind" == measurement && "${FAST_SAMPLER:-false}" == true ]]; then
-    python3 "$repo_dir/scripts/verifier-isolated/fast-sampler.py" "$run_dir" "$container" "$database" "$event_id" "$port_a" "$port_b" "${FAST_SAMPLER_INTERVAL:-0.2}" &
+    python3 "$repo_dir/scripts/verifier-isolated/fast-sampler.py" "$run_dir" "$container" "$database" "$event_id" "$port_a" "$port_b" "${FAST_SAMPLER_INTERVAL:-0.2}" 2>>"$run_dir/fast-sampler.log" &
     fast_sampler_pid=$!
   fi
   bash "$repo_dir/scripts/coupon-integrated-loadtest/monitor-generator.sh" "$run_dir" "$k6_pid" 0.5 &
