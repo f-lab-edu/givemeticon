@@ -75,6 +75,10 @@
         SELECT DISTINCT event_id FROM coupon_application WHERE status = 'PENDING'
     </select>
 
+    <select id="countPendingByEvent" resultType="map">
+        SELECT event_id, COUNT(*) AS pending FROM coupon_application WHERE status = 'PENDING' GROUP BY event_id
+    </select>
+
     <update id="markIssued">
         UPDATE coupon_application
         SET status = 'ISSUED', finalized_at = UTC_TIMESTAMP(6)
