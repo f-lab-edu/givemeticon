@@ -2,6 +2,9 @@
 set -euo pipefail
 
 # Usage: monitor-admission.sh RUN_DIR EVENT_ID APP1_PID APP2_PID [K6_PID] [APP1_PROM] [APP2_PROM]
+# MONITOR_LOCK_INTROSPECTION=false 이면 매초 실행하는 무거운 잠금 조회(performance_schema.data_lock_waits 건수,
+# sys.innodb_lock_waits 덤프)를 건너뛴다. data_lock_wait_rows 컬럼은 빈 값으로 남고 locks/*.tsv는 만들지 않는다.
+# 기본값(true)은 이전과 같은 조회·파일을 만든다 - 과거 진단 결과와의 비교를 위해 기본은 바꾸지 않는다.
 run_dir=$1
 event_id=$2
 app1_pid=$3
@@ -11,6 +14,7 @@ app1=${6:-http://127.0.0.1:18080/actuator/prometheus}
 app2=${7:-http://127.0.0.1:18081/actuator/prometheus}
 container=${MYSQL_CONTAINER:-givemeticon-mysql}
 database=${COUPON_ADMISSION_LOADTEST_DB:-givemeticon_coupon_admission_loadtest}
+lock_introspection=${MONITOR_LOCK_INTROSPECTION:-true}
 mkdir -p "$run_dir/prometheus" "$run_dir/locks"
 
 printf 'timestamp_utc,app,active,idle,total,max,pending\n' > "$run_dir/hikari.csv"
@@ -46,19 +50,26 @@ gc_values() {
   jstat -gcutil "$pid" 1 1 2>/dev/null | tail -1 | awk '{printf "%s,%s,%s,%s,%s", $7,$8,$9,$10,$13}'
 }
 
+lock_wait_rows_query='SELECT COUNT(*) FROM performance_schema.data_lock_waits; '
+[[ "$lock_introspection" == false ]] && lock_wait_rows_query=''
+
 while true; do
   timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   sample_app app1 "$app1" "$timestamp"
   sample_app app2 "$app2" "$timestamp"
 
-  docker exec "$container" sh -lc "export MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\"; exec mysql -uroot -Nse \"SELECT COUNT(*), SUM(status='PENDING') FROM $database.coupon_application WHERE event_id=$event_id; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_waits'; SELECT COUNT(*) FROM performance_schema.data_lock_waits; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_os_log_written'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_written'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_reads'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_writes';\"" \
+  docker exec "$container" sh -lc "export MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\"; exec mysql -uroot -Nse \"SELECT COUNT(*), SUM(status='PENDING') FROM $database.coupon_application WHERE event_id=$event_id; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_waits'; ${lock_wait_rows_query}SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_os_log_written'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_written'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_reads'; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_writes';\"" \
     > "$run_dir/.mysql-sample" 2>>"$run_dir/monitor-errors.log" || true
   if [[ -s "$run_dir/.mysql-sample" ]]; then
     values=($(cat "$run_dir/.mysql-sample"))
+    # 조회를 뺀 경우 data_lock_wait_rows 자리(인덱스 3)에 빈 값을 끼워 뒤 컬럼 인덱스가 밀리지 않게 한다.
+    [[ "$lock_introspection" == false ]] && values=("${values[@]:0:3}" "" "${values[@]:3}")
     printf '%s,%s,%s,%s,%s,%s,%s,%s,%s\n' "$timestamp" "${values[0]:-}" "${values[1]:-}" "${values[2]:-}" "${values[3]:-}" "${values[4]:-}" "${values[5]:-}" "${values[6]:-}" "${values[7]:-}" >> "$run_dir/mysql.csv"
   fi
-  docker exec "$container" sh -lc 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot --batch --skip-column-names -e "SELECT NOW(6), waiting_pid, blocking_pid, locked_table, locked_index, wait_age_secs, waiting_query, blocking_query FROM sys.innodb_lock_waits;"' \
-    > "$run_dir/locks/${timestamp}.tsv" 2>>"$run_dir/monitor-errors.log" || true
+  if [[ "$lock_introspection" != false ]]; then
+    docker exec "$container" sh -lc 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot --batch --skip-column-names -e "SELECT NOW(6), waiting_pid, blocking_pid, locked_table, locked_index, wait_age_secs, waiting_query, blocking_query FROM sys.innodb_lock_waits;"' \
+      > "$run_dir/locks/${timestamp}.tsv" 2>>"$run_dir/monitor-errors.log" || true
+  fi
 
   stats=$(docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}}' "$container" 2>/dev/null || true)
   mysql_cpu=$(printf '%s' "$stats" | awk -F, '{gsub("%","",$2); print $2}')

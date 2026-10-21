@@ -181,6 +181,8 @@ run_one() {
   mkdir -p "$run_dir"
   printf 'run_id=%s\nkind=%s\nevent_id=%s\nmember_id_start=%s\nrate=%s\nduration=%s\nduplicate_rate=%s\npoll_budget_ms=%s\nstarted_at_utc=%s\n' \
     "$run_id" "$kind" "$event_id" "$member_start" "$run_rate" "$run_duration" "$dup_rate" "$poll_budget" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$run_dir/run.env"
+  # monitor-admission.sh는 이 값을 환경에서 상속해 읽는다(별도 인자 없음). 기본 true = 무거운 잠금 조회 포함.
+  echo "monitor_lock_introspection=${MONITOR_LOCK_INTROSPECTION:-true}" >> "$run_dir/run.env"
   scrape_snapshot_with_retry "$run_dir" app1 "http://127.0.0.1:$port_a/actuator/prometheus" "$run_dir/app1-before.prom" || true
   scrape_snapshot_with_retry "$run_dir" app2 "http://127.0.0.1:$port_b/actuator/prometheus" "$run_dir/app2-before.prom" || true
 

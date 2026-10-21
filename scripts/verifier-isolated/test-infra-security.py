@@ -28,6 +28,10 @@ elif a[0]=="stop" and os.environ.get("STOP_FAIL"): sys.exit(25)
 elif a[0]=="ps": print("test-mysql")
 elif a[0]=="exec" and "printenv" in a: print("sensitive-test-value")
 elif a[0]=="logs": print("ready for connections port: 3306  MySQL")
+elif a[0]=="exec" and any("Innodb_row_lock_waits" in x for x in a):
+ q=[x for x in a if "Innodb_row_lock_waits" in x][0]
+ print("11\\t22")
+ for i in range(q.count("SELECT")-1): print(33+11*i)
 elif a[0]=="exec" and "-i" in a:
  first=True
  for line in sys.stdin:
@@ -318,6 +322,59 @@ class SecurityTests(unittest.TestCase):
                 p.communicate()
         self.assert_pairs_within_request_window("fast-mysql-locks.csv")
         self.assertIn("lock sampler: skipped=1 late_discarded=1", err)
+
+    OLD_MONITOR_QUERY = (
+        "export MYSQL_PWD=\"$MYSQL_ROOT_PASSWORD\"; exec mysql -uroot -Nse \"SELECT COUNT(*), SUM(status='PENDING') FROM "
+        "testdb.coupon_application WHERE event_id=7; SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE "
+        "VARIABLE_NAME='Innodb_row_lock_waits'; SELECT COUNT(*) FROM performance_schema.data_lock_waits; SELECT VARIABLE_VALUE "
+        "FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_os_log_written'; SELECT VARIABLE_VALUE FROM "
+        "performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_written'; SELECT VARIABLE_VALUE FROM "
+        "performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_reads'; SELECT VARIABLE_VALUE FROM "
+        "performance_schema.global_status WHERE VARIABLE_NAME='Innodb_data_writes';\"")
+
+    def run_monitor(self, **extra_env):
+        """Run monitor-admission.sh for one full sampling pass (gc.csv is its last write), then stop it. Returns the run dir."""
+        run_dir = self.path / "monitor-run"
+        env = dict(self.env, MYSQL_CONTAINER="test-mysql", COUPON_ADMISSION_LOADTEST_DB="testdb", **extra_env)
+        p = subprocess.Popen(["bash", str(ROOT.parent / "coupon-admission/monitor-admission.sh"), str(run_dir), "7",
+                              "999999", "999998", "999997", "http://127.0.0.1:1/p", "http://127.0.0.1:1/p"],
+                             env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             start_new_session=True)
+        try:
+            self.wait_for(lambda: len((run_dir / "gc.csv").read_text().splitlines()) > 1
+                          if (run_dir / "gc.csv").exists() else False, "monitor sampling pass did not finish")
+        finally:
+            os.killpg(p.pid, signal.SIGKILL)
+            p.wait()
+        return run_dir
+
+    def monitor_mysql_calls(self):
+        return [c for c in self.calls() if c[0] == "exec" and any("Innodb_row_lock_waits" in x for x in c)]
+
+    def test_monitor_default_keeps_lock_introspection(self):
+        run_dir = self.run_monitor()
+        everything = json.dumps(self.calls())
+        self.assertIn("sys.innodb_lock_waits", everything)
+        self.assertIn("performance_schema.data_lock_waits", everything)
+        # the default command is byte-for-byte the one the monitor used before the switch existed
+        self.assertEqual(self.monitor_mysql_calls()[0][-1], self.OLD_MONITOR_QUERY)
+        self.assertEqual(self.lines("monitor-run/mysql.csv")[1].split(",", 1)[1], "11,22,33,44,55,66,77,88")
+        self.assertTrue(list((run_dir / "locks").glob("*.tsv")))
+
+    def test_monitor_can_disable_lock_introspection(self):
+        run_dir = self.run_monitor(MONITOR_LOCK_INTROSPECTION="false")
+        everything = json.dumps(self.calls())
+        self.assertNotIn("sys.innodb_lock_waits", everything)
+        self.assertNotIn("data_lock_waits", everything)
+        self.assertEqual(list((run_dir / "locks").glob("*.tsv")), [])
+
+    def test_monitor_disabled_keeps_mysql_csv_columns_aligned(self):
+        self.run_monitor(MONITOR_LOCK_INTROSPECTION="false")
+        rows = self.lines("monitor-run/mysql.csv")
+        self.assertEqual(rows[0], "timestamp_utc,applications,pending,innodb_row_lock_waits,data_lock_wait_rows,"
+                                  "innodb_os_log_written,innodb_data_written,innodb_data_reads,innodb_data_writes")
+        # only data_lock_wait_rows is empty; every other column keeps its own value
+        self.assertEqual(rows[1].split(",", 1)[1], "11,22,33,,44,55,66,77")
 
 if __name__ == "__main__":
     unittest.main()
