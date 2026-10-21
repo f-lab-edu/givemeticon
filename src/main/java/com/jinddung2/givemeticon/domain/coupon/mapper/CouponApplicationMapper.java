@@ -5,7 +5,6 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Mapper
@@ -33,9 +32,6 @@ public interface CouponApplicationMapper {
 
     /** 발급 워커가 폴링할 행사 목록: 처리할 PENDING이 남아있는 행사 ID다. */
     List<Long> findDistinctPendingEventIds();
-
-    /** 계측 전용: 행사별 PENDING 잔량. 각 행은 event_id, pending 키를 가진다. */
-    List<Map<String, Object>> countPendingByEvent();
 
     /** 조건부 갱신(WHERE status='PENDING')이라 이미 확정된 행을 덮어쓰지 않는다. */
     int markIssued(@Param("applicationId") long applicationId);

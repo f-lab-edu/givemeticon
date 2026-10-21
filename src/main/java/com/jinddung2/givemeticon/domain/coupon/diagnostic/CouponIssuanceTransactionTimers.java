@@ -13,8 +13,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * 발급 워커 트랜잭션(단건·묶음 공용)의 계측이다. 이름 규칙은 접수 계측(CouponAdmissionTransactionTimers)과
  * 같다 - coupon.issuance.transaction{outcome}, coupon.issuance.batch.size.
  *
- * 처리할 PENDING이 없어 아무 일도 하지 않고 커밋된 폴링(드레인 루프의 마지막 호출)은 기록하지 않는다 -
- * 기록하면 발급 지연 분포가 빈 폴링으로 희석된다. 롤백은 일을 했는지와 무관하게 기록한다.
+ * outcome은 committed(신청을 처리하고 커밋) / empty(처리할 PENDING이 없어 커밋된 폴링) / rolled_back이다.
+ * 빈 폴링도 행사 행 잠금을 먼저 잡으므로 버리지 않고 empty로 남긴다 - 분석 쪽에서 outcome으로 거를 수 있다.
  * 계측 실패는 발급 트랜잭션에 영향을 주지 않도록 모두 삼킨다.
  */
 @Slf4j
@@ -32,13 +32,11 @@ public class CouponIssuanceTransactionTimers {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                     @Override
                     public void afterCompletion(int status) {
-                        boolean committed = status == STATUS_COMMITTED;
-                        if (committed && !tracker.worked) {
-                            return;
-                        }
+                        String outcome = status != STATUS_COMMITTED ? "rolled_back"
+                                : tracker.worked ? "committed" : "empty";
                         sample.stop(Timer.builder("coupon.issuance.transaction")
-                                .description("행사 잠금부터 발급 트랜잭션 종료까지(처리할 신청이 없던 빈 폴링 제외)")
-                                .tag("outcome", committed ? "committed" : "rolled_back")
+                                .description("행사 잠금부터 발급 트랜잭션 종료까지(empty = 처리할 신청이 없던 빈 폴링)")
+                                .tag("outcome", outcome)
                                 .publishPercentileHistogram()
                                 .register(meterRegistry));
                     }

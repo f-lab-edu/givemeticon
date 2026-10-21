@@ -30,7 +30,13 @@ elif a[0]=="exec" and "printenv" in a: print("sensitive-test-value")
 elif a[0]=="logs": print("ready for connections port: 3306  MySQL")
 elif a[0]=="exec" and "-i" in a:
  for line in sys.stdin:
-  print("1000\\t1\\t0\\t1",flush=True)
+  if "performance_schema" in line:
+   mode=os.environ.get("LOCK_MODE","ok")
+   if mode=="exit": sys.exit(0)
+   if mode=="silent": continue
+   print("1000\\t5\\t30\\t0",flush=True)
+  elif os.environ.get("DB_MODE")=="silent": continue
+  else: print("1000\\t1\\t0\\t1",flush=True)
 """
 
 class SecurityTests(unittest.TestCase):
@@ -131,7 +137,8 @@ class SecurityTests(unittest.TestCase):
         gradle = repo / "gradlew"
         gradle.write_text("#!/bin/sh\nexit 17\n")
         gradle.chmod(0o755)
-        result = subprocess.run(["bash", str(runner)], cwd=repo,
+        # stdin must not be inherited: the fake `docker exec -i` reads it and would block on an open terminal/pipe.
+        result = subprocess.run(["bash", str(runner)], cwd=repo, stdin=subprocess.DEVNULL,
                                 env=dict(self.env, MYSQL_CONTAINER="test-mysql",
                                          REPORT_ROOT=str(self.path / "results")),
                                 capture_output=True, text=True)
@@ -148,7 +155,7 @@ class SecurityTests(unittest.TestCase):
         end = source.index("\n}", start) + 2
         function = source[start:end]
         subprocess.run(["bash", "-c", function + '\ncontainer=test-mysql; docker_mysql testdb --batch -e "SELECT 1"'],
-                       env=self.env, check=True, capture_output=True)
+                       env=self.env, check=True, capture_output=True, stdin=subprocess.DEVNULL)
         calls = self.calls()
         self.assertEqual(len(calls), 1)
         self.assertIn('export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"', " ".join(calls[0]))
@@ -172,32 +179,107 @@ class SecurityTests(unittest.TestCase):
         self.assertIn("1 0.1 100 java", out.read_text())
         self.assertNotIn("sensitive-test-value", out.read_text())
 
-    def test_sampler_uses_container_env_and_records_db(self):
-        p = subprocess.Popen(["python3", "-B", str(ROOT / "fast-sampler.py"),
-                              str(self.path), "test-mysql", "testdb", "1", "1", "1", "0.01"],
-                             env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    def start_sampler(self, **extra_env):
+        return subprocess.Popen(["python3", "-B", str(ROOT / "fast-sampler.py"),
+                                 str(self.path), "test-mysql", "testdb", "1", "1", "1", "0.01"],
+                                env=dict(self.env, **extra_env), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    def stop_sampler(self, p):
+        """SIGTERM then require exit within 5s; returns (returncode, stderr)."""
         try:
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline:
-                f = self.path / "fast-db.csv"
-                if f.exists() and len(f.read_text().splitlines()) > 1:
-                    break
-                time.sleep(0.02)
-            else:
-                self.fail("DB sample not recorded")
             p.send_signal(signal.SIGTERM)
             _, err = p.communicate(timeout=5)
-            self.assertEqual(p.returncode, 0, err.decode())
+            return p.returncode, err.decode()
         finally:
             if p.poll() is None:
                 p.kill()
                 p.communicate()
-        calls = self.calls()
-        self.assertEqual(len(calls), 1)
-        self.assertIn('export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"', " ".join(calls[0]))
-        self.assertNotIn("printenv", calls[0])
-        self.assertNotIn("sensitive-test-value", json.dumps(calls))
-        self.assertNotIn("-e", calls[0])
+
+    def lines(self, name):
+        f = self.path / name
+        return f.read_text().splitlines() if f.exists() else []
+
+    def wait_for(self, predicate, what):
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if predicate():
+                return
+            time.sleep(0.02)
+        self.fail(what)
+
+    def test_sampler_uses_container_env_and_records_db(self):
+        p = self.start_sampler()
+        try:
+            self.wait_for(lambda: len(self.lines("fast-db.csv")) > 1, "DB sample not recorded")
+            rc, err = self.stop_sampler(p)
+            self.assertEqual(rc, 0, err)
+        finally:
+            if p.poll() is None:
+                p.kill()
+                p.communicate()
+        calls = [c for c in self.calls() if c[0] == "exec" and "-i" in c]
+        # one session for fast-db.csv and a separate one for lock metrics
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            self.assertIn('export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"', " ".join(call))
+            self.assertNotIn("printenv", call)
+            self.assertNotIn("-e", call)
+        self.assertNotIn("sensitive-test-value", json.dumps(self.calls()))
+
+    def test_lock_sampler_records_locks(self):
+        p = self.start_sampler(LOCK_MODE="ok")
+        try:
+            self.wait_for(lambda: len(self.lines("fast-mysql-locks.csv")) > 1, "lock sample not recorded")
+            rc, err = self.stop_sampler(p)
+            self.assertEqual(rc, 0, err)
+        finally:
+            if p.poll() is None:
+                p.kill()
+                p.communicate()
+        rows = self.lines("fast-mysql-locks.csv")
+        self.assertEqual(rows[0], "host_before_ms,host_after_ms,server_ms,row_lock_waits,row_lock_time_ms,data_lock_waits")
+        self.assertTrue(rows[1].endswith(",1000,5,30,0"), rows[1])
+
+    def test_lock_failure_does_not_stop_db_sampling(self):
+        p = self.start_sampler(LOCK_MODE="exit")
+        try:
+            self.wait_for(lambda: len(self.lines("fast-db.csv")) > 2, "DB sample not recorded")
+            first = len(self.lines("fast-db.csv"))
+            time.sleep(0.5)
+            self.assertGreater(len(self.lines("fast-db.csv")), first, "fast-db.csv stopped growing after lock session ended")
+            rc, err = self.stop_sampler(p)
+            self.assertEqual(rc, 0, err)
+        finally:
+            if p.poll() is None:
+                p.kill()
+                p.communicate()
+        self.assertIn("lock sampler stopped", err)
+        self.assertEqual(len(self.lines("fast-mysql-locks.csv")), 1)  # header only
+        self.assertNotIn("performance_schema", err)
+
+    def test_silent_lock_session_still_terminates(self):
+        p = self.start_sampler(LOCK_MODE="silent")
+        try:
+            self.wait_for(lambda: len(self.lines("fast-db.csv")) > 1, "DB sample not recorded")
+            rc, err = self.stop_sampler(p)
+            self.assertEqual(rc, 0, err)
+        finally:
+            if p.poll() is None:
+                p.kill()
+                p.communicate()
+        self.assertEqual(len(self.lines("fast-mysql-locks.csv")), 1)  # no fabricated samples
+
+    def test_silent_db_session_still_terminates(self):
+        p = self.start_sampler(DB_MODE="silent")
+        try:
+            self.wait_for(lambda: len(self.lines("fast-mysql-locks.csv")) > 1, "lock sample not recorded")
+            rc, err = self.stop_sampler(p)
+            self.assertEqual(rc, 0, err)
+        finally:
+            if p.poll() is None:
+                p.kill()
+                p.communicate()
+        self.assertEqual(len(self.lines("fast-db.csv")), 1)  # header only, no fabricated samples
 
 if __name__ == "__main__":
     unittest.main()

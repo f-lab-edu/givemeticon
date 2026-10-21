@@ -1,6 +1,11 @@
 package com.jinddung2.givemeticon.domain.coupon.diagnostic;
 
+import com.jinddung2.givemeticon.domain.coupon.domain.CouponEvent;
 import com.jinddung2.givemeticon.domain.coupon.mapper.CouponApplicationMapper;
+import com.jinddung2.givemeticon.domain.coupon.mapper.CouponAwardMapper;
+import com.jinddung2.givemeticon.domain.coupon.mapper.CouponEventMapper;
+import com.jinddung2.givemeticon.domain.coupon.service.CouponEventIssuanceBatchTransactionService;
+import com.jinddung2.givemeticon.domain.coupon.service.CouponEventIssuanceTransactionService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -9,9 +14,11 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -40,15 +47,17 @@ class CouponIssuanceMetricsTest {
     }
 
     @Test
-    @DisplayName("처리할 신청이 없던 빈 폴링 커밋은 기록하지 않는다")
-    void skipsIdlePoll() {
+    @DisplayName("처리할 신청이 없던 빈 폴링 커밋은 outcome=empty로 기록하고 batch.size는 남기지 않는다")
+    void recordsEmptyPoll() {
         CouponIssuanceTransactionTimers timers = new CouponIssuanceTransactionTimers(registry);
         TransactionSynchronizationManager.initSynchronization();
 
         timers.begin();
         complete(TransactionSynchronization.STATUS_COMMITTED);
 
-        assertThat(registry.find("coupon.issuance.transaction").timers()).isEmpty();
+        assertThat(registry.get("coupon.issuance.transaction").tag("outcome", "empty").timer().count()).isEqualTo(1);
+        assertThat(registry.find("coupon.issuance.transaction").tag("outcome", "committed").timer()).isNull();
+        assertThat(registry.find("coupon.issuance.batch.size").summary()).isNull();
     }
 
     @Test
@@ -75,30 +84,43 @@ class CouponIssuanceMetricsTest {
     }
 
     @Test
-    @DisplayName("PENDING 잔량 게이지는 행사별로 값을 갖고, 사라진 행사는 0으로 내려가며, 조회 실패 시 직전 값을 유지한다")
-    void pendingGauge() {
-        CouponApplicationMapper mapper = mock(CouponApplicationMapper.class);
-        CouponIssuancePendingGauge gauge = new CouponIssuancePendingGauge(mapper, registry);
-        when(mapper.countPendingByEvent()).thenReturn(
-                List.of(Map.of("event_id", 7L, "pending", 120L), Map.of("event_id", 8L, "pending", 3L)));
+    @DisplayName("단건 발급 서비스: 빈 폴링은 행사 잠금 뒤 false를 돌려주고 outcome=empty로 1회만 기록된다")
+    void singleServiceEmptyPoll() {
+        CouponEventMapper eventMapper = mock(CouponEventMapper.class);
+        CouponApplicationMapper applicationMapper = mock(CouponApplicationMapper.class);
+        when(eventMapper.findByIdForUpdate(1L)).thenReturn(Optional.of(mock(CouponEvent.class)));
+        when(applicationMapper.findFirstPendingForUpdate(1L)).thenReturn(Optional.empty());
+        CouponEventIssuanceTransactionService service = new CouponEventIssuanceTransactionService(
+                eventMapper, applicationMapper, mock(CouponAwardMapper.class), new CouponIssuanceTransactionTimers(registry));
+        TransactionSynchronizationManager.initSynchronization();
 
-        gauge.refresh();
+        assertThat(service.processNext(1L)).isFalse();
+        complete(TransactionSynchronization.STATUS_COMMITTED);
 
-        assertThat(pending(7)).isEqualTo(120.0);
-        assertThat(pending(8)).isEqualTo(3.0);
-
-        when(mapper.countPendingByEvent()).thenReturn(List.of(Map.of("event_id", 7L, "pending", 40L)));
-        gauge.refresh();
-        assertThat(pending(7)).isEqualTo(40.0);
-        assertThat(pending(8)).isZero();
-
-        when(mapper.countPendingByEvent()).thenThrow(new IllegalStateException("db down"));
-        gauge.refresh();
-        assertThat(pending(7)).isEqualTo(40.0);
+        assertEmptyOnly();
     }
 
-    private double pending(long eventId) {
-        return registry.get("coupon.issuance.pending").tag("event_id", String.valueOf(eventId)).gauge().value();
+    @Test
+    @DisplayName("묶음 발급 서비스: 빈 폴링은 행사 잠금 뒤 false를 돌려주고 outcome=empty로 1회만 기록된다")
+    void batchServiceEmptyPoll() {
+        CouponEventMapper eventMapper = mock(CouponEventMapper.class);
+        CouponApplicationMapper applicationMapper = mock(CouponApplicationMapper.class);
+        when(eventMapper.findByIdForUpdate(1L)).thenReturn(Optional.of(mock(CouponEvent.class)));
+        when(applicationMapper.findPendingForUpdate(anyLong(), anyInt())).thenReturn(List.of());
+        CouponEventIssuanceBatchTransactionService service = new CouponEventIssuanceBatchTransactionService(
+                eventMapper, applicationMapper, mock(CouponAwardMapper.class), new CouponIssuanceTransactionTimers(registry));
+        TransactionSynchronizationManager.initSynchronization();
+
+        assertThat(service.processNext(1L)).isFalse();
+        complete(TransactionSynchronization.STATUS_COMMITTED);
+
+        assertEmptyOnly();
+    }
+
+    private void assertEmptyOnly() {
+        assertThat(registry.get("coupon.issuance.transaction").tag("outcome", "empty").timer().count()).isEqualTo(1);
+        assertThat(registry.find("coupon.issuance.transaction").tag("outcome", "committed").timer()).isNull();
+        assertThat(registry.find("coupon.issuance.batch.size").summary()).isNull();
     }
 
     private void complete(int status) {

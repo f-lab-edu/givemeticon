@@ -7,11 +7,11 @@
     server_ms - (before+after)/2 가 시계 offset 추정치(오차 ±(after-before)/2)다.
   - 쿠폰 지표: 두 앱의 coupon_admission_*, coupon_issuance_* (히스토그램 _bucket 제외) 전 시리즈를 fast-coupon-prom.csv 로 기록
       host_ms,app,series,value   (series = 지표명{태그}, 예: caller/outcome 태그별 select_for_update _count/_sum/_max)
-  - MySQL 락: 같은 상주 세션에서 Innodb_row_lock_waits/Innodb_row_lock_time(ms)/performance_schema.data_lock_waits 건수를
-    fast-mysql-locks.csv 로 기록   (performance_schema 가 켜져 있어야 한다)
+  - MySQL 락: fast-db.csv 세션과 분리된 별도 mysql 세션·스레드에서 Innodb_row_lock_waits/Innodb_row_lock_time(ms, 누적)/
+    performance_schema.data_lock_waits 건수를 fast-mysql-locks.csv 로 기록. 이 조회가 실패해도 fast-db.csv 기록은 계속된다.
 SIGTERM 으로 종료한다. 비밀번호는 컨테이너 env 에서 읽어 인자/로그에 노출하지 않는다.
 """
-import csv, re, signal, subprocess, sys, threading, time, urllib.request
+import csv, queue, re, signal, subprocess, sys, threading, time, urllib.request
 
 run_dir, container, database, event_id, pa, pb = sys.argv[1:7]
 interval = float(sys.argv[7]) if len(sys.argv) > 7 else 0.2
@@ -56,36 +56,89 @@ def db_loop():
                           'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot --unbuffered --batch --skip-column-names "$1"',
                           "sh", database], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                          stderr=subprocess.DEVNULL, text=True, bufsize=1)
+    # 응답 없는 mysql 세션에서 readline이 무기한 막혀 SIGTERM 뒤에도 종료하지 못하는 일을 막기 위해
+    # reader 스레드가 줄을 큐에 넣고, 여기서는 타임아웃을 두고 기다린다(lock_loop와 같은 구조).
+    lines = queue.Queue()
+    def reader():
+        for l in p.stdout: lines.put(l)
+        lines.put(None)
+    threading.Thread(target=reader, daemon=True).start()
     q = (f"SELECT CAST(UNIX_TIMESTAMP(NOW(6))*1000 AS UNSIGNED), IFNULL(SUM(status IN ('ISSUED','SOLD_OUT')),0), "
          f"IFNULL(SUM(status IN ('PENDING','CHECKING')),0), COUNT(*) FROM coupon_application WHERE event_id={int(event_id)};\n")
+    f = open(f"{run_dir}/fast-db.csv", "w", newline=""); w = csv.writer(f)
+    w.writerow(["host_before_ms", "host_after_ms", "server_ms", "final_visible", "unresolved", "total"])
+    try:
+        while not stop.is_set():
+            t0 = time.time(); b = int(t0 * 1000)
+            p.stdin.write(q); p.stdin.flush()
+            try:
+                line = lines.get(timeout=1.0)
+            except queue.Empty:
+                continue  # 이 표본은 건너뛴다(값을 만들지 않는다)
+            if line is None:
+                print("db sampler stopped: mysql session ended", file=sys.stderr); break
+            a = int(time.time() * 1000)
+            parts = line.strip().split("\t")
+            if len(parts) == 4: w.writerow([b, a] + parts)
+            f.flush()
+            stop.wait(max(0, interval - (time.time() - t0)))
+    except (BrokenPipeError, ValueError) as e:
+        print(f"db sampler stopped: {type(e).__name__}", file=sys.stderr)
+    finally:
+        f.close()
+        try: p.stdin.close()
+        except (BrokenPipeError, ValueError): pass
+        p.terminate()
+
+def lock_loop():
+    """InnoDB 락 지표 전용 스레드. fast-db.csv 세션과 별도의 mysql 프로세스를 쓰므로, 이 조회가 실패하거나
+    (performance_schema 권한·버전 문제 등) 멈춰도 db_loop·prom_loop에 영향이 없다.
+    Innodb_row_lock_time은 밀리초 단위 누적값이다(차분은 분석 단계에서)."""
     lock_q = ("SELECT CAST(UNIX_TIMESTAMP(NOW(6))*1000 AS UNSIGNED), "
               "(SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_waits'), "
               "(SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='Innodb_row_lock_time'), "
               "(SELECT COUNT(*) FROM performance_schema.data_lock_waits);\n")
-    f = open(f"{run_dir}/fast-db.csv", "w", newline=""); w = csv.writer(f)
-    lf = open(f"{run_dir}/fast-mysql-locks.csv", "w", newline=""); lw = csv.writer(lf)
-    lw.writerow(["host_before_ms", "host_after_ms", "server_ms", "row_lock_waits", "row_lock_time_ms", "data_lock_waits"])
-    w.writerow(["host_before_ms", "host_after_ms", "server_ms", "final_visible", "unresolved", "total"])
-    while not stop.is_set():
-        t0 = time.time(); b = int(t0 * 1000)
-        p.stdin.write(q); p.stdin.flush()
-        line = p.stdout.readline()
-        a = int(time.time() * 1000)
-        parts = line.strip().split("\t")
-        if len(parts) == 4: w.writerow([b, a] + parts)
+    f = None; p = None
+    try:
+        f = open(f"{run_dir}/fast-mysql-locks.csv", "w", newline=""); w = csv.writer(f)
+        w.writerow(["host_before_ms", "host_after_ms", "server_ms", "row_lock_waits", "row_lock_time_ms", "data_lock_waits"])
         f.flush()
-        # 락 지표는 별도 문장이지만 같은 세션·같은 주기다. 쿼리가 실패하면(performance_schema 비활성 등)
-        # mysql 세션이 끝나므로 EOF에서 루프를 멈춘다 - 이때까지의 기록은 보존된다.
-        lb = int(time.time() * 1000)
-        p.stdin.write(lock_q); p.stdin.flush()
-        lline = p.stdout.readline()
-        la = int(time.time() * 1000)
-        if not lline: break
-        lparts = lline.strip().split("\t")
-        if len(lparts) == 4: lw.writerow([lb, la] + lparts)
-        lf.flush()
-        stop.wait(max(0, interval - (time.time() - t0)))
-    f.close(); lf.close(); p.stdin.close(); p.terminate()
+        p = subprocess.Popen(["docker", "exec", "-i", container, "sh", "-c",
+                              'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mysql -uroot --unbuffered --batch --skip-column-names "$1"',
+                              "sh", database], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL, text=True, bufsize=1)
+        lines = queue.Queue()
+        def reader():
+            for l in p.stdout: lines.put(l)
+            lines.put(None)  # EOF sentinel
+        threading.Thread(target=reader, daemon=True).start()
+        while not stop.is_set():
+            t0 = time.time(); b = int(t0 * 1000)
+            p.stdin.write(lock_q); p.stdin.flush()
+            try:
+                line = lines.get(timeout=1.0)
+            except queue.Empty:
+                continue  # 응답이 없으면 이 표본은 건너뛴다(값을 만들지 않는다)
+            if line is None:
+                print("lock sampler stopped: mysql session ended", file=sys.stderr); break
+            a = int(time.time() * 1000)
+            parts = line.strip().split("\t")
+            if len(parts) == 4: w.writerow([b, a] + parts)
+            f.flush()
+            stop.wait(max(0, interval - (time.time() - t0)))
+    except Exception as e:
+        print(f"lock sampler stopped: {type(e).__name__}", file=sys.stderr)
+    finally:
+        if f is not None: f.close()
+        if p is not None:
+            try: p.stdin.close()
+            except Exception: pass
+            p.terminate()
 
-ts = [threading.Thread(target=prom_loop), threading.Thread(target=db_loop)]
-[t.start() for t in ts]; [t.join() for t in ts]
+# 데몬 스레드 + 유한 join: 어떤 mysql 세션이 멈춰도 SIGTERM 뒤 프로세스가 무기한 대기하지 않는다.
+ts = [threading.Thread(target=fn, daemon=True) for fn in (prom_loop, db_loop, lock_loop)]
+[t.start() for t in ts]
+while not stop.is_set():
+    stop.wait(0.5)
+for t in ts:
+    t.join(timeout=3)
