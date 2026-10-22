@@ -10,10 +10,10 @@ import java.util.Optional;
 public interface CouponEventMapper {
     Optional<CouponEvent> findByIdForUpdate(@Param("eventId") long eventId);
 
-    int markOpen(@Param("eventId") long eventId);
+    /** 잠금 없는 읽기다. 접수는 순번 카운터 행을 잠근 뒤 이 쿼리로 행사 정보를 읽는다(ADR-006). */
+    Optional<CouponEvent> findById(@Param("eventId") long eventId);
 
-    int updateNextAcceptanceSequence(@Param("eventId") long eventId,
-                                     @Param("nextAcceptanceSequence") long nextAcceptanceSequence);
+    int markOpen(@Param("eventId") long eventId);
 
     /**
      * 발급 워커 전용: 준비 수량 조건(issued_quantity &lt; total_quantity)을 만족할 때만 1 증가시키고,

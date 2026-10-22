@@ -3,13 +3,24 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponEventMapper">
+    <sql id="columns">
+        id, public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points,
+        issued_quantity, settings_locked_at, created_at, updated_at, closed_at,
+        UTC_TIMESTAMP(6) AS db_now
+    </sql>
+
     <select id="findByIdForUpdate" resultType="CouponEvent">
-        SELECT id, public_id, status, starts_at_utc, total_quantity, high_quantity, high_points, normal_points,
-               next_acceptance_sequence, issued_quantity, settings_locked_at, created_at, updated_at, closed_at,
-               UTC_TIMESTAMP(6) AS db_now
+        SELECT <include refid="columns"/>
         FROM coupon_event
         WHERE id = #{eventId}
         FOR UPDATE
+    </select>
+
+    <!-- 잠금 없는 읽기다. 접수는 순번 카운터 행을 잠근 뒤 이 쿼리로 상태·시작 시각·수량을 읽는다(ADR-006). -->
+    <select id="findById" resultType="CouponEvent">
+        SELECT <include refid="columns"/>
+        FROM coupon_event
+        WHERE id = #{eventId}
     </select>
 
     <update id="markOpen">
@@ -17,13 +28,6 @@
         SET status = 'OPEN', updated_at = UTC_TIMESTAMP(6)
         WHERE id = #{eventId}
           AND status = 'SCHEDULED'
-    </update>
-
-    <update id="updateNextAcceptanceSequence">
-        UPDATE coupon_event
-        SET next_acceptance_sequence = #{nextAcceptanceSequence},
-            updated_at = UTC_TIMESTAMP(6)
-        WHERE id = #{eventId}
     </update>
 
     <!-- WHERE의 issued_quantity &lt; total_quantity가 재고 조건부 차감이다. 이 UPDATE만으로 증가와

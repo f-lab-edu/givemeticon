@@ -1,5 +1,6 @@
 package com.jinddung2.givemeticon.domain.coupon.service;
 
+import com.jinddung2.givemeticon.domain.coupon.diagnostic.CouponIssuanceTransactionTimers;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponApplication;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponAward;
 import com.jinddung2.givemeticon.domain.coupon.domain.CouponEvent;
@@ -56,10 +57,12 @@ public class CouponEventIssuanceBatchTransactionService implements CouponIssuanc
     private final CouponEventMapper couponEventMapper;
     private final CouponApplicationMapper couponApplicationMapper;
     private final CouponAwardMapper couponAwardMapper;
+    private final CouponIssuanceTransactionTimers timers;
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public boolean processNext(long eventId) {
+        CouponIssuanceTransactionTimers.Tracker tracker = timers.begin();
         CouponEvent event = couponEventMapper.findByIdForUpdate(eventId)
                 .orElseThrow(CouponEventNotFoundException::new);
 
@@ -67,6 +70,7 @@ public class CouponEventIssuanceBatchTransactionService implements CouponIssuanc
         if (batch.isEmpty()) {
             return false;
         }
+        tracker.markWorked(batch.size());
 
         List<Long> soldOutIds = new ArrayList<>();
         List<CouponApplication> issueCandidates = new ArrayList<>();

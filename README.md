@@ -8,7 +8,7 @@ Codex / Claude Code의 Agent Orchestrator 설치·실행 방법은 [멀티 에�
 
 ---
 <div>
-    <img src="https://img.shields.io/badge/Java17-red?style=for-the-badge&logo=Java&logoColor=white"/> 
+    <img src="https://img.shields.io/badge/Java21-red?style=for-the-badge&logo=Java&logoColor=white"/> 
     <img src="https://img.shields.io/badge/spring boot-brightgreen?style=for-the-badge&logo=spring boot&logoColor=white"/>
     <img src="https://img.shields.io/badge/MyBatis-000000?style=for-the-badge&logo=MyBatis&logoColor=white">
     <img src="https://img.shields.io/badge/amazon_rds-%23%23527FFF?style=for-the-badge&logo=amazon_rds&logoColor=white"/>

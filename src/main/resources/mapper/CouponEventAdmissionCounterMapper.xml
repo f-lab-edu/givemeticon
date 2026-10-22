@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jinddung2.givemeticon.domain.coupon.mapper.CouponEventAdmissionCounterMapper">
+    <select id="findByEventIdForUpdate" resultType="long">
+        SELECT next_acceptance_sequence
+        FROM coupon_event_admission_counter
+        WHERE event_id = #{eventId}
+        FOR UPDATE
+    </select>
+
+    <update id="updateNextAcceptanceSequence">
+        UPDATE coupon_event_admission_counter
+        SET next_acceptance_sequence = #{nextAcceptanceSequence},
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE event_id = #{eventId}
+    </update>
+</mapper>

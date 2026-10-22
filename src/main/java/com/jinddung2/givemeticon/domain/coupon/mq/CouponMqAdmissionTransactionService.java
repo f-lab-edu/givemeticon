@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CouponMqAdmissionTransactionService {
     private final CouponEventMapper events;
+    private final CouponEventAdmissionCounterMapper counters;
     private final CouponMqControlMapper controls;
     private final CouponMqAttemptMapper attempts;
     private final CouponApplicationMapper applications;
@@ -25,15 +26,29 @@ public class CouponMqAdmissionTransactionService {
     public record BatchResult(List<Action> actions, boolean paused) { }
     public static class Paused extends RuntimeException { }
 
-    /** Return crosses the Spring transaction proxy: callers may ACK only after this return. */
+    /**
+     * Return crosses the Spring transaction proxy: callers may ACK only after this return.
+     *
+     * Lock order (ADR-006): admission counter row, then coupon_mq_control. Readiness locks coupon_event, then
+     * coupon_mq_control (CouponMqReadinessTransactionService), and issuance locks coupon_event only, so no path takes
+     * these rows in opposite orders. coupon_event is read without a lock after the counter is held. The V1 admission
+     * rule that closes admission at total_quantity is NOT applied here: valid confirmed backlog is mapped to PENDING
+     * even after CLOSED and the issuance worker records SOLD_OUT (ADR-004).
+     */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public BatchResult accept(long eventId, List<Message> messages) {
         if (messages.isEmpty() || messages.size() > 50) throw new IllegalArgumentException("invalid MQ batch size");
-        var event = events.findByIdForUpdate(eventId).orElseThrow(Paused::new);
+        var counter = counters.findByEventIdForUpdate(eventId);
+        if (counter.isEmpty()) {
+            if (events.findById(eventId).isEmpty()) throw new Paused();
+            throw new IllegalStateException("coupon_event_admission_counter row is missing: eventId=" + eventId);
+        }
+        long lastSequence = counter.get();
+        var event = events.findById(eventId).orElseThrow(Paused::new);
         var control = controls.findForUpdate(eventId).orElseThrow(Paused::new);
         if (control.isIngestPaused()) throw new Paused();
         var actions = new ArrayList<Action>();
-        long next = event.getNextAcceptanceSequence();
+        long next = lastSequence;
         for (Message message : messages) {
             CouponMqProtocol.Payload payload;
             byte[] canonical;
@@ -68,7 +83,7 @@ public class CouponMqAdmissionTransactionService {
                 if (existing.isEmpty()) {
                     next = Math.addExact(next, 1);
                     if (applications.insert(CouponApplication.pending(eventId, payload.memberId(), next)) != 1
-                            || events.updateNextAcceptanceSequence(eventId, next) != 1) {
+                            || counters.updateNextAcceptanceSequence(eventId, next) != 1) {
                         throw new IllegalStateException("MQ admission write failed");
                     }
                 }
