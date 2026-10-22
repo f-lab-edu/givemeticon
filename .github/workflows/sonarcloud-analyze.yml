@@ -27,8 +27,8 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v2
         with:
-          java-version: '19'
-          distribution: 'adopt'
+          java-version: '21'
+          distribution: 'temurin'
 
       # sonar-gradle 플러그인이 Java 21+를 요구하는데 위 "Set up JDK" 스텝은 19를 설치해
       # ./gradlew sonar가 항상 "Java 19 is not supported" 로 즉시 실패하고 있다
