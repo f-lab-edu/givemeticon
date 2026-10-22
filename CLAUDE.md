@@ -18,7 +18,6 @@ Korean gifticon marketplace backend. Spring Boot app in `src/`, Gradle build at 
 * `docs/db/legacy-schema.sql` — DDL for the legacy tables that the Flyway migrations assume already exist. Run it once on an empty schema before the first app start. `docs/config/application-coupon-mq.yml.example` — template for the `coupon.mq.*` keys of the `coupon-mq` profile. Update these only when the task asks.
 * `scripts/verifier-isolated/verifier-loadtest-config.yml` — dummy config read by `VerifierHarnessConfigurationTest`. It is the only file in `scripts/`; the load-test scripts were removed. Do not delete it while that test exists.
 * `observability/` — Prometheus scrape config and Grafana dashboards/provisioning.
-* No docker-compose files are tracked. Local MySQL/Redis/Kafka for integration tests are set up outside the repo (`build.gradle` still mentions `docker-compose.infra.yml`, which does not exist here).
 * `codestyle/` — Naver checkstyle and IntelliJ formatter rules. Follow them; do not reformat files you did not change.
 
 ## Commands (from repo root)
