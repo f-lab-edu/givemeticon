@@ -16,6 +16,18 @@
         SELECT total_quantity FROM coupon_event WHERE id = #{eventId}
     </select>
 
+    <resultMap id="couponStockMap" type="com.jinddung2.couponlab.coupon.model.CouponStock">
+        <constructor>
+            <idArg column="id" javaType="long"/>
+            <arg column="total_quantity" javaType="int"/>
+            <arg column="remaining_quantity" javaType="int"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectForUpdate" resultMap="couponStockMap">
+        SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = #{eventId} FOR UPDATE
+    </select>
+
     <update id="decrementRemaining">
         UPDATE coupon_event SET remaining_quantity = remaining_quantity - 1 WHERE id = #{eventId}
     </update>
