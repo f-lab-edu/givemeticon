@@ -11,7 +11,12 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 status=$(git status --porcelain -- coupon-lab)
 touched=false
 [ -z "$status" ] || touched=true
-if git log -1 --name-only --format= 2>/dev/null | grep -q '^coupon-lab/'; then touched=true; fi
+if git rev-parse --verify --quiet origin/develop >/dev/null; then
+    # commits of this branch that are not on develop
+    [ -z "$(git diff --name-only origin/develop...HEAD -- coupon-lab)" ] || touched=true
+elif git log -1 --name-only --format= 2>/dev/null | grep -q '^coupon-lab/'; then
+    touched=true
+fi
 [ "$touched" = true ] || exit 0
 
 block() { echo "$1" >&2; exit 2; }

@@ -69,11 +69,16 @@ fi
 hook require-verify-on-stop.sh '{"stop_hook_active":false}'
 rc_verified=$rc
 msg_verified=$out
+# "touched" must not depend on what this branch contains, so force it with a temporary change
+touch_backup=$(mktemp)
+cp "$touch_file" "$touch_backup"
+echo "# smoke" >>"$touch_file"
 moved_unit=$(mktemp)
 mv build/verify/unit.json "$moved_unit" 2>/dev/null
 hook require-verify-on-stop.sh '{"stop_hook_active":false}'
 rc_missing=$rc
 restore_unit
+restore_touched
 if [ "$rc_verified" -eq 0 ] && [ "$rc_missing" -eq 2 ]; then
     ok "3 require-verify-on-stop: exit 0 with clean tree and verified unit.json, exit 2 without it, unit.json restored"
 else
