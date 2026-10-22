@@ -8,6 +8,8 @@
 # Exit codes: 0 PASS, 1 FAIL, 2 usage/config error, 4 TIMEOUT, 5 BUILD_ERROR, 6 NO_TESTS.
 set -euo pipefail
 
+command -v python3 >/dev/null || { echo "python3 required" >&2; exit 2; }
+
 BUNDLES="consistency load bottleneck recovery fairness"
 
 usage() {
@@ -55,7 +57,8 @@ case "$mode" in
 esac
 
 sha=$(git rev-parse --short HEAD 2>/dev/null) || { echo "not a git repository" >&2; exit 2; }
-if [ -n "$(git status --porcelain -- . 2>/dev/null)" ]; then dirty=true; else dirty=false; fi
+# Untracked files under evidence/ are this script's own output; they must not make later runs dirty.
+if [ -n "$(git status --porcelain -- . 2>/dev/null | grep -v '^?? coupon-lab/evidence/' || true)" ]; then dirty=true; else dirty=false; fi
 
 mkdir -p build/verify
 log="build/verify/$tier.log"
