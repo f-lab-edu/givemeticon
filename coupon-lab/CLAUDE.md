@@ -17,7 +17,7 @@ test bundle: consistency, load, bottleneck, recovery, fairness.
 
 ## Environment
 * Testcontainers requires Docker. If Docker is unavailable, report it; do not fall back to an
-  external database.
+  external database. Requires Testcontainers >= 1.21.4 for Docker Engine 29+.
 
 ## Reporting
 * End every task with the `builder-report` skill.

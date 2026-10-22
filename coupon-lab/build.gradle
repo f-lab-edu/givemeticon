@@ -15,6 +15,9 @@ java {
     }
 }
 
+// Boot 3.3.5 manages Testcontainers 1.19.8, which cannot talk to Docker Engine 29 (minimum API 1.44).
+ext['testcontainers.version'] = '1.21.4'
+
 repositories {
     mavenCentral()
 }
