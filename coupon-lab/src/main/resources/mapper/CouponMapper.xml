@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jinddung2.couponlab.coupon.mapper.CouponMapper">
+
+    <insert id="insertEvent" parameterType="com.jinddung2.couponlab.coupon.model.CouponEvent"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO coupon_event (name, total_quantity, remaining_quantity, created_at)
+        VALUES (#{name}, #{totalQuantity}, #{totalQuantity}, NOW(6))
+    </insert>
+
+    <select id="selectRemaining" resultType="java.lang.Integer">
+        SELECT remaining_quantity FROM coupon_event WHERE id = #{eventId}
+    </select>
+
+    <select id="selectTotal" resultType="java.lang.Integer">
+        SELECT total_quantity FROM coupon_event WHERE id = #{eventId}
+    </select>
+
+    <update id="decrementRemaining">
+        UPDATE coupon_event SET remaining_quantity = remaining_quantity - 1 WHERE id = #{eventId}
+    </update>
+
+    <insert id="insertIssue">
+        INSERT INTO coupon_issue (event_id, member_id, seq, created_at)
+        VALUES (#{eventId}, #{memberId}, #{seq}, NOW(6))
+    </insert>
+</mapper>

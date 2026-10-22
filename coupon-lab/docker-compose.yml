@@ -1,0 +1,12 @@
+# For running the app by hand only; the tests start their own MySQL through Testcontainers.
+#   export COUPON_LAB_DB_PASSWORD=...
+#   docker compose up -d
+#   COUPON_LAB_DB_URL=jdbc:mysql://localhost:13306/coupon_lab COUPON_LAB_DB_USER=root ./gradlew bootRun
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_DATABASE: coupon_lab
+      MYSQL_ROOT_PASSWORD: ${COUPON_LAB_DB_PASSWORD:?set COUPON_LAB_DB_PASSWORD}

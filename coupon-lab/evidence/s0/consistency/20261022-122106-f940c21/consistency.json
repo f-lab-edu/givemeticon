@@ -1,0 +1,111 @@
+{
+  "test" : "A",
+  "stage" : "s0",
+  "repetitions" : 10,
+  "threads" : 1000,
+  "total_quantity" : 100,
+  "runs" : [ {
+    "run" : 1,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 909
+  }, {
+    "run" : 2,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 785
+  }, {
+    "run" : 3,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 751
+  }, {
+    "run" : 4,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 594
+  }, {
+    "run" : 5,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 566
+  }, {
+    "run" : 6,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 797
+  }, {
+    "run" : 7,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 712
+  }, {
+    "run" : 8,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 620
+  }, {
+    "run" : 9,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 578
+  }, {
+    "run" : 10,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 532
+  } ],
+  "summary" : {
+    "runs_broken" : 10,
+    "max_over_issue" : 7,
+    "max_dup_members" : 0
+  },
+  "env" : {
+    "java" : "21.0.5",
+    "spring_boot" : "3.3.5",
+    "mysql_image" : "mysql:8.0",
+    "hikari_pool_size" : 10,
+    "cpu" : 8,
+    "os" : "Mac OS X 26.3.1 aarch64"
+  }
+}
