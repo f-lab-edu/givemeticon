@@ -1,0 +1,60 @@
+import java.time.Duration
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.5'
+    id 'io.spring.dependency-management' version '1.1.6'
+}
+
+group = 'com.jinddung2'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:mysql'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform {
+        excludeTags 'consistency', 'load', 'bottleneck', 'recovery', 'fairness'
+    }
+    timeout = Duration.ofMinutes(15)
+    // verify.sh must always report a fresh run, never a cached result.
+    outputs.upToDateWhen { false }
+}
+
+// ./gradlew bundleTest -Pbundle=<tag> -Pstage=<sN>
+tasks.register('bundleTest', Test) {
+    description = 'Runs one tagged test bundle against the stage given by -Pstage.'
+    group = 'verification'
+    def bundle = project.findProperty('bundle')
+    def stage = project.findProperty('stage') ?: 's0'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        if (bundle) {
+            includeTags bundle.toString()
+        }
+    }
+    doFirst {
+        if (!bundle) {
+            throw new GradleException('bundleTest requires -Pbundle=<tag>')
+        }
+    }
+    systemProperty 'coupon.strategy', stage.toString()
+    timeout = Duration.ofMinutes(30)
+    outputs.upToDateWhen { false }
+}
