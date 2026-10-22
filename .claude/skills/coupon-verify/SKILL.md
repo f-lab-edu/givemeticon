@@ -1,9 +1,9 @@
 ---
-name: verify
+name: coupon-verify
 description: Run coupon-lab verification through scripts/verify.sh (compile, unit, bundle), read the VERIFY line and exit code, and classify any failure as code, test or environment.
 ---
 
-# verify
+# coupon-verify
 
 Run from `coupon-lab/`. Never call `./gradlew test` directly; only `scripts/verify.sh` produces results that count.
 
