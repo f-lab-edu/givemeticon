@@ -1,0 +1,39 @@
+# application-coupon-mq.yml 샘플 (값은 모두 placeholder)
+#
+# 사용법
+#   1. 이 파일을 givemeticon-config 서브모듈 루트에 application-coupon-mq.yml 로 복사해 값을 채운다.
+#      (build.gradle 의 copyFiles 가 givemeticon-config/*.yml 을 src/main/resources 로 복사한다.)
+#   2. `coupon-mq` 프로파일을 함께 켠다. 예) SPRING_PROFILES_ACTIVE=local,coupon-mq
+#      프로파일이 꺼져 있으면 CouponMqConfiguration 과 관련 빈이 등록되지 않으므로 이 값들은 읽히지 않는다.
+#
+# 주의
+#   - 비밀번호 등 실제 값은 서브모듈(비공개)에만 둔다. 이 샘플에는 실제 값을 넣지 않는다.
+#   - 아래 키는 모두 기본값이 없다. 하나라도 빠지면 coupon-mq 프로파일 기동이 실패한다.
+#   - 이 파일은 .yml.example 이라 .gitignore(application-*.yml)와 copyFiles(*.yml) 대상이 아니다.
+
+coupon:
+  mq:
+    # 쿠폰 이벤트 ID (long). exchange/queue 이름이 이 값으로 결정된다.
+    #   exchange: coupon.mq.<event-id>
+    #   queue   : coupon.mq.<event-id>.main
+    #   parking : coupon.mq.<event-id>.parking
+    # 이벤트마다 고유한 값을 쓴다. 다른 이벤트와 겹치면 토폴로지/정책 검증이 어긋난다.
+    event-id: 0
+
+    # RabbitMQ 호스트. 리터럴 IPv4(예: 10.0.0.5)만 허용한다. 호스트명, localhost, IPv6 는 기동 시 거부된다.
+    host: 0.0.0.0
+
+    # AMQP 포트 (기본 RabbitMQ 5672, 로컬 격리 브로커는 README 의 loopback 포트를 따른다)
+    port: 5672
+
+    # 브로커 vhost
+    vhost: /
+
+    # AMQP 접속과 management API(HTTP Basic) 인증에 같은 계정을 사용한다.
+    # 이 계정은 큐/exchange 선언 및 management API 조회 권한이 필요하다.
+    username: CHANGE_ME
+    password: CHANGE_ME
+
+    # RabbitMQ management API 의 base URL. 뒤에 "/api" 를 붙이지 않는다(코드가 "/api/..." 를 덧붙인다).
+    # 연결/읽기 타임아웃은 각각 1초다. 브로커 버전은 4.3.6 이어야 readiness 검증을 통과한다.
+    management-url: http://0.0.0.0:15672
