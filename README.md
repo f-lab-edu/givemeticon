@@ -21,60 +21,10 @@ Codex / Claude Code의 Agent Orchestrator 설치·실행 방법은 [멀티 에�
     <img src="https://img.shields.io/badge/github_actions-%232088FF?style=for-the-badge&logo=github%20actions&logoColor=white"/>
 </div>
 
-## Local coupon MQ (configuration only)
+## Coupon MQ 설정
 
-앱 설정 샘플(`coupon-mq` 프로파일의 `coupon.mq.*` 키)은
+`coupon-mq` 프로파일의 `coupon.mq.*` 키 샘플은
 [`docs/config/application-coupon-mq.yml.example`](docs/config/application-coupon-mq.yml.example)를 참고한다.
-
-Use Docker Compose v2.24+ and Python 3 with the already-local ARM64 image pins in
-`docker-compose.coupon-mq.yml`. Set the **live** base-file directory explicitly;
-never substitute a worktree copy of the base files when targeting existing local services.
-
-```bash
-export LIVE_COMPOSE_DIR=/absolute/path/to/live/givemeticon
-export MQ_PRIVATE_DIR=/absolute/private/path/outside/git/coupon-mq
-export AO_SESSION_ID=your-owning-session
-scripts/local/coupon-mq-compose.sh prepare
-scripts/local/coupon-mq-compose.sh config
-# Only after separate resource/start authorization and Root preflight:
-scripts/local/coupon-mq-compose.sh broker
-```
-
-`prepare` preserves generated credentials (directory0700, files0600); do not print
-resolved Compose configuration or private files. The launcher always uses project
-`givemeticon`, both explicit live base files and this overlay, targeting only
-`mq-rabbit` with `--no-deps --no-recreate --pull never`. Do not use unqualified
-`up`/`down`, orphan removal, existing-service recreation or volume deletion.
-Root must verify local pins, new-name/volume ownership, free loopback ports and
-current Docker VM headroom before starting anything. Do not overlap the fault campaign.
-
-The new broker uses loopback35672/35673,1024MiB/1CPU and a512MiB memory watermark.
-The optional `coupon-mq-app` profile declares a new768MiB/1CPU MySQL,128MiB/.25CPU
-Redis and two512MiB/.75CPU apps (loopback35801/35802); no extra swap or JDWP.
-The full ceiling is2944MiB/3.75CPU, with at least1GiB additional current VM headroom.
-The first validation remains bounded to3600s including120s owned-service shutdown;
-this script is configuration/targeting, not a lifetime watchdog or shutdown grant.
-The dedicated ordinary bridge defaults host binding to127.0.0.1; it is not an egress boundary.
-
-App startup is deliberately blocked by the launcher in this phase. Before enabling
-it, verify an explicit existing JAR's SHA-256 and source provenance, bootstrap the
-**new** database with the full legacy schema, normal Flyway migrations and synthetic
-users/events, and verify genuine password/session authentication. The partial
-`mysql-coupon-schema.sql` and historical fault fixtures are insufficient substitutes.
-Do not import production data or bypass Flyway. No implicit build/download is provided.
-
-After separately authorized creation of the new prerequisites, `bind-endpoints`
-verifies their immutable IDs and dedicated network ID and writes private literal IPv4
-bindings. Regenerate them after recreation. Both apps must use that new Redis for
-mail/coupon Redisson, generic Redis and a shared new Spring Session namespace.
-Supply `MQ_APP_JAR` and the owned `COUPON_MQ_EVENT_ID` explicitly when app startup is subsequently enabled. Before either
-app starts, declare durable quorum/SAC topology and converge exact main policy
-(including `delayed-retry-type=disabled`) and empty parking effective policy. Then
-verify current-generation startup, genuine beans/session behavior and two consumers
-within90s. Broker readiness alone proves none of these app prerequisites.
-The app configuration excludes Kafka listeners and routes SMTP/OAuth/bootstrap to
-loopback failures; existing Kafka and all other services remain unchanged.
-No k6 service, load, functional/recovery completion or performance claim is included.
 
 ## 📖 프로토타입
 
