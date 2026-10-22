@@ -15,9 +15,10 @@ Korean gifticon marketplace backend. Spring Boot app in `src/`, Gradle build at 
 * `src/main/java/com/jinddung2/givemeticon/` — Java 21 (Temurin), Spring Boot 3.3, MyBatis (XML mappers in `src/main/resources/mapper/`), Flyway (`src/main/resources/db/migration/`), MySQL, Redis x2 (mail, coupon), Kafka, RabbitMQ.
 * `src/test/` — unit tests, plus `@Tag("integration")` tests that need local infra.
 * `givemeticon-config/` — private config submodule. Its `*.yml` files are copied into resources at build time. Never edit it, never print its values, never commit copies of it.
-* `docs/` — ADRs, decision records, experiment results. Historical evidence; update only when the task asks.
-* `scripts/` — load-test and verification scripts for coupon flows. Do not run load tests unless the task asks.
-* `docker-compose.infra.yml` — local MySQL/Redis/Kafka. `docker-compose.coupon-mq.yml` — RabbitMQ for coupon MQ.
+* `docs/db/legacy-schema.sql` — DDL for the legacy tables that the Flyway migrations assume already exist. Run it once on an empty schema before the first app start. `docs/config/application-coupon-mq.yml.example` — template for the `coupon.mq.*` keys of the `coupon-mq` profile. Update these only when the task asks.
+* `scripts/verifier-isolated/verifier-loadtest-config.yml` — dummy config read by `VerifierHarnessConfigurationTest`. It is the only file in `scripts/`; the load-test scripts were removed. Do not delete it while that test exists.
+* `observability/` — Prometheus scrape config and Grafana dashboards/provisioning.
+* No docker-compose files are tracked. Local MySQL/Redis/Kafka for integration tests are set up outside the repo (`build.gradle` still mentions `docker-compose.infra.yml`, which does not exist here).
 * `codestyle/` — Naver checkstyle and IntelliJ formatter rules. Follow them; do not reformat files you did not change.
 
 ## Commands (from repo root)
