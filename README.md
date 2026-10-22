@@ -23,6 +23,9 @@ Codex / Claude Code의 Agent Orchestrator 설치·실행 방법은 [멀티 에�
 
 ## Local coupon MQ (configuration only)
 
+앱 설정 샘플(`coupon-mq` 프로파일의 `coupon.mq.*` 키)은
+[`docs/config/application-coupon-mq.yml.example`](docs/config/application-coupon-mq.yml.example)를 참고한다.
+
 Use Docker Compose v2.24+ and Python 3 with the already-local ARM64 image pins in
 `docker-compose.coupon-mq.yml`. Set the **live** base-file directory explicitly;
 never substitute a worktree copy of the base files when targeting existing local services.
