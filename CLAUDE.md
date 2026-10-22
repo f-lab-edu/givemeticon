@@ -12,6 +12,7 @@ Korean gifticon marketplace backend. Spring Boot app in `src/`, Gradle build at 
 
 ## Repository map
 
+* `coupon-lab/` — active work: first-come coupon stages S0..S4 with a shared test bundle. Standalone Gradle project with its own `gradlew`; see `coupon-lab/CLAUDE.md`.
 * `src/main/java/com/jinddung2/givemeticon/` — Java 21 (Temurin), Spring Boot 3.3, MyBatis (XML mappers in `src/main/resources/mapper/`), Flyway (`src/main/resources/db/migration/`), MySQL, Redis x2 (mail, coupon), Kafka, RabbitMQ.
 * `src/test/` — unit tests, plus `@Tag("integration")` tests that need local infra.
 * `givemeticon-config/` — private config submodule. Its `*.yml` files are copied into resources at build time. Never edit it, never print its values, never commit copies of it.
