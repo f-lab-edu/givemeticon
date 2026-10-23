@@ -79,6 +79,119 @@ def write_raw(path, lines):
         f.write("\n".join(lines) + "\n")
 
 
+# A tiny layout whose steps carry enough requests to be classified by achieved_rps (window = 4 s per step).
+MINI = {
+    "warmup": {"rps": 10, "seconds": 2},
+    "transition_seconds": 1,
+    "vus": {"pre_allocated": 5, "max": 50},
+    "profiles": {"mini": {"stock": 1000, "steps": [{"rps": r, "seconds": 5} for r in (10, 20, 40)]}},
+}
+
+
+def mini_window(index):
+    start = MINI["warmup"]["seconds"] + 5 * index
+    return start + 1, start + 5
+
+
+def fast(i, n):
+    return 5.0
+
+
+def with_stalled_tail(i, n):
+    """Median fine, the slowest 10% take 2 s: p95 > 500 ms without queueing."""
+    return 2000.0 if i >= n * 0.9 else 5.0
+
+
+def slow(i, n):
+    return 300.0
+
+
+def mini_lines(steps):
+    """steps: one dict per step with frac (share of the target rate that completes), lat and drops."""
+    lines = [point("http_req_duration", 0.01, 10, status="200", phase="warmup", target_rps="10"),
+             point("coupon_results", 0.01, 1, result="issued", phase="warmup", target_rps="10")]
+    for index, spec in enumerate(steps):
+        rps = MINI["profiles"]["mini"]["steps"][index]["rps"]
+        start, end = mini_window(index)
+        n = int(round(rps * (end - start) * spec.get("frac", 1.0)))
+        lat = spec.get("lat", fast)
+        for i in range(n):
+            lines += request_lines(start + (end - start) * i / float(n), lat(i, n), "measure", rps, "issued")
+        if spec.get("drops"):
+            lines.append(point("dropped_iterations", start + 1, spec["drops"]))
+    return lines
+
+
+class KindTest(unittest.TestCase):
+    def report(self, steps, stats=None):
+        lines = mini_lines(steps)
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            stats_path = None
+            if stats:
+                stats_path = os.path.join(tmp, "stats.jsonl")
+                with open(stats_path, "w", encoding="utf-8") as f:
+                    f.write("\n".join(stats) + "\n")
+            return postprocess.build_report(raw, MINI, "mini", "s0", issued_count(lines), {}, None, stats_path)
+
+    def kinds(self, report):
+        return [s["kind"] for s in report["stages"]]
+
+    def test_everything_ok(self):
+        report = self.report([{}, {}, {}])
+        self.assertEqual(self.kinds(report), ["ok", "ok", "ok"])
+        self.assertEqual(report["sustained_limit_rps"], 40)
+        self.assertEqual(report["stalls"], [])
+        self.assertEqual(report["max_achieved_rps"], {"achieved_rps": 40.0, "target_rps": 40})
+        self.assertEqual(report["limit_rps_first_violation"], "not reached")
+
+    def test_a_stall_is_flagged_but_does_not_cap_the_sustained_limit(self):
+        start, end = mini_window(1)
+        stats = [stat_line(start + 1, "coupon-lab-load-mysql", 101.9), stat_line(start + 2, "coupon-lab-load-app", 75.7)]
+        report = self.report([{}, {"lat": with_stalled_tail}, {}], stats=stats)
+        self.assertEqual(self.kinds(report), ["ok", "stall", "ok"])
+        self.assertEqual(report["sustained_limit_rps"], 40)  # the later ok stage counts
+        self.assertEqual(report["limit_rps_first_violation"], 10)  # the older statistic is capped by the stall
+        self.assertEqual(report["stalls"], [{"target_rps": 20, "p95_ms": report["stages"][1]["p95_ms"],
+                                             "dropped_iterations": 0, "mysql_cpu_pct_max": 101.9,
+                                             "app_cpu_pct_max": 75.7}])
+        self.assertGreater(report["stalls"][0]["p95_ms"], 500)
+        self.assertLess(report["stages"][1]["p50_ms"], 100)
+
+    def test_a_high_median_means_saturated(self):
+        report = self.report([{}, {}, {"lat": slow}])
+        self.assertEqual(self.kinds(report), ["ok", "ok", "saturated"])
+        self.assertEqual(report["sustained_limit_rps"], 20)
+
+    def test_falling_short_of_the_target_rate_means_saturated(self):
+        report = self.report([{}, {"frac": 0.9}, {}])  # 18 of 20 rps completed: 90% < 95%
+        self.assertEqual(self.kinds(report), ["ok", "saturated", "ok"])
+
+    def test_dropped_iterations_with_fast_latency_are_a_stall(self):
+        report = self.report([{}, {"frac": 0.9625, "drops": 3}, {}])  # 77 completed, 3 dropped
+        self.assertEqual(self.kinds(report), ["ok", "stall", "ok"])
+        self.assertGreaterEqual(report["stages"][1]["dropped_ratio"], 0.01)
+        self.assertEqual(report["stalls"][0]["dropped_iterations"], 3)
+
+    def test_max_achieved_may_be_at_a_saturated_stage(self):
+        report = self.report([{}, {}, {"frac": 0.7, "lat": slow}])  # 28 rps achieved at target 40
+        self.assertEqual(report["max_achieved_rps"], {"achieved_rps": 28.0, "target_rps": 40})
+        self.assertEqual(report["sustained_limit_rps"], 20)
+
+    def test_no_ok_stage_gives_no_sustained_limit(self):
+        report = self.report([{"lat": slow}, {"lat": slow}, {"lat": slow}])
+        self.assertIsNone(report["sustained_limit_rps"])
+        # the older statistic only looks at validity, p95 and errors, so it does not see this queueing (p50 300 ms)
+        self.assertEqual(report["limit_rps_first_violation"], "not reached")
+
+    def test_the_sustained_limit_ignores_what_lower_stages_did(self):
+        report = self.report([{"lat": with_stalled_tail}, {}, {}])
+        self.assertEqual(self.kinds(report), ["stall", "ok", "ok"])
+        self.assertEqual(report["sustained_limit_rps"], 40)
+        self.assertTrue(report["validity"]["valid"])  # run validity is unchanged: stage 0 dropped nothing
+
+
 class PostprocessTest(unittest.TestCase):
     def report(self, lines, profile="ramping", db_rows=None, filtered=None):
         with tempfile.TemporaryDirectory() as tmp:
@@ -155,21 +268,21 @@ class PostprocessTest(unittest.TestCase):
         self.assertEqual(stage["p95_ms"], 95.05)
         self.assertEqual(stage["p99_ms"], 99.01)
         self.assertEqual(stage["achieved_rps"], round(100 / 29.0, 1))
-        self.assertEqual(report["limit_rps"], "not reached")
+        self.assertEqual(report["limit_rps_first_violation"], "not reached")
         self.assertTrue(report["validity"]["valid"])
-        self.assertTrue(all(s["valid"] and not s["saturated"] for s in report["stages"]))
+        self.assertTrue(all(s["valid"] and not s["after_first_violation"] for s in report["stages"]))
         self.assertEqual(report["db"]["http_issued"], 1 + 5 * 101)  # warmup + measure + transition
 
     def test_slow_step_is_the_limit_and_everything_after_it_is_saturated(self):
         report = self.report(synthetic(slow_steps={3, 4}))
-        self.assertEqual(report["limit_rps"], 1000)
-        self.assertEqual([s["saturated"] for s in report["stages"]], [False, False, False, True, True])
+        self.assertEqual(report["limit_rps_first_violation"], 1000)
+        self.assertEqual([s["after_first_violation"] for s in report["stages"]], [False, False, False, True, True])
         self.assertTrue(report["validity"]["valid"])  # saturating later stages does not invalidate the run
 
     def test_a_good_stage_after_the_first_bad_one_is_still_saturated(self):
         report = self.report(synthetic(slow_steps={2}))
-        self.assertEqual(report["limit_rps"], 500)
-        self.assertEqual([s["saturated"] for s in report["stages"]], [False, False, True, True, True])
+        self.assertEqual(report["limit_rps_first_violation"], 500)
+        self.assertEqual([s["after_first_violation"] for s in report["stages"]], [False, False, True, True, True])
         self.assertLessEqual(report["stages"][3]["p95_ms"], 500)  # numbers are kept, only flagged
 
     def test_dropped_iterations_make_that_stage_invalid_and_saturated_not_the_run(self):
@@ -178,21 +291,21 @@ class PostprocessTest(unittest.TestCase):
         self.assertEqual(stage["dropped_iterations"], 50)
         self.assertAlmostEqual(stage["dropped_ratio"], 50 / 150, places=5)
         self.assertFalse(stage["valid"])
-        self.assertEqual(report["limit_rps"], 500)
-        self.assertEqual([s["saturated"] for s in report["stages"]], [False, False, True, True, True])
+        self.assertEqual(report["limit_rps_first_violation"], 500)
+        self.assertEqual([s["after_first_violation"] for s in report["stages"]], [False, False, True, True, True])
         self.assertTrue(report["validity"]["valid"])
 
     def test_dropped_iterations_in_the_first_stage_invalidate_the_run(self):
         report = self.report(synthetic(drops={0: 50}))
-        self.assertEqual(report["limit_rps"], "below_min_stage")
+        self.assertEqual(report["limit_rps_first_violation"], "below_min_stage")
         self.assertFalse(report["validity"]["stage0_valid"])
         self.assertFalse(report["validity"]["valid"])
-        self.assertTrue(all(s["saturated"] for s in report["stages"]))
+        self.assertTrue(all(s["after_first_violation"] for s in report["stages"]))
 
     def test_less_than_one_percent_dropped_is_still_valid(self):
         report = self.report(synthetic(drops={0: 1}))  # 1 / 101 < 1%
         self.assertTrue(report["stages"][0]["valid"])
-        self.assertEqual(report["limit_rps"], "not reached")
+        self.assertEqual(report["limit_rps_first_violation"], "not reached")
 
     def test_error_rate_above_one_percent_is_a_violation(self):
         lines = synthetic()
@@ -200,7 +313,7 @@ class PostprocessTest(unittest.TestCase):
         lines += request_lines(start + 1, 10, "measure", 500, "error") * 2  # 2 errors in 102 requests
         report = self.report(lines)
         self.assertAlmostEqual(report["stages"][1]["error_rate"], 2 / 102, places=5)
-        self.assertEqual(report["limit_rps"], 100)
+        self.assertEqual(report["limit_rps_first_violation"], 100)
 
     def test_db_mismatch_makes_the_run_invalid(self):
         lines = synthetic()
@@ -274,7 +387,7 @@ class ReprocessTest(unittest.TestCase):
     def test_old_report_without_layout_uses_profiles_json(self):
         report, tmp = self.reprocess(False, profiles=LAYOUT)
         self.assertEqual(report["stage"], "s1")
-        self.assertEqual(report["limit_rps"], 500)
+        self.assertEqual(report["limit_rps_first_violation"], 500)
         self.assertTrue(report["validity"]["valid"])  # judged by the new rule, not the stored verdict
         self.assertEqual(report["reprocessed_from"], tmp)
         self.assertEqual(report["env"], {"app_cpus": 2, "k6_version": "v2.2.0", "cpu": 8, "os": "Darwin 25.3.0 arm64"})

@@ -10,8 +10,15 @@ issue.js). Dropped iterations carry no tags, so they are assigned to a step by t
 profiles.json anchored at the start of the first request.
 
 Validity is per stage: dropped_iterations / (requests + dropped_iterations) < 1%. A run is valid when its first stage
-is valid and the DB row count matches the 200 responses. limit_rps is the last stage before the first stage that is
-invalid, slower than 500 ms at p95 or above 1% errors; that stage and every later one is marked saturated.
+is valid and the DB row count matches the 200 responses.
+
+Every stage also gets a kind:
+  saturated  achieved_rps < 0.95 * target_rps, or p50 > 100 ms (the system cannot keep up; requests queue)
+  stall      not saturated, but p95 > 500 ms, dropped_ratio >= 1% or error_rate > 1% (p50 is fine: a transient hiccup)
+  ok         otherwise
+sustained_limit_rps is the highest target_rps whose stage is ok, regardless of what lower stages did, so one stall no
+longer sets the limit. limit_rps_first_violation keeps the older statistic (the stage before the first stage that is
+invalid, p95 > 500 ms or error_rate > 1%) for comparison; stages from that one on have after_first_violation = true.
 --reprocess-from re-aggregates an evidence directory (load.json, raw.json.gz, summary.json, stats.jsonl) with the
 current rules; the layout stored in its load.json is used when present, otherwise profiles.json, and only if that
 still describes the same stages.
@@ -36,6 +43,8 @@ from contextlib import ExitStack
 P95_LIMIT_MS = 500.0
 ERROR_RATE_LIMIT = 0.01
 DROPPED_RATIO_LIMIT = 0.01  # per stage
+ACHIEVED_RATIO_MIN = 0.95  # below this share of the target a stage is saturated
+P50_SATURATED_MS = 100.0  # above this median latency a stage is saturated
 WANTED = ('"http_req_duration"', '"coupon_results"', '"dropped_iterations"')
 DEFAULT_PROFILES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "profiles.json")
 
@@ -157,6 +166,20 @@ def read_vus(summary_path, layout):
     return {"max_vus": configured, "vus_max": peak, "vus_peak": peak_active, "vus_max_reached": reached}
 
 
+def classify(stage):
+    """ok | stall | saturated; see the module docstring."""
+    if (stage["p50_ms"] is None
+            or stage["achieved_rps"] < ACHIEVED_RATIO_MIN * stage["target_rps"]
+            or stage["p50_ms"] > P50_SATURATED_MS):
+        return "saturated"
+    if (stage["p95_ms"] is None
+            or stage["p95_ms"] > P95_LIMIT_MS
+            or stage["dropped_ratio"] >= DROPPED_RATIO_LIMIT
+            or (stage["error_rate"] or 0) > ERROR_RATE_LIMIT):
+        return "stall"
+    return "ok"
+
+
 def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, filtered_path=None,
                  stats_path=None, summary_path=None):
     profile = layout["profiles"][profile_name]
@@ -197,20 +220,29 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
             "dropped_iterations": dropped_here,
             "dropped_ratio": round(dropped_ratio, 6),
             "valid": dropped_ratio < DROPPED_RATIO_LIMIT,
-            "saturated": False,
+            "after_first_violation": False,
+            "kind": None,
             "app_cpu_pct_mean": app_mean,
             "app_cpu_pct_max": app_max,
             "mysql_cpu_pct_mean": mysql_mean,
             "mysql_cpu_pct_max": mysql_max,
         })
 
-    limit_rps = "not reached"
+    first_violation = "not reached"
     for index, stage in enumerate(stages):
         if not stage_ok(stage):
-            limit_rps = stages[index - 1]["target_rps"] if index > 0 else "below_min_stage"
+            first_violation = stages[index - 1]["target_rps"] if index > 0 else "below_min_stage"
             for later in stages[index:]:
-                later["saturated"] = True
+                later["after_first_violation"] = True
             break
+
+    for stage in stages:
+        stage["kind"] = classify(stage)
+    ok_rates = [s["target_rps"] for s in stages if s["kind"] == "ok"]
+    best = max(stages, key=lambda s: s["achieved_rps"])
+    stalls = [{"target_rps": s["target_rps"], "p95_ms": s["p95_ms"], "dropped_iterations": s["dropped_iterations"],
+               "mysql_cpu_pct_max": s["mysql_cpu_pct_max"], "app_cpu_pct_max": s["app_cpu_pct_max"]}
+              for s in stages if s["kind"] == "stall"]
 
     http_issued = sum(n for (_, _, result), n in counts.items() if result == "issued")
     match = db_issued_rows == http_issued
@@ -227,7 +259,10 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
             "steps": profile["steps"],
         },
         "stages": stages,
-        "limit_rps": limit_rps,
+        "sustained_limit_rps": max(ok_rates) if ok_rates else None,
+        "max_achieved_rps": {"achieved_rps": best["achieved_rps"], "target_rps": best["target_rps"]},
+        "stalls": stalls,
+        "limit_rps_first_violation": first_violation,
         "db": {"issued_rows": db_issued_rows, "http_issued": http_issued, "match": match},
         "vus": read_vus(summary_path, layout),
         "validity": {
@@ -317,8 +352,9 @@ def main(argv=None):
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
         f.write("\n")
-    print("postprocess: profile=%s stage=%s limit_rps=%s valid=%s" % (
-        report["profile"], report["stage"], report["limit_rps"], str(report["validity"]["valid"]).lower()))
+    print("postprocess: profile=%s stage=%s sustained_limit_rps=%s first_violation=%s stalls=%d valid=%s" % (
+        report["profile"], report["stage"], report["sustained_limit_rps"], report["limit_rps_first_violation"],
+        len(report["stalls"]), str(report["validity"]["valid"]).lower()))
     return 0
 
 

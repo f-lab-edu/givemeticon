@@ -29,7 +29,9 @@
 * 유효성(stage별): `stages[i].valid = dropped_iterations / (requests + dropped_iterations) < 0.01`. 한 단계에서 k6 가 iteration 을 버리기 시작하면 서버가 그 부하를 따라가지 못한다는 신호이므로, 그 단계부터는 측정이 아니라 포화 관찰이다.
   run 유효성(`validity.valid`) = `stages[0].valid && db.match`. 즉 가장 낮은 부하 단계가 깨끗하고 DB 행 수 == 200 응답 수(워밍업 포함)이면 PASS, 아니면 VERIFY 가 FAIL. 뒤쪽 단계가 포화돼도 run 은 무효가 되지 않는다.
   spike 는 단계가 3000rps 하나뿐이라, 서버가 3000rps 를 따라가지 못하면 그 run 은 FAIL 이다.
-* 한계 처리량(`limit_rps`): 단계를 순서대로 보며 `valid` 이고 p95 <= 500ms 이고 error_rate <= 1% 인 마지막 단계의 target_rps. 처음으로 이 조건을 어긴 단계와 그 이후 모든 단계는 `saturated: true`(수치는 그대로 남긴다). 전 단계 통과 시 `not reached`, 첫 단계부터 어기면 `below_min_stage`.
+* stage 종류(`stages[].kind`): `saturated` = 달성률 `achieved_rps < 0.95 * target_rps` 또는 `p50_ms > 100`(따라가지 못해 요청이 줄 서는 상태). `stall` = saturated 가 아니면서 `p95_ms > 500` 또는 `dropped_ratio >= 0.01` 또는 `error_rate > 0.01`(중앙값은 정상인데 꼬리만 튀는 일시 정지). `ok` = 그 외.
+* 한계 처리량: `sustained_limit_rps` = `kind == ok` 인 stage 중 가장 높은 target_rps (낮은 stage 에서 무엇이 있었는지와 무관). 일시 정지 한 번이 한계를 정하지 않는다. 함께 `max_achieved_rps`(최대 달성 처리량과 그때의 target), `stalls`(stall stage 의 target_rps, p95_ms, dropped_iterations, mysql_cpu_pct_max, app_cpu_pct_max)를 기록한다.
+  이전 통계는 비교용으로 `limit_rps_first_violation` 으로 남긴다: 단계를 순서대로 보며 `valid` 이고 p95 <= 500ms 이고 error_rate <= 1% 인 마지막 단계의 target_rps (전 단계 통과 시 `not reached`, 첫 단계부터 어기면 `below_min_stage`). 처음 어긴 단계부터는 `after_first_violation: true`.
 * Evidence: `evidence/<stage>/load/<profile>/<UTC ts>-<sha>[-dirty]/` 의 `load.json`, `summary.json`, `raw.json.gz`. raw.json.gz 는 집계에 쓰는 점(http_req_duration, coupon_results, dropped_iterations)만 남긴 것이다(k6 전체 출력은 요청당 십수 개 메트릭이라 GB 단위).
 * 관측: k6 가 도는 동안 2초마다 `docker stats --no-stream` 으로 app/mysql 컨테이너를 샘플링해 `stats.jsonl` 로 evidence 에 남긴다. `stages[].app_cpu_pct_mean|max`, `mysql_cpu_pct_mean|max` 는 단계별 측정 구간의 CPU% (100 = 코어 1개 전부, cpus 2 이므로 최대 약 200). `vus.vus_max_reached` 는 summary.json 의 `vus_max` 가 설정한 maxVUs(profiles.json `vus.max`)에 닿았는지, 즉 VU 풀이 소진돼 k6 가 iteration 을 버릴 수 있었는지를 보여 준다.
 * 비교 조건: 같은 프로필, 같은 env 블록(cpus, heap, Hikari, k6 버전, 호스트)끼리만 비교한다.

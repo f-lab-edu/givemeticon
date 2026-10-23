@@ -302,8 +302,9 @@ run_load() {
         summary=$(python3 -I -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
-print("limit_rps=%s stage0_dropped_ratio=%s db_issued_rows=%s http_issued=%s valid=%s" % (
-    d["limit_rps"], d["validity"]["stage0_dropped_ratio"], d["db"]["issued_rows"], d["db"]["http_issued"],
+print("sustained_limit_rps=%s first_violation=%s stalls=%d stage0_dropped_ratio=%s db_issued_rows=%s http_issued=%s valid=%s" % (
+    d["sustained_limit_rps"], d["limit_rps_first_violation"], len(d["stalls"]), d["validity"]["stage0_dropped_ratio"],
+    d["db"]["issued_rows"], d["db"]["http_issued"],
     str(d["validity"]["valid"]).lower()))
 print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/load.json")
         echo "run $1/$runs: $(head -n 1 <<<"$summary")"
@@ -369,8 +370,9 @@ run_reprocess() {
     verdict=$(python3 -I -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
-print("limit_rps=%s stage0_dropped_ratio=%s db_issued_rows=%s http_issued=%s valid=%s" % (
-    d["limit_rps"], d["validity"]["stage0_dropped_ratio"], d["db"]["issued_rows"], d["db"]["http_issued"],
+print("sustained_limit_rps=%s first_violation=%s stalls=%d stage0_dropped_ratio=%s db_issued_rows=%s http_issued=%s valid=%s" % (
+    d["sustained_limit_rps"], d["limit_rps_first_violation"], len(d["stalls"]), d["validity"]["stage0_dropped_ratio"],
+    d["db"]["issued_rows"], d["db"]["http_issued"],
     str(d["validity"]["valid"]).lower()))
 print("PASS" if d["validity"]["valid"] else "FAIL")' "$dest/load.json")
     echo "reprocessed $source_dir: $(head -n 1 <<<"$verdict")"
