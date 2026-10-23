@@ -16,6 +16,7 @@ spec.loader.exec_module(postprocess)
 LAYOUT = {
     "warmup": {"rps": 100, "seconds": 15},
     "transition_seconds": 1,
+    "vus": {"pre_allocated": 500, "max": 3000},
     "profiles": {
         "ramping": {"stock": 10000000, "steps": [{"rps": r, "seconds": 30} for r in (100, 500, 1000, 2000, 3000)]},
         "spike": {"stock": 100, "steps": [{"rps": 3000, "seconds": 21}]},
@@ -68,6 +69,11 @@ def synthetic(slow_steps=(), drops=None):
     return lines
 
 
+def stat_line(offset_s, name, cpu):
+    return json.dumps({"time": int(postprocess.parse_time(stamp(offset_s))),
+                       "stat": {"Name": name, "CPUPerc": "%.2f%%" % cpu, "MemUsage": "1GiB / 8GiB"}})
+
+
 def write_raw(path, lines):
     with gzip.open(path, "wt", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
@@ -85,6 +91,52 @@ class PostprocessTest(unittest.TestCase):
                 with gzip.open(filtered, "rt", encoding="utf-8") as f:
                     out["_filtered_lines"] = f.read().splitlines()
             return out
+
+    def report_with(self, lines, stats=None, summary=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            stats_path = summary_path = None
+            if stats is not None:
+                stats_path = os.path.join(tmp, "stats.jsonl")
+                with open(stats_path, "w", encoding="utf-8") as f:
+                    f.write("\n".join(stats) + "\n")
+            if summary is not None:
+                summary_path = os.path.join(tmp, "summary.json")
+                with open(summary_path, "w", encoding="utf-8") as f:
+                    json.dump(summary, f)
+            return postprocess.build_report(raw, LAYOUT, "ramping", "s0", issued_count(lines), {}, None,
+                                            stats_path, summary_path)
+
+    def test_cpu_is_summarised_per_stage_window(self):
+        start, end = window_of("ramping", 1)  # the 500 rps step
+        stats = [stat_line(start + 2, "coupon-lab-load-app", 150.0), stat_line(start + 4, "coupon-lab-load-app", 190.0),
+                 stat_line(start + 2, "coupon-lab-load-mysql", 80.5), stat_line(start + 4, "coupon-lab-load-mysql", 99.5),
+                 stat_line(5, "coupon-lab-load-app", 5.0),  # during warmup: in no stage window
+                 stat_line(end + 1, "coupon-lab-load-app", 5.0),  # after the window
+                 "not json", json.dumps({"time": 1, "stat": {"Name": "other", "CPUPerc": "1%"}})]
+        report = self.report_with(synthetic(), stats=stats)
+        stage = report["stages"][1]
+        self.assertEqual((stage["app_cpu_pct_mean"], stage["app_cpu_pct_max"]), (170.0, 190.0))
+        self.assertEqual((stage["mysql_cpu_pct_mean"], stage["mysql_cpu_pct_max"]), (90.0, 99.5))
+        first = report["stages"][0]
+        self.assertEqual((first["app_cpu_pct_mean"], first["mysql_cpu_pct_max"]), (None, None))
+
+    def test_without_stats_cpu_fields_are_null(self):
+        stage = self.report_with(synthetic())["stages"][0]
+        self.assertIsNone(stage["app_cpu_pct_mean"])
+        self.assertIsNone(stage["mysql_cpu_pct_max"])
+
+    def test_vus_max_reached_compares_the_high_water_mark_with_max_vus(self):
+        def summary(vus_max, vus):
+            return {"metrics": {"vus_max": {"value": vus_max, "min": 500, "max": vus_max},
+                                "vus": {"value": 3, "min": 0, "max": vus}}}
+        reached = self.report_with(synthetic(), summary=summary(3000, 2900))["vus"]
+        self.assertEqual(reached, {"max_vus": 3000, "vus_max": 3000, "vus_peak": 2900, "vus_max_reached": True})
+        spare = self.report_with(synthetic(), summary=summary(1200, 1100))["vus"]
+        self.assertFalse(spare["vus_max_reached"])
+        missing = self.report_with(synthetic())["vus"]
+        self.assertEqual(missing, {"max_vus": 3000, "vus_max": None, "vus_peak": None, "vus_max_reached": None})
 
     def test_parse_time_handles_nanoseconds_and_offsets(self):
         a = postprocess.parse_time("2026-10-23T12:00:00.123456789+09:00")
@@ -187,6 +239,7 @@ class PostprocessTest(unittest.TestCase):
             self.assertEqual(len(rates), len(set(rates)), name)
             self.assertTrue(all(s["seconds"] > real["transition_seconds"] for s in profile["steps"]), name)
             self.assertGreater(profile["stock"], 0, name)
+        self.assertGreaterEqual(real["vus"]["max"], real["vus"]["pre_allocated"])
 
 
 class ReprocessTest(unittest.TestCase):
@@ -194,11 +247,12 @@ class ReprocessTest(unittest.TestCase):
         lines = synthetic(drops={2: 50})
         write_raw(os.path.join(tmp, "raw.json.gz"), lines)
         old = {"test": "B", "profile": "ramping", "stage": "s1", "stock": 10000000,
+               "stages": [{"target_rps": s["rps"]} for s in LAYOUT["profiles"]["ramping"]["steps"]],
                "db": {"issued_rows": issued_count(lines), "http_issued": issued_count(lines), "match": True},
                "validity": {"dropped_ratio": 0.5, "valid": False},
                "env": {"app_cpus": 2, "k6_version": "v2.2.0", "cpu": 8, "os": "Darwin 25.3.0 arm64"}}
         if with_layout:
-            old["layout"] = {"warmup": LAYOUT["warmup"], "transition_seconds": 1,
+            old["layout"] = {"warmup": LAYOUT["warmup"], "transition_seconds": 1, "vus": LAYOUT["vus"],
                              "steps": LAYOUT["profiles"]["ramping"]["steps"]}
         with open(os.path.join(tmp, "load.json"), "w", encoding="utf-8") as f:
             json.dump(old, f)
@@ -225,6 +279,38 @@ class ReprocessTest(unittest.TestCase):
         self.assertEqual(report["reprocessed_from"], tmp)
         self.assertEqual(report["env"], {"app_cpus": 2, "k6_version": "v2.2.0", "cpu": 8, "os": "Darwin 25.3.0 arm64"})
         self.assertEqual(report["db"]["issued_rows"], report["db"]["http_issued"])
+
+    def test_a_run_without_stored_layout_is_not_reprocessed_with_a_retuned_profile(self):
+        retuned = json.loads(json.dumps(LAYOUT))
+        retuned["profiles"]["ramping"]["steps"] = [{"rps": r, "seconds": 30} for r in (100, 200, 300)]
+        with tempfile.TemporaryDirectory() as tmp:
+            self.make_source(tmp, False)
+            with open(os.path.join(tmp, "load.json"), encoding="utf-8") as f:
+                old = json.load(f)
+            old["stages"] = [{"target_rps": r} for r in (100, 500, 1000, 2000, 3000)]
+            with open(os.path.join(tmp, "load.json"), "w", encoding="utf-8") as f:
+                json.dump(old, f)
+            path = os.path.join(tmp, "profiles.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(retuned, f)
+            with self.assertRaises(SystemExit):
+                postprocess.main(["--reprocess-from", tmp, "--profiles", path, "--out", os.path.join(tmp, "new.json")])
+            self.assertFalse(os.path.exists(os.path.join(tmp, "new.json")))
+
+    def test_stats_and_summary_next_to_the_source_are_used(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.make_source(tmp, True)
+            start, _ = window_of("ramping", 0)
+            with open(os.path.join(tmp, "stats.jsonl"), "w", encoding="utf-8") as f:
+                f.write(stat_line(start + 3, "coupon-lab-load-app", 120.0) + "\n")
+            with open(os.path.join(tmp, "summary.json"), "w", encoding="utf-8") as f:
+                json.dump({"metrics": {"vus_max": {"max": 3000}, "vus": {"max": 10}}}, f)
+            out = os.path.join(tmp, "new.json")
+            self.assertEqual(postprocess.main(["--reprocess-from", tmp, "--out", out]), 0)
+            with open(out, encoding="utf-8") as f:
+                report = json.load(f)
+        self.assertEqual(report["stages"][0]["app_cpu_pct_mean"], 120.0)
+        self.assertTrue(report["vus"]["vus_max_reached"])
 
     def test_stored_layout_wins_over_profiles_json(self):
         retuned = json.loads(json.dumps(LAYOUT))

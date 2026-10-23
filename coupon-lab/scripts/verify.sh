@@ -143,16 +143,31 @@ LOAD_PREFIX=coupon-lab-load-
 LOAD_HEALTH_TIMEOUT_S=${LOAD_HEALTH_TIMEOUT_S:-60}
 LOAD_HIKARI_POOL_SIZE=${HIKARI_POOL_SIZE:-10}
 
+# Every 2 s one line per container into <outfile>: {"time": <epoch>, "stat": <docker stats object>}. Run in the
+# background during k6 and killed afterwards; postprocess.py turns it into per-stage CPU figures.
+load_sample_stats() {
+    local out=$1 started now
+    while :; do
+        started=$(date +%s)
+        docker stats --no-stream --format json "${LOAD_PREFIX}app" "${LOAD_PREFIX}mysql" 2>/dev/null | while IFS= read -r line; do
+            [ -z "$line" ] || printf '{"time":%s,"stat":%s}\n' "$(date +%s)" "$line" >>"$out"
+        done
+        now=$(date +%s)
+        [ $((now - started)) -ge 2 ] || sleep $((2 - now + started))
+    done
+}
+
 # verify.sh load: for each run, compose up (app + mysql), seed one event, k6 from the host, postprocess,
 # count issued rows, compose down -v, copy the result to evidence/<stage>/load/<profile>/. Stops at the first run
 # that is not PASS. k6 must be installed on the host and no container other than coupon-lab-load-* may be running.
 run_load() {
     set +e
     local compose=(docker compose -p coupon-lab-load -f docker-compose.load.yml)
-    local compose_up=false run_status="" run_note="" work="" run_evidence=""
+    local compose_up=false run_status="" run_note="" work="" run_evidence="" sampler_pid=""
     local passed=0 failed=0 n evidence_dirs=() failures=()
 
     load_cleanup() {
+        if [ -n "$sampler_pid" ]; then kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""; fi
         [ "$compose_up" = true ] || return 0
         compose_up=false
         "${compose[@]}" down -v --remove-orphans >>"$log" 2>&1 \
@@ -221,10 +236,14 @@ run_load() {
 
         # 4. k6, postprocess, DB check
         echo "run $1/$runs: k6 $profile on $stage, event $event_id, stock $stock"
+        : >"$work/stats.jsonl"
+        load_sample_stats "$work/stats.jsonl" &
+        sampler_pid=$!
         k6 run --out json="$work/raw.json.gz" --summary-export "$work/summary.json" \
             -e BASE_URL=http://127.0.0.1:18080 -e EVENT_ID="$event_id" -e PROFILE="$profile" \
             scripts/load/issue.js >>"$log" 2>&1
         local k6_rc=$?
+        kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""
         if [ "$k6_rc" -ne 0 ]; then
             run_status=BUILD_ERROR; run_note="k6 exited $k6_rc (see $log)"; return
         fi
@@ -239,6 +258,7 @@ run_load() {
         hikari=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=//p')
         python3 -I scripts/load/postprocess.py --raw "$work/raw.json.gz" --profile "$profile" --stage "$stage" \
             --db-issued-rows "$issued_rows" --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
+            --stats "$work/stats.jsonl" --summary "$work/summary.json" \
             --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "jvm_heap=$heap" \
             --env "hikari_pool_size=$hikari" --env "k6_version=$(k6 version 2>/dev/null | head -n 1 | awk '{print $2}')" \
             >>"$log" 2>&1
@@ -270,6 +290,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/load.json")
             mkdir -p "$run_evidence"
             cp "$work/load.json" "$run_evidence/"
             [ ! -f "$work/summary.json" ] || cp "$work/summary.json" "$run_evidence/"
+            [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
             [ ! -f "$work/raw-filtered.json.gz" ] || cp "$work/raw-filtered.json.gz" "$run_evidence/raw.json.gz"
             evidence_dirs+=("$run_evidence")
             echo "run $n/$runs: evidence in $run_evidence"

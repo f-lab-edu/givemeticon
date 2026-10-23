@@ -1,15 +1,18 @@
 {
   "warmup": { "rps": 100, "seconds": 15 },
   "transition_seconds": 1,
+  "vus": { "pre_allocated": 500, "max": 3000 },
   "profiles": {
     "ramping": {
       "stock": 10000000,
       "steps": [
         { "rps": 100, "seconds": 30 },
+        { "rps": 200, "seconds": 30 },
+        { "rps": 300, "seconds": 30 },
+        { "rps": 400, "seconds": 30 },
         { "rps": 500, "seconds": 30 },
-        { "rps": 1000, "seconds": 30 },
-        { "rps": 2000, "seconds": 30 },
-        { "rps": 3000, "seconds": 30 }
+        { "rps": 650, "seconds": 30 },
+        { "rps": 800, "seconds": 30 }
       ]
     },
     "spike": {

@@ -12,8 +12,13 @@ profiles.json anchored at the start of the first request.
 Validity is per stage: dropped_iterations / (requests + dropped_iterations) < 1%. A run is valid when its first stage
 is valid and the DB row count matches the 200 responses. limit_rps is the last stage before the first stage that is
 invalid, slower than 500 ms at p95 or above 1% errors; that stage and every later one is marked saturated.
---reprocess-from re-aggregates an evidence directory (load.json, raw.json.gz, summary.json) with the current rules;
-the layout stored in its load.json is used when present, otherwise profiles.json.
+--reprocess-from re-aggregates an evidence directory (load.json, raw.json.gz, summary.json, stats.jsonl) with the
+current rules; the layout stored in its load.json is used when present, otherwise profiles.json, and only if that
+still describes the same stages.
+
+--stats is the stats.jsonl sampled by verify.sh (one {"time": epoch, "stat": <docker stats object>} per container
+about every 2 s); every stage gets the mean and max CPU% of the app and mysql containers over its measure window
+(100 = one fully used core). --summary is the k6 summary export; it provides the VU high-water mark.
 --filtered-raw keeps just the points this script reads, which is what goes into evidence (the full k6 output
 has a dozen http metrics per request and runs to a gigabyte).
 """
@@ -111,12 +116,55 @@ def stage_ok(stage):
             and stage["error_rate"] <= ERROR_RATE_LIMIT)
 
 
-def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, filtered_path=None):
+def load_stats(path):
+    """stats.jsonl -> {"app": [(epoch, cpu%)], "mysql": [...]}; lines that cannot be read are skipped."""
+    samples = {"app": [], "mysql": []}
+    if not path or not os.path.exists(path):
+        return samples
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            try:
+                item = json.loads(line)
+                name = item["stat"]["Name"]
+                cpu = float(item["stat"]["CPUPerc"].rstrip("%"))
+                when = float(item["time"])
+            except (ValueError, KeyError, TypeError, AttributeError):
+                continue
+            role = "app" if name.endswith("-app") else "mysql" if name.endswith("-mysql") else None
+            if role:
+                samples[role].append((when, cpu))
+    return samples
+
+
+def cpu_summary(samples, window_start, window_end):
+    values = [cpu for when, cpu in samples if window_start <= when < window_end]
+    if not values:
+        return None, None
+    return round(sum(values) / len(values), 1), round(max(values), 1)
+
+
+def read_vus(summary_path, layout):
+    """VU high-water mark from the k6 summary export against the configured maxVUs."""
+    configured = (layout.get("vus") or {}).get("max")
+    reached = peak = peak_active = None
+    if summary_path and os.path.exists(summary_path):
+        with open(summary_path, encoding="utf-8") as f:
+            metrics = json.load(f).get("metrics", {})
+        peak = (metrics.get("vus_max") or {}).get("max")
+        peak_active = (metrics.get("vus") or {}).get("max")
+        if peak is not None and configured is not None:
+            reached = peak >= configured
+    return {"max_vus": configured, "vus_max": peak, "vus_peak": peak_active, "vus_max_reached": reached}
+
+
+def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, filtered_path=None,
+                 stats_path=None, summary_path=None):
     profile = layout["profiles"][profile_name]
     rates = [step["rps"] for step in profile["steps"]]
     if len(set(rates)) != len(rates):
         raise ValueError("target rps must be unique within a profile: %s" % rates)
     latencies, counts, dropped, anchor = collect(raw_path, filtered_path)
+    stats = load_stats(stats_path)
     if anchor is None:
         raise ValueError("no http_req_duration points in " + raw_path)
 
@@ -133,6 +181,8 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         values = sorted(latencies.get(rps, []))
         dropped_here = int(sum(v for t, v in dropped if window_start <= t < window_end))
         dropped_ratio = dropped_here / (requests + dropped_here) if requests + dropped_here else 1.0
+        app_mean, app_max = cpu_summary(stats["app"], window_start, window_end)
+        mysql_mean, mysql_max = cpu_summary(stats["mysql"], window_start, window_end)
         stages.append({
             "target_rps": rps,
             "requests": requests,
@@ -148,6 +198,10 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
             "dropped_ratio": round(dropped_ratio, 6),
             "valid": dropped_ratio < DROPPED_RATIO_LIMIT,
             "saturated": False,
+            "app_cpu_pct_mean": app_mean,
+            "app_cpu_pct_max": app_max,
+            "mysql_cpu_pct_mean": mysql_mean,
+            "mysql_cpu_pct_max": mysql_max,
         })
 
     limit_rps = "not reached"
@@ -169,11 +223,13 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         "layout": {
             "warmup": layout["warmup"],
             "transition_seconds": layout["transition_seconds"],
+            "vus": layout.get("vus"),
             "steps": profile["steps"],
         },
         "stages": stages,
         "limit_rps": limit_rps,
         "db": {"issued_rows": db_issued_rows, "http_issued": http_issued, "match": match},
+        "vus": read_vus(summary_path, layout),
         "validity": {
             "stage0_dropped_ratio": stages[0]["dropped_ratio"],
             "stage0_valid": stages[0]["valid"],
@@ -203,7 +259,7 @@ def layout_from_report(old):
     stored = old.get("layout")
     if not stored:
         return None
-    return {"warmup": stored["warmup"], "transition_seconds": stored["transition_seconds"],
+    return {"warmup": stored["warmup"], "transition_seconds": stored["transition_seconds"], "vus": stored.get("vus"),
             "profiles": {old["profile"]: {"stock": old["stock"], "steps": stored["steps"]}}}
 
 
@@ -217,6 +273,8 @@ def main(argv=None):
     parser.add_argument("--filtered-raw")
     parser.add_argument("--profiles", default=DEFAULT_PROFILES)
     parser.add_argument("--env", action="append", default=[], metavar="KEY=VALUE")
+    parser.add_argument("--stats", metavar="STATS_JSONL")
+    parser.add_argument("--summary", metavar="SUMMARY_JSON")
     parser.add_argument("--reprocess-from", metavar="EVIDENCE_DIR")
     args = parser.parse_args(argv)
 
@@ -233,6 +291,8 @@ def main(argv=None):
         args.db_issued_rows = old["db"]["issued_rows"]
         env_pairs = ["%s=%s" % (k, v) for k, v in old["env"].items()]
         layout = layout_from_report(old)
+        args.stats = os.path.join(source, "stats.jsonl")
+        args.summary = os.path.join(source, "summary.json")
         reprocessed_from = source
     elif None in (args.raw, args.profile, args.stage, args.db_issued_rows):
         parser.error("--raw, --profile, --stage and --db-issued-rows are required without --reprocess-from")
@@ -242,8 +302,16 @@ def main(argv=None):
             layout = json.load(f)
     if args.profile not in layout["profiles"]:
         parser.error("unknown profile: " + args.profile)
+    if reprocessed_from and "layout" not in old:
+        # No layout was stored with that run: profiles.json may have been retuned since, which would silently
+        # apply the wrong step windows to the old data.
+        recorded = [stage["target_rps"] for stage in old.get("stages", [])]
+        current = [step["rps"] for step in layout["profiles"][args.profile]["steps"]]
+        if recorded != current:
+            parser.error("profiles.json no longer matches %s (stages %s, profile now %s); reprocess a run whose "
+                         "load.json stores its layout" % (reprocessed_from, recorded, current))
     report = build_report(args.raw, layout, args.profile, args.stage, args.db_issued_rows,
-                          _env(env_pairs), args.filtered_raw)
+                          _env(env_pairs), args.filtered_raw, args.stats, args.summary)
     if reprocessed_from:
         report["reprocessed_from"] = reprocessed_from
     with open(args.out, "w", encoding="utf-8") as f:
