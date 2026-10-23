@@ -17,6 +17,13 @@ usage() {
     exit 2
 }
 
+# A stage given with --stage must exist on this branch; stop here instead of failing later in the Spring context.
+require_stage_class() {
+    local n=${1#s} found
+    found=$(find src/main/java -type f -name "S${n}CouponIssueService.java" 2>/dev/null | head -n 1 || true)
+    [ -n "$found" ] || { echo "S${n}CouponIssueService not found on this branch" >&2; exit 2; }
+}
+
 [ $# -ge 1 ] || usage
 if [ ! -x ./gradlew ] || [ ! -f settings.gradle ] || ! grep -q "rootProject.name = 'coupon-lab'" settings.gradle; then
     echo "verify.sh must run from the coupon-lab/ directory (its own ./gradlew not found)" >&2
@@ -51,6 +58,7 @@ case "$mode" in
             stage=$2
         fi
         [[ "$stage" =~ ^s[0-9]+$ ]] || { echo "invalid stage: $stage (expected sN)" >&2; exit 2; }
+        require_stage_class "$stage"
         tier="bundle-$bundle"
         ;;
     *) usage ;;
