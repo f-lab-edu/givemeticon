@@ -18,9 +18,9 @@
 
     <resultMap id="couponStockMap" type="com.jinddung2.couponlab.coupon.model.CouponStock">
         <constructor>
-            <idArg column="id" javaType="long"/>
-            <arg column="total_quantity" javaType="int"/>
-            <arg column="remaining_quantity" javaType="int"/>
+            <idArg column="id" javaType="_long"/>
+            <arg column="total_quantity" javaType="_int"/>
+            <arg column="remaining_quantity" javaType="_int"/>
         </constructor>
     </resultMap>
 
