@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Compare saved test-B runs across repetitions and stages. Standard library only.
 
-usage: python3 -I compare.py [--out FILE] <evidence dir | load.json | glob> [...]
+usage: python3 -I compare.py [--out FILE] [--p50-at RPS] <evidence dir | load.json | glob> [...]
 
 Reads the load.json of each run (it must have sustained_limit_rps, i.e. be produced or reprocessed by the current
 postprocess.py) and prints a markdown report, also written to --out:
-  Runs            one row per run: sustained_limit_rps, max_achieved_rps, stalls, run_order, ...
-  Per stage       median and min-max of sustained_limit_rps and max_achieved_rps over the runs of each stage
+  Runs            one row per run: sustained_limit_rps, max_achieved_rps, p50 at one target, stalls, run_order, ...
+  Per stage       median and min-max of sustained_limit_rps, max_achieved_rps and the p50 at that target over the runs
+                  of each stage. The p50 at a mid-range target (--p50-at, default 650) shows where queueing starts even
+                  when both stages still count as ok there.
   Per target_rps  median p95 and achieved rps and the kinds seen at each target, per stage
 Runs must share the profile and the step layout. Runs of one stage that differ in env (for example k6_mode) are
 pooled but listed under the table, because evidence is only comparable across the same env block.
@@ -73,30 +75,40 @@ def env_differences(runs):
     return notes
 
 
-def build_markdown(runs):
+def p50_at(report, target):
+    for stage in report["stages"]:
+        if stage["target_rps"] == target:
+            return stage["p50_ms"]
+    return None
+
+
+def build_markdown(runs, p50_target=650):
     report0 = runs[0]["report"]
     stages = sorted(set(r["report"]["stage"] for r in runs))
     by_stage = dict((s, [r for r in runs if r["report"]["stage"] == s]) for s in stages)
     out = ["# Load test B comparison (profile %s)" % report0["profile"], ""]
 
     out += ["## Runs", "",
-            "| stage | run | k6 | order | sustained_limit_rps | max_achieved_rps (at target) | stalls | first_violation | valid |",
-            "|---|---|---|---|---|---|---|---|---|"]
+            "| stage | run | k6 | order | sustained_limit_rps | max_achieved_rps (at target) | p50@%d ms | stalls | first_violation | valid |" % p50_target,
+            "|---|---|---|---|---|---|---|---|---|---|"]
     for r in runs:
         rep = r["report"]
         best = rep["max_achieved_rps"]
-        out.append("| %s | %s | %s | %s | %s | %s (at %s) | %d | %s | %s |" % (
+        out.append("| %s | %s | %s | %s | %s | %s (at %s) | %s | %d | %s | %s |" % (
             rep["stage"], r["name"], rep["env"].get("k6_mode", "-"), fmt((rep.get("run") or {}).get("run_order")),
-            fmt(rep["sustained_limit_rps"]), fmt(best["achieved_rps"]), fmt(best["target_rps"]), len(rep["stalls"]),
+            fmt(rep["sustained_limit_rps"]), fmt(best["achieved_rps"]), fmt(best["target_rps"]),
+            fmt(p50_at(rep, p50_target), 2), len(rep["stalls"]),
             rep["limit_rps_first_violation"], "yes" if rep["validity"]["valid"] else "no"))
 
     out += ["", "## Per stage (median, min-max over runs)", "",
-            "| stage | n | sustained_limit_rps | max_achieved_rps | stalls (total) |", "|---|---|---|---|---|"]
+            "| stage | n | sustained_limit_rps | max_achieved_rps | p50@%d ms | stalls (total) |" % p50_target,
+            "|---|---|---|---|---|---|"]
     for stage in stages:
         group = [r["report"] for r in by_stage[stage]]
-        out.append("| %s | %d | %s | %s | %d |" % (
+        out.append("| %s | %d | %s | %s | %s | %d |" % (
             stage, len(group), median_range([g["sustained_limit_rps"] for g in group], 0),
-            median_range([g["max_achieved_rps"]["achieved_rps"] for g in group]), sum(len(g["stalls"]) for g in group)))
+            median_range([g["max_achieved_rps"]["achieved_rps"] for g in group]),
+            median_range([p50_at(g, p50_target) for g in group], 2), sum(len(g["stalls"]) for g in group)))
     for stage in stages:
         notes = env_differences(by_stage[stage])
         if notes:
@@ -122,8 +134,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("runs", nargs="+", metavar="EVIDENCE_DIR_OR_GLOB")
     parser.add_argument("--out")
+    parser.add_argument("--p50-at", type=int, default=650, metavar="RPS")
     args = parser.parse_args(argv)
-    text = build_markdown(load_runs(find_reports(args.runs)))
+    text = build_markdown(load_runs(find_reports(args.runs)), args.p50_at)
     sys.stdout.write(text)
     if args.out:
         os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)

@@ -202,6 +202,8 @@ class KindTest(unittest.TestCase):
         self.assertEqual(report["stalls"], [])
         self.assertEqual(report["max_achieved_rps"], {"achieved_rps": 40.0, "target_rps": 40})
         self.assertEqual(report["limit_rps_first_violation"], "not reached")
+        self.assertEqual([s["achieved_ratio"] for s in report["stages"]], [1.0, 1.0, 1.0])
+        self.assertEqual([s["p95_margin_ms"] for s in report["stages"]], [495.0, 495.0, 495.0])  # 5 ms latency
 
     def test_a_stall_is_flagged_but_does_not_cap_the_sustained_limit(self):
         start, end = mini_window(1)
@@ -215,6 +217,7 @@ class KindTest(unittest.TestCase):
                                              "app_cpu_pct_max": 75.7}])
         self.assertGreater(report["stalls"][0]["p95_ms"], 500)
         self.assertLess(report["stages"][1]["p50_ms"], 100)
+        self.assertLess(report["stages"][1]["p95_margin_ms"], 0)  # negative: over the 500 ms line
 
     def test_a_high_median_means_saturated(self):
         report = self.report([{}, {}, {"lat": slow}])
@@ -224,6 +227,7 @@ class KindTest(unittest.TestCase):
     def test_falling_short_of_the_target_rate_means_saturated(self):
         report = self.report([{}, {"frac": 0.9}, {}])  # 18 of 20 rps completed: 90% < 95%
         self.assertEqual(self.kinds(report), ["ok", "saturated", "ok"])
+        self.assertEqual(report["stages"][1]["achieved_ratio"], 0.9)
 
     def test_dropped_iterations_with_fast_latency_are_a_stall(self):
         report = self.report([{}, {"frac": 0.9625, "drops": 3}, {}])  # 77 completed, 3 dropped
@@ -325,6 +329,8 @@ class PostprocessTest(unittest.TestCase):
         self.assertEqual(stage["p95_ms"], 95.05)
         self.assertEqual(stage["p99_ms"], 99.01)
         self.assertEqual(stage["achieved_rps"], round(100 / 29.0, 1))
+        self.assertEqual(stage["achieved_ratio"], round(100 / 29.0 / 100, 4))
+        self.assertEqual(stage["p95_margin_ms"], 404.95)  # 500 - 95.05
         self.assertEqual(report["limit_rps_first_violation"], "not reached")
         self.assertTrue(report["validity"]["valid"])
         self.assertTrue(all(s["valid"] and not s["after_first_violation"] for s in report["stages"]))

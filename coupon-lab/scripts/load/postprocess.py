@@ -16,6 +16,8 @@ Every stage also gets a kind:
   saturated  achieved_rps < 0.95 * target_rps, or p50 > 100 ms (the system cannot keep up; requests queue)
   stall      not saturated, but p95 > 500 ms, dropped_ratio >= 1% or error_rate > 1% (p50 is fine: a transient hiccup)
   ok         otherwise
+achieved_ratio (achieved_rps / target_rps) and p95_margin_ms (500 - p95_ms) show how close a stage was to the
+saturated / stall thresholds; they are not used for classification themselves.
 sustained_limit_rps is the highest target_rps whose stage is ok, regardless of what lower stages did, so one stall no
 longer sets the limit. limit_rps_first_violation keeps the older statistic (the stage before the first stage that is
 invalid, p95 > 500 ms or error_rate > 1%) for comparison; stages from that one on have after_first_violation = true.
@@ -232,12 +234,16 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
             1 for when, ms in gc_pauses if window_start <= when < window_end and ms > GC_PAUSE_LIMIT_MS)
         app_mean, app_max = cpu_summary(stats["app"], window_start, window_end)
         mysql_mean, mysql_max = cpu_summary(stats["mysql"], window_start, window_end)
+        achieved = requests / (window_end - window_start)
+        p95 = _round(percentile(values, 95))
         stages.append({
             "target_rps": rps,
             "requests": requests,
-            "achieved_rps": round(requests / (window_end - window_start), 1),
+            "achieved_rps": round(achieved, 1),
+            "achieved_ratio": round(achieved / rps, 4),
             "p50_ms": _round(percentile(values, 50)),
-            "p95_ms": _round(percentile(values, 95)),
+            "p95_ms": p95,
+            "p95_margin_ms": None if p95 is None else round(P95_LIMIT_MS - p95, 2),
             "p99_ms": _round(percentile(values, 99)),
             "issued": by_result["issued"],
             "sold_out": by_result["sold_out"],
