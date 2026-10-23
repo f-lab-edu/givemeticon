@@ -20,7 +20,8 @@
 ## 테스트 B - 한계 부하 (k6)
 
 * 목적: 같은 환경에서 단계별(S0, S1, ...) 한계 처리량과 지연 분포를 비교한다. 정합성은 테스트 A 가 본다.
-* 실행: `scripts/verify.sh load --stage sN --profile ramping|spike [--runs N]`. 앱과 MySQL 은 `docker-compose.load.yml`(각 cpus 2, JVM `-Xms1g -Xmx1g`, Hikari 10 고정), k6 는 호스트에서 실행한다. 다른 컨테이너가 떠 있으면 실행기가 거부한다(idle machine).
+* 실행: `scripts/verify.sh load --stage sN --profile ramping|spike [--runs N] [--k6 host|container]`. 앱과 MySQL 은 `docker-compose.load.yml`(각 cpus 2, JVM `-Xms1g -Xmx1g`, Hikari 10 고정), k6 는 기본적으로 호스트에서 실행한다. 다른 컨테이너가 떠 있으면 실행기가 거부한다(idle machine).
+  `--k6 container` 는 `$K6_IMAGE`(기본 `grafana/k6:latest`)를 compose 네트워크 안에서 돌려 `http://app:8080` 으로 쏜다(호스트 포트 포워딩 경로 제외). 출력은 바인드 마운트한 `build/load/run-N/` 에 쓰이고, `load.json` 의 `env.k6_mode`(와 container 일 때 `env.k6_image`, `k6_version`)에 기록된다. 호스트 모드와 container 모드의 차이는 네트워크 경로와 k6 가 쓰는 CPU 위치뿐이므로 둘의 achieved_rps 를 비교해 포트 포워딩 경로가 천장인지 확인할 수 있다.
 * 프로필 (`scripts/load/profiles.json`, issue.js 와 postprocess.py 가 같이 읽는다. load.json 의 `layout` 에도 저장돼 재처리 때 쓴다)
   * `ramping`(v2): 15s@100rps 워밍업 후 100→200→300→400→500→650→800 rps 를 단계당 30s. stock 10,000,000 (매진 없이 발급 경로만 측정). v1(100/500/1000/2000/3000)은 1차 측정에서 서버 포화점(약 500rps)을 찾기엔 성겨서 포화점 주변으로 다시 짰다. v1 결과의 단계 구성은 해당 evidence 의 `layout` 에 남아 있다.
   * `spike`: 15s@100rps 워밍업 후 1s 만에 3000rps 로 올려 20s 유지. stock 100 (매진 경로).

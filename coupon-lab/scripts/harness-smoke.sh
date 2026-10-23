@@ -253,7 +253,11 @@ fi
 run env PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/load
 if [ "$rc" -eq 0 ]; then ok "14 scripts/load unit tests"; else fail "14 scripts/load unit tests" "exit=$rc $(tail -n 3 <<<"$out")"; fi
 
-total=$((14 - skipped))
+# 15. verify.sh load rejects an unknown --k6 mode before touching docker
+run scripts/verify.sh load --stage s0 --profile ramping --k6 nope
+if [ "$rc" -eq 2 ] && [[ "$out" == *usage* ]]; then ok "15 verify load --k6 nope: exit 2 (usage)"; else fail "15 verify load --k6 nope" "exit=$rc"; fi
+
+total=$((15 - skipped))
 suffix=""
 [ "$skipped" -eq 0 ] || suffix=" skipped=$skipped"
 echo "harness-smoke: $((total - fails))/$total OK in ${SECONDS}s$suffix"

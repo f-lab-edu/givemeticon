@@ -3,7 +3,7 @@
 #   verify.sh compile
 #   verify.sh unit [--tests <pattern>]
 #   verify.sh bundle <consistency|load|bottleneck|recovery|fairness> [--stage sN]
-#   verify.sh load --stage sN --profile <ramping|spike> [--runs N]   (test B: k6 against docker compose, see docs/stages.md)
+#   verify.sh load --stage sN --profile <ramping|spike> [--runs N] [--k6 host|container]   (test B: k6 against docker compose, see docs/stages.md)
 #   verify.sh reprocess evidence/<stage>/load/<profile>/<dir>        (test B: re-aggregate a saved run into a new -reprocessed dir)
 # Last stdout line:
 #   VERIFY <tier> <PASS|FAIL|INFRA_DOWN|BUILD_ERROR|TIMEOUT|NO_TESTS> passed=N failed=N skipped=N duration=Ns sha=<short> dirty=<bool> report=<path>
@@ -19,7 +19,7 @@ BUNDLES="consistency load bottleneck recovery fairness"
 
 usage() {
     echo "usage: scripts/verify.sh compile | unit [--tests <pattern>] | bundle <$(echo "$BUNDLES" | tr ' ' '|')> [--stage sN]" >&2
-    echo "       scripts/verify.sh load --stage sN --profile ramping|spike [--runs N]" >&2
+    echo "       scripts/verify.sh load --stage sN --profile ramping|spike [--runs N] [--k6 host|container]" >&2
     echo "       scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir>" >&2
     exit 2
 }
@@ -71,16 +71,19 @@ case "$mode" in
     load)
         profile=""
         runs=1
+        k6_mode=host
         while [ $# -gt 0 ]; do
             [ $# -ge 2 ] || usage
             case "$1" in
                 --stage) stage=$2 ;;
                 --profile) profile=$2 ;;
                 --runs) runs=$2 ;;
+                --k6) k6_mode=$2 ;;
                 *) usage ;;
             esac
             shift 2
         done
+        case "$k6_mode" in host|container) ;; *) usage ;; esac
         [ -n "$stage" ] && [ -n "$profile" ] || usage
         [[ "$stage" =~ ^s[0-9]+$ ]] || { echo "invalid stage: $stage (expected sN)" >&2; exit 2; }
         case "$profile" in ramping|spike) ;; *) usage ;; esac
@@ -140,6 +143,8 @@ PY
 }
 
 LOAD_PREFIX=coupon-lab-load-
+LOAD_NETWORK=coupon-lab-load_default
+K6_IMAGE=${K6_IMAGE:-grafana/k6:latest}
 LOAD_HEALTH_TIMEOUT_S=${LOAD_HEALTH_TIMEOUT_S:-60}
 LOAD_HIKARI_POOL_SIZE=${HIKARI_POOL_SIZE:-10}
 
@@ -159,7 +164,9 @@ load_sample_stats() {
 
 # verify.sh load: for each run, compose up (app + mysql), seed one event, k6 from the host, postprocess,
 # count issued rows, compose down -v, copy the result to evidence/<stage>/load/<profile>/. Stops at the first run
-# that is not PASS. k6 must be installed on the host and no container other than coupon-lab-load-* may be running.
+# that is not PASS. No container other than coupon-lab-load-* may be running. With --k6 host (default) k6 must be
+# installed on the host and reaches the app through the published port; with --k6 container k6 runs from $K6_IMAGE
+# inside the compose network against http://app:8080 and writes its output to a bind-mounted directory.
 run_load() {
     set +e
     local compose=(docker compose -p coupon-lab-load -f docker-compose.load.yml)
@@ -168,6 +175,7 @@ run_load() {
 
     load_cleanup() {
         if [ -n "$sampler_pid" ]; then kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""; fi
+        [ "$k6_mode" != container ] || docker rm -f "${LOAD_PREFIX}k6" >/dev/null 2>&1
         [ "$compose_up" = true ] || return 0
         compose_up=false
         "${compose[@]}" down -v --remove-orphans >>"$log" 2>&1 \
@@ -179,7 +187,10 @@ run_load() {
 
     : >"$log"
     # 1. preconditions: k6, docker daemon, idle machine
-    if ! command -v k6 >/dev/null; then echo "k6 not found; install it on the host first" >&2; exit 2; fi
+    if [ "$k6_mode" = host ] && ! command -v k6 >/dev/null; then
+        echo "k6 not found; install it on the host first (or use --k6 container)" >&2
+        exit 2
+    fi
     if ! command -v docker >/dev/null || ! docker info >/dev/null 2>&1; then
         echo "docker daemon not reachable" | tee -a "$log"
         load_finish INFRA_DOWN 3
@@ -206,6 +217,17 @@ run_load() {
         mkdir -p "$work"
         export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE
         COUPON_LAB_DB_PASSWORD=$(python3 -I -c 'import secrets; print(secrets.token_hex(12))')
+
+        local k6_version k6_env=()
+        if [ "$k6_mode" = container ]; then
+            if ! docker image inspect "$K6_IMAGE" >/dev/null 2>&1 && ! docker pull "$K6_IMAGE" >>"$log" 2>&1; then
+                run_status=INFRA_DOWN; run_note="cannot pull $K6_IMAGE (see $log)"; return
+            fi
+            k6_version=$(docker run --rm "$K6_IMAGE" version 2>>"$log" | head -n 1 | awk '{print $2}')
+            k6_env=(--env "k6_image=$K6_IMAGE")
+        else
+            k6_version=$(k6 version 2>/dev/null | head -n 1 | awk '{print $2}')
+        fi
 
         # 2. environment
         "${compose[@]}" down -v --remove-orphans >>"$log" 2>&1
@@ -235,16 +257,27 @@ run_load() {
         fi
 
         # 4. k6, postprocess, DB check
-        echo "run $1/$runs: k6 $profile on $stage, event $event_id, stock $stock"
+        echo "run $1/$runs: k6 ($k6_mode) $profile on $stage, event $event_id, stock $stock"
         : >"$work/stats.jsonl"
         load_sample_stats "$work/stats.jsonl" &
         sampler_pid=$!
-        k6 run --out json="$work/raw.json.gz" --summary-export "$work/summary.json" \
-            -e BASE_URL=http://127.0.0.1:18080 -e EVENT_ID="$event_id" -e PROFILE="$profile" \
-            scripts/load/issue.js >>"$log" 2>&1
+        if [ "$k6_mode" = container ]; then
+            docker run --rm --name "${LOAD_PREFIX}k6" --network "$LOAD_NETWORK" --user "$(id -u):$(id -g)" \
+                -v "$PWD/scripts/load:/scripts:ro" -v "$PWD/$work:/out" \
+                -e BASE_URL=http://app:8080 -e EVENT_ID="$event_id" -e PROFILE="$profile" \
+                "$K6_IMAGE" run --out json=/out/raw.json.gz --summary-export /out/summary.json /scripts/issue.js >>"$log" 2>&1
+        else
+            k6 run --out json="$work/raw.json.gz" --summary-export "$work/summary.json" \
+                -e BASE_URL=http://127.0.0.1:18080 -e EVENT_ID="$event_id" -e PROFILE="$profile" \
+                scripts/load/issue.js >>"$log" 2>&1
+        fi
         local k6_rc=$?
         kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""
         if [ "$k6_rc" -ne 0 ]; then
+            # docker itself failed (125 daemon error, 126/127 cannot start the command) is infra, not a k6 script error
+            if [ "$k6_mode" = container ] && [ "$k6_rc" -ge 125 ] && [ "$k6_rc" -le 127 ]; then
+                run_status=INFRA_DOWN; run_note="docker run of the k6 container failed with $k6_rc (see $log)"; return
+            fi
             run_status=BUILD_ERROR; run_note="k6 exited $k6_rc (see $log)"; return
         fi
         local issued_rows nano cpus_app cpus_mysql heap hikari
@@ -260,7 +293,7 @@ run_load() {
             --db-issued-rows "$issued_rows" --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
             --stats "$work/stats.jsonl" --summary "$work/summary.json" \
             --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "jvm_heap=$heap" \
-            --env "hikari_pool_size=$hikari" --env "k6_version=$(k6 version 2>/dev/null | head -n 1 | awk '{print $2}')" \
+            --env "hikari_pool_size=$hikari" --env "k6_version=$k6_version" --env "k6_mode=$k6_mode" ${k6_env[@]+"${k6_env[@]}"} \
             >>"$log" 2>&1
         if [ $? -ne 0 ]; then
             run_status=BUILD_ERROR; run_note="postprocess failed (see $log)"; return
