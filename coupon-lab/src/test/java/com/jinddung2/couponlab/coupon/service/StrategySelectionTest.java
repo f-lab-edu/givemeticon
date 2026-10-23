@@ -3,10 +3,13 @@ package com.jinddung2.couponlab.coupon.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import java.util.Map;
+
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 
 import com.jinddung2.couponlab.coupon.mapper.CouponMapper;
 
@@ -31,5 +34,16 @@ class StrategySelectionTest {
             assertThat(context.getBeansOfType(CouponIssueService.class)).hasSize(1);
             assertThat(context.getBean(CouponIssueService.class)).isInstanceOf(S1CouponIssueService.class);
         });
+    }
+
+    @Test
+    void strategyIsSelectableByEnvironmentVariable() {
+        contextRunner
+                .withInitializer(context -> context.getEnvironment().getPropertySources().addFirst(
+                        new SystemEnvironmentPropertySource("testEnvironment", Map.<String, Object>of("COUPON_STRATEGY", "s1"))))
+                .run(context -> {
+                    assertThat(context.getBeansOfType(CouponIssueService.class)).hasSize(1);
+                    assertThat(context.getBean(CouponIssueService.class)).isInstanceOf(S1CouponIssueService.class);
+                });
     }
 }

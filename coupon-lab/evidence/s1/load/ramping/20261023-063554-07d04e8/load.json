@@ -1,0 +1,92 @@
+{
+  "test": "B",
+  "profile": "ramping",
+  "stage": "s1",
+  "stock": 10000000,
+  "stages": [
+    {
+      "target_rps": 100,
+      "requests": 2900,
+      "achieved_rps": 100.0,
+      "p50_ms": 3.21,
+      "p95_ms": 7.91,
+      "p99_ms": 32.56,
+      "issued": 2900,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 0
+    },
+    {
+      "target_rps": 500,
+      "requests": 14501,
+      "achieved_rps": 500.0,
+      "p50_ms": 9.89,
+      "p95_ms": 550.61,
+      "p99_ms": 663.33,
+      "issued": 14501,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 0
+    },
+    {
+      "target_rps": 1000,
+      "requests": 19305,
+      "achieved_rps": 665.7,
+      "p50_ms": 4936.35,
+      "p95_ms": 5089.34,
+      "p99_ms": 5118.89,
+      "issued": 19305,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 9712
+    },
+    {
+      "target_rps": 2000,
+      "requests": 17815,
+      "achieved_rps": 614.3,
+      "p50_ms": 4924.77,
+      "p95_ms": 5204.95,
+      "p99_ms": 5234.27,
+      "issued": 17815,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 40189
+    },
+    {
+      "target_rps": 3000,
+      "requests": 13896,
+      "achieved_rps": 479.2,
+      "p50_ms": 6157.94,
+      "p95_ms": 7577.77,
+      "p99_ms": 8015.61,
+      "issued": 13896,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 73040
+    }
+  ],
+  "limit_rps": 100,
+  "db": {
+    "issued_rows": 72226,
+    "http_issued": 72226,
+    "match": true
+  },
+  "validity": {
+    "dropped_ratio": 0.642466,
+    "valid": false
+  },
+  "env": {
+    "app_cpus": 2,
+    "mysql_cpus": 2,
+    "jvm_heap": "1g",
+    "hikari_pool_size": 10,
+    "k6_version": "v2.2.0",
+    "cpu": 8,
+    "os": "Darwin 25.3.0 arm64"
+  }
+}
