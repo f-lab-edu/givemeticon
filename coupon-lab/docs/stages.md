@@ -36,7 +36,7 @@
 * 관측: k6 가 도는 동안 2초마다 `docker stats --no-stream` 으로 app/mysql 컨테이너를 샘플링해 `stats.jsonl` 로 evidence 에 남긴다. `stages[].app_cpu_pct_mean|max`, `mysql_cpu_pct_mean|max` 는 단계별 측정 구간의 CPU% (100 = 코어 1개 전부, cpus 2 이므로 최대 약 200). `vus.vus_max_reached` 는 summary.json 의 `vus_max` 가 설정한 maxVUs(profiles.json `vus.max`)에 닿았는지, 즉 VU 풀이 소진돼 k6 가 iteration 을 버릴 수 있었는지를 보여 준다.
 * stall 진단: 앱 JVM 은 `-Xlog:gc*:file=/var/log/app/gc.log:time,uptime` 로 GC 로그를 남기고(실행마다 `build/load/run-N/gc/` 를 바인드 마운트), evidence 에 `gc.log` 로 복사된다. `stages[].gc_pauses_over_200ms` 는 그 단계 측정 구간에서 끝난 200ms 초과 GC 일시정지 수이고, GC 로그 시각은 컨테이너 시계 기준이라 `run.container_clock_offset_s`(컨테이너 - 호스트, 초)가 2초를 넘으면 신뢰하지 않는다. GC 로그가 없는 run(이 기능 이전)은 null.
   `env` 에는 `innodb_flush_log_at_trx_commit`, `innodb_buffer_pool_size`, `innodb_log_file_size`, `innodb_redo_log_capacity` 를 실행 시점에 MySQL 에서 읽어 기록한다. `run.run_order` 는 연속 실행 묶음 안의 순번(1..n, 직전 run 시작이 60분(`LOAD_SESSION_GAP_MIN`)보다 오래 전이면 1부터 다시, 카운터는 `build/verify/load-run-counter`), `run.minutes_since_compose_up` 은 k6 시작 시점에 compose 를 올린 지 몇 분이 지났는지이다. 열 조절이나 순서 효과를 의심할 때 본다.
-* 여러 run 비교: `python3 -I scripts/load/compare.py --out build/load/compare.md 'evidence/s*/load/ramping/*-reprocessed'`. run 별 표, stage 별 중앙값과 최소-최대, target_rps 별 p95 중앙값을 마크다운으로 낸다. 프로필이나 단계 구성이 다른 run 은 섞지 않고 거부하며, 한 stage 안에서 env 가 다르면(예: `k6_mode`) 표 아래에 밝힌다. 현재 규칙의 필드가 없는 run 은 먼저 `verify.sh reprocess` 로 재처리해야 한다.
+* 여러 run 비교: `python3 -I scripts/load/compare.py --out build/load/compare.md 'evidence/s*/load/ramping/*-<재처리 sha>-reprocessed'`. run 별 표, stage 별 중앙값과 최소-최대, target_rps 별 p95 중앙값을 마크다운으로 낸다. 프로필이나 단계 구성이 다른 run 은 섞지 않고 거부하며, 한 stage 안에서 env 가 다르면(예: `k6_mode`) 표 아래에 밝힌다. 현재 규칙의 필드가 없는 run(예: v1 재처리본)이 glob 에 섞이면 거부되므로 재처리한 커밋의 sha 로 glob 을 좁힌다. 현재 규칙의 필드가 없는 run 은 먼저 `verify.sh reprocess` 로 재처리해야 한다.
 * 비교 조건: 같은 프로필, 같은 env 블록(cpus, heap, Hikari, k6 버전, 호스트)끼리만 비교한다.
 * 재처리: `scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir>` 가 저장된 raw.json.gz 를 현재 규칙으로 다시 집계해 옆에 `<ts>-<sha>[-dirty]-reprocessed/` 를 새로 만든다. 원본은 건드리지 않는다.
 * 1차 측정(v1 프로필 100/500/1000/2000/3000, 각 stage 1회) — 옛 규칙(run 전체 dropped_ratio < 1%)으로는 4건 모두 FAIL, 새 규칙 재처리본은 `evidence/*/load/*/*-reprocessed/load.json`.
@@ -44,4 +44,41 @@
   * spike(매진 경로, SELECT 만): `stages[0].achieved_rps` S0 1389.7, S1 1310.8. 같은 k6, 같은 호스트, 같은 네트워크 경로로 발급 경로의 2배 이상이 나오므로 600rps 근처의 천장은 k6→Docker 네트워크 경로가 아니라 서버 쪽 쓰기 경로에 있다.
   * S0 와 S1 이 같은 천장을 공유하는 이유(해석, 직접 측정하지 않음): S0 의 UPDATE 도 커밋까지 `coupon_event` 행 락을 쥔다. FOR UPDATE 는 그 락을 앞당길 뿐이므로 직렬화 지점은 락 방식이 아니라 한 행에 몰린 쓰기+커밋이다. 단, S1 의 매진 경로도 FOR UPDATE 로 같은 행 락을 잡는데 1310rps 가 나오므로, 락 대기만으로 600rps 가 정해지는 것은 아니고 락 안에서 일어나는 쓰기와 커밋 비용이 천장을 정하는 것으로 보인다. 확인하려면 InnoDB 행 락 대기 지표나 단계별 CPU 가 필요하다.
   * 500rps 부근이 무릎이다: S1 은 500rps 에서 `achieved_rps` 500.0, `dropped_iterations` 0, `p95_ms` 550.6 이고 S0 는 `p95_ms` 2091.8, `dropped_iterations` 564. 1차 프로필은 100→500 사이가 너무 성기고 1000 이상은 앞 단계의 대기열만 측정한다.
-* Result: 로컬 실행 후 기입 (v2 프로필)
+* v2 프로필 측정(ramping 100/200/300/400/500/650/800, S0 호스트 2회 + 컨테이너 1회, S1 호스트 2회). 원본은 `evidence/s*/load/ramping/20261023-07*` 이고 위 규칙으로 재처리한 5건(`*-67068ca-reprocessed`)을 `compare.py` 로 비교했다. **n=3/2, not yet rank-able; target n=5 per stage.**
+  * CPU 는 병목이 아니다: `stages[].app_cpu_pct_mean` 17~50, `mysql_cpu_pct_mean` 14~61 (한도 200), 포화 stage 에서도 앱 41~50, MySQL 55~61. 단, 한 행에 몰린 쓰기·커밋 대기 같은 직렬화는 CPU 에 나타나지 않으므로 이 수치가 그것을 배제하지는 않는다.
+  * k6 컨테이너 모드(`s0/…-a633503`)는 호스트 모드와 같은 모양이다: 650rps 를 `p95_ms` 290.7, `achieved_rps` 650.0 으로 유지하고 800rps 에서 `achieved_rps` 762.3. 호스트 포트 포워딩 경로가 천장은 아니다.
+  * `limit_rps_first_violation` 의 run 간 편차(S0 400~650, S1 200~500)는 용량보다 일시 정지(stall) 때문이다: `s1/…-a541492` 300rps stage 는 `p50_ms` 2.19 인데 `p95_ms` 1767.3, `dropped_iterations` 95, `mysql_cpu_pct_max` 101.9 이고 바로 다음 400rps stage 는 `p95_ms` 15.8 로 회복한다. 첫 위반 규칙은 이런 stall 한 번이 한계를 정하므로 `sustained_limit_rps` 를 기준 통계로 쓴다. stall 의 원인은 아직 모른다(GC 로그와 InnoDB 설정은 이 측정 이후에 수집하기 시작했다).
+  * 진짜 포화는 다섯 run 모두 같은 모양이다: target 650~800 에서 `achieved_rps` 가 533~762 에 머물고 800rps stage 의 `p50_ms` 가 1.2~5.5초로 오른다.
+
+#### v2 비교표 (compare.py 출력)
+
+#### Runs
+
+| stage | run | k6 | order | sustained_limit_rps | max_achieved_rps (at target) | stalls | first_violation | valid |
+|---|---|---|---|---|---|---|---|---|
+| s0 | 20261023-075245-67068ca-reprocessed | host | - | 400 | 625.2 (at 650) | 0 | 400 | yes |
+| s0 | 20261023-075249-67068ca-reprocessed | host | - | 650 | 737 (at 800) | 0 | 650 | yes |
+| s0 | 20261023-075253-67068ca-reprocessed | container | - | 650 | 762.3 (at 800) | 1 | 400 | yes |
+| s1 | 20261023-075247-67068ca-reprocessed | host | - | 500 | 587.5 (at 650) | 0 | 500 | yes |
+| s1 | 20261023-075251-67068ca-reprocessed | host | - | 500 | 698.1 (at 800) | 1 | 200 | yes |
+
+#### Per stage (median, min-max over runs)
+
+| stage | n | sustained_limit_rps | max_achieved_rps | stalls (total) |
+|---|---|---|---|---|
+| s0 | 3 | 650 (400-650) | 737 (625.2-762.3) | 1 |
+| s1 | 2 | 500 (500-500) | 642.8 (587.5-698.1) | 1 |
+
+Note: the s0 runs are pooled although their env differs - k6_image: (missing), grafana/k6:latest; k6_mode: container, host.
+
+#### Per target_rps (median over runs; kinds = ok/stall/saturated counts)
+
+| target_rps | s0 p95 ms | s0 achieved | s0 kinds | s1 p95 ms | s1 achieved | s1 kinds |
+|---|---|---|---|---|---|---|
+| 100 | 6.2 | 100 | 3/0/0 | 13.0 | 100 | 2/0/0 |
+| 200 | 49.9 | 200 | 3/0/0 | 59.5 | 200 | 2/0/0 |
+| 300 | 22.8 | 300 | 3/0/0 | 946.0 | 298.4 | 1/1/0 |
+| 400 | 64.2 | 400 | 3/0/0 | 73.1 | 400 | 2/0/0 |
+| 500 | 622.6 | 500 | 1/1/1 | 249.6 | 500 | 2/0/0 |
+| 650 | 290.7 | 650 | 2/0/1 | 2077.0 | 618.8 | 0/0/2 |
+| 800 | 2887.6 | 737 | 0/0/3 | 5883.9 | 615.4 | 0/0/2 |
