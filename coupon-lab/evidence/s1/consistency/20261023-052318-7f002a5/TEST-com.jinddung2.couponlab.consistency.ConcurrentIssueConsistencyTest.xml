@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-23T05:23:29" hostname="heojinhyeog-ui-MacBookAir.local" time="5.283">
+  <properties/>
+  <testcase name="issuedNeverExceedsStockUnderConcurrency()" classname="com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest" time="5.283"/>
+  <system-out><![CDATA[14:23:19.904 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest]: ConcurrentIssueConsistencyTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+14:23:19.950 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.jinddung2.couponlab.CouponLabApplication for test class com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest
+14:23:20.010 [Test worker] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+14:23:20.011 [Test worker] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+14:23:20.015 [Test worker] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.21.4
+14:23:20.111 [Test worker] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+14:23:20.246 [Test worker] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+14:23:20.246 [Test worker] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+14:23:20.262 [Test worker] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 29.7.2
+  API Version: 1.55
+  Operating System: Docker Desktop
+  Total Memory: 3916 MB
+  Labels: 
+    com.docker.desktop.address=unix:///Users/jinhyuck/Library/Containers/com.docker.docker/Data/docker-cli.sock
+14:23:20.278 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Creating container for image: testcontainers/ryuk:0.12.0
+14:23:20.488 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Container testcontainers/ryuk:0.12.0 is starting: f67af56f3fd184dfc6987497fadd7ce2af4957acfe03374270c2325fe0082ec9
+14:23:20.653 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Container testcontainers/ryuk:0.12.0 started in PT0.375458S
+14:23:20.657 [Test worker] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
+14:23:20.657 [Test worker] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+14:23:20.657 [Test worker] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+14:23:20.658 [Test worker] INFO tc.mysql:8.0 -- Creating container for image: mysql:8.0
+14:23:20.717 [Test worker] INFO tc.mysql:8.0 -- Container mysql:8.0 is starting: 146b35549e85dfcc00f8945c177df693271b0f0ca95a95ae0134ab6c365869f2
+14:23:20.844 [Test worker] INFO tc.mysql:8.0 -- Waiting for database connection to become available at jdbc:mysql://localhost:51795/test using query 'SELECT 1'
+14:23:28.493 [Test worker] INFO tc.mysql:8.0 -- Container mysql:8.0 started in PT7.834481S
+14:23:28.493 [Test worker] INFO tc.mysql:8.0 -- Container is started (JDBC URL: jdbc:mysql://localhost:51795/test)
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.5)
+
+2026-10-23T14:23:28.641+09:00  INFO 69207 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : Starting ConcurrentIssueConsistencyTest using Java 21.0.5 with PID 69207 (started by jinhyuck in /Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab)
+2026-10-23T14:23:28.642+09:00  INFO 69207 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : No active profile set, falling back to 1 default profile: "default"
+2026-10-23T14:23:29.072+09:00  INFO 69207 --- [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-23T14:23:29.178+09:00  INFO 69207 --- [    Test worker] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@23708f14
+2026-10-23T14:23:29.179+09:00  INFO 69207 --- [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-23T14:23:29.205+09:00  INFO 69207 --- [    Test worker] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:51795/test (MySQL 8.0)
+2026-10-23T14:23:29.245+09:00  INFO 69207 --- [    Test worker] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table `test`.`flyway_schema_history` does not exist yet
+2026-10-23T14:23:29.247+09:00  INFO 69207 --- [    Test worker] o.f.core.internal.command.DbValidate     : Successfully validated 1 migration (execution time 00:00.010s)
+2026-10-23T14:23:29.261+09:00  INFO 69207 --- [    Test worker] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table `test`.`flyway_schema_history` ...
+2026-10-23T14:23:29.306+09:00  INFO 69207 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Current version of schema `test`: << Empty Schema >>
+2026-10-23T14:23:29.311+09:00  INFO 69207 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Migrating schema `test` to version "1 - init"
+2026-10-23T14:23:29.350+09:00  INFO 69207 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Successfully applied 1 migration to schema `test`, now at version v1 (execution time 00:00.023s)
+2026-10-23T14:23:29.663+09:00  INFO 69207 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : Started ConcurrentIssueConsistencyTest in 1.144 seconds (process running for 10.167)
+]]></system-out>
+  <system-err><![CDATA[WARNING: A Java agent has been loaded dynamically (/Users/jinhyuck/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.14.19/154da3a65b4f4a909d3e5bdec55d1b2b4cbb6ce1/byte-buddy-agent-1.14.19.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+run 1: 1000 exceptions, first: org.mybatis.spring.MyBatisSystemException: 
+### Error querying database.  Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (1,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+### The error may exist in file [/Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab/build/resources/main/mapper/CouponMapper.xml]
+### The error may involve com.jinddung2.couponlab.coupon.mapper.CouponMapper.selectForUpdate
+### The error occurred while handling results
+### SQL: SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = ? FOR UPDATE
+### Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (1,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+run 2: 1000 exceptions, first: org.mybatis.spring.MyBatisSystemException: 
+### Error querying database.  Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (2,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+### The error may exist in file [/Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab/build/resources/main/mapper/CouponMapper.xml]
+### The error may involve com.jinddung2.couponlab.coupon.mapper.CouponMapper.selectForUpdate
+### The error occurred while handling results
+### SQL: SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = ? FOR UPDATE
+### Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (2,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+run 3: 1000 exceptions, first: org.mybatis.spring.MyBatisSystemException: 
+### Error querying database.  Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (3,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+### The error may exist in file [/Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab/build/resources/main/mapper/CouponMapper.xml]
+### The error may involve com.jinddung2.couponlab.coupon.mapper.CouponMapper.selectForUpdate
+### The error occurred while handling results
+### SQL: SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = ? FOR UPDATE
+### Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (3,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+run 4: 1000 exceptions, first: org.mybatis.spring.MyBatisSystemException: 
+### Error querying database.  Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (4,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+### The error may exist in file [/Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab/build/resources/main/mapper/CouponMapper.xml]
+### The error may involve com.jinddung2.couponlab.coupon.mapper.CouponMapper.selectForUpdate
+### The error occurred while handling results
+### SQL: SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = ? FOR UPDATE
+### Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (4,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+run 5: 1000 exceptions, first: org.mybatis.spring.MyBatisSystemException: 
+### Error querying database.  Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (5,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+### The error may exist in file [/Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab/build/resources/main/mapper/CouponMapper.xml]
+### The error may involve com.jinddung2.couponlab.coupon.mapper.CouponMapper.selectForUpdate
+### The error occurred while handling results
+### SQL: SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = ? FOR UPDATE
+### Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (5,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+run 6: 1000 exceptions, first: org.mybatis.spring.MyBatisSystemException: 
+### Error querying database.  Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (6,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+### The error may exist in file [/Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab/build/resources/main/mapper/CouponMapper.xml]
+### The error may involve com.jinddung2.couponlab.coupon.mapper.CouponMapper.selectForUpdate
+### The error occurred while handling results
+### SQL: SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = ? FOR UPDATE
+### Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (6,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+run 7: 1000 exceptions, first: org.mybatis.spring.MyBatisSystemException: 
+### Error querying database.  Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (7,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+### The error may exist in file [/Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab/build/resources/main/mapper/CouponMapper.xml]
+### The error may involve com.jinddung2.couponlab.coupon.mapper.CouponMapper.selectForUpdate
+### The error occurred while handling results
+### SQL: SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = ? FOR UPDATE
+### Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (7,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+run 8: 1000 exceptions, first: org.mybatis.spring.MyBatisSystemException: 
+### Error querying database.  Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (8,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+### The error may exist in file [/Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab/build/resources/main/mapper/CouponMapper.xml]
+### The error may involve com.jinddung2.couponlab.coupon.mapper.CouponMapper.selectForUpdate
+### The error occurred while handling results
+### SQL: SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = ? FOR UPDATE
+### Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (8,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+run 9: 1000 exceptions, first: org.mybatis.spring.MyBatisSystemException: 
+### Error querying database.  Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (9,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+### The error may exist in file [/Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab/build/resources/main/mapper/CouponMapper.xml]
+### The error may involve com.jinddung2.couponlab.coupon.mapper.CouponMapper.selectForUpdate
+### The error occurred while handling results
+### SQL: SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = ? FOR UPDATE
+### Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (9,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+run 10: 1000 exceptions, first: org.mybatis.spring.MyBatisSystemException: 
+### Error querying database.  Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (10,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+### The error may exist in file [/Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab/build/resources/main/mapper/CouponMapper.xml]
+### The error may involve com.jinddung2.couponlab.coupon.mapper.CouponMapper.selectForUpdate
+### The error occurred while handling results
+### SQL: SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = ? FOR UPDATE
+### Cause: org.apache.ibatis.reflection.ReflectionException: Error instantiating class com.jinddung2.couponlab.coupon.model.CouponStock with invalid types (Long,Integer,Integer) or values (10,100,100). Cause: java.lang.NoSuchMethodException: com.jinddung2.couponlab.coupon.model.CouponStock.<init>(java.lang.Long,java.lang.Integer,java.lang.Integer)
+]]></system-err>
+</testsuite>

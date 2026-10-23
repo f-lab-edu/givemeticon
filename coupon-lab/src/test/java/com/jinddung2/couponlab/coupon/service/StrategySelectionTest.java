@@ -1,0 +1,35 @@
+package com.jinddung2.couponlab.coupon.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+
+import javax.sql.DataSource;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+
+import com.jinddung2.couponlab.coupon.mapper.CouponMapper;
+
+class StrategySelectionTest {
+
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withBean(DataSource.class, () -> mock(DataSource.class))
+            .withBean(CouponMapper.class, () -> mock(CouponMapper.class))
+            .withUserConfiguration(S0CouponIssueService.class, S1CouponIssueService.class);
+
+    @Test
+    void s0SelectsOnlyS0() {
+        contextRunner.withPropertyValues("coupon.strategy=s0").run(context -> {
+            assertThat(context.getBeansOfType(CouponIssueService.class)).hasSize(1);
+            assertThat(context.getBean(CouponIssueService.class)).isInstanceOf(S0CouponIssueService.class);
+        });
+    }
+
+    @Test
+    void s1SelectsOnlyS1() {
+        contextRunner.withPropertyValues("coupon.strategy=s1").run(context -> {
+            assertThat(context.getBeansOfType(CouponIssueService.class)).hasSize(1);
+            assertThat(context.getBean(CouponIssueService.class)).isInstanceOf(S1CouponIssueService.class);
+        });
+    }
+}

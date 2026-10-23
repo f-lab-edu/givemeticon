@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-10-23T05:38:02" hostname="heojinhyeog-ui-MacBookAir.local" time="7.548">
+  <properties/>
+  <testcase name="issuedNeverExceedsStockUnderConcurrency()" classname="com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest" time="7.548">
+    <failure message="org.gradle.internal.exceptions.DefaultMultiCauseException: Multiple Failures (2 failures)&#10;&#9;org.opentest4j.AssertionFailedError: invariants broken in 10 of 10 runs; max over_issue=7, max dup_members=0 ==&gt; expected: &lt;0&gt; but was: &lt;10&gt;&#10;&#9;org.opentest4j.AssertionFailedError: issued != 100 or exceptions &gt; 0 in 10 of 10 runs; issued per run=[107, 107, 107, 107, 107, 107, 107, 107, 107, 107], exceptions per run=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0] ==&gt; expected: &lt;0&gt; but was: &lt;10&gt;" type="org.gradle.internal.exceptions.DefaultMultiCauseException">org.gradle.internal.exceptions.DefaultMultiCauseException: Multiple Failures (2 failures)
+	org.opentest4j.AssertionFailedError: invariants broken in 10 of 10 runs; max over_issue=7, max dup_members=0 ==&gt; expected: &lt;0&gt; but was: &lt;10&gt;
+	org.opentest4j.AssertionFailedError: issued != 100 or exceptions &gt; 0 in 10 of 10 runs; issued per run=[107, 107, 107, 107, 107, 107, 107, 107, 107, 107], exceptions per run=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0] ==&gt; expected: &lt;0&gt; but was: &lt;10&gt;
+	at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:80)
+	at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:44)
+	at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:38)
+	at app//org.junit.jupiter.api.Assertions.assertAll(Assertions.java:2944)
+	at app//com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest.issuedNeverExceedsStockUnderConcurrency(ConcurrentIssueConsistencyTest.java:102)
+	at java.base@21.0.5/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base@21.0.5/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base@21.0.5/java.util.ArrayList.forEach(ArrayList.java:1596)
+	Suppressed: org.opentest4j.AssertionFailedError: invariants broken in 10 of 10 runs; max over_issue=7, max dup_members=0 ==&gt; expected: &lt;0&gt; but was: &lt;10&gt;
+		at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+		at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+		at app//org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+		at app//org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:172)
+		at app//org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:699)
+		at app//com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest.lambda$issuedNeverExceedsStockUnderConcurrency$1(ConcurrentIssueConsistencyTest.java:103)
+		at app//org.junit.jupiter.api.AssertAll.lambda$assertAll$0(AssertAll.java:68)
+		at java.base@21.0.5/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+		at java.base@21.0.5/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:1024)
+		at java.base@21.0.5/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+		at java.base@21.0.5/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+		at java.base@21.0.5/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+		at java.base@21.0.5/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+		at java.base@21.0.5/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+		at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:77)
+		... 7 more
+	Suppressed: org.opentest4j.AssertionFailedError: issued != 100 or exceptions &gt; 0 in 10 of 10 runs; issued per run=[107, 107, 107, 107, 107, 107, 107, 107, 107, 107], exceptions per run=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0] ==&gt; expected: &lt;0&gt; but was: &lt;10&gt;
+		at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+		at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+		at app//org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+		at app//org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:172)
+		at app//org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:699)
+		at app//com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest.lambda$issuedNeverExceedsStockUnderConcurrency$3(ConcurrentIssueConsistencyTest.java:105)
+		at app//org.junit.jupiter.api.AssertAll.lambda$assertAll$0(AssertAll.java:68)
+		at java.base@21.0.5/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+		at java.base@21.0.5/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:1024)
+		at java.base@21.0.5/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+		at java.base@21.0.5/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+		at java.base@21.0.5/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+		at java.base@21.0.5/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+		at java.base@21.0.5/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+		at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:77)
+		... 7 more
+Cause 1: org.opentest4j.AssertionFailedError: invariants broken in 10 of 10 runs; max over_issue=7, max dup_members=0 ==&gt; expected: &lt;0&gt; but was: &lt;10&gt;
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at app//org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at app//org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:172)
+	at app//org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:699)
+	at app//com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest.lambda$issuedNeverExceedsStockUnderConcurrency$1(ConcurrentIssueConsistencyTest.java:103)
+	at app//org.junit.jupiter.api.AssertAll.lambda$assertAll$0(AssertAll.java:68)
+	at java.base@21.0.5/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base@21.0.5/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:1024)
+	at java.base@21.0.5/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base@21.0.5/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base@21.0.5/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base@21.0.5/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base@21.0.5/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:77)
+	at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:44)
+	at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:38)
+	at app//org.junit.jupiter.api.Assertions.assertAll(Assertions.java:2944)
+	at app//com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest.issuedNeverExceedsStockUnderConcurrency(ConcurrentIssueConsistencyTest.java:102)
+	at java.base@21.0.5/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base@21.0.5/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base@21.0.5/java.util.ArrayList.forEach(ArrayList.java:1596)
+Cause 2: org.opentest4j.AssertionFailedError: issued != 100 or exceptions &gt; 0 in 10 of 10 runs; issued per run=[107, 107, 107, 107, 107, 107, 107, 107, 107, 107], exceptions per run=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0] ==&gt; expected: &lt;0&gt; but was: &lt;10&gt;
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at app//org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at app//org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:172)
+	at app//org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:699)
+	at app//com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest.lambda$issuedNeverExceedsStockUnderConcurrency$3(ConcurrentIssueConsistencyTest.java:105)
+	at app//org.junit.jupiter.api.AssertAll.lambda$assertAll$0(AssertAll.java:68)
+	at java.base@21.0.5/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base@21.0.5/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:1024)
+	at java.base@21.0.5/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base@21.0.5/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base@21.0.5/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+	at java.base@21.0.5/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base@21.0.5/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+	at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:77)
+	at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:44)
+	at app//org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:38)
+	at app//org.junit.jupiter.api.Assertions.assertAll(Assertions.java:2944)
+	at app//com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest.issuedNeverExceedsStockUnderConcurrency(ConcurrentIssueConsistencyTest.java:102)
+	at java.base@21.0.5/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base@21.0.5/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base@21.0.5/java.util.ArrayList.forEach(ArrayList.java:1596)
+</failure>
+  </testcase>
+  <system-out><![CDATA[14:37:52.870 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest]: ConcurrentIssueConsistencyTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+14:37:52.938 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.jinddung2.couponlab.CouponLabApplication for test class com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest
+14:37:53.040 [Test worker] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+14:37:53.041 [Test worker] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+14:37:53.048 [Test worker] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.21.4
+14:37:53.225 [Test worker] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+14:37:53.363 [Test worker] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+14:37:53.364 [Test worker] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+14:37:53.376 [Test worker] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 29.7.2
+  API Version: 1.55
+  Operating System: Docker Desktop
+  Total Memory: 3916 MB
+  Labels: 
+    com.docker.desktop.address=unix:///Users/jinhyuck/Library/Containers/com.docker.docker/Data/docker-cli.sock
+14:37:53.395 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Creating container for image: testcontainers/ryuk:0.12.0
+14:37:53.754 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Container testcontainers/ryuk:0.12.0 is starting: 805ccf080c603ae4ec4e2c6c9dcfa6e8e973ff4d1fd0abbbddf3cc18ba72cc85
+14:37:54.223 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Container testcontainers/ryuk:0.12.0 started in PT0.827283S
+14:37:54.227 [Test worker] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
+14:37:54.227 [Test worker] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+14:37:54.227 [Test worker] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+14:37:54.230 [Test worker] INFO tc.mysql:8.0 -- Creating container for image: mysql:8.0
+14:37:54.314 [Test worker] INFO tc.mysql:8.0 -- Container mysql:8.0 is starting: 398a814e724ebc7e22b5bbe53ac9d8147218ee27f46a9bd925cf52f7120dec2e
+14:37:54.441 [Test worker] INFO tc.mysql:8.0 -- Waiting for database connection to become available at jdbc:mysql://localhost:52379/test using query 'SELECT 1'
+14:38:01.228 [Test worker] INFO tc.mysql:8.0 -- Container mysql:8.0 started in PT6.998408S
+14:38:01.229 [Test worker] INFO tc.mysql:8.0 -- Container is started (JDBC URL: jdbc:mysql://localhost:52379/test)
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.5)
+
+2026-10-23T14:38:01.383+09:00  INFO 70458 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : Starting ConcurrentIssueConsistencyTest using Java 21.0.5 with PID 70458 (started by jinhyuck in /Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab)
+2026-10-23T14:38:01.384+09:00  INFO 70458 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : No active profile set, falling back to 1 default profile: "default"
+2026-10-23T14:38:01.854+09:00  INFO 70458 --- [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-23T14:38:01.957+09:00  INFO 70458 --- [    Test worker] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@35f01759
+2026-10-23T14:38:01.958+09:00  INFO 70458 --- [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-23T14:38:01.982+09:00  INFO 70458 --- [    Test worker] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:52379/test (MySQL 8.0)
+2026-10-23T14:38:02.022+09:00  INFO 70458 --- [    Test worker] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table `test`.`flyway_schema_history` does not exist yet
+2026-10-23T14:38:02.024+09:00  INFO 70458 --- [    Test worker] o.f.core.internal.command.DbValidate     : Successfully validated 1 migration (execution time 00:00.009s)
+2026-10-23T14:38:02.038+09:00  INFO 70458 --- [    Test worker] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table `test`.`flyway_schema_history` ...
+2026-10-23T14:38:02.085+09:00  INFO 70458 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Current version of schema `test`: << Empty Schema >>
+2026-10-23T14:38:02.090+09:00  INFO 70458 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Migrating schema `test` to version "1 - init"
+2026-10-23T14:38:02.133+09:00  INFO 70458 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Successfully applied 1 migration to schema `test`, now at version v1 (execution time 00:00.025s)
+2026-10-23T14:38:02.551+09:00  INFO 70458 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : Started ConcurrentIssueConsistencyTest in 1.292 seconds (process running for 10.203)
+]]></system-out>
+  <system-err><![CDATA[WARNING: A Java agent has been loaded dynamically (/Users/jinhyuck/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.14.19/154da3a65b4f4a909d3e5bdec55d1b2b4cbb6ce1/byte-buddy-agent-1.14.19.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>
