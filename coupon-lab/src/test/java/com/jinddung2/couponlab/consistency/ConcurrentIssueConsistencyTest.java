@@ -1,5 +1,6 @@
 package com.jinddung2.couponlab.consistency;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
@@ -43,6 +44,8 @@ import com.zaxxer.hikari.HikariDataSource;
 /**
  * Test A: THREADS members race for TOTAL_QUANTITY coupons, REPETITIONS times, each time on a fresh event.
  * The invariants are no over-issue, no member issued twice, and remaining matching the issued rows.
+ * A run only counts as healthy if it also threw no exceptions and issued exactly min(THREADS, TOTAL_QUANTITY)
+ * coupons; without that, a service that fails every call would pass the negative checks above.
  * Expected to FAIL on S0, whose read-then-decrement has no protection; the numbers are the evidence.
  */
 @Tag("consistency")
@@ -53,6 +56,7 @@ class ConcurrentIssueConsistencyTest {
     private static final int REPETITIONS = 10;
     private static final int THREADS = 1000;
     private static final int TOTAL_QUANTITY = 100;
+    private static final int EXPECTED_ISSUED = Math.min(THREADS, TOTAL_QUANTITY);
 
     private static final String MYSQL_IMAGE = "mysql:8.0";
     private static final Path EVIDENCE_FILE = Path.of("build", "evidence", "consistency.json");
@@ -95,8 +99,12 @@ class ConcurrentIssueConsistencyTest {
             RUNS.add(runOnce(run));
         }
 
-        assertEquals(0, runsBroken(), () -> "invariants broken in " + runsBroken() + " of " + REPETITIONS
-                + " runs; max over_issue=" + maxOf("over_issue") + ", max dup_members=" + maxOf("dup_members"));
+        assertAll(
+                () -> assertEquals(0, runsBroken(), () -> "invariants broken in " + runsBroken() + " of " + REPETITIONS
+                        + " runs; max over_issue=" + maxOf("over_issue") + ", max dup_members=" + maxOf("dup_members")),
+                () -> assertEquals(0, runsUnhealthy(), () -> "issued != " + EXPECTED_ISSUED + " or exceptions > 0 in "
+                        + runsUnhealthy() + " of " + REPETITIONS + " runs; issued per run=" + valuesOf("issued")
+                        + ", exceptions per run=" + valuesOf("exceptions")));
     }
 
     private Map<String, Object> runOnce(int run) throws InterruptedException {
@@ -156,6 +164,18 @@ class ConcurrentIssueConsistencyTest {
         return (int) run.get("over_issue") > 0
                 || (int) run.get("dup_members") > 0
                 || (boolean) run.get("remaining_mismatch");
+    }
+
+    private static boolean isUnhealthy(Map<String, Object> run) {
+        return (int) run.get("exceptions") != 0 || (int) run.get("issued") != EXPECTED_ISSUED;
+    }
+
+    private static long runsUnhealthy() {
+        return RUNS.stream().filter(ConcurrentIssueConsistencyTest::isUnhealthy).count();
+    }
+
+    private static List<Object> valuesOf(String key) {
+        return RUNS.stream().map(run -> run.get(key)).toList();
     }
 
     private static long runsBroken() {
