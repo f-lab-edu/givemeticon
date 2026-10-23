@@ -148,6 +148,18 @@ K6_IMAGE=${K6_IMAGE:-grafana/k6:latest}
 LOAD_HEALTH_TIMEOUT_S=${LOAD_HEALTH_TIMEOUT_S:-60}
 LOAD_HIKARI_POOL_SIZE=${HIKARI_POOL_SIZE:-10}
 
+# Position of this run within a batch of back-to-back runs (1..n): the counter file holds "<count> <start epoch of the last
+# run>" and starts again at 1 when the previous run began more than LOAD_SESSION_GAP_MIN (default 60) minutes ago.
+load_next_run_order() {
+    local file=build/verify/load-run-counter count=0 last=0 now
+    now=$(date +%s)
+    [ ! -f "$file" ] || read -r count last <"$file" 2>/dev/null
+    [[ "$count" =~ ^[0-9]+$ && "$last" =~ ^[0-9]+$ ]] || { count=0; last=0; }
+    if [ $((now - last)) -gt $((${LOAD_SESSION_GAP_MIN:-60} * 60)) ]; then count=1; else count=$((count + 1)); fi
+    echo "$count $now" >"$file"
+    echo "$count"
+}
+
 # Every 2 s one line per container into <outfile>: {"time": <epoch>, "stat": <docker stats object>}. Run in the
 # background during k6 and killed afterwards; postprocess.py turns it into per-stage CPU figures.
 load_sample_stats() {
@@ -215,7 +227,10 @@ run_load() {
         work="build/load/run-$1"
         rm -rf "$work"
         mkdir -p "$work"
-        export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE
+        mkdir -p "$work/gc"
+        export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE LOAD_GC_DIR="$PWD/$work/gc"
+        local run_order up_epoch
+        run_order=$(load_next_run_order)
         COUPON_LAB_DB_PASSWORD=$(python3 -I -c 'import secrets; print(secrets.token_hex(12))')
 
         local k6_version k6_env=()
@@ -236,6 +251,7 @@ run_load() {
         if ! "${compose[@]}" up -d --build >>"$log" 2>&1; then
             run_status=INFRA_DOWN; run_note="docker compose up failed (see $log)"; return
         fi
+        up_epoch=$(date +%s)
         local waited=0 health=""
         while [ "$waited" -lt "$LOAD_HEALTH_TIMEOUT_S" ]; do
             health=$(load_inspect '{{.State.Health.Status}}' app)
@@ -256,7 +272,17 @@ run_load() {
             run_status=INFRA_DOWN; run_note="seeding the event failed (see $log)"; return
         fi
 
+        # InnoDB settings that decide how expensive a commit is, recorded with the run
+        local mysql_env=() var_name var_value
+        while IFS=$'\t' read -r var_name var_value; do
+            [ -z "$var_name" ] || mysql_env+=(--env "$var_name=$var_value")
+        done < <(load_mysql "SHOW VARIABLES WHERE Variable_name IN ('innodb_flush_log_at_trx_commit','innodb_buffer_pool_size','innodb_log_file_size','innodb_redo_log_capacity')")
+
         # 4. k6, postprocess, DB check
+        local container_epoch clock_offset="" minutes_up
+        container_epoch=$(docker exec "${LOAD_PREFIX}app" date +%s 2>/dev/null)
+        [[ "$container_epoch" =~ ^[0-9]+$ ]] && clock_offset=$((container_epoch - $(date +%s)))
+        minutes_up=$(awk -v now="$(date +%s)" -v up="$up_epoch" 'BEGIN { printf "%.1f", (now - up) / 60 }')
         echo "run $1/$runs: k6 ($k6_mode) $profile on $stage, event $event_id, stock $stock"
         : >"$work/stats.jsonl"
         load_sample_stats "$work/stats.jsonl" &
@@ -291,9 +317,10 @@ run_load() {
         hikari=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=//p')
         python3 -I scripts/load/postprocess.py --raw "$work/raw.json.gz" --profile "$profile" --stage "$stage" \
             --db-issued-rows "$issued_rows" --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
-            --stats "$work/stats.jsonl" --summary "$work/summary.json" \
+            --stats "$work/stats.jsonl" --summary "$work/summary.json" --gc-log "$work/gc/gc.log" \
+            --run-order "$run_order" --minutes-since-up "$minutes_up" ${clock_offset:+--clock-offset-s "$clock_offset"} \
             --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "jvm_heap=$heap" \
-            --env "hikari_pool_size=$hikari" --env "k6_version=$k6_version" --env "k6_mode=$k6_mode" ${k6_env[@]+"${k6_env[@]}"} \
+            --env "hikari_pool_size=$hikari" --env "k6_version=$k6_version" --env "k6_mode=$k6_mode" ${k6_env[@]+"${k6_env[@]}"} ${mysql_env[@]+"${mysql_env[@]}"} \
             >>"$log" 2>&1
         if [ $? -ne 0 ]; then
             run_status=BUILD_ERROR; run_note="postprocess failed (see $log)"; return
@@ -325,6 +352,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/load.json")
             cp "$work/load.json" "$run_evidence/"
             [ ! -f "$work/summary.json" ] || cp "$work/summary.json" "$run_evidence/"
             [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
+            [ ! -f "$work/gc/gc.log" ] || cp "$work/gc/gc.log" "$run_evidence/"
             [ ! -f "$work/raw-filtered.json.gz" ] || cp "$work/raw-filtered.json.gz" "$run_evidence/raw.json.gz"
             evidence_dirs+=("$run_evidence")
             echo "run $n/$runs: evidence in $run_evidence"
@@ -366,6 +394,7 @@ run_reprocess() {
     cp "$tmp/load.json" "$dest/"
     [ ! -f "$source_dir/summary.json" ] || cp "$source_dir/summary.json" "$dest/"
     [ ! -f "$source_dir/stats.jsonl" ] || cp "$source_dir/stats.jsonl" "$dest/"
+    [ ! -f "$source_dir/gc.log" ] || cp "$source_dir/gc.log" "$dest/"
     evidence_dirs+=("$dest")
     verdict=$(python3 -I -c '
 import json, sys

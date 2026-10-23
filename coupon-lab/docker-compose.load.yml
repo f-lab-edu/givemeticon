@@ -1,6 +1,6 @@
 # Environment for `scripts/verify.sh load`: app and MySQL with pinned CPU limits, k6 runs on the host.
 # Started and removed (down -v) by verify.sh; the manual-run docker-compose.yml is unrelated.
-# Required variables (set by verify.sh): COUPON_LAB_DB_PASSWORD, COUPON_STRATEGY. Optional: HIKARI_POOL_SIZE.
+# Required variables (set by verify.sh): COUPON_LAB_DB_PASSWORD, COUPON_STRATEGY, LOAD_GC_DIR. Optional: HIKARI_POOL_SIZE.
 services:
   mysql:
     image: mysql:8.0
@@ -34,6 +34,8 @@ services:
       COUPON_STRATEGY: ${COUPON_STRATEGY:?set COUPON_STRATEGY}
       SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${HIKARI_POOL_SIZE:-10}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+    volumes:
+      - ${LOAD_GC_DIR:?set LOAD_GC_DIR}:/var/log/app
     healthcheck:
       # bash /dev/tcp instead of curl: the JRE image is not guaranteed to ship curl.
       test:

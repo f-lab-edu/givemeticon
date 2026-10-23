@@ -25,7 +25,10 @@ still describes the same stages.
 
 --stats is the stats.jsonl sampled by verify.sh (one {"time": epoch, "stat": <docker stats object>} per container
 about every 2 s); every stage gets the mean and max CPU% of the app and mysql containers over its measure window
-(100 = one fully used core). --summary is the k6 summary export; it provides the VU high-water mark.
+(100 = one fully used core). --summary is the k6 summary export; it provides the VU high-water mark. --gc-log is the app JVM's GC log
+(-Xlog:gc*:file=...:time,uptime); every stage gets the number of GC pauses over 200 ms inside its measure window.
+GC timestamps come from the container clock: run.container_clock_offset_s (container minus host, whole seconds) tells
+how far they can be off. --run-order / --minutes-since-up / --clock-offset-s end up in the "run" block.
 --filtered-raw keeps just the points this script reads, which is what goes into evidence (the full k6 output
 has a dozen http metrics per request and runs to a gigabyte).
 """
@@ -48,7 +51,10 @@ P50_SATURATED_MS = 100.0  # above this median latency a stage is saturated
 WANTED = ('"http_req_duration"', '"coupon_results"', '"dropped_iterations"')
 DEFAULT_PROFILES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "profiles.json")
 
-_TIME = re.compile(r"^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d+))?(Z|[+-]\d\d:\d\d)$")
+_TIME = re.compile(r"^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d+))?(Z|[+-]\d\d:?\d\d)$")
+# JVM -Xlog:gc*:file=...:time,uptime, e.g. "[2026-10-23T07:49:09.394+0000][1.138s] GC(0) Pause Young (Normal) ... 15.951ms"
+_GC_PAUSE = re.compile(r"^\[([^\]]+)\](?:\[[^\]]*\])* GC\(\d+\) Pause .*? ([\d.]+)ms\s*$")
+GC_PAUSE_LIMIT_MS = 200.0
 
 
 def parse_time(text):
@@ -63,7 +69,7 @@ def parse_time(text):
     zone = m.group(8)
     if zone != "Z":
         sign = 1 if zone[0] == "+" else -1
-        epoch -= sign * (int(zone[1:3]) * 3600 + int(zone[4:6]) * 60)
+        epoch -= sign * (int(zone[1:3]) * 3600 + int(zone[-2:]) * 60)
     return epoch
 
 
@@ -152,6 +158,23 @@ def cpu_summary(samples, window_start, window_end):
     return round(sum(values) / len(values), 1), round(max(values), 1)
 
 
+def load_gc_pauses(path):
+    """gc.log -> [(epoch of the end of the pause, duration ms)] for every 'Pause ...' line; None without a log."""
+    if not path or not os.path.exists(path):
+        return None
+    pauses = []
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            m = _GC_PAUSE.match(line)
+            if not m:
+                continue
+            try:
+                pauses.append((parse_time(m.group(1)), float(m.group(2))))
+            except ValueError:
+                continue
+    return pauses
+
+
 def read_vus(summary_path, layout):
     """VU high-water mark from the k6 summary export against the configured maxVUs."""
     configured = (layout.get("vus") or {}).get("max")
@@ -181,13 +204,14 @@ def classify(stage):
 
 
 def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, filtered_path=None,
-                 stats_path=None, summary_path=None):
+                 stats_path=None, summary_path=None, gc_path=None, run_info=None):
     profile = layout["profiles"][profile_name]
     rates = [step["rps"] for step in profile["steps"]]
     if len(set(rates)) != len(rates):
         raise ValueError("target rps must be unique within a profile: %s" % rates)
     latencies, counts, dropped, anchor = collect(raw_path, filtered_path)
     stats = load_stats(stats_path)
+    gc_pauses = load_gc_pauses(gc_path)
     if anchor is None:
         raise ValueError("no http_req_duration points in " + raw_path)
 
@@ -204,6 +228,8 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         values = sorted(latencies.get(rps, []))
         dropped_here = int(sum(v for t, v in dropped if window_start <= t < window_end))
         dropped_ratio = dropped_here / (requests + dropped_here) if requests + dropped_here else 1.0
+        long_pauses = None if gc_pauses is None else sum(
+            1 for when, ms in gc_pauses if window_start <= when < window_end and ms > GC_PAUSE_LIMIT_MS)
         app_mean, app_max = cpu_summary(stats["app"], window_start, window_end)
         mysql_mean, mysql_max = cpu_summary(stats["mysql"], window_start, window_end)
         stages.append({
@@ -226,6 +252,7 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
             "app_cpu_pct_max": app_max,
             "mysql_cpu_pct_mean": mysql_mean,
             "mysql_cpu_pct_max": mysql_max,
+            "gc_pauses_over_200ms": long_pauses,
         })
 
     first_violation = "not reached"
@@ -265,6 +292,7 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         "limit_rps_first_violation": first_violation,
         "db": {"issued_rows": db_issued_rows, "http_issued": http_issued, "match": match},
         "vus": read_vus(summary_path, layout),
+        "run": run_info or {},
         "validity": {
             "stage0_dropped_ratio": stages[0]["dropped_ratio"],
             "stage0_valid": stages[0]["valid"],
@@ -310,10 +338,15 @@ def main(argv=None):
     parser.add_argument("--env", action="append", default=[], metavar="KEY=VALUE")
     parser.add_argument("--stats", metavar="STATS_JSONL")
     parser.add_argument("--summary", metavar="SUMMARY_JSON")
+    parser.add_argument("--gc-log", metavar="GC_LOG")
+    parser.add_argument("--run-order", type=int)
+    parser.add_argument("--minutes-since-up", type=float)
+    parser.add_argument("--clock-offset-s", type=int)
     parser.add_argument("--reprocess-from", metavar="EVIDENCE_DIR")
     args = parser.parse_args(argv)
 
     layout = None
+    run_info = None
     env_pairs = args.env
     reprocessed_from = None
     if args.reprocess_from:
@@ -328,6 +361,8 @@ def main(argv=None):
         layout = layout_from_report(old)
         args.stats = os.path.join(source, "stats.jsonl")
         args.summary = os.path.join(source, "summary.json")
+        args.gc_log = os.path.join(source, "gc.log")
+        run_info = old.get("run") or None
         reprocessed_from = source
     elif None in (args.raw, args.profile, args.stage, args.db_issued_rows):
         parser.error("--raw, --profile, --stage and --db-issued-rows are required without --reprocess-from")
@@ -345,8 +380,14 @@ def main(argv=None):
         if recorded != current:
             parser.error("profiles.json no longer matches %s (stages %s, profile now %s); reprocess a run whose "
                          "load.json stores its layout" % (reprocessed_from, recorded, current))
+    if run_info is None:
+        run_info = {}
+        for key, value in (("run_order", args.run_order), ("minutes_since_compose_up", args.minutes_since_up),
+                           ("container_clock_offset_s", args.clock_offset_s)):
+            if value is not None:
+                run_info[key] = value
     report = build_report(args.raw, layout, args.profile, args.stage, args.db_issued_rows,
-                          _env(env_pairs), args.filtered_raw, args.stats, args.summary)
+                          _env(env_pairs), args.filtered_raw, args.stats, args.summary, args.gc_log, run_info)
     if reprocessed_from:
         report["reprocessed_from"] = reprocessed_from
     with open(args.out, "w", encoding="utf-8") as f:

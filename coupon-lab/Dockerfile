@@ -11,4 +11,5 @@ FROM eclipse-temurin:21-jre
 COPY --from=build /app.jar /app.jar
 EXPOSE 8080
 # Fixed heap: the load results are only comparable across stages with the same JVM settings.
-ENTRYPOINT ["java", "-Xms1g", "-Xmx1g", "-jar", "/app.jar"]
+# GC log for stall diagnosis; the directory is a bind mount made by verify.sh load (see docker-compose.load.yml).
+ENTRYPOINT ["java", "-Xms1g", "-Xmx1g", "-Xlog:gc*:file=/var/log/app/gc.log:time,uptime", "-jar", "/app.jar"]

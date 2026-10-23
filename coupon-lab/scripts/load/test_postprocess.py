@@ -122,6 +122,63 @@ def mini_lines(steps):
     return lines
 
 
+def gc_pause_line(offset_s, ms, kind="Young (Normal) (G1 Evacuation Pause)"):
+    """The line a real JDK 21 prints with -Xlog:gc*:file=...:time,uptime when a pause ends (+0900 as in stamp())."""
+    when = (T0 + timedelta(seconds=offset_s)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "+0900"
+    return "[%s][%.3fs] GC(7) Pause %s 18M->10M(64M) %.3fms" % (when, 100 + offset_s, kind, ms)
+
+
+class GcTest(unittest.TestCase):
+    def report(self, gc_lines, extra=None):
+        lines = synthetic()
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            gc_path = None
+            if gc_lines is not None:
+                gc_path = os.path.join(tmp, "gc.log")
+                with open(gc_path, "w", encoding="utf-8") as f:
+                    f.write("\n".join(gc_lines) + "\n")
+            return postprocess.build_report(raw, LAYOUT, "ramping", "s0", issued_count(lines), {}, None, None, None,
+                                            gc_path, extra)
+
+    def test_real_jvm_log_lines_are_parsed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "gc.log")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("\n".join([
+                    "[2026-10-23T07:49:09.378+0000][1.122s] GC(0) Pause Young (Normal) (G1 Evacuation Pause)",
+                    "[2026-10-23T07:49:09.394+0000][1.138s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 14M->4M(64M) 15.951ms",
+                    "[2026-10-23T07:49:10.000+0000][1.700s] GC(1) Concurrent Mark Cycle 40.000ms",
+                    "[2026-10-23T07:49:11.500+0000][3.200s] GC(2) Pause Remark 22M->22M(64M) 250.500ms",
+                    "[2026-10-23T07:49:12.000+0000][3.700s] GC(3) Pause Full (System.gc()) 30M->5M(64M) 410.042ms"]) + "\n")
+            pauses = postprocess.load_gc_pauses(path)
+        self.assertEqual([ms for _, ms in pauses], [15.951, 250.5, 410.042])
+        self.assertAlmostEqual(pauses[0][0], postprocess.parse_time("2026-10-23T07:49:09.394Z"), places=3)
+
+    def test_pauses_over_200ms_are_counted_in_the_stage_they_fall_into(self):
+        start, end = window_of("ramping", 2)
+        report = self.report([
+            gc_pause_line(start + 3, 450.0),
+            gc_pause_line(start + 5, 200.0),  # not over 200
+            gc_pause_line(start + 6, 12.0),
+            gc_pause_line(end + 0.5, 900.0),  # after the window: belongs to the transition second of the next step
+            gc_pause_line(5, 300.0, "Full (System.gc())"),  # warmup: no stage
+            "[2026-10-23T03:00:00.000+0000][0.010s] GC(0) Using G1"])
+        self.assertEqual([s["gc_pauses_over_200ms"] for s in report["stages"]], [0, 0, 1, 0, 0])
+
+    def test_without_a_gc_log_the_count_is_null(self):
+        self.assertTrue(all(s["gc_pauses_over_200ms"] is None for s in self.report(None)["stages"]))
+
+    def test_run_info_is_recorded(self):
+        run = {"run_order": 3, "minutes_since_compose_up": 1.4, "container_clock_offset_s": 0}
+        self.assertEqual(self.report(None, run)["run"], run)
+
+    def test_the_timestamp_offset_may_omit_the_colon(self):
+        self.assertAlmostEqual(postprocess.parse_time("2026-10-23T12:00:00.5+0900"),
+                               postprocess.parse_time("2026-10-23T03:00:00.5Z"), places=6)
+
+
 class KindTest(unittest.TestCase):
     def report(self, steps, stats=None):
         lines = mini_lines(steps)
@@ -409,6 +466,24 @@ class ReprocessTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 postprocess.main(["--reprocess-from", tmp, "--profiles", path, "--out", os.path.join(tmp, "new.json")])
             self.assertFalse(os.path.exists(os.path.join(tmp, "new.json")))
+
+    def test_gc_log_and_run_block_next_to_the_source_are_kept(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.make_source(tmp, True)
+            with open(os.path.join(tmp, "load.json"), encoding="utf-8") as f:
+                old = json.load(f)
+            old["run"] = {"run_order": 2, "minutes_since_compose_up": 1.1}
+            with open(os.path.join(tmp, "load.json"), "w", encoding="utf-8") as f:
+                json.dump(old, f)
+            start, _ = window_of("ramping", 1)
+            with open(os.path.join(tmp, "gc.log"), "w", encoding="utf-8") as f:
+                f.write(gc_pause_line(start + 4, 333.0) + "\n")
+            out = os.path.join(tmp, "new.json")
+            self.assertEqual(postprocess.main(["--reprocess-from", tmp, "--out", out]), 0)
+            with open(out, encoding="utf-8") as f:
+                report = json.load(f)
+        self.assertEqual(report["run"], {"run_order": 2, "minutes_since_compose_up": 1.1})
+        self.assertEqual(report["stages"][1]["gc_pauses_over_200ms"], 1)
 
     def test_stats_and_summary_next_to_the_source_are_used(self):
         with tempfile.TemporaryDirectory() as tmp:
