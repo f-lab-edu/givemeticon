@@ -33,7 +33,7 @@ public class S1CouponIssueService implements CouponIssueService {
             return new IssueResult.SoldOut();
         }
         couponMapper.decrementRemaining(eventId);
-        int seq = stock.totalQuantity() - (stock.remainingQuantity() - 1);
+        int seq = couponMapper.selectTotal(eventId) - couponMapper.selectRemaining(eventId);
         couponMapper.insertIssue(eventId, memberId, seq);
         return new IssueResult.Issued(seq);
     }
