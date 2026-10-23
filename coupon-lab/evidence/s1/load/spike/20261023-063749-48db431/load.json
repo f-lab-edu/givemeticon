@@ -1,0 +1,40 @@
+{
+  "test": "B",
+  "profile": "spike",
+  "stage": "s1",
+  "stock": 100,
+  "stages": [
+    {
+      "target_rps": 3000,
+      "requests": 26215,
+      "achieved_rps": 1310.8,
+      "p50_ms": 2195.49,
+      "p95_ms": 2999.73,
+      "p99_ms": 3178.97,
+      "issued": 0,
+      "sold_out": 26215,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 33755
+    }
+  ],
+  "limit_rps": "below_min_stage",
+  "db": {
+    "issued_rows": 100,
+    "http_issued": 100,
+    "match": true
+  },
+  "validity": {
+    "dropped_ratio": 0.562865,
+    "valid": false
+  },
+  "env": {
+    "app_cpus": 2,
+    "mysql_cpus": 2,
+    "jvm_heap": "1g",
+    "hikari_pool_size": 10,
+    "k6_version": "v2.2.0",
+    "cpu": 8,
+    "os": "Darwin 25.3.0 arm64"
+  }
+}
