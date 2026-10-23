@@ -4,11 +4,13 @@
 #   verify.sh unit [--tests <pattern>]
 #   verify.sh bundle <consistency|load|bottleneck|recovery|fairness> [--stage sN]
 #   verify.sh load --stage sN --profile <ramping|spike> [--runs N]   (test B: k6 against docker compose, see docs/stages.md)
+#   verify.sh reprocess evidence/<stage>/load/<profile>/<dir>        (test B: re-aggregate a saved run into a new -reprocessed dir)
 # Last stdout line:
 #   VERIFY <tier> <PASS|FAIL|INFRA_DOWN|BUILD_ERROR|TIMEOUT|NO_TESTS> passed=N failed=N skipped=N duration=Ns sha=<short> dirty=<bool> report=<path>
 # Exit codes: 0 PASS, 1 FAIL, 2 usage/config error, 3 INFRA_DOWN, 4 TIMEOUT, 5 BUILD_ERROR, 6 NO_TESTS.
-# For `load`: PASS = valid measurement, FAIL = invalid measurement (dropped iterations or DB mismatch),
-# INFRA_DOWN = docker/compose/health/seed problem, BUILD_ERROR = k6 or postprocess failed.
+# For `load`: PASS = valid run (first stage without dropped iterations >= 1% and DB rows == 200 responses),
+# FAIL = invalid run, INFRA_DOWN = docker/compose/health/seed problem, BUILD_ERROR = k6 or postprocess failed.
+# Later stages that saturate do not invalidate a run; they are flagged saturated in load.json.
 set -euo pipefail
 
 command -v python3 >/dev/null || { echo "python3 required" >&2; exit 2; }
@@ -18,6 +20,7 @@ BUNDLES="consistency load bottleneck recovery fairness"
 usage() {
     echo "usage: scripts/verify.sh compile | unit [--tests <pattern>] | bundle <$(echo "$BUNDLES" | tr ' ' '|')> [--stage sN]" >&2
     echo "       scripts/verify.sh load --stage sN --profile ramping|spike [--runs N]" >&2
+    echo "       scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir>" >&2
     exit 2
 }
 
@@ -85,6 +88,17 @@ case "$mode" in
         require_stage_class "$stage"
         tier="load-$profile"
         ;;
+    reprocess)
+        [ $# -eq 1 ] || usage
+        source_dir=${1%/}
+        [[ "$source_dir" =~ ^evidence/(s[0-9]+)/load/(ramping|spike)/[^/]+$ ]] \
+            || { echo "expected evidence/<stage>/load/<profile>/<dir>, got: $1" >&2; exit 2; }
+        stage=${BASH_REMATCH[1]}
+        profile=${BASH_REMATCH[2]}
+        [ -f "$source_dir/load.json" ] && [ -f "$source_dir/raw.json.gz" ] \
+            || { echo "$source_dir needs load.json and raw.json.gz" >&2; exit 2; }
+        tier=load-reprocess
+        ;;
     *) usage ;;
 esac
 
@@ -99,6 +113,31 @@ started_epoch=$(date +%s)
 started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 stamp=$(date -u +%Y%m%d-%H%M%S)
 echo "verify $tier: sha=$sha dirty=$dirty started=$started_at${stage:+ stage=$stage}"
+
+# Writes the report, prints the VERIFY line and exits. Reads passed/failed/evidence_dirs/failures of the caller.
+load_finish() {   # <status> <exit code>
+    local ended_epoch
+    ended_epoch=$(date +%s)
+    python3 -I - "$tier" "$stage" "$sha" "$dirty" "$1" "$passed" "$failed" "$started_at" \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$((ended_epoch - started_epoch))" "$2" "$report" \
+        "${evidence_dirs[*]:-}" "$(IFS=';'; echo "${failures[*]:-}")" <<'PY'
+import json, sys
+(tier, stage, sha, dirty, status, passed, failed, started_at, ended_at, duration, exit_code, report,
+ evidence_dirs, failures) = sys.argv[1:15]
+dirs = evidence_dirs.split()
+with open(report, "w") as f:
+    json.dump({
+        "tier": tier, "stage": stage, "sha": sha, "dirty": dirty == "true", "status": status,
+        "passed": int(passed), "failed": int(failed), "skipped": 0,
+        "failures": [{"class": "load", "method": "run", "message": m} for m in failures.split(";") if m],
+        "started_at": started_at, "ended_at": ended_at, "duration_s": int(duration), "exit_code": int(exit_code),
+        "gradle_exit_code": None, "evidence_dir": dirs[-1] if dirs else None, "evidence_dirs": dirs,
+    }, f, indent=2)
+    f.write("\n")
+PY
+    echo "VERIFY $tier $1 passed=$passed failed=$failed skipped=0 duration=$((ended_epoch - started_epoch))s sha=$sha dirty=$dirty report=$report"
+    exit "$2"
+}
 
 LOAD_PREFIX=coupon-lab-load-
 LOAD_HEALTH_TIMEOUT_S=${LOAD_HEALTH_TIMEOUT_S:-60}
@@ -122,30 +161,6 @@ run_load() {
     trap load_cleanup EXIT
     trap 'exit 130' INT
     trap 'exit 143' TERM
-
-    load_finish() {   # <status> <exit code>
-        local ended_epoch
-        ended_epoch=$(date +%s)
-        python3 -I - "$tier" "$stage" "$sha" "$dirty" "$1" "$passed" "$failed" "$started_at" \
-            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$((ended_epoch - started_epoch))" "$2" "$report" \
-            "${evidence_dirs[*]:-}" "$(IFS=';'; echo "${failures[*]:-}")" <<'PY'
-import json, sys
-(tier, stage, sha, dirty, status, passed, failed, started_at, ended_at, duration, exit_code, report,
- evidence_dirs, failures) = sys.argv[1:15]
-dirs = evidence_dirs.split()
-with open(report, "w") as f:
-    json.dump({
-        "tier": tier, "stage": stage, "sha": sha, "dirty": dirty == "true", "status": status,
-        "passed": int(passed), "failed": int(failed), "skipped": 0,
-        "failures": [{"class": "load", "method": "run", "message": m} for m in failures.split(";") if m],
-        "started_at": started_at, "ended_at": ended_at, "duration_s": int(duration), "exit_code": int(exit_code),
-        "gradle_exit_code": None, "evidence_dir": dirs[-1] if dirs else None, "evidence_dirs": dirs,
-    }, f, indent=2)
-    f.write("\n")
-PY
-        echo "VERIFY $tier $1 passed=$passed failed=$failed skipped=0 duration=$((ended_epoch - started_epoch))s sha=$sha dirty=$dirty report=$report"
-        exit "$2"
-    }
 
     : >"$log"
     # 1. preconditions: k6, docker daemon, idle machine
@@ -234,8 +249,8 @@ PY
         summary=$(python3 -I -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
-print("limit_rps=%s dropped_ratio=%s db_issued_rows=%s http_issued=%s valid=%s" % (
-    d["limit_rps"], d["validity"]["dropped_ratio"], d["db"]["issued_rows"], d["db"]["http_issued"],
+print("limit_rps=%s stage0_dropped_ratio=%s db_issued_rows=%s http_issued=%s valid=%s" % (
+    d["limit_rps"], d["validity"]["stage0_dropped_ratio"], d["db"]["issued_rows"], d["db"]["http_issued"],
     str(d["validity"]["valid"]).lower()))
 print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/load.json")
         echo "run $1/$runs: $(head -n 1 <<<"$summary")"
@@ -274,7 +289,51 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/load.json")
         *) load_finish BUILD_ERROR 5 ;;
     esac
 }
-[ "$mode" != load ] || run_load
+
+# verify.sh reprocess <evidence dir>: aggregate a saved run again with the current rules. The source stays untouched;
+# the result goes to a new <ts>-<sha>[-dirty]-reprocessed directory next to it.
+run_reprocess() {
+    set +e
+    local passed=0 failed=0 evidence_dirs=() failures=() dest tmp=build/load/reprocess verdict
+    : >"$log"
+    rm -rf "$tmp"
+    mkdir -p "$tmp"
+    if ! python3 -I scripts/load/postprocess.py --reprocess-from "$source_dir" --out "$tmp/load.json" >>"$log" 2>&1; then
+        failures+=("postprocess failed for $source_dir (see $log)")
+        echo "postprocess failed for $source_dir (see $log)"
+        load_finish BUILD_ERROR 5
+    fi
+    dest="evidence/$stage/load/$profile/$(date -u +%Y%m%d-%H%M%S)-$sha"
+    [ "$dirty" = false ] || dest="$dest-dirty"
+    dest="$dest-reprocessed"
+    if [ -e "$dest" ]; then echo "$dest already exists; evidence is never overwritten" >&2; exit 2; fi
+    mkdir -p "$dest"
+    cp "$tmp/load.json" "$dest/"
+    [ ! -f "$source_dir/summary.json" ] || cp "$source_dir/summary.json" "$dest/"
+    [ ! -f "$source_dir/stats.jsonl" ] || cp "$source_dir/stats.jsonl" "$dest/"
+    evidence_dirs+=("$dest")
+    verdict=$(python3 -I -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("limit_rps=%s stage0_dropped_ratio=%s db_issued_rows=%s http_issued=%s valid=%s" % (
+    d["limit_rps"], d["validity"]["stage0_dropped_ratio"], d["db"]["issued_rows"], d["db"]["http_issued"],
+    str(d["validity"]["valid"]).lower()))
+print("PASS" if d["validity"]["valid"] else "FAIL")' "$dest/load.json")
+    echo "reprocessed $source_dir: $(head -n 1 <<<"$verdict")"
+    echo "evidence in $dest"
+    if [ "$(tail -n 1 <<<"$verdict")" = PASS ]; then
+        passed=1
+        load_finish PASS 0
+    fi
+    failed=1
+    failures+=("run invalid: $(head -n 1 <<<"$verdict")")
+    load_finish FAIL 1
+}
+
+case "$mode" in
+    load) run_load ;;
+    reprocess) run_reprocess ;;
+esac
 
 # Remove artifacts of earlier runs so a stale result can never be mistaken for this run.
 case "$mode" in

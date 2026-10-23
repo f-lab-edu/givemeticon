@@ -21,12 +21,20 @@
 
 * 목적: 같은 환경에서 단계별(S0, S1, ...) 한계 처리량과 지연 분포를 비교한다. 정합성은 테스트 A 가 본다.
 * 실행: `scripts/verify.sh load --stage sN --profile ramping|spike [--runs N]`. 앱과 MySQL 은 `docker-compose.load.yml`(각 cpus 2, JVM `-Xms1g -Xmx1g`, Hikari 10 고정), k6 는 호스트에서 실행한다. 다른 컨테이너가 떠 있으면 실행기가 거부한다(idle machine).
-* 프로필 (`scripts/load/profiles.json`, issue.js 와 postprocess.py 가 같이 읽는다)
+* 프로필 (`scripts/load/profiles.json`, issue.js 와 postprocess.py 가 같이 읽는다. load.json 의 `layout` 에도 저장돼 재처리 때 쓴다)
   * `ramping`: 15s@100rps 워밍업 후 100→500→1000→2000→3000 rps 를 단계당 30s. stock 10,000,000 (매진 없이 발급 경로만 측정).
   * `spike`: 15s@100rps 워밍업 후 1s 만에 3000rps 로 올려 20s 유지. stock 100 (매진 경로).
   * 각 단계의 첫 1s 는 전환 구간(`phase=transition`)이라 집계에서 빼고, 나머지(ramping 29s, spike 20s)만 `phase=measure` 로 집계한다. 200(issued)과 409(sold_out)는 성공 응답, 그 외는 error.
-* 유효성: `valid = dropped_ratio < 0.01 && db.match`. dropped_ratio 는 measure 구간의 dropped_iterations / (요청 수 + dropped_iterations), db.match 는 `coupon_issue` 행 수 == 200 응답 수(워밍업 포함). 무효이면 VERIFY 가 FAIL 이다.
-* 한계 처리량(`limit_rps`): p95 > 500ms, error_rate > 1%, 또는 응답 0건이 처음 나타난 단계의 직전 단계 target_rps. 없으면 `not reached`, 첫 단계에서 이미 넘으면 `below_min_stage`.
+* 유효성(stage별): `stages[i].valid = dropped_iterations / (requests + dropped_iterations) < 0.01`. 한 단계에서 k6 가 iteration 을 버리기 시작하면 서버가 그 부하를 따라가지 못한다는 신호이므로, 그 단계부터는 측정이 아니라 포화 관찰이다.
+  run 유효성(`validity.valid`) = `stages[0].valid && db.match`. 즉 가장 낮은 부하 단계가 깨끗하고 DB 행 수 == 200 응답 수(워밍업 포함)이면 PASS, 아니면 VERIFY 가 FAIL. 뒤쪽 단계가 포화돼도 run 은 무효가 되지 않는다.
+  spike 는 단계가 3000rps 하나뿐이라, 서버가 3000rps 를 따라가지 못하면 그 run 은 FAIL 이다.
+* 한계 처리량(`limit_rps`): 단계를 순서대로 보며 `valid` 이고 p95 <= 500ms 이고 error_rate <= 1% 인 마지막 단계의 target_rps. 처음으로 이 조건을 어긴 단계와 그 이후 모든 단계는 `saturated: true`(수치는 그대로 남긴다). 전 단계 통과 시 `not reached`, 첫 단계부터 어기면 `below_min_stage`.
 * Evidence: `evidence/<stage>/load/<profile>/<UTC ts>-<sha>[-dirty]/` 의 `load.json`, `summary.json`, `raw.json.gz`. raw.json.gz 는 집계에 쓰는 점(http_req_duration, coupon_results, dropped_iterations)만 남긴 것이다(k6 전체 출력은 요청당 십수 개 메트릭이라 GB 단위).
 * 비교 조건: 같은 프로필, 같은 env 블록(cpus, heap, Hikari, k6 버전, 호스트)끼리만 비교한다.
-* Result: 로컬 실행 후 기입
+* 재처리: `scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir>` 가 저장된 raw.json.gz 를 현재 규칙으로 다시 집계해 옆에 `<ts>-<sha>[-dirty]-reprocessed/` 를 새로 만든다. 원본은 건드리지 않는다.
+* 1차 측정(v1 프로필 100/500/1000/2000/3000, 각 stage 1회) — 옛 규칙(run 전체 dropped_ratio < 1%)으로는 4건 모두 FAIL, 새 규칙 재처리본은 `evidence/*/load/*/*-reprocessed/load.json`.
+  * 발급 경로는 S0, S1 모두 포화한다: `stages[target_rps>=1000].achieved_rps` 가 S0 505.5/539.3/610.1, S1 665.7/614.3/479.2 (약 480~670rps), `p95_ms` 5.1~7.8초, `error_rate` 0. 목표를 올려도 처리량은 늘지 않고 지연만 커진다.
+  * spike(매진 경로, SELECT 만): `stages[0].achieved_rps` S0 1389.7, S1 1310.8. 같은 k6, 같은 호스트, 같은 네트워크 경로로 발급 경로의 2배 이상이 나오므로 600rps 근처의 천장은 k6→Docker 네트워크 경로가 아니라 서버 쪽 쓰기 경로에 있다.
+  * S0 와 S1 이 같은 천장을 공유하는 이유(해석, 직접 측정하지 않음): S0 의 UPDATE 도 커밋까지 `coupon_event` 행 락을 쥔다. FOR UPDATE 는 그 락을 앞당길 뿐이므로 직렬화 지점은 락 방식이 아니라 한 행에 몰린 쓰기+커밋이다. 단, S1 의 매진 경로도 FOR UPDATE 로 같은 행 락을 잡는데 1310rps 가 나오므로, 락 대기만으로 600rps 가 정해지는 것은 아니고 락 안에서 일어나는 쓰기와 커밋 비용이 천장을 정하는 것으로 보인다. 확인하려면 InnoDB 행 락 대기 지표나 단계별 CPU 가 필요하다.
+  * 500rps 부근이 무릎이다: S1 은 500rps 에서 `achieved_rps` 500.0, `dropped_iterations` 0, `p95_ms` 550.6 이고 S0 는 `p95_ms` 2091.8, `dropped_iterations` 564. 1차 프로필은 100→500 사이가 너무 성기고 1000 이상은 앞 단계의 대기열만 측정한다.
+* Result: 로컬 실행 후 기입 (v2 프로필)
