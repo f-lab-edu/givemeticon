@@ -1,0 +1,49 @@
+# Environment for `scripts/verify.sh load`: app and MySQL with pinned CPU limits, k6 runs on the host.
+# Started and removed (down -v) by verify.sh; the manual-run docker-compose.yml is unrelated.
+# Required variables (set by verify.sh): COUPON_LAB_DB_PASSWORD, COUPON_STRATEGY. Optional: HIKARI_POOL_SIZE.
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: coupon-lab-load-mysql
+    cpus: 2
+    ports:
+      - "13307:3306"
+    environment:
+      MYSQL_DATABASE: coupon_lab
+      MYSQL_ROOT_PASSWORD: ${COUPON_LAB_DB_PASSWORD:?set COUPON_LAB_DB_PASSWORD}
+    healthcheck:
+      # -h 127.0.0.1 forces TCP, which only the real server answers (not the temporary init server).
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build: .
+    container_name: coupon-lab-load-app
+    cpus: 2
+    ports:
+      - "18080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      COUPON_LAB_DB_URL: jdbc:mysql://mysql:3306/coupon_lab?useSSL=false&allowPublicKeyRetrieval=true
+      COUPON_LAB_DB_USER: root
+      COUPON_LAB_DB_PASSWORD: ${COUPON_LAB_DB_PASSWORD:?set COUPON_LAB_DB_PASSWORD}
+      COUPON_STRATEGY: ${COUPON_STRATEGY:?set COUPON_STRATEGY}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${HIKARI_POOL_SIZE:-10}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+    healthcheck:
+      # bash /dev/tcp instead of curl: the JRE image is not guaranteed to ship curl.
+      test:
+        - CMD
+        - bash
+        - -c
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8080 &&
+          printf 'GET /actuator/health HTTP/1.0\r\n\r\n' >&3 &&
+          grep -q '"status":"UP"' <&3
+      interval: 3s
+      timeout: 3s
+      retries: 30
