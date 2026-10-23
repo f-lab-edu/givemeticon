@@ -1,0 +1,59 @@
+{
+  "test": "B",
+  "profile": "spike",
+  "stage": "s0",
+  "stock": 100,
+  "layout": {
+    "warmup": {
+      "rps": 100,
+      "seconds": 15
+    },
+    "transition_seconds": 1,
+    "steps": [
+      {
+        "rps": 3000,
+        "seconds": 21
+      }
+    ]
+  },
+  "stages": [
+    {
+      "target_rps": 3000,
+      "requests": 27793,
+      "achieved_rps": 1389.7,
+      "p50_ms": 2095.24,
+      "p95_ms": 2984.87,
+      "p99_ms": 3381.54,
+      "issued": 0,
+      "sold_out": 27793,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 32202,
+      "dropped_ratio": 0.536745,
+      "valid": false,
+      "saturated": true
+    }
+  ],
+  "limit_rps": "below_min_stage",
+  "db": {
+    "issued_rows": 101,
+    "http_issued": 101,
+    "match": true
+  },
+  "validity": {
+    "stage0_dropped_ratio": 0.536745,
+    "stage0_valid": false,
+    "db_match": true,
+    "valid": false
+  },
+  "env": {
+    "app_cpus": 2,
+    "mysql_cpus": 2,
+    "jvm_heap": "1g",
+    "hikari_pool_size": 10,
+    "k6_version": "v2.2.0",
+    "cpu": 8,
+    "os": "Darwin 25.3.0 arm64"
+  },
+  "reprocessed_from": "evidence/s0/load/spike/20261023-063652-0575d71"
+}
