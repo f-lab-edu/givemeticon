@@ -1,0 +1,239 @@
+{
+  "test": "B",
+  "profile": "ramping",
+  "stage": "s1",
+  "stock": 10000000,
+  "layout": {
+    "warmup": {
+      "rps": 100,
+      "seconds": 15
+    },
+    "transition_seconds": 1,
+    "vus": {
+      "pre_allocated": 500,
+      "max": 3000
+    },
+    "steps": [
+      {
+        "rps": 100,
+        "seconds": 30
+      },
+      {
+        "rps": 200,
+        "seconds": 30
+      },
+      {
+        "rps": 300,
+        "seconds": 30
+      },
+      {
+        "rps": 400,
+        "seconds": 30
+      },
+      {
+        "rps": 500,
+        "seconds": 30
+      },
+      {
+        "rps": 650,
+        "seconds": 30
+      },
+      {
+        "rps": 800,
+        "seconds": 30
+      }
+    ]
+  },
+  "stages": [
+    {
+      "target_rps": 100,
+      "requests": 2900,
+      "achieved_rps": 100.0,
+      "p50_ms": 3.44,
+      "p95_ms": 20.77,
+      "p99_ms": 105.31,
+      "issued": 2900,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 0,
+      "dropped_ratio": 0.0,
+      "valid": true,
+      "after_first_violation": false,
+      "kind": "ok",
+      "app_cpu_pct_mean": 21.4,
+      "app_cpu_pct_max": 53.7,
+      "mysql_cpu_pct_mean": 15.3,
+      "mysql_cpu_pct_max": 22.2,
+      "gc_pauses_over_200ms": null
+    },
+    {
+      "target_rps": 200,
+      "requests": 5800,
+      "achieved_rps": 200.0,
+      "p50_ms": 2.73,
+      "p95_ms": 114.75,
+      "p99_ms": 311.81,
+      "issued": 5800,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 0,
+      "dropped_ratio": 0.0,
+      "valid": true,
+      "after_first_violation": false,
+      "kind": "ok",
+      "app_cpu_pct_mean": 32.5,
+      "app_cpu_pct_max": 76.6,
+      "mysql_cpu_pct_mean": 28.6,
+      "mysql_cpu_pct_max": 62.5,
+      "gc_pauses_over_200ms": null
+    },
+    {
+      "target_rps": 300,
+      "requests": 8700,
+      "achieved_rps": 300.0,
+      "p50_ms": 2.37,
+      "p95_ms": 124.62,
+      "p99_ms": 345.85,
+      "issued": 8700,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 0,
+      "dropped_ratio": 0.0,
+      "valid": true,
+      "after_first_violation": false,
+      "kind": "ok",
+      "app_cpu_pct_mean": 32.8,
+      "app_cpu_pct_max": 78.6,
+      "mysql_cpu_pct_mean": 33.3,
+      "mysql_cpu_pct_max": 76.7,
+      "gc_pauses_over_200ms": null
+    },
+    {
+      "target_rps": 400,
+      "requests": 11600,
+      "achieved_rps": 400.0,
+      "p50_ms": 2.09,
+      "p95_ms": 130.42,
+      "p99_ms": 216.05,
+      "issued": 11600,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 0,
+      "dropped_ratio": 0.0,
+      "valid": true,
+      "after_first_violation": false,
+      "kind": "ok",
+      "app_cpu_pct_mean": 27.0,
+      "app_cpu_pct_max": 37.4,
+      "mysql_cpu_pct_mean": 35.0,
+      "mysql_cpu_pct_max": 44.1,
+      "gc_pauses_over_200ms": null
+    },
+    {
+      "target_rps": 500,
+      "requests": 14501,
+      "achieved_rps": 500.0,
+      "p50_ms": 2.49,
+      "p95_ms": 400.7,
+      "p99_ms": 594.08,
+      "issued": 14501,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 0,
+      "dropped_ratio": 0.0,
+      "valid": true,
+      "after_first_violation": false,
+      "kind": "ok",
+      "app_cpu_pct_mean": 37.1,
+      "app_cpu_pct_max": 122.0,
+      "mysql_cpu_pct_mean": 40.6,
+      "mysql_cpu_pct_max": 54.2,
+      "gc_pauses_over_200ms": null
+    },
+    {
+      "target_rps": 650,
+      "requests": 17037,
+      "achieved_rps": 587.5,
+      "p50_ms": 1976.56,
+      "p95_ms": 3570.32,
+      "p99_ms": 3687.78,
+      "issued": 17037,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 1813,
+      "dropped_ratio": 0.09618,
+      "valid": false,
+      "after_first_violation": true,
+      "kind": "saturated",
+      "app_cpu_pct_mean": 44.4,
+      "app_cpu_pct_max": 59.2,
+      "mysql_cpu_pct_mean": 55.7,
+      "mysql_cpu_pct_max": 63.2,
+      "gc_pauses_over_200ms": null
+    },
+    {
+      "target_rps": 800,
+      "requests": 15448,
+      "achieved_rps": 532.7,
+      "p50_ms": 5525.23,
+      "p95_ms": 7162.45,
+      "p99_ms": 7290.08,
+      "issued": 15448,
+      "sold_out": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 7747,
+      "dropped_ratio": 0.333994,
+      "valid": false,
+      "after_first_violation": true,
+      "kind": "saturated",
+      "app_cpu_pct_mean": 46.4,
+      "app_cpu_pct_max": 76.4,
+      "mysql_cpu_pct_mean": 59.7,
+      "mysql_cpu_pct_max": 87.8,
+      "gc_pauses_over_200ms": null
+    }
+  ],
+  "sustained_limit_rps": 500,
+  "max_achieved_rps": {
+    "achieved_rps": 587.5,
+    "target_rps": 650
+  },
+  "stalls": [],
+  "limit_rps_first_violation": 500,
+  "db": {
+    "issued_rows": 80021,
+    "http_issued": 80021,
+    "match": true
+  },
+  "vus": {
+    "max_vus": 3000,
+    "vus_max": 3000,
+    "vus_peak": 3000,
+    "vus_max_reached": true
+  },
+  "run": {},
+  "validity": {
+    "stage0_dropped_ratio": 0.0,
+    "stage0_valid": true,
+    "db_match": true,
+    "valid": true
+  },
+  "env": {
+    "app_cpus": 2,
+    "mysql_cpus": 2,
+    "jvm_heap": "1g",
+    "hikari_pool_size": 10,
+    "k6_version": "v2.2.0",
+    "k6_mode": "host",
+    "cpu": 8,
+    "os": "Darwin 25.3.0 arm64"
+  },
+  "reprocessed_from": "evidence/s1/load/ramping/20261023-072117-c0ef9b0"
+}
