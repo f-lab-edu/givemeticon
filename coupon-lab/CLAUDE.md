@@ -18,6 +18,7 @@ test bundle: consistency, load, bottleneck, recovery, fairness.
 ## Environment
 * Testcontainers requires Docker. If Docker is unavailable, report it; do not fall back to an
   external database. Requires Testcontainers >= 1.21.4 for Docker Engine 29+.
+* Load tests (`verify.sh load`) must run on an idle machine; the runner refuses if other containers are up.
 
 ## Reporting
 * End every task with the `builder-report` skill.

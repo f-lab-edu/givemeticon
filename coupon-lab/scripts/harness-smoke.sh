@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self-test of the coupon-lab harness (verify.sh and the three hooks). Run from coupon-lab/.
+# Self-test of the coupon-lab harness (verify.sh, the three hooks and the non-Docker parts of the load runner). Run from coupon-lab/.
 # Prints OK/FAIL/SKIP per item; exits 1 if any item failed.
 set -uo pipefail
 
@@ -211,7 +211,49 @@ else
     fail "11 untracked evidence file" "compile line: $last; unit exit=$rc_unit; hook exit=$rc_untracked ($msg_untracked); after removal exit=$rc_clean (want 0)"
 fi
 
-total=$((11 - skipped))
+# 12. a stage that does not exist on this branch stops before Gradle starts
+run scripts/verify.sh bundle consistency --stage s9
+if [ "$rc" -eq 2 ] && [[ "$out" == *"S9CouponIssueService not found on this branch"* ]]; then
+    ok "12 verify bundle --stage s9: exit 2 (S9CouponIssueService not found on this branch)"
+else
+    fail "12 verify bundle --stage s9" "exit=$rc output: $out"
+fi
+
+# 13. verify.sh load: the idle-machine precondition (exit 2) and the INFRA_DOWN path (exit 3). Both run against
+#     stand-ins for docker and k6 placed first on PATH, so no real container is started or inspected, no load is
+#     generated and Docker is not needed (nor is an actually idle machine).
+shim=$(mk)
+rm -f "$shim"
+mkdir "$shim"
+printf '#!/bin/sh\necho "k6 v0.0.0 (smoke)"\n' >"$shim/k6"
+cat >"$shim/docker" <<'SHIM'
+#!/bin/sh
+case "$1" in
+    info) exit 0 ;;
+    ps) printf '%s' "$SMOKE_PS"; exit 0 ;;
+    *) exit 1 ;;
+esac
+SHIM
+chmod +x "$shim/k6" "$shim/docker"
+out=$(SMOKE_PS=$'legacy-redis\nlegacy-kafka\n' PATH="$shim:$PATH" scripts/verify.sh load --stage s0 --profile ramping 2>&1)
+rc_busy=$?
+msg_busy=$out
+out=$(SMOKE_PS=$'coupon-lab-load-app\n' PATH="$shim:$PATH" scripts/verify.sh load --stage s0 --profile ramping 2>&1)
+rc_infra=$?
+msg_infra=$(tail -n 1 <<<"$out")
+rm -rf "$shim"
+if [ "$rc_busy" -eq 2 ] && [[ "$msg_busy" == *"legacy-redis"* ]] && [[ "$msg_busy" == *"stop other containers first"* ]] \
+    && [ "$rc_infra" -eq 3 ] && [[ "$msg_infra" == "VERIFY load-ramping INFRA_DOWN "* ]]; then
+    ok "13 verify load: exit 2 with other containers up, exit 3 INFRA_DOWN when compose fails (coupon-lab-load-* ignored)"
+else
+    fail "13 verify load" "busy exit=$rc_busy ($msg_busy), infra exit=$rc_infra ($msg_infra)"
+fi
+
+# 14. postprocess.py on synthetic k6 output
+run env PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/load
+if [ "$rc" -eq 0 ]; then ok "14 scripts/load unit tests"; else fail "14 scripts/load unit tests" "exit=$rc $(tail -n 3 <<<"$out")"; fi
+
+total=$((14 - skipped))
 suffix=""
 [ "$skipped" -eq 0 ] || suffix=" skipped=$skipped"
 echo "harness-smoke: $((total - fails))/$total OK in ${SECONDS}s$suffix"
