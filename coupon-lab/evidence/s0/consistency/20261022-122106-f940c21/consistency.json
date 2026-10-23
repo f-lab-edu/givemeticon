@@ -15,7 +15,7 @@
     "elapsed_ms" : 909
   }, {
     "run" : 2,
-    "issued" : 107,
+    "issued" : 1
     "remaining" : -7,
     "over_issue" : 7,
     "dup_members" : 0,
