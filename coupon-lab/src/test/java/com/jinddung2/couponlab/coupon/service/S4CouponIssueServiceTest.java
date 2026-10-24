@@ -93,6 +93,9 @@ class S4CouponIssueServiceTest {
 
     @Test
     void unknownEventIsRejected() {
+        // MyBatis returns null for a missing row; a Mockito mock would return 0 for Integer unless told otherwise.
+        given(couponMapper.selectTotal(8L)).willReturn(null);
+
         assertThatThrownBy(() -> service.issue(8L, 42L)).isInstanceOf(IllegalArgumentException.class);
     }
 }
