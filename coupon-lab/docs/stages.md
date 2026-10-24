@@ -578,3 +578,79 @@ S4 에 주는 시사점: S3 의 자리 손실은 "도착률 × 중단 길이"가
 4. **503 폭발:** 원인은 예측하지 않는다. 진단이 정한다.
    * `by_reason` 이 채널/연결 계열 클래스로 채워지고 캐시 200 에서 폭발이 사라지면, 원인은 채널 churn 이었다.
    * `timeout` 이 대부분인데 `queue.jsonl` 의 `channels` 가 평평하고 `rabbitmq.log` 에 flow/alarm 이 보이면, 브로커 포화다.
+
+### S4 재측정 결과 (`cc348a1`, 사용자 Mac, 각 n=1)
+
+Evidence: `coupon-lab/evidence/s4/recovery/consumer-redeliver-aof/20261024-130802-cc348a1/`, `.../db-down-aof/20261024-131112-cc348a1/`, `.../redis-restart-aof/20261024-132015-cc348a1/`, `.../redis-restart/20261024-132219-cc348a1/`(`--no-redis-aof`), `coupon-lab/evidence/s4/load/ramping-rows1-aof/20261024-131906-cc348a1/`, `.../spike-aof/20261024-132015-cc348a1/`.
+
+찾은 것:
+
+1. **모든 503 은 채널 고갈이다.**
+   * consumer-redeliver 의 `publish_failures` 는 `{"total": 5510, "by_reason": {"AmqpResourceNotAvailableException": 5510}}` 이고, `app-errors.log` 의 원인 줄은 `org.springframework.amqp.AmqpResourceNotAvailableException: The channelMax limit is reached. Try later.` 다.
+   * Spring AMQP(`SimpleConnection.createChannel`)는 클라이언트의 `connection.createChannel()` 이 null 을 돌려줄 때 이 예외를 던진다. 연결 하나의 채널 번호 2,047개가 모두 할당된 상태다.
+   * `ramping-rows1` 에서도 실패 95,462건 중 95,460건이 이 예외이고 2건이 `timeout` 이다.
+   * `rabbitmq.log` 에는 기동 시 경고만 있고 flow/alarm 줄이 없다. 브로커 포화가 아니다.
+   * `queue.jsonl` 의 `channels`(5초 통계 창마다 갱신)는 100rps 워밍업에서 약 460~710, 500rps 에서 약 1,830~1,950 까지 오르고, 창마다 다시 떨어진다. 발행 요청마다 새 채널이 열리고 몇 초 뒤에 닫힌다는 뜻이다.
+   * `cache.channel.size: 200` 은 아무것도 바꾸지 못했다. 즉 이 채널들은 캐시로 돌아가지 않는다. 의심 경로는 `rabbitTemplate.invoke(…waitForConfirms…)` 의 전용 채널이었다(아래 "S4 후속 2" 에서 확인).
+2. **소비자 처리 속도의 한계는 테이블 훑기였다.** 인덱스(V2) 뒤 db-down 45초에서 쌓인 21,923건을 27.7초에 다 썼다(약 790 행/초, 이전 약 250 행/초).
+3. **message_id 멱등성이 동작한다.**
+   * AOF 없는 redis-restart(`--no-redis-aof`): `confirmed_but_missing` 0(이전 6,981), 이제 `over_issue` 5,013 이 보인다(`dup_seq` 7,017).
+   * AOF 로 돌린 run 에서는 카운터가 그대로 살아남았다(28,000 = 요청 28,001 중 카운터에 닿은 수). `docker restart` 는 정상 종료라 AOF 가 끝까지 쓰인 것이고, kill -9 시험이 아니다.
+4. **새로 보인 것: AOF redis-restart run 에서 18초(sec 20~37) 동안 모든 요청이 타임아웃됐다.**
+   * Redis 는 +3.5초에 healthy 였다. 타임아웃 6,541건은 모두 k6 `error_code` 1050(요청 타임아웃)이다.
+   * 이전 redis-restart run 들(AOF `12799fa`, `16cda28`; AOF 없음 `b81de97`, `cc348a1` 의 `132219`)에서는 타임아웃이 0 이었다.
+   * 가설: Lettuce 재연결의 지수 백오프. 이번 작업에서는 고치지 않고 관찰 가능하게만 만든다(아래 B).
+5. **`blackout_s` 정의가 틀렸다.** 200 이 없는 초를 세므로 매진된 꼬리(409 만 있는 초)도 blackout 으로 센다. S3 redis-restart-aof 의 "21초"는 전부 매진 구간이다.
+
+예측과 비교(앞 절 "S4 재측정 예측"):
+
+| 예측 | 판정 |
+|---|---|
+| 1. consumer-redeliver: `coupon_s4_redeliveries` ≈ http_200/50 (±10%), 중복 행 0, 정착 뒤 DB 행 == http_200 | **확인**: 509 대 25,492/50 = 509.8, `dup_seq` 0, 25,492 == 25,492 |
+| 2. db-down 45초: 타임아웃 0, blackout 0, DB 행 == http_200, 비우는 시간 < 35초 | **확인**: 0, 0, 25,533 == 25,533, `recovery_time_s` 27.7초(이전 69.6초). 한계는 직렬 커밋이 아니라 훑기였다 |
+| 3a. AOF: `over_issue` ≤ 약 500, 잃은 확인된 당첨 0 | **확인**, 단 되감김은 ≤500 이 아니라 0 이었다. `docker restart` 가 정상 종료(SIGTERM)라 Redis 가 종료하면서 AOF 를 다 쓰고 내려갔다. everysec 의 최대 1초 창은 크래시(kill -9)에서만 드러나고, 이 실험으로는 재지 못한다. 확인된 당첨 손실 0(`recorded_despite_unknown` 2,247 은 클라이언트가 타임아웃했지만 행이 생긴 수) |
+| 3b. AOF 없음: `over_issue` ≈ 재시작 뒤 다시 팔린 자리, 잃은 당첨 0 | **잃은 당첨 0 은 확인**(`confirmed_but_missing` 0). `over_issue` 5,013 대 다시 쓰인 seq 7,017(`dup_seq`)은 같지 않다. 503(5,768건)으로 자리를 쓰고도 행이 없는 당첨이 섞여 있어 "≈" 는 이 run 으로 검증할 수 없다 |
+| 4. 503 원인은 진단이 정한다 | 결정됨: 원인은 채널 고갈이다. 다만 캐시 200 으로 사라지지 않았으므로 "캐시 크기" 가 아니라 캐시로 돌아가지 않는 채널이다 |
+
+### S4 후속 2 (측정 전에 적는다)
+
+**`invoke()` 채널이 캐시로 돌아가지 않는 경로 (spring-rabbit 3.1.7 소스에서 확인).**
+1. `RabbitTemplate.invoke(OperationsCallback, ConfirmCallback, ConfirmCallback)` 은 `connection.createChannel(false)` 로 전용 채널을 받은 직후, `if (!connectionFactory.isPublisherConfirms()) RabbitUtils.setPhysicalCloseRequired(channel, true);` 를 실행한다.
+2. `CachingConnectionFactory.isPublisherConfirms()` 는 `ConfirmType.CORRELATED.equals(this.confirmType)` 일 때만 true 다. 그래서 `publisher-confirm-type: simple` 에서는 모든 `invoke()` 채널이 "물리적으로 닫아야 함"으로 표시된다.
+3. `invoke()` 의 `finally` → `cleanUpAfterAction(...)` → `RabbitUtils.closeChannel(channel)` 이 채널 프록시의 `close` 를 부른다. `CachedChannelInvocationHandler.invoke` 의 `"close"` 분기는 `RabbitUtils.isPhysicalCloseRequired()` 가 true 이므로 `logicalClose`/`returnToCache` 가 아니라 `physicalClose()` 로 간다.
+4. `physicalClose()` 는 팩토리가 active 이고 `ConfirmType.CORRELATED` 이거나 `publisherReturns` 이면 `asyncClose()` 를 쓴다. 우리는 `publisher-returns: true` 다.
+5. `asyncClose()` 는 채널 실행기에서 CORRELATED 가 아니면 `Thread.sleep(ASYNC_CLOSE_TIMEOUT)`(`ASYNC_CLOSE_TIMEOUT = 5_000`) 한 뒤에야 `channel.close()` 를 부른다.
+
+따라서 발행 요청마다 채널 하나가 새로 열리고 캐시를 거치지 않은 채 5초 동안 열려 있다. 500rps × 5초 ≈ 2,500 > 2,047 이므로 `channelMax` 에 닿는다. 100rps 에서 약 500, 500rps 에서 약 1,900 인 `channels` 와 맞는다.
+
+변경:
+
+* **A. correlated confirm, 전용 채널 없음.**
+  * 설정: `publisher-confirm-type: correlated`, `publisher-returns: true` 유지, `template.mandatory: true`.
+  * `issue()` 는 `CorrelationData(messageId)` 와 함께 `rabbitTemplate.convertAndSend(…, postProcessor, correlation)` 로 보내고 `correlation.getFuture().get(confirmTimeoutMs)` 를 기다린다. `invoke`/`waitForConfirms` 는 없앴다.
+  * 미래(future)는 템플릿의 publisher-callback 채널(`PublisherCallbackChannelImpl`)이 ack 때 채우고, 반환(return)이 오면 `setReturned` 한다. 우리가 따로 `setConfirmCallback` 을 걸지 않는다.
+  * 결과: ack 가 false → `nack`, `get` 의 `TimeoutException` → `timeout`, `getReturned() != null`(라우팅 실패, 브로커는 그래도 ack) → `returned`, 그 밖의 예외 → 단순 클래스 이름(`ExecutionException` 은 원인을 꺼낸다).
+  * `cache.channel.size: 200` 은 이제 의미가 있다(채널을 캐시에서 빌리고 돌려준다).
+  * 한 줄 ERROR 형식과 `coupon_s4_publish_failures{reason}` 는 그대로다.
+* **B. Redis 재연결을 볼 수 있게 한다(`verify.sh`).**
+  * `app-errors.log` 는 ERROR 에 더해 WARN 줄과 로거가 Lettuce(`io.lettuce`, 로그 패턴에서는 `i.l.…` 로 줄어든다)이거나 `ConnectionWatchdog` 인 모든 줄(수준 무관)을 남긴다. 400자 자르기, 최대 4000줄, 스택 프레임(들여쓴 줄)은 제외한다.
+  * s3/s4 recovery run 은 `docker logs redis` 전체를 `redis.log` 로 남긴다.
+  * `spring.data.redis.timeout` 과 Lettuce 옵션은 바꾸지 않았다.
+* **C. `blackout_s` = 결정이 없던 초.**
+  * 새 정의: 부하 구간에서 그 초에 시작한 요청 중 200 도 409 도 없는 초가 이어진 가장 긴 길이. 매진된 꼬리는 blackout 이 아니다.
+  * `sold_out_at_s` 는 409 가 처음 나온 초다(없으면 null).
+  * 앞 절 "테스트 D" 표의 `blackout_s` 정의(200 이 없는 초)는 이 시점부터 바뀌었다. 기존 S3/S4 recovery run 은 모두 `-reprocessed` 디렉터리(`20261024-1341*-a3e9d8c-reprocessed`, `20261024-1342*-a3e9d8c-reprocessed`)로 다시 집계했고 원본은 그대로다.
+  * 달라진 값: S3 redis-restart-aof `blackout_s` 21 → 0(`sold_out_at_s` 38), S4 redis-restart-aof(`12799fa`) 21 → 0(`sold_out_at_s` 38), S4 redis-restart-aof(`cc348a1`) 17(타임아웃 구간, `sold_out_at_s` 43). S3 db-down 14 / 15 / 54 는 그대로다(그 구간에는 409 가 없다).
+* **D. s4 load 유효성.**
+  * s4 만 `db.rows_from_timed_out_publishes = issued_rows - http_issued` 이고, `0 <= 그 값 <= publish_failures.by_reason.timeout` 이면 유효하다. 2초를 기다린 뒤 도착한 confirm 은 클라이언트에게 503 으로 답했지만 메시지는 발행되었고 소비자가 행을 쓴다. 카운터를 읽지 못하면 timeout 0 으로 보고 같음만 유효하다.
+  * 다른 stage 는 그대로 `issued_rows == http_issued` 다.
+  * `evidence/s4/load/ramping-rows1-aof/20261024-131906-cc348a1` 의 재처리본 `.../20261024-134208-a3e9d8c-reprocessed/` 는 2 == 2 로 **유효**가 되었다(`sustained_limit_rps` 400 은 그대로).
+
+다음 측정의 예측:
+
+1. **consumer-redeliver:** http_5xx ≤ 10 (이전 5,510). `queue.jsonl` 의 `channels` 는 내내 ≤ 약 210. redeliveries ≈ http_200/50. DB 행 == http_200.
+2. **ramping-rows1 (n=3):** 1,200rps 미만의 어떤 단계도 error_rate > 1% 가 아니다. `sustained_limit_rps` ≥ 1,200. 천장은 앱 CPU 로 옮겨 간다(첫 포화 단계에서 2 cpu 의 ≥ 190%). 503 이 채널 고갈이 아닌 다른 reason 으로 남으면 이 수정이 틀린 것이고, 그 새 reason 이 다음 단서다.
+3. **db-down 45초:** 그대로(타임아웃 0, blackout 0, 행 == http_200, 비우기 < 35초).
+4. **redis-restart, AOF (n=3):** 매번 `over_issue` 0. 18초 blackout 이 다시 나오거나(그러면 `redis.log`/`app-errors.log` 에 재연결 시도와 그 시각이 보여야 하고, 그것이 S4 의 다음 작업이 된다) 나오지 않는다(그러면 설명되지 않은 단일 사건으로 남기고 그렇게 적는다).
+5. **spike:** http_5xx 0, 행 100.
+
