@@ -206,3 +206,27 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 * **S2(Redis 분산 락)는 건너뛴다.** 직렬화 지점이 하나 남는 구조라 천장이 움직이지 않는다. 임계 구역을 DB 행 락에서 다른 락으로 옮길 뿐이라는 뜻이다.
 * **다음 단계는 S3**: Redis 원자적 카운터가 당첨을 결정하고 DB 에는 당첨자만 저장한다. 1단(한 행의 직렬화)을 구조에서 없애는 단계다.
 * 2단(MySQL CPU / 커밋 경로)은 S3/S4 결과를 해석할 때 다시 중요해진다. fsync/binlog 분해는 그때까지 보류한다.
+
+## S2 - 생략
+
+* Redis 분산 락 단계는 만들지 않는다. 근거는 테스트 C(위 C5 "결정"): 락을 DB 행에서 Redis 로 옮겨도 이벤트당 직렬화 지점이 하나 남아 1단 천장(약 650rps)이 움직이지 않는다. 임계 구역의 위치만 바뀐다.
+* Evidence: `coupon-lab/evidence/s1/load/ramping-rows1/`, `.../ramping-rows4/`, `.../ramping-rows16/` (행 수를 늘리면 천장이 오른다 = 직렬화 지점이 천장), `coupon-lab/evidence/s0/load/ramping-rows4/`. 판단은 C2/C4 표 1~4행.
+
+## S3 - Redis 원자 카운터가 결정, DB 는 당첨자만 저장
+
+* Changed: 발급 결정을 `coupon_event` 행에서 Redis 로 옮겼다. `S3CouponIssueService` 가 Lua 스크립트 한 번(`INCR coupon:event:{eventId}:issued`, 결과 n 이 total 을 넘으면 -1)으로 결정한다. n <= total 이면 당첨(seq = n), 아니면 DB 호출 없이 `SoldOut`. 카운터는 total 을 넘어 올라갈 수 있고 줄이지 않는다(품절 = n > total). total 은 이벤트당 한 번 `selectTotal` 로 읽어 `ConcurrentHashMap` 에 둔다(이 실험에서 이벤트는 불변). 모르는 이벤트는 S0/S1 과 같은 `IllegalArgumentException`.
+* Did NOT change: 회원 중복 방지 없음(후속 단계), 요청마다 `coupon_event` 를 읽거나 쓰지 않는다(`remaining_quantity` 는 S3 가 건드리지 않는다), 당첨자의 `coupon_issue` INSERT 는 동기 단일 문장(`insertIssue` 그대로, `@Transactional` 없음), 락·트랜잭션·제약 계약은 그대로, S0/S1 서비스는 동결.
+* Known gap: 카운터를 이긴 뒤 INSERT 가 실패하면 ERROR 로그(eventId/memberId/seq)를 남기고 예외를 다시 던져 컨트롤러가 500 을 돌려준다. 자리는 이미 소모된 상태로 남는다(발급 행 수 < 당첨 수). S4 의 동기.
+* 환경 변화: 부하 compose 에 `redis:7-alpine`(cpus 1, appendonly no, 스냅샷 없음)이 모든 stage 에서 뜨고 `env.redis_image`/`env.redis_cpus` 가 기록된다. 그래서 이전 S0/S1 부하 evidence 와 env 블록이 다르다. 짝 비교용으로 S1 spike 를 새 실행기로 다시 잰다. docker stats 샘플링은 app 과 mysql 만 대상이라 Redis CPU 는 기록되지 않는다.
+* 테스트 A v3: 반복마다 `over_issue == 0`, `dup_members == 0`, `issued == min(THREADS, TOTAL_QUANTITY)`, `exceptions == 0` 만 단언한다. `remaining_mismatch` 는 단언하지 않는다. `remaining` 은 정보로만 기록하고 출처를 JSON 의 `remaining_source` 에 남긴다(`db`: s0/s1 은 `coupon_event.remaining_quantity`, `redis`: s3 는 total - min(redis 카운터, total) 과 `redis_counter`). 기준이 바뀌었으므로 S0/S1 은 v3 로 한 번 다시 기록한다.
+* 부하 실행기: stage s3 는 시드한 이벤트의 Redis 카운터 합을 `load.json` 의 `db.redis_counter` 로 기록한다(정보용). 유효성 규칙은 그대로 `db.issued_rows == http_issued`. 시드는 그대로(DB INSERT), S3 는 첫 요청에서 DB 로 total 을 읽는다.
+
+### S3 예측 (측정 전에 적는다)
+
+* **A (consistency, 1000 threads, stock 100, 10회):** 깨진 반복 0/10, 매 회 `issued` 100, `exceptions` 0, `dup_members` 0. `redis_counter` 는 1000.
+* **B ramping (stock 10M, 모든 요청이 당첨):** 650 과 800rps 에서 p50 이 약 2ms 로 유지된다(`row_lock_wait_ratio` ≈ 0, 1단 소멸). 천장은 2단 값(약 1,100~1,200rps)까지 오르고 `mysql_cpu_pct_mean` 은 높다(당첨자마다 INSERT + 커밋 비용이 든다).
+* **B spike (stock 100, 3,000rps):** `db.issued_rows == 100`, `redis_counter` ≫ 100, 달성 rps 는 S1 spike(1,311)보다 훨씬 높다(패자는 MySQL 을 거치지 않는다).
+
+### S3 결과
+
+* 로컬 실행 후 기입 (실행 명령과 evidence 경로는 사용자 로컬 계획에 따른다)

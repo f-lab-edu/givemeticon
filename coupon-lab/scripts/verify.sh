@@ -365,6 +365,17 @@ run_load() {
         if ! [[ "$issued_rows" =~ ^[0-9]+$ ]]; then
             run_status=INFRA_DOWN; run_note="counting coupon_issue rows failed (see $log)"; return
         fi
+        # S3 only: the decision counter of the seeded events (informational; the validity rule stays db rows == http issued)
+        local redis_counter_arg=() redis_counter id value
+        if [ "$stage" = s3 ]; then
+            redis_counter=0
+            for id in ${event_ids//,/ }; do
+                value=$(docker exec "${LOAD_PREFIX}redis" redis-cli --raw GET "coupon:event:$id:issued" 2>>"$log")
+                [[ "${value:-0}" =~ ^[0-9]+$ ]] || { run_status=INFRA_DOWN; run_note="reading the redis counter of event $id failed (got '$value'; see $log)"; return; }
+                redis_counter=$((redis_counter + ${value:-0}))
+            done
+            redis_counter_arg=(--redis-counter "$redis_counter")
+        fi
         nano=$(load_inspect '{{.HostConfig.NanoCpus}}' app); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_app=$((nano / 1000000000))
         nano=$(load_inspect '{{.HostConfig.NanoCpus}}' mysql); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_mysql=$((nano / 1000000000))
         heap=$(load_inspect '{{json .Config.Entrypoint}}' app | grep -o -- '-Xmx[0-9]*[kKmMgG]' | head -n 1 | sed 's/^-Xmx//')
@@ -372,7 +383,7 @@ run_load() {
         nano=$(load_inspect '{{.HostConfig.NanoCpus}}' redis); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_redis=$((nano / 1000000000))
         redis_image=$(load_inspect '{{.Config.Image}}' redis)
         python3 -I scripts/load/postprocess.py --raw "$work/raw.json.gz" --profile "$profile" --stage "$stage" \
-            --db-issued-rows "$issued_rows" --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
+            --db-issued-rows "$issued_rows" ${redis_counter_arg[@]+"${redis_counter_arg[@]}"} --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
             --stats "$work/stats.jsonl" --summary "$work/summary.json" --gc-log "$work/gc/gc.log" --innodb "$work/innodb.jsonl" \
             --run-order "$run_order" --minutes-since-up "$minutes_up" ${clock_offset:+--clock-offset-s "$clock_offset"} \
             --rows "$rows" ${max_vus:+--max-vus "$max_vus"} --env "max_vus=${max_vus:-$vus_max_default}" \

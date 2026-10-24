@@ -452,6 +452,19 @@ class PostprocessTest(unittest.TestCase):
         self.assertFalse(report["validity"]["db_match"])
         self.assertFalse(report["validity"]["valid"])
 
+    def test_redis_counter_is_recorded_next_to_the_db_rows_and_is_not_part_of_validity(self):
+        lines = synthetic()
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            with_counter = postprocess.build_report(raw, LAYOUT, "ramping", "s3", issued_count(lines), {},
+                                                    redis_counter=issued_count(lines) + 7)
+            without = postprocess.build_report(raw, LAYOUT, "ramping", "s3", issued_count(lines), {})
+        self.assertEqual(with_counter["db"]["redis_counter"], issued_count(lines) + 7)
+        self.assertTrue(with_counter["db"]["match"])
+        self.assertTrue(with_counter["validity"]["valid"])
+        self.assertNotIn("redis_counter", without["db"])
+
     def test_filtered_raw_reproduces_the_report(self):
         with tempfile.TemporaryDirectory() as tmp:
             filtered = os.path.join(tmp, "filtered.json.gz")
@@ -536,6 +549,20 @@ class ReprocessTest(unittest.TestCase):
             self.assertEqual(postprocess.main(argv), 0)
             with open(out, encoding="utf-8") as f:
                 return json.load(f), tmp
+
+    def test_redis_counter_of_the_source_survives_a_reprocess(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.make_source(tmp, True)
+            path = os.path.join(tmp, "load.json")
+            with open(path, encoding="utf-8") as f:
+                old = json.load(f)
+            old["db"]["redis_counter"] = 1000
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(old, f)
+            out = os.path.join(tmp, "new.json")
+            self.assertEqual(postprocess.main(["--reprocess-from", tmp, "--out", out]), 0)
+            with open(out, encoding="utf-8") as f:
+                self.assertEqual(json.load(f)["db"]["redis_counter"], 1000)
 
     def test_old_report_without_layout_uses_profiles_json(self):
         report, tmp = self.reprocess(False, profiles=LAYOUT)
