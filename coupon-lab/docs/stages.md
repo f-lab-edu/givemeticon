@@ -320,3 +320,48 @@ Evidence: `coupon-lab/evidence/s0/consistency/20261024-031516-aa357e0/`, `.../s1
 * **천장 원인은 더 파지 않고 "원인 미상(후보 ①~④)"으로 기록한다.** 어느 후보가 맞아도 S4 결정이 달라지지 않는다. DB 커밋 경로가 이 천장의 원인이 아니라는 것은 확정이고, S4 설계에 영향을 주는 것은 그것뿐이다. 가장 싼 추가 실험은 코드 변경 없는 `--k6 container` 1회(오르면 ①②, 같으면 ③④)이지만 하지 않는다.
 * **S4 의 동기는 내구성이다.** Redis `INCR` 로 당첨이 확정된 뒤 INSERT 실패, 앱 크래시, DB 장애가 나면 자리가 소모되고 기록이 남지 않는다. S4 의 본질은 당첨 결정을 내구성 있게 보존한 뒤 응답하는 것(MQ 발행 또는 outbox)이고, 당첨자 INSERT 를 비동기로 묶는 처리량 논거는 약해졌다(모든 요청이 당첨되는 2,225rps 에서도 MySQL CPU 84/200, 요청당 fsync 0.78). 배치 소비는 선택적 최적화로 낮춘다. S4 는 recovery 번들로 잰다.
 * 모름: 2,225rps 천장의 원인, `vus` 상한이 찬 단계, 2400 단계 p50 89.62 ms 가 생성기 한계 기준 바로 아래인 것의 의미, run 간 편차(n=1), S1 spike 1,311 대 1,517 차이의 원인.
+
+## 테스트 D - 장애 복구 (S3 에서 먼저 잰다)
+
+* 목적: S3 의 알려진 갭(카운터를 이긴 뒤 INSERT 가 실패하면 자리가 소모되고 기록이 없다, Redis 에 영속성이 없다)을 S4 가 고치기 전에 숫자로 만든다. S4 의 전후 비교 기준선이다. 정합성(테스트 A)이나 한계 처리량(테스트 B/C)과 달리 여기서 재는 것은 **손실의 크기**이고, 손실 수치는 PASS/FAIL 이 아니라 결과다.
+* 실행: `scripts/verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at 20] [--fault-duration 10] [--stock N]`. 테스트 B 의 `docker-compose.load.yml` 과 "idle machine" 검사를 그대로 쓰고(앱 2cpu, MySQL 2cpu, Redis 1cpu, Hikari 풀 10), k6 는 호스트에서 돌린다. 한 번에 약 6분. 마지막 줄은 `VERIFY recovery-<scenario> PASS|FAIL|INFRA_DOWN|BUILD_ERROR ...`, 종료 코드는 `load` 와 같다.
+* 부하(`scripts/load/recovery.js`, `profiles.json` 의 `recovery`): 10초 워밍업(100rps) 뒤 `constant-arrival-rate` 500rps 를 60초, `preAllocatedVUs` 200, `maxVUs` 2000, 요청 타임아웃 5초. 이벤트는 1개, 요청마다 다른 회원. 결과는 200(issued, seq 를 `recovery_seq` 로 수집), 409, 5xx, 타임아웃/네트워크 오류(status 0)로 센다. 요청은 **시작한 초**에 센다. 시간 0 은 500rps 구간의 시작이고 워밍업은 -10..-1초다. `setup()` 이 러너가 정한 벽시계 시각까지 시작을 붙들어 두므로 러너는 그 시각에서 결함 시점(`--fault-at`)을 계산한다.
+* 결함 주입(러너가 호스트에서 실행하고 모든 단계를 `fault.log` 에 시각과 함께 남긴다):
+  * `db-down`(재고 기본 10,000,000): `--fault-at` 초에 `docker stop coupon-lab-load-mysql`, stop 이 돌아온 뒤 `--fault-duration` 초 지나 `docker start`, 헬스체크가 healthy 가 될 때까지 기다린다. 앱 컨테이너는 건드리지 않는다.
+  * `redis-restart`(재고 기본 20,000): `--fault-at` 초에 `docker restart coupon-lab-load-redis`. 영속성이 없어 카운터가 0 으로 돌아간다. 재고를 2만으로 둔 것은 리셋 뒤에 초과 발급이 보이게 하기 위해서다.
+  * `consumer-redeliver`: 소비자가 있는 단계(S4 이상)가 필요하다. 지금은 종료 코드 2 로 거부하고, S4 작업에서 구현한다.
+* 부하가 끝난 뒤 `db_rows`(그 이벤트의 `coupon_issue` 행 수)가 5번 연속 변하지 않을 때까지 1초마다 확인한다(최대 120초). 그 값과 Redis 카운터, 이벤트의 `(member_id, seq)` 전체를 읽어 후처리한다.
+* 지표(`recovery.json`; `timeline.json` 은 같은 `timeline` 배열):
+
+| 필드 | 정의 |
+|---|---|
+| `totals` | 워밍업을 포함한 모든 요청을 클라이언트가 본 결과별로 센 값: `requests`, `http_200`, `http_409`, `http_5xx`, `timeouts`, `http_other`, `dropped_iterations`(k6 가 VU 부족으로 못 시작한 요청, 참고용) |
+| `redis_counter` | 실행이 끝난 뒤 `coupon:event:{id}:issued`. 카운터가 없는 stage 는 null, `redis-restart` 에서는 리셋 이후의 값이라 `redis_counter_meaningful: false` |
+| `wins` | `min(redis_counter, stock)`. 카운터가 의미 없으면 null |
+| `consumed_but_unconfirmed` | `wins - http_200`: 결정은 자리를 가져갔는데 어떤 클라이언트도 성공으로 확인하지 못한 수. 요구 정의는 `redis_counter - http_200` 이고 카운터가 재고를 넘지 않으면 같다. 재고를 넘으면 패자(409)가 "미확인"으로 섞이므로 `wins` 로 계산한다. DB 행이 있어도 클라이언트가 못 받았으면 센다 |
+| `confirmed_but_missing` | `http_200 - db_rows`: "발급됨"이라 답했는데 DB 기록이 없는 수. 음수는 클라이언트는 포기(타임아웃)했지만 INSERT 가 나중에 끝난 행 |
+| `over_issue` | `max(0, db_rows - stock)`. 재고로만 한정된다: 요청 수가 재고보다 적으면(재고 1천만) 구조상 0 이며 `over_issue_note` 가 이를 적는다 |
+| `dup_seq` | 이벤트의 행 수 - 서로 다른 `seq` 수(다른 행과 `seq` 를 나눠 가진 잉여 행). `seq` 가 1 로 다시 시작하면 되돌아간 구간만큼 쌓인다 |
+| `dup_members` | 행이 둘 이상인 회원 수 |
+| `recovery_time_s` | 결함이 끝난 시각(`started_at`)과 부하가 끝난 시각 중 **늦은 쪽**에서 `db_rows` 가 최종값에 도달할 때까지의 초. 부하가 끝난 뒤에도 행이 계속 들어오면(밀린 일을 처리 중) 양수다. 값이 최종값에 머문 샘플이 5개 미만이면 null(`settled: false`). 같은 값을 결함 종료 시각만 기준으로 잰 `rows_final_after_fault_end_s` 도 남긴다(부하가 계속되는 동안 행이 늘어나므로 부하 길이가 섞여 들어간다) |
+| `timeline` | 초마다 `http_200`, `http_409`, `http_5xx`, `timeouts`, `db_rows`(그 초의 마지막 샘플, MySQL 이 죽어 있으면 null) |
+| `validity` | `k6_completed`(k6 종료 코드 0, 500rps 구간이 마지막 초까지 돌았다), `fault_observed`(결함 이벤트가 순서대로 기록되었고 500rps 구간 안에서 주입되었다). 둘 다여야 `valid` |
+
+  `fault.observed` 의 `stopped_at` 은 결함 주입 직전(`docker stop`/`docker restart` 실행 직전), `stop_returned_at` 은 `docker stop` 이 돌아온 때, `started_at` 은 결함이 끝난 때(`docker start` 실행, 또는 `docker restart` 가 돌아온 때), `healthy_at` 은 헬스체크가 healthy 가 된 때다. `at_s` 는 500rps 구간 시작 대비 `stopped_at` 이다. 증거 경로: `evidence/<stage>/recovery/<scenario>/<ts>-<sha>/`(`recovery.json`, `timeline.json`, `fault.log`, `summary.json`, `stats.jsonl`). 원본 k6 출력은 보관하지 않으므로 재처리 명령은 없다.
+* env 에는 `hikari_connection_timeout_ms`(이 작업에서 설정하지 않았으므로 라이브러리 기본값 30000, 컨테이너가 환경변수로 바꾸면 그 값)와 `redis_appendonly`(실행 중인 Redis 에서 읽은 값)를 기록한다. 이 작업에서는 둘 다 바꾸지 않는다.
+* 한계: 한 run 은 n=1 이다. k6 호스트 CPU 는 샘플링하지 않는다. k6 의 요청 타임아웃(5초)이 Hikari 의 연결 대기(30초)보다 짧아서, 클라이언트가 포기한 뒤 서버가 나중에 처리를 끝내는 경우가 생길 수 있고 그 수치는 위 표대로 음수 `confirmed_but_missing` 으로 나타난다.
+
+### 테스트 D 예측 (S3, 측정 전에 적는다)
+
+* **db-down (재고 1천만):** `consumed_but_unconfirmed` ≈ 500rps × 10초 ≈ 5,000 (`INCR` 은 성공하고 INSERT 가 실패해 5xx). `confirmed_but_missing` 0. `recovery_time_s` ≈ 0 (밀린 일이 없다). `dup_seq`, `dup_members` 0.
+* **redis-restart (재고 2만):** 약 10,000건 당첨된 20초 시점에 카운터가 0 으로 돌아가고 그 뒤 최대 20,000건이 더 당첨된다 → `over_issue` ≈ 10,000, `dup_seq` ≈ 10,000 (`seq` 가 1 부터 다시 시작). 이것이 `appendonly=no` 의 비용이다.
+* 예측이 틀릴 수 있는 지점(예측 자체는 위 그대로 둔다): (1) 연결 대기 30초 대 요청 타임아웃 5초 때문에 INSERT 실패가 즉시 5xx 가 아니라 타임아웃으로 보일 수 있다. 이 경우 `consumed_but_unconfirmed` 에는 타임아웃도 들어가고, DB 복구 뒤에 끝난 INSERT 는 `confirmed_but_missing` 을 음수로 만들 수 있다. (2) 서버 스레드가 연결 대기로 막히면 500rps 가 유지되지 않을 수 있고(VU 2000 은 500rps × 4초에 해당) `dropped_iterations` 가 생겨 5,000 보다 작게 나올 수 있다. (3) redis-restart 의 "약 10,000건"은 20초 시점의 당첨 수이고 워밍업 약 1,000건이 앞에 더해진다(약 11,000건).
+
+### S4 개요와 예측 (측정 전에 적는다)
+
+* S4 개요(RabbitMQ): 응답하기 전에 publisher confirm 으로 메시지를 발행하고, 큐는 durable 로 둔다. 소비자가 `coupon_issue` 에 INSERT 하며 `UNIQUE(event_id, seq)` 로 재전달에 안전하게 한다.
+* 예측: **db-down** → `consumed_but_unconfirmed` 0, `confirmed_but_missing` 은 큐가 비면 0(복구 전 구간의 timeline 에서는 응답 수가 DB 행보다 앞선다는 해석), `recovery_time_s` = 큐를 비우는 데 걸린 시간. **redis-restart** → AOF 를 켜지 않는 한 S3 와 같다(별도 환경 노브이며 S4 에서 잰다).
+
+### 테스트 D 결과 (S3)
+
+* 로컬 실행 후 기입
