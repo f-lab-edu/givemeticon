@@ -348,7 +348,55 @@ else
     fail "19 pre-commit hook append-only" "modify=$rc_mod ($msg_mod) delete=$rc_del rename=$rc_ren index=$rc_index ($msg_index) new=$rc_new"
 fi
 
-total=$((19 - skipped))
+# 20. verify.sh recovery refuses bad requests before touching docker: unknown scenario (usage), the consumer scenario (no stage has a
+#     consumer yet), a stage that does not exist on this branch, and a fault that would not end before the load does.
+run scripts/verify.sh recovery --stage s3 --scenario nope
+rc_scenario=$rc; msg_scenario=$out
+run scripts/verify.sh recovery --stage s3 --scenario consumer-redeliver
+rc_consumer=$rc; msg_consumer=$out
+run scripts/verify.sh recovery --stage s9 --scenario db-down
+rc_stage=$rc; msg_stage=$out
+run scripts/verify.sh recovery --stage s3 --scenario db-down --fault-at 55 --fault-duration 10
+rc_late=$rc; msg_late=$out
+if [ "$rc_scenario" -eq 2 ] && [[ "$msg_scenario" == *usage* ]] \
+    && [ "$rc_consumer" -eq 2 ] && [[ "$msg_consumer" == *"requires a consumer (S4+)"* ]] \
+    && [ "$rc_stage" -eq 2 ] && [[ "$msg_stage" == *"S9CouponIssueService not found on this branch"* ]] \
+    && [ "$rc_late" -eq 2 ] && [[ "$msg_late" == *"must end before the load does"* ]]; then
+    ok "20 verify recovery: exit 2 for an unknown scenario, consumer-redeliver (requires a consumer (S4+)), a missing stage and a fault that outlasts the load"
+else
+    fail "20 verify recovery argument checks" "scenario=$rc_scenario consumer=$rc_consumer ($msg_consumer) stage=$rc_stage late=$rc_late ($msg_late)"
+fi
+
+# 21. verify.sh recovery: the idle-machine precondition (exit 2) and the INFRA_DOWN path (exit 3), against stand-ins for docker and k6
+#     like item 13 (no container is started, no load is generated, Docker is not needed).
+shim=$(mk)
+rm -f "$shim"
+mkdir "$shim"
+printf '#!/bin/sh\necho "k6 v0.0.0 (smoke)"\n' >"$shim/k6"
+cat >"$shim/docker" <<'SHIM'
+#!/bin/sh
+case "$1" in
+    info) exit 0 ;;
+    ps) printf '%s' "$SMOKE_PS"; exit 0 ;;
+    *) exit 1 ;;
+esac
+SHIM
+chmod +x "$shim/k6" "$shim/docker"
+out=$(SMOKE_PS=$'legacy-redis\n' PATH="$shim:$PATH" scripts/verify.sh recovery --stage s3 --scenario db-down 2>&1)
+rc_busy=$?
+msg_busy=$out
+out=$(SMOKE_PS=$'coupon-lab-load-app\n' PATH="$shim:$PATH" scripts/verify.sh recovery --stage s3 --scenario redis-restart 2>&1)
+rc_infra=$?
+msg_infra=$(tail -n 1 <<<"$out")
+rm -rf "$shim"
+if [ "$rc_busy" -eq 2 ] && [[ "$msg_busy" == *"legacy-redis"* ]] && [[ "$msg_busy" == *"stop other containers first"* ]] \
+    && [ "$rc_infra" -eq 3 ] && [[ "$msg_infra" == "VERIFY recovery-redis-restart INFRA_DOWN "* ]]; then
+    ok "21 verify recovery: exit 2 with other containers up, exit 3 INFRA_DOWN when compose fails (coupon-lab-load-* ignored)"
+else
+    fail "21 verify recovery" "busy exit=$rc_busy ($msg_busy), infra exit=$rc_infra ($msg_infra)"
+fi
+
+total=$((21 - skipped))
 suffix=""
 [ "$skipped" -eq 0 ] || suffix=" skipped=$skipped"
 echo "harness-smoke: $((total - fails))/$total OK in ${SECONDS}s$suffix"

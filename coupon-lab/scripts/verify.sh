@@ -7,9 +7,12 @@
 #                  [--flush-log 1|2] [--pool N]    (--flush-log 2 relaxes durability: a DIAGNOSTIC, never a configuration)
 #                  (tests B and C: k6 against docker compose, see docs/stages.md)
 #   verify.sh reprocess evidence/<stage>/load/<profile>/<dir>        (test B: re-aggregate a saved run into a new -reprocessed dir)
+#   verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at 20] [--fault-duration 10] [--stock N]
+#                  (test D: 500 rps for 60 s while a fault is injected, then the loss accounting; see docs/stages.md. consumer-redeliver is refused until S4)
 # Last stdout line:
 #   VERIFY <tier> <PASS|FAIL|INFRA_DOWN|BUILD_ERROR|TIMEOUT|NO_TESTS> passed=N failed=N skipped=N duration=Ns sha=<short> dirty=<bool> report=<path>
 # Exit codes: 0 PASS, 1 FAIL, 2 usage/config error, 3 INFRA_DOWN, 4 TIMEOUT, 5 BUILD_ERROR, 6 NO_TESTS.
+# For `recovery`: PASS = valid measurement (k6 ran to the end and the fault was injected while it ran); the loss figures are outcomes, never part of PASS/FAIL.
 # For `load`: PASS = valid run (first stage without dropped iterations >= 1% and DB rows == 200 responses),
 # FAIL = invalid run, INFRA_DOWN = docker/compose/health/seed problem, BUILD_ERROR = k6 or postprocess failed.
 # Later stages that saturate do not invalidate a run; they are flagged saturated in load.json.
@@ -25,6 +28,7 @@ usage() {
     echo "usage: scripts/verify.sh compile | unit [--tests <pattern>] | bundle <$(echo "$BUNDLES" | tr ' ' '|')> [--stage sN]" >&2
     echo "       scripts/verify.sh load --stage sN --profile ramping|spike|ramping-rows [--runs N] [--k6 host|container] [--rows N] [--max-vus N] [--flush-log 1|2] [--pool N]" >&2
     echo "       scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir>" >&2
+    echo "       scripts/verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at S] [--fault-duration S] [--stock N]" >&2
     exit 2
 }
 
@@ -113,6 +117,41 @@ case "$mode" in
         [ "$profile" != ramping-rows ] || variant="ramping-rows$rows"
         [ "$flush_log" = 1 ] || variant="$variant-flush$flush_log"
         [ "$LOAD_HIKARI_POOL_SIZE" = 10 ] || variant="$variant-pool$LOAD_HIKARI_POOL_SIZE"
+        ;;
+    recovery)
+        scenario=""
+        fault_at=20
+        fault_duration=10
+        stock=""
+        while [ $# -gt 0 ]; do
+            [ $# -ge 2 ] || usage
+            case "$1" in
+                --stage) stage=$2 ;;
+                --scenario) scenario=$2 ;;
+                --fault-at) fault_at=$2 ;;
+                --fault-duration) fault_duration=$2 ;;
+                --stock) stock=$2 ;;
+                *) usage ;;
+            esac
+            shift 2
+        done
+        [ -n "$stage" ] && [ -n "$scenario" ] || usage
+        [[ "$stage" =~ ^s[0-9]+$ ]] || { echo "invalid stage: $stage (expected sN)" >&2; exit 2; }
+        case "$scenario" in
+            db-down) : "${stock:=10000000}" ;;
+            redis-restart) : "${stock:=20000}" ;;
+            consumer-redeliver) echo "consumer-redeliver requires a consumer (S4+); no stage has one yet" >&2; exit 2 ;;
+            *) usage ;;
+        esac
+        [[ "$fault_at" =~ ^[1-9][0-9]*$ ]] && [[ "$fault_duration" =~ ^[1-9][0-9]*$ ]] && [[ "$stock" =~ ^[1-9][0-9]*$ ]] || usage
+        recovery_seconds=$(python3 -I -c 'import json; print(json.load(open("scripts/load/profiles.json"))["recovery"]["load"]["seconds"])')
+        recovery_warmup=$(python3 -I -c 'import json; print(json.load(open("scripts/load/profiles.json"))["recovery"]["warmup"]["seconds"])')
+        # db-down: the fault must be over before the load ends; redis-restart has no duration, only its start must fall inside the load
+        fault_end_s=$fault_at
+        [ "$scenario" != db-down ] || fault_end_s=$((fault_at + fault_duration))
+        [ "$fault_end_s" -lt "$recovery_seconds" ] || { echo "the fault ends at second $fault_end_s of ${recovery_seconds}; it must end before the load does" >&2; exit 2; }
+        require_stage_class "$stage"
+        tier="recovery-$scenario"
         ;;
     reprocess)
         [ $# -eq 1 ] || usage
@@ -443,6 +482,267 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/load.json")
     esac
 }
 
+# verify.sh recovery (test D): one run. Compose up (app, mysql, redis), seed one event, k6 (recovery.js) from the host while the
+# fault is injected from here, wait until db_rows stops changing, read the final state, postprocess, keep the evidence, compose
+# down -v. No container other than coupon-lab-load-* may be running. Timestamps of every step go to fault.log; recovery.js holds
+# its start until a wall-clock second chosen here, so the fault is scheduled relative to the start of the 500 rps phase.
+run_recovery() {
+    set +e
+    local compose=(docker compose -p coupon-lab-load -f docker-compose.load.yml)
+    local compose_up=false run_status="" run_note="" work="build/recovery/$scenario" run_evidence=""
+    local sampler_pid="" dbpoll_pid="" fault_pid="" k6_pid="" event_id="" fault_target=mysql
+    local passed=0 failed=0 evidence_dirs=() failures=()
+    local start_lead=${RECOVERY_START_LEAD_S:-20}
+    [ "$scenario" != redis-restart ] || fault_target=redis
+
+    rec_cleanup() {
+        local pid
+        for pid in "$sampler_pid" "$dbpoll_pid" "$fault_pid" "$k6_pid"; do
+            [ -z "$pid" ] || { kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; }
+        done
+        sampler_pid=""; dbpoll_pid=""; fault_pid=""; k6_pid=""
+        [ "$compose_up" = true ] || return 0
+        compose_up=false
+        "${compose[@]}" down -v --remove-orphans >>"$log" 2>&1 \
+            || echo "WARN: docker compose down failed; remove the ${LOAD_PREFIX}* containers and volumes by hand" >&2
+    }
+    trap rec_cleanup EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    : >"$log"
+    if ! command -v k6 >/dev/null; then
+        echo "k6 not found; install it on the host first" >&2
+        exit 2
+    fi
+    if ! command -v docker >/dev/null || ! docker info >/dev/null 2>&1; then
+        echo "docker daemon not reachable" | tee -a "$log"
+        load_finish INFRA_DOWN 3
+    fi
+    local others
+    others=$(docker ps --format '{{.Names}}' | grep -v "^$LOAD_PREFIX" || true)
+    if [ -n "$others" ]; then
+        echo "running containers other than ${LOAD_PREFIX}*:" >&2
+        sed 's/^/  /' <<<"$others" >&2
+        echo "stop other containers first; measurements must run on an idle machine" >&2
+        exit 2
+    fi
+
+    load_mysql() {   # <sql>: rows without header; the password travels in the environment, not in argv
+        MYSQL_PWD="$COUPON_LAB_DB_PASSWORD" docker exec -e MYSQL_PWD "${LOAD_PREFIX}mysql" \
+            mysql -h 127.0.0.1 -uroot -N -B coupon_lab -e "$1" 2>>"$log"
+    }
+    load_inspect() { docker inspect -f "$1" "${LOAD_PREFIX}$2" 2>/dev/null; }
+
+    rec_event() {   # <event> [note]: one line "<iso time> <event> epoch=<seconds> <note>" in fault.log
+        python3 -I -c 'import datetime, sys, time
+t = time.time()
+print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3], sys.argv[1], t, sys.argv[2]))' \
+            "$1" "${2:-}" >>"$work/fault.log"
+    }
+    rec_wait_until() { python3 -I -c 'import sys, time; time.sleep(max(0.0, float(sys.argv[1]) - time.time()))' "$1"; }
+    rec_wait_healthy() {   # <service>: up to 180 s; returns 1 when it never became healthy
+        local waited=0
+        while [ "$waited" -lt 180 ]; do
+            [ "$(load_inspect '{{.State.Health.Status}}' "$1")" != healthy ] || return 0
+            sleep 1
+            waited=$((waited + 1))
+        done
+        return 1
+    }
+
+    # Runs in the background: waits for <main start> + fault-at, injects the fault, logs every step.
+    rec_inject() {   # <epoch at which the 500 rps phase starts>
+        local rc
+        rec_event fault_scheduled "scenario=$scenario target=${LOAD_PREFIX}$fault_target at=main+${fault_at}s"
+        rec_wait_until "$(($1 + fault_at))"
+        if [ "$scenario" = db-down ]; then
+            rec_event stopped_at "about to docker stop ${LOAD_PREFIX}mysql"
+            docker stop "${LOAD_PREFIX}mysql" >>"$log" 2>&1; rc=$?
+            rec_event stop_returned_at "docker stop ${LOAD_PREFIX}mysql rc=$rc"
+            sleep "$fault_duration"
+            docker start "${LOAD_PREFIX}mysql" >>"$log" 2>&1; rc=$?
+            rec_event started_at "docker start ${LOAD_PREFIX}mysql rc=$rc"
+        else
+            rec_event stopped_at "about to docker restart ${LOAD_PREFIX}redis"
+            docker restart "${LOAD_PREFIX}redis" >>"$log" 2>&1; rc=$?
+            rec_event started_at "docker restart ${LOAD_PREFIX}redis returned rc=$rc"
+        fi
+        if rec_wait_healthy "$fault_target"; then rec_event healthy_at "${LOAD_PREFIX}$fault_target healthy"
+        else rec_event healthy_timeout "${LOAD_PREFIX}$fault_target not healthy after 180s"; fi
+    }
+
+    # Every whole second: {"time": <epoch s>, "db_rows": <rows of the event, null while MySQL is unreachable>}.
+    rec_sample_db() {   # <outfile>
+        local out=$1 now rows
+        while :; do
+            python3 -I -c 'import time; time.sleep(1 - time.time() % 1)'
+            now=$(date +%s)
+            rows=$(MYSQL_PWD="$COUPON_LAB_DB_PASSWORD" docker exec -e MYSQL_PWD "${LOAD_PREFIX}mysql" \
+                mysql -h 127.0.0.1 -uroot -N -B coupon_lab -e "SELECT COUNT(*) FROM coupon_issue WHERE event_id = $event_id" 2>/dev/null)
+            [[ "$rows" =~ ^[0-9]+$ ]] || rows=null
+            printf '{"time":%s,"db_rows":%s}\n' "$now" "$rows" >>"$out"
+        done
+    }
+
+    # After k6: true once the last 5 samples taken after <base> are equal and not null (db_rows stopped changing); gives up after 120 s.
+    rec_wait_settled() {   # <number of samples when k6 ended>
+        local waited=0 total vals
+        while [ "$waited" -lt 120 ]; do
+            total=$(wc -l <"$work/db-samples.jsonl")
+            if [ "$total" -ge $(($1 + 5)) ]; then
+                vals=$(tail -n 5 "$work/db-samples.jsonl" | sed -n 's/.*"db_rows":\([0-9a-z]*\)}.*/\1/p' | sort -u)
+                ! [[ "$vals" =~ ^[0-9]+$ ]] || return 0
+            fi
+            sleep 1
+            waited=$((waited + 1))
+        done
+        return 1
+    }
+
+    # sets run_status (PASS|FAIL|INFRA_DOWN|BUILD_ERROR), run_note
+    rec_body() {
+        rm -rf "$work"
+        mkdir -p "$work/gc"
+        : >"$work/fault.log"
+        export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE FLUSH_LOG=1 LOAD_GC_DIR="$PWD/$work/gc"
+        COUPON_LAB_DB_PASSWORD=$(python3 -I -c 'import secrets; print(secrets.token_hex(12))')
+        local k6_version
+        k6_version=$(k6 version 2>/dev/null | head -n 1 | awk '{print $2}')
+
+        # 1. environment
+        "${compose[@]}" down -v --remove-orphans >>"$log" 2>&1
+        compose_up=true
+        echo "recovery $scenario on $stage: docker compose up (first image build takes a few minutes)"
+        if ! "${compose[@]}" up -d --build >>"$log" 2>&1; then
+            run_status=INFRA_DOWN; run_note="docker compose up failed (see $log)"; return
+        fi
+        local waited=0 health="" redis_health=""
+        while [ "$waited" -lt "$LOAD_HEALTH_TIMEOUT_S" ]; do
+            health=$(load_inspect '{{.State.Health.Status}}' app)
+            redis_health=$(load_inspect '{{.State.Health.Status}}' redis)
+            [ "$health" != healthy ] || [ "$redis_health" != healthy ] || break
+            sleep 2
+            waited=$((waited + 2))
+        done
+        if [ "$health" != healthy ] || [ "$redis_health" != healthy ]; then
+            docker logs --tail 40 "${LOAD_PREFIX}app" >>"$log" 2>&1
+            run_status=INFRA_DOWN; run_note="app (${health:-?}) or redis (${redis_health:-?}) not healthy after ${LOAD_HEALTH_TIMEOUT_S}s (see $log)"; return
+        fi
+
+        # 2. one event with the stock of the scenario
+        event_id=$(load_mysql "INSERT INTO coupon_event (name, total_quantity, remaining_quantity, created_at) VALUES ('recovery-$scenario-$stage', $stock, $stock, NOW(6)); SELECT LAST_INSERT_ID();")
+        if ! [[ "$event_id" =~ ^[0-9]+$ ]]; then
+            run_status=INFRA_DOWN; run_note="seeding the event failed (got '$event_id'; see $log)"; return
+        fi
+
+        # settings that decide how the system behaves under the fault, recorded with the run (read, never changed)
+        local mysql_env=() var_name var_value nano cpus_app cpus_mysql cpus_redis redis_image heap hikari hikari_timeout appendonly
+        while IFS=$'\t' read -r var_name var_value; do
+            [ -z "$var_name" ] || mysql_env+=(--env "$var_name=$var_value")
+        done < <(load_mysql "SHOW VARIABLES WHERE Variable_name IN ('innodb_flush_log_at_trx_commit','innodb_buffer_pool_size','innodb_log_file_size','innodb_redo_log_capacity')")
+        nano=$(load_inspect '{{.HostConfig.NanoCpus}}' app); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_app=$((nano / 1000000000))
+        nano=$(load_inspect '{{.HostConfig.NanoCpus}}' mysql); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_mysql=$((nano / 1000000000))
+        nano=$(load_inspect '{{.HostConfig.NanoCpus}}' redis); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_redis=$((nano / 1000000000))
+        redis_image=$(load_inspect '{{.Config.Image}}' redis)
+        heap=$(load_inspect '{{json .Config.Entrypoint}}' app | grep -o -- '-Xmx[0-9]*[kKmMgG]' | head -n 1 | sed 's/^-Xmx//')
+        hikari=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=//p')
+        # Hikari's connectionTimeout is not set by the compose file: the library default (30000 ms) applies unless the container sets it
+        hikari_timeout=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=//p')
+        [[ "$hikari_timeout" =~ ^[0-9]+$ ]] || hikari_timeout=30000
+        appendonly=$(docker exec "${LOAD_PREFIX}redis" redis-cli --raw CONFIG GET appendonly 2>>"$log" | tail -n 1)
+
+        # 3. samplers, k6, fault
+        : >"$work/stats.jsonl"
+        load_sample_stats "$work/stats.jsonl" &
+        sampler_pid=$!
+        : >"$work/db-samples.jsonl"
+        rec_sample_db "$work/db-samples.jsonl" &
+        dbpoll_pid=$!
+        local start_at_s main_start
+        start_at_s=$(($(date +%s) + start_lead))
+        main_start=$((start_at_s + recovery_warmup))
+        local fault_text="$fault_target fault at main+${fault_at}s"
+        [ "$scenario" != db-down ] || fault_text="$fault_text for ${fault_duration}s"
+        echo "recovery $scenario on $stage: event $event_id, stock $stock, $fault_text; k6 starts at epoch $start_at_s"
+        rec_event k6_started "test starts at epoch $start_at_s, main phase at epoch $main_start"
+        k6 run --out json="$work/raw.json.gz" --summary-export "$work/summary.json" \
+            -e BASE_URL=http://127.0.0.1:18080 -e EVENT_ID="$event_id" -e START_AT_MS=$((start_at_s * 1000)) \
+            scripts/load/recovery.js >>"$log" 2>&1 &
+        k6_pid=$!
+        rec_inject "$main_start" &
+        fault_pid=$!
+        wait "$k6_pid"
+        local k6_rc=$?
+        k6_pid=""
+        rec_event k6_ended_at "k6 exit $k6_rc"
+        if [ "$k6_rc" -ne 0 ]; then
+            run_status=BUILD_ERROR; run_note="k6 exited $k6_rc (see $log)"; return
+        fi
+        wait "$fault_pid"
+        fault_pid=""
+
+        # 4. wait until the rows stop changing (a backlog being drained keeps them moving), then read the final state
+        local base
+        base=$(wc -l <"$work/db-samples.jsonl")
+        rec_wait_settled "$base" || echo "recovery $scenario: db_rows still changing 120 s after the load ended (recovery_time_s will be null)"
+        kill "$dbpoll_pid" 2>/dev/null; wait "$dbpoll_pid" 2>/dev/null; dbpoll_pid=""
+        kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""
+        local db_rows counter counter_arg=()
+        db_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_issue WHERE event_id = $event_id")
+        if ! [[ "$db_rows" =~ ^[0-9]+$ ]] || ! load_mysql "SELECT member_id, seq FROM coupon_issue WHERE event_id = $event_id" >"$work/issues.tsv"; then
+            run_status=INFRA_DOWN; run_note="reading the final coupon_issue rows failed (see $log)"; return
+        fi
+        counter=$(docker exec "${LOAD_PREFIX}redis" redis-cli --raw GET "coupon:event:$event_id:issued" 2>>"$log")
+        [[ "$counter" =~ ^[0-9]+$ ]] && counter_arg=(--redis-counter "$counter")
+
+        python3 -I scripts/load/recovery_postprocess.py --raw "$work/raw.json.gz" --scenario "$scenario" --stage "$stage" --stock "$stock" \
+            --fault-log "$work/fault.log" --db-samples "$work/db-samples.jsonl" --issues "$work/issues.tsv" --db-rows "$db_rows" \
+            ${counter_arg[@]+"${counter_arg[@]}"} --k6-exit "$k6_rc" --fault-at "$fault_at" --fault-duration "$fault_duration" \
+            --target "${LOAD_PREFIX}$fault_target" --out "$work/recovery.json" --timeline-out "$work/timeline.json" \
+            --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "redis_image=$redis_image" --env "redis_cpus=$cpus_redis" \
+            --env "jvm_heap=$heap" --env "hikari_pool_size=$hikari" --env "hikari_connection_timeout_ms=$hikari_timeout" \
+            --env "redis_appendonly=$appendonly" --env "k6_version=$k6_version" --env "k6_mode=host" ${mysql_env[@]+"${mysql_env[@]}"} \
+            >>"$log" 2>&1
+        if [ $? -ne 0 ]; then
+            run_status=BUILD_ERROR; run_note="recovery_postprocess failed (see $log)"; return
+        fi
+        local summary
+        summary=$(python3 -I -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+t = d["totals"]
+print("http_200=%s http_409=%s http_5xx=%s timeouts=%s db_rows=%s redis_counter=%s consumed_but_unconfirmed=%s confirmed_but_missing=%s over_issue=%s dup_seq=%s dup_members=%s recovery_time_s=%s k6_completed=%s fault_observed=%s" % (
+    t["http_200"], t["http_409"], t["http_5xx"], t["timeouts"], d["db_rows"], d["redis_counter"], d["consumed_but_unconfirmed"],
+    d["confirmed_but_missing"], d["over_issue"], d["dup_seq"], d["dup_members"], d["recovery_time_s"],
+    str(d["validity"]["k6_completed"]).lower(), str(d["validity"]["fault_observed"]).lower()))
+print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/recovery.json")
+        echo "recovery $scenario on $stage: $(head -n 1 <<<"$summary")"
+        run_status=$(tail -n 1 <<<"$summary")
+        [ "$run_status" = PASS ] || run_note="measurement invalid: $(head -n 1 <<<"$summary")"
+    }
+
+    rec_body
+    rec_cleanup   # always, before anything else touches the result
+    if [ -f "$work/recovery.json" ]; then
+        run_evidence="evidence/$stage/recovery/$scenario/$stamp-$sha"
+        [ "$dirty" = false ] || run_evidence="$run_evidence-dirty"
+        mkdir -p "$run_evidence"
+        cp "$work/recovery.json" "$work/timeline.json" "$work/fault.log" "$run_evidence/"
+        [ ! -f "$work/summary.json" ] || cp "$work/summary.json" "$run_evidence/"
+        [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
+        evidence_dirs+=("$run_evidence")
+        echo "recovery $scenario on $stage: evidence in $run_evidence"
+    fi
+    [ -z "$run_note" ] || { echo "recovery $scenario on $stage: $run_status - $run_note"; failures+=("$run_note"); }
+    case "$run_status" in
+        PASS) passed=1; load_finish PASS 0 ;;
+        FAIL) failed=1; load_finish FAIL 1 ;;
+        INFRA_DOWN) load_finish INFRA_DOWN 3 ;;
+        *) load_finish BUILD_ERROR 5 ;;
+    esac
+}
+
 # verify.sh reprocess <evidence dir>: aggregate a saved run again with the current rules. The source stays untouched;
 # the result goes to a new <ts>-<sha>[-dirty]-reprocessed directory next to it.
 run_reprocess() {
@@ -488,6 +788,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$dest/load.json")
 
 case "$mode" in
     load) run_load ;;
+    recovery) run_recovery ;;
     reprocess) run_reprocess ;;
 esac
 
