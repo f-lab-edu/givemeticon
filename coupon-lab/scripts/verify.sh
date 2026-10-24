@@ -660,6 +660,12 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
         # Hikari's connectionTimeout is not set by the compose file: the library default (30000 ms) applies unless the container sets it
         hikari_timeout=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=//p')
         [[ "$hikari_timeout" =~ ^[0-9]+$ ]] || hikari_timeout=30000
+        # Likewise the server thread limit (Spring Boot 3.3.5 default: Tomcat max 200 platform threads) is not set by the compose file
+        local tomcat_threads virtual_threads
+        tomcat_threads=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SERVER_TOMCAT_THREADS_MAX=//p')
+        [[ "$tomcat_threads" =~ ^[0-9]+$ ]] || tomcat_threads=200
+        virtual_threads=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_THREADS_VIRTUAL_ENABLED=//p')
+        [ "$virtual_threads" = true ] || virtual_threads=false
         appendonly=$(docker exec "${LOAD_PREFIX}redis" redis-cli --raw CONFIG GET appendonly 2>>"$log" | tail -n 1)
 
         # 3. samplers, k6, fault
@@ -719,7 +725,7 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
             ${counter_arg[@]+"${counter_arg[@]}"} ${failures_arg[@]+"${failures_arg[@]}"} --k6-exit "$k6_rc" --fault-at "$fault_at" --fault-duration "$fault_duration" \
             --target "${LOAD_PREFIX}$fault_target" --out "$work/recovery.json" --timeline-out "$work/timeline.json" \
             --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "redis_image=$redis_image" --env "redis_cpus=$cpus_redis" \
-            --env "jvm_heap=$heap" --env "hikari_pool_size=$hikari" --env "hikari_connection_timeout_ms=$hikari_timeout" \
+            --env "jvm_heap=$heap" --env "hikari_pool_size=$hikari" --env "hikari_connection_timeout_ms=$hikari_timeout" --env "tomcat_max_threads=$tomcat_threads" --env "virtual_threads=$virtual_threads" \
             --env "redis_appendonly=$appendonly" --env "k6_version=$k6_version" --env "k6_mode=host" ${mysql_env[@]+"${mysql_env[@]}"} \
             >>"$log" 2>&1
         if [ $? -ne 0 ]; then
@@ -730,9 +736,9 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
 import json, sys
 d = json.load(open(sys.argv[1]))
 t = d["totals"]
-print("http_200=%s http_409=%s http_5xx=%s timeouts=%s db_rows=%s redis_counter=%s seats_lost=%s client_unknown=%s recorded_despite_unknown=%s over_issue=%s dup_seq=%s dup_members=%s insert_failures_logged=%s recovery_time_s=%s k6_completed=%s fault_observed=%s" % (
+print("http_200=%s http_409=%s http_5xx=%s timeouts=%s db_rows=%s redis_counter=%s seats_lost=%s client_unknown=%s recorded_despite_unknown=%s not_admitted=%s blackout_s=%s over_issue=%s dup_seq=%s dup_members=%s insert_failures_logged=%s recovery_time_s=%s k6_completed=%s fault_observed=%s" % (
     t["http_200"], t["http_409"], t["http_5xx"], t["timeouts"], d["db_rows"], d["redis_counter"], d["seats_lost"],
-    d["client_unknown"], d["recorded_despite_unknown"], d["over_issue"], d["dup_seq"], d["dup_members"],
+    d["client_unknown"], d["recorded_despite_unknown"], d["not_admitted"], d["blackout_s"], d["over_issue"], d["dup_seq"], d["dup_members"],
     d["insert_failures_logged"], d["recovery_time_s"],
     str(d["validity"]["k6_completed"]).lower(), str(d["validity"]["fault_observed"]).lower()))
 print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/recovery.json")
@@ -790,8 +796,8 @@ run_reprocess_recovery() {
     verdict=$(python3 -I -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
-print("seats_lost=%s client_unknown=%s recorded_despite_unknown=%s db_rows=%s valid=%s" % (
-    d["seats_lost"], d["client_unknown"], d["recorded_despite_unknown"], d["db_rows"], str(d["validity"]["valid"]).lower()))
+print("seats_lost=%s client_unknown=%s recorded_despite_unknown=%s not_admitted=%s blackout_s=%s db_rows=%s valid=%s" % (
+    d["seats_lost"], d["client_unknown"], d["recorded_despite_unknown"], d["not_admitted"], d["blackout_s"], d["db_rows"], str(d["validity"]["valid"]).lower()))
 print("PASS" if d["validity"]["valid"] else "FAIL")' "$dest/recovery.json")
     echo "reprocessed $source_dir: $(head -n 1 <<<"$verdict")"
     echo "evidence in $dest"

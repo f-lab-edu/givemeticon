@@ -7,7 +7,8 @@
 // test until START_AT_MS, so the runner knows the wall-clock second at which `main` starts and schedules the fault from it.
 // Every request is tagged phase=warmup|main and sec=<whole seconds since the start of `main`> (warmup: -10..-1), counted by
 // the second it STARTED in. Outcomes (recovery_results, tag result): issued (200), sold_out (409), http_5xx, timeout (status 0:
-// timeout or network error), other. The seq of every 200 goes into the recovery_seq trend.
+// timeout or network error), other. A request without an HTTP answer also carries its k6 error_code as a tag. The seq of every
+// 200 goes into the recovery_seq trend.
 import http from 'k6/http';
 import exec from 'k6/execution';
 import { sleep } from 'k6';
@@ -82,7 +83,8 @@ export default function () {
   } else if (res.status === 0) {
     result = 'timeout';
   }
-  results.add(1, Object.assign({}, tags, { result }));
+  const failure = res.status === 0 ? { error_code: String(res.error_code) } : {};
+  results.add(1, Object.assign({}, tags, { result }, failure));
   if (result === 'issued') {
     try {
       const seq = res.json('seq');

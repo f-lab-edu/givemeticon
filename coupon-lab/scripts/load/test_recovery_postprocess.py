@@ -225,6 +225,23 @@ class ReportTest(unittest.TestCase):
         totals = rp.totals_of(raw["per_sec"])
         self.assertEqual((totals["timeouts"], totals["http_5xx"], totals["http_200"], totals["requests"]), (1_000, 0, 30_000, 31_000))
 
+    def test_the_k6_error_codes_of_requests_without_an_answer_are_counted(self):
+        lines = synthetic_raw()
+        lines.append(point("recovery_results", MAIN + 21.5, 7, {"phase": "main", "sec": "21", "result": "timeout", "error_code": "1050"}))
+        lines.append(point("recovery_results", MAIN + 22.5, 2, {"phase": "main", "sec": "22", "result": "timeout", "error_code": "1210"}))
+        lines.append(point("recovery_results", MAIN + 23.5, 4, {"phase": "main", "sec": "23", "result": "timeout", "error_code": "1050"}))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "raw.json.gz")
+            write_raw(path, lines)
+            raw = rp.collect_raw(path)
+        self.assertEqual(raw["error_codes"], {"1050": 11, "1210": 2})
+        report = self.report(raw)
+        self.assertEqual(report["error_codes"], {"1050": 11, "1210": 2})
+        self.assertEqual(report["totals"]["timeouts"], 13)
+
+    def test_a_run_without_error_codes_reports_an_empty_mapping(self):
+        self.assertEqual(self.report(self.raw())["error_codes"], {})
+
     def test_a_complete_run_with_the_fault_observed_is_valid_and_carries_the_accounting(self):
         report = self.report(self.raw())
         self.assertEqual(report["validity"], {"k6_completed": True, "fault_observed": True, "valid": True})
@@ -294,7 +311,8 @@ class ReportTest(unittest.TestCase):
     def test_reprocess_adds_the_axes_to_an_old_report_and_leaves_the_source_alone(self):
         full = self.report(self.raw())
         old = {k: v for k, v in full.items()
-               if k not in ("seats_lost", "client_unknown", "recorded_despite_unknown", "legacy_fields", "insert_failures_logged")}
+               if k not in ("seats_lost", "client_unknown", "recorded_despite_unknown", "not_admitted", "blackout_s", "legacy_fields",
+                            "insert_failures_logged", "error_codes")}
         with tempfile.TemporaryDirectory() as tmp:
             source = os.path.join(tmp, "recovery.json")
             with open(source, "w", encoding="utf-8") as f:
@@ -307,16 +325,27 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(again["seats_lost"], full["seats_lost"])
         self.assertEqual(again["client_unknown"], full["client_unknown"])
         self.assertEqual(again["recorded_despite_unknown"], full["recorded_despite_unknown"])
+        self.assertEqual(again["not_admitted"], full["not_admitted"])
+        self.assertEqual(again["blackout_s"], full["blackout_s"])
         self.assertIsNone(again["insert_failures_logged"])
+        self.assertIsNone(again["error_codes"])  # the raw k6 output is not kept, so older runs cannot be filled in
         self.assertEqual(again["reprocessed_from"], tmp)
         self.assertEqual(again["consumed_but_unconfirmed"], old["consumed_but_unconfirmed"])  # recorded values are kept
         self.assertEqual(again["validity"], old["validity"])
 
 
 class LossAxesTest(unittest.TestCase):
-    def report(self, wins, db_rows, http_200, timeouts=0, http_5xx=0, dup_seq=0, dup_members=0):
-        return {"totals": {"http_200": http_200, "timeouts": timeouts, "http_5xx": http_5xx}, "wins": wins,
-                "db_rows": db_rows, "dup_seq": dup_seq, "dup_members": dup_members}
+    def report(self, wins, db_rows, http_200, timeouts=0, http_5xx=0, dup_seq=0, dup_members=0, requests=None,
+               redis_counter=None, meaningful=None, timeline=None):
+        return {"totals": {"http_200": http_200, "timeouts": timeouts, "http_5xx": http_5xx,
+                           "requests": requests if requests is not None else http_200 + timeouts + http_5xx},
+                "wins": wins, "db_rows": db_rows, "dup_seq": dup_seq, "dup_members": dup_members,
+                "redis_counter": redis_counter, "redis_counter_meaningful": meaningful if meaningful is not None else wins is not None,
+                "load": {"seconds": 60}, "timeline": timeline if timeline is not None else []}
+
+    @staticmethod
+    def seconds(*http_200_per_second, start=0):
+        return [{"sec": start + i, "http_200": n} for i, n in enumerate(http_200_per_second)]
 
     def test_the_numbers_of_the_s3_db_down_run(self):
         # test D, S3, db-down run 1: 28,183 wins, 28,173 rows, 22,475 confirmed, 5,708 timeouts
@@ -336,6 +365,27 @@ class LossAxesTest(unittest.TestCase):
     def test_a_stage_without_a_counter_still_has_the_client_side_axes(self):
         axes = rp.loss_axes(self.report(None, 480, 500, timeouts=20))
         self.assertEqual((axes["seats_lost"], axes["client_unknown"], axes["recorded_despite_unknown"]), (None, 20, -20))
+
+    def test_not_admitted_is_the_requests_that_never_reached_the_counter(self):
+        # test D, S3, 49 s outage: 24,660 requests, the counter reached 15,455
+        axes = rp.loss_axes(self.report(15_455, 15_255, 3_533, timeouts=21_127, requests=24_660, redis_counter=15_455))
+        self.assertEqual(axes["not_admitted"], 9_205)
+
+    def test_not_admitted_is_null_without_a_usable_counter(self):
+        reset = self.report(None, 30_794, 30_794, requests=30_795, redis_counter=19_737, meaningful=False)
+        self.assertIsNone(rp.loss_axes(reset)["not_admitted"])
+        self.assertIsNone(rp.loss_axes(self.report(None, 5, 5, requests=5))["not_admitted"])
+
+    def test_blackout_is_the_longest_run_of_seconds_without_a_200(self):
+        timeline = self.seconds(*([500] * 5 + [0] * 55))  # a 49 s outage: the 200s stop at second 5 and never return during the load
+        self.assertEqual(rp.loss_axes(self.report(1, 1, 1, timeline=timeline))["blackout_s"], 55)
+        self.assertEqual(rp.blackout_seconds(self.seconds(5, 0, 0, 5, 0, 0, 0, 5), 60), 3)
+        self.assertEqual(rp.blackout_seconds(self.seconds(*([500] * 60)), 60), 0)
+
+    def test_blackout_ignores_seconds_after_the_load_and_a_missing_second_breaks_the_run(self):
+        self.assertEqual(rp.blackout_seconds(self.seconds(0, 0, 0, start=58), 60), 2)  # seconds 58 and 59 only
+        gap = [{"sec": 0, "http_200": 0}, {"sec": 2, "http_200": 0}]
+        self.assertEqual(rp.blackout_seconds(gap, 60), 1)
 
     def test_the_first_generation_fields_are_named_as_legacy(self):
         self.assertEqual(rp.loss_axes(self.report(1, 1, 1))["legacy_fields"], ["consumed_but_unconfirmed", "confirmed_but_missing"])
@@ -375,8 +425,9 @@ class CommandLineTest(unittest.TestCase):
 
     def test_reprocess_from_writes_a_new_report_and_needs_no_other_arguments(self):
         with tempfile.TemporaryDirectory() as tmp:
-            old = {"totals": {"http_200": 10, "timeouts": 2, "http_5xx": 1}, "wins": 14, "db_rows": 12, "dup_seq": 0,
-                   "dup_members": 0, "validity": {"valid": True}}
+            old = {"totals": {"http_200": 10, "timeouts": 2, "http_5xx": 1, "requests": 20}, "wins": 14, "db_rows": 12, "dup_seq": 0,
+                   "dup_members": 0, "redis_counter": 15, "redis_counter_meaningful": True, "load": {"seconds": 60},
+                   "timeline": [], "validity": {"valid": True}}
             with open(os.path.join(tmp, "recovery.json"), "w", encoding="utf-8") as f:
                 json.dump(old, f)
             out = os.path.join(tmp, "new.json")
@@ -384,6 +435,7 @@ class CommandLineTest(unittest.TestCase):
             with open(out, encoding="utf-8") as f:
                 new = json.load(f)
         self.assertEqual((new["seats_lost"], new["client_unknown"], new["recorded_despite_unknown"]), (2, 3, 2))
+        self.assertEqual((new["not_admitted"], new["blackout_s"]), (5, 0))
 
     def test_a_fresh_run_without_its_inputs_is_a_usage_error(self):
         with self.assertRaises(SystemExit):

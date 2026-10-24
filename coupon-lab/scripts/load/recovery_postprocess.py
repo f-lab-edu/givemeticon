@@ -29,6 +29,12 @@ Definitions (the numbers are OUTCOMES: they never decide PASS/FAIL, only validit
   recovery_time_s            seconds from the later of (fault end = started_at, load end = k6_ended_at) until db_rows reached the value it
                              finally kept; "settled" needs 5 consecutive unchanged non-null polls. Rows still arriving after the load ended
                              (a backlog being drained) make it positive. rows_final_after_fault_end_s is the same measured from the fault end alone.
+  not_admitted               requests - redis_counter: requests that never reached the decision (the counter). null when the counter is
+                             not meaningful. client_unknown minus not_admitted is roughly "took a seat, client does not know".
+  blackout_s                 the longest run of consecutive seconds of the load (0..59) in which no request started in that second
+                             was answered 200 (a second is counted by when its requests started).
+  error_codes                {k6 error_code: requests} of the requests that got no HTTP answer; null when the run predates the
+                             recording (the raw k6 output is not kept, so older runs cannot be filled in).
   seats_lost                 wins - db_rows: seats the decision took that have no row (the durability figure). null when wins is null.
   client_unknown             timeouts + http_5xx: requests whose client did not learn the outcome.
   recorded_despite_unknown   db_rows - http_200: rows no client saw confirmed ("unknown to the client, but it did win"); null when
@@ -78,6 +84,7 @@ def collect_raw(raw_path):
     """k6 output -> per-second outcome counts, confirmed seqs, dropped iterations and the start of the main phase."""
     pp = _postprocess()
     per_sec = {}  # sec -> Counter(result)
+    error_codes = Counter()
     seq_values = []
     dropped = 0
     main_start = None  # epoch of the earliest request of the main phase
@@ -98,6 +105,8 @@ def collect_raw(raw_path):
                 points += 1
                 sec = int(tags["sec"])
                 per_sec.setdefault(sec, Counter())[tags["result"]] += int(value)
+                if tags.get("error_code"):
+                    error_codes[tags["error_code"]] += int(value)
                 if tags.get("phase") == "main" and (main_max_sec is None or sec > main_max_sec):
                     main_max_sec = sec
             elif metric == "recovery_seq":
@@ -108,7 +117,7 @@ def collect_raw(raw_path):
                 started = pp.parse_time(data["time"]) - value / 1000.0
                 main_start = started if main_start is None else min(main_start, started)
     return {"per_sec": per_sec, "seq_values": seq_values, "dropped": dropped, "main_start": main_start,
-            "main_max_sec": main_max_sec, "points": points}
+            "main_max_sec": main_max_sec, "points": points, "error_codes": dict(error_codes)}
 
 
 def totals_of(per_sec, dropped=0):
@@ -144,12 +153,29 @@ def loss_axes(report):
     totals = report["totals"]
     wins = report.get("wins")
     no_duplicates = report["dup_seq"] == 0 and report["dup_members"] == 0
+    counter = report.get("redis_counter")
     return {
         "seats_lost": wins - report["db_rows"] if wins is not None else None,
         "client_unknown": totals["timeouts"] + totals["http_5xx"],
         "recorded_despite_unknown": report["db_rows"] - totals["http_200"] if no_duplicates else None,
+        "not_admitted": totals["requests"] - counter if report.get("redis_counter_meaningful") and counter is not None else None,
+        "blackout_s": blackout_seconds(report["timeline"], report["load"]["seconds"]),
         "legacy_fields": ["consumed_but_unconfirmed", "confirmed_but_missing"],
     }
+
+
+def blackout_seconds(timeline, load_seconds):
+    """Longest run of consecutive seconds 0..load_seconds-1 with no 200 among the requests started in them."""
+    longest = current = 0
+    by_sec = {entry["sec"]: entry for entry in timeline}
+    for sec in range(load_seconds):
+        entry = by_sec.get(sec)
+        if entry is not None and entry["http_200"] == 0:
+            current += 1
+            longest = max(longest, current)
+        else:
+            current = 0
+    return longest
 
 
 def reprocess(source_dir):
@@ -158,6 +184,7 @@ def reprocess(source_dir):
         report = json.load(f)
     report.update(loss_axes(report))
     report.setdefault("insert_failures_logged", None)
+    report.setdefault("error_codes", None)
     report["reprocessed_from"] = source_dir
     return report
 
@@ -296,6 +323,7 @@ def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lin
         "issue_rows_read": issue_rows,
         "seq": {"confirmed": len(confirmed), "distinct": len(set(confirmed)), "max": max(confirmed) if confirmed else None},
         "insert_failures_logged": insert_failures,
+        "error_codes": raw.get("error_codes"),
         "settled": settled,
         "recovery_time_s": recovery_time,
         "rows_final_after_fault_end_s": after_fault,
@@ -336,8 +364,8 @@ def main(argv=None):
         with open(args.out, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
             f.write("\n")
-        print("recovery_postprocess: reprocessed %s: seats_lost=%s client_unknown=%s recorded_despite_unknown=%s" % (
-            args.reprocess_from, report["seats_lost"], report["client_unknown"], report["recorded_despite_unknown"]))
+        print("recovery_postprocess: reprocessed %s: seats_lost=%s client_unknown=%s not_admitted=%s blackout_s=%s" % (
+            args.reprocess_from, report["seats_lost"], report["client_unknown"], report["not_admitted"], report["blackout_s"]))
         return 0
     required = ("raw", "scenario", "stage", "stock", "fault_log", "db_samples", "issues", "db_rows", "k6_exit", "timeline_out")
     missing = [name for name in required if getattr(args, name) is None]
@@ -362,10 +390,10 @@ def main(argv=None):
         f.write("\n")
     totals = report["totals"]
     print("recovery_postprocess: scenario=%s stage=%s requests=%d http_200=%d http_5xx=%d timeouts=%d db_rows=%d "
-          "seats_lost=%s client_unknown=%s recorded_despite_unknown=%s recovery_time_s=%s valid=%s" % (
+          "seats_lost=%s client_unknown=%s not_admitted=%s blackout_s=%s recovery_time_s=%s valid=%s" % (
               report["scenario"], report["stage"], totals["requests"], totals["http_200"], totals["http_5xx"],
               totals["timeouts"], report["db_rows"], report["seats_lost"], report["client_unknown"],
-              report["recorded_despite_unknown"], report["recovery_time_s"], str(report["validity"]["valid"]).lower()))
+              report["not_admitted"], report["blackout_s"], report["recovery_time_s"], str(report["validity"]["valid"]).lower()))
     return 0
 
 
