@@ -29,6 +29,23 @@ jobs:
 
       - name: Get Repository
         uses: actions/checkout@v3
+        with:
+          # the evidence check below diffs against the merge base of the PR's base branch
+          fetch-depth: 0
+
+      # coupon-lab/evidence is append-only. There is no override: a correction PR is expected to fail here and
+      # to be merged knowingly, with the reason in the PR body.
+      - name: Check coupon-lab evidence is append-only and valid JSON
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          changed=$(git diff --no-renames --name-only --diff-filter=MDT "origin/$GITHUB_BASE_REF...HEAD" -- coupon-lab/evidence)
+          if [ -n "$changed" ]; then
+            echo "::error::coupon-lab/evidence is append-only; this PR modifies or deletes committed evidence:"
+            echo "$changed"
+            exit 1
+          fi
+          coupon-lab/scripts/check-evidence.sh
 
       - name: Set up JDK 21
         uses: actions/setup-java@v3

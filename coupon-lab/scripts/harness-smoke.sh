@@ -310,7 +310,45 @@ else
     fail "18 pre-commit hook" "unrelated=$rc_unrelated staged-bad=$rc_staged_bad ($msg_hook) staged-good=$rc_staged_good"
 fi
 
-total=$((18 - skipped))
+# 19. evidence is append-only. In a throwaway repository with one committed evidence file the hook rejects a staged modification
+#     (still valid JSON), deletion and rename of it, judges a new file by what is staged (not by the working tree), and accepts a new valid file.
+repo=$(mk)
+rm -f "$repo"
+mkdir -p "$repo/coupon-lab/scripts" "$repo/coupon-lab/evidence/s0/consistency/run-a"
+cp -R scripts/githooks "$repo/coupon-lab/scripts/githooks"
+git -C "$repo" init -q .
+evid_rel=coupon-lab/evidence/s0/consistency/run-a/consistency.json
+printf '{\n  "issued" : 107,\n  "remaining" : -7\n}\n' >"$repo/$evid_rel"
+git -C "$repo" add coupon-lab
+git -C "$repo" -c core.hooksPath=/dev/null -c user.email=smoke@example.invalid -c user.name=smoke commit -q -m base
+githook() { (cd "$repo" && coupon-lab/scripts/githooks/pre-commit 2>&1); }
+printf '{\n  "issued" : 1,\n  "remaining" : -7\n}\n' >"$repo/$evid_rel"
+git -C "$repo" add -A coupon-lab
+out=$(githook); rc_mod=$?; msg_mod=$out
+git -C "$repo" reset -q --hard
+git -C "$repo" rm -q "$evid_rel"
+out=$(githook); rc_del=$?
+git -C "$repo" reset -q --hard
+git -C "$repo" mv "$evid_rel" coupon-lab/evidence/s0/consistency/run-a/renamed.json
+out=$(githook); rc_ren=$?
+git -C "$repo" reset -q --hard
+new_rel=coupon-lab/evidence/s0/consistency/run-a/added.json
+printf '{"a" 1}\n' >"$repo/$new_rel"
+git -C "$repo" add "$new_rel"
+printf '{"a" : 1}\n' >"$repo/$new_rel"   # fixed in the working tree only; the index still holds the broken file
+out=$(githook); rc_index=$?; msg_index=$out
+git -C "$repo" add "$new_rel"
+out=$(githook); rc_new=$?
+rm -rf "$repo"
+if [ "$rc_mod" -eq 1 ] && [[ "$msg_mod" == *"consistency.json"* ]] && [[ "$msg_mod" == *"evidence is append-only"* ]] \
+    && [ "$rc_del" -eq 1 ] && [ "$rc_ren" -eq 1 ] \
+    && [ "$rc_index" -eq 1 ] && [[ "$msg_index" == *"added.json"* ]] && [ "$rc_new" -eq 0 ]; then
+    ok "19 pre-commit hook: staged modify/delete/rename of committed evidence exit 1, broken new file judged as staged exit 1, new valid file exit 0"
+else
+    fail "19 pre-commit hook append-only" "modify=$rc_mod ($msg_mod) delete=$rc_del rename=$rc_ren index=$rc_index ($msg_index) new=$rc_new"
+fi
+
+total=$((19 - skipped))
 suffix=""
 [ "$skipped" -eq 0 ] || suffix=" skipped=$skipped"
 echo "harness-smoke: $((total - fails))/$total OK in ${SECONDS}s$suffix"
