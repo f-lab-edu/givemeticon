@@ -3,6 +3,7 @@
 
 usage: python3 -I postprocess.py --raw raw.json.gz --profile ramping|spike --stage sN --db-issued-rows N
            --out load.json [--filtered-raw out.json.gz] [--env key=value ...] [--redis-counter N] [--settle-s S --settled true|false]
+           [--publish-failures '{"<reason>": N, ...}']
        python3 -I postprocess.py --reprocess-from <evidence dir> --out load.json
 
 Only the measure phase is aggregated, per target_rps. A request belongs to the step it started in (tag set by
@@ -13,6 +14,8 @@ Validity is per stage: dropped_iterations / (requests + dropped_iterations) < 1%
 is valid and the DB row count matches the 200 responses. --redis-counter (S3 only) is recorded as db.redis_counter and
 never enters the validity rule. --settle-s / --settled (S4 only: the runner waited for the asynchronously written rows to
 stop changing before counting them) are recorded as settle_s and settled; the validity rule is unchanged.
+--publish-failures (S4 only) is the app's coupon_s4_publish_failures counter per reason tag; it is recorded as
+publish_failures {"total", "by_reason"}, null when not given (other stages, or the counter could not be read).
 
 Every stage also gets a kind:
   saturated  achieved_rps < 0.95 * target_rps, or p50 > 100 ms (the system cannot keep up; requests queue)
@@ -380,6 +383,13 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
     }
 
 
+def publish_failures_of(by_reason):
+    """{reason: N} -> {"total": N, "by_reason": {...}}; None when the counter was not read."""
+    if by_reason is None:
+        return None
+    return {"total": sum(by_reason.values()), "by_reason": dict(sorted(by_reason.items()))}
+
+
 def _max_or_none(points):
     return max(value for _, value in points) if points else None
 
@@ -416,6 +426,7 @@ def main(argv=None):
     parser.add_argument("--redis-counter", type=int)
     parser.add_argument("--settle-s", type=int)
     parser.add_argument("--settled", choices=("true", "false"))
+    parser.add_argument("--publish-failures", type=json.loads, metavar="JSON")
     parser.add_argument("--out", required=True)
     parser.add_argument("--filtered-raw")
     parser.add_argument("--profiles", default=DEFAULT_PROFILES)
@@ -448,6 +459,8 @@ def main(argv=None):
         if "settle_s" in old:
             args.settle_s = old["settle_s"]
             args.settled = str(old["settled"]).lower()
+        publish_failures = old.get("publish_failures")
+        args.publish_failures = publish_failures["by_reason"] if publish_failures else None
         env_pairs = ["%s=%s" % (k, v) for k, v in old["env"].items()]
         layout = layout_from_report(old)
         args.stats = os.path.join(source, "stats.jsonl")
@@ -484,6 +497,7 @@ def main(argv=None):
     report = build_report(args.raw, layout, args.profile, args.stage, args.db_issued_rows,
                           _env(env_pairs), args.filtered_raw, args.stats, args.summary, args.gc_log, run_info,
                           args.innodb, args.rows, args.redis_counter)
+    report["publish_failures"] = publish_failures_of(args.publish_failures)
     if args.settle_s is not None:
         report["settle_s"] = args.settle_s
         report["settled"] = args.settled == "true"

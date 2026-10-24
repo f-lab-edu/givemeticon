@@ -4,17 +4,19 @@
 #   verify.sh unit [--tests <pattern>]
 #   verify.sh bundle <consistency|load|bottleneck|recovery|fairness> [--stage sN]
 #   verify.sh load --stage sN --profile <ramping|spike|ramping-rows> [--runs N] [--k6 host|container] [--rows N] [--max-vus N]
-#                  [--flush-log 1|2] [--pool N] [--redis-aof]    (--flush-log 2 relaxes durability: a DIAGNOSTIC, never a configuration)
+#                  [--flush-log 1|2] [--pool N] [--redis-aof|--no-redis-aof]    (--flush-log 2 relaxes durability: a DIAGNOSTIC, never a configuration)
 #                  (tests B and C: k6 against docker compose, see docs/stages.md)
 #   verify.sh reprocess evidence/<stage>/load/<profile>/<dir>        (test B: re-aggregate a saved run into a new -reprocessed dir)
 #   verify.sh reprocess evidence/<stage>/recovery/<scenario>/<dir>   (test D: add the loss axes to a saved recovery.json, new -reprocessed dir)
-#   verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at 20] [--fault-duration 10] [--stock N] [--redis-aof]
+#   verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at 20] [--fault-duration 10] [--stock N] [--redis-aof|--no-redis-aof]
 #                  (test D: 500 rps for 60 s while a fault is injected, then the loss accounting; see docs/stages.md. consumer-redeliver is
 #                  s4 only: no container fault, the app runs with COUPON_S4_CONSUMER_FAIL_EVERY=50; other stages are refused with exit 2)
 #   Stage s4 (asynchronous writes): load and recovery settle before the rows are counted (poll until 5 polls in a row are equal,
-#                  at most 120 s; settle_s) and sample the depth of coupon.issued every second (queue.jsonl, timeline.queue_depth).
-#   --redis-aof (load, recovery): Redis runs with appendonly yes, appendfsync everysec (a configuration, not code); env.redis_appendonly=yes
-#                  and the evidence directory gets an -aof suffix. Default: appendonly no.
+#                  at most 600 s; settle_s), sample coupon.issued and the broker's channel count every second from the management API
+#                  (queue.jsonl, timeline.queue_depth), keep the broker log (rabbitmq.log) and read coupon_s4_publish_failures per reason.
+#   --redis-aof / --no-redis-aof (load, recovery): Redis with appendonly yes, appendfsync everysec (a configuration, not code), or without.
+#                  Default: yes for --stage s4 (AOF is part of the S4 design; --no-redis-aof is the contrast run), no for every other stage.
+#                  env.redis_appendonly records it; the evidence directory gets an -aof suffix when it is yes.
 # Last stdout line:
 #   VERIFY <tier> <PASS|FAIL|INFRA_DOWN|BUILD_ERROR|TIMEOUT|NO_TESTS> passed=N failed=N skipped=N duration=Ns sha=<short> dirty=<bool> report=<path>
 # Exit codes: 0 PASS, 1 FAIL, 2 usage/config error, 3 INFRA_DOWN, 4 TIMEOUT, 5 BUILD_ERROR, 6 NO_TESTS.
@@ -32,9 +34,9 @@ LOAD_HIKARI_POOL_SIZE=${HIKARI_POOL_SIZE:-10}
 
 usage() {
     echo "usage: scripts/verify.sh compile | unit [--tests <pattern>] | bundle <$(echo "$BUNDLES" | tr ' ' '|')> [--stage sN]" >&2
-    echo "       scripts/verify.sh load --stage sN --profile ramping|spike|ramping-rows [--runs N] [--k6 host|container] [--rows N] [--max-vus N] [--flush-log 1|2] [--pool N] [--redis-aof]" >&2
+    echo "       scripts/verify.sh load --stage sN --profile ramping|spike|ramping-rows [--runs N] [--k6 host|container] [--rows N] [--max-vus N] [--flush-log 1|2] [--pool N] [--redis-aof|--no-redis-aof]" >&2
     echo "       scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir> | evidence/<stage>/recovery/<scenario>/<dir>" >&2
-    echo "       scripts/verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at S] [--fault-duration S] [--stock N] [--redis-aof]" >&2
+    echo "       scripts/verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at S] [--fault-duration S] [--stock N] [--redis-aof|--no-redis-aof]" >&2
     exit 2
 }
 
@@ -56,7 +58,9 @@ shift
 tests_pattern=""
 stage=""
 bundle=""
-redis_aof=no
+redis_aof=""   # load/recovery: yes or no from --redis-aof / --no-redis-aof, else the stage default (yes for s4, no otherwise)
+# Stage default of the Redis AOF knob, applied once --stage is known.
+default_redis_aof() { [ -n "$redis_aof" ] || { if [ "$stage" = s4 ]; then redis_aof=yes; else redis_aof=no; fi; }; }
 case "$mode" in
     compile)
         [ $# -eq 0 ] || usage
@@ -93,6 +97,7 @@ case "$mode" in
         pool=""
         while [ $# -gt 0 ]; do
             if [ "$1" = --redis-aof ]; then redis_aof=yes; shift; continue; fi
+            if [ "$1" = --no-redis-aof ]; then redis_aof=no; shift; continue; fi
             [ $# -ge 2 ] || usage
             case "$1" in
                 --stage) stage=$2 ;;
@@ -119,6 +124,7 @@ case "$mode" in
         [ -z "$pool" ] || LOAD_HIKARI_POOL_SIZE=$pool
         [[ "$runs" =~ ^[1-9][0-9]*$ ]] || usage
         require_stage_class "$stage"
+        default_redis_aof
         tier="load-$profile"
         # evidence/<stage>/load/<variant>/: the profile plus whatever distinguishes the run (the row count is part of ramping-rows)
         variant=$profile
@@ -134,6 +140,7 @@ case "$mode" in
         stock=""
         while [ $# -gt 0 ]; do
             if [ "$1" = --redis-aof ]; then redis_aof=yes; shift; continue; fi
+            if [ "$1" = --no-redis-aof ]; then redis_aof=no; shift; continue; fi
             [ $# -ge 2 ] || usage
             case "$1" in
                 --stage) stage=$2 ;;
@@ -164,6 +171,7 @@ case "$mode" in
         [ "$scenario" != db-down ] || fault_end_s=$((fault_at + fault_duration))
         [ "$fault_end_s" -lt "$recovery_seconds" ] || { echo "the fault ends at second $fault_end_s of ${recovery_seconds}; it must end before the load does" >&2; exit 2; }
         require_stage_class "$stage"
+        default_redis_aof
         tier="recovery-$scenario"
         # evidence/<stage>/recovery/<scenario dir>/: the scenario plus the configuration knob that distinguishes the run
         scenario_dir=$scenario
@@ -202,7 +210,7 @@ report="build/verify/$tier.json"
 started_epoch=$(date +%s)
 started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 stamp=$(date -u +%Y%m%d-%H%M%S)
-echo "verify $tier: sha=$sha dirty=$dirty started=$started_at${stage:+ stage=$stage}"
+echo "verify $tier: sha=$sha dirty=$dirty started=$started_at${stage:+ stage=$stage}${redis_aof:+ redis_aof=$redis_aof}"
 
 # Writes the report, prints the VERIFY line and exits. Reads passed/failed/evidence_dirs/failures of the caller.
 load_finish() {   # <status> <exit code>
@@ -276,26 +284,44 @@ load_sample_stats() {
     done
 }
 
-# Stage s4: about every second one line {"time": <epoch>, "queue_depth": <messages of coupon.issued, ready + unacked; null when
-# unreadable>} from rabbitmqctl inside the rabbitmq container (the CLI itself takes about a second and runs on that container's cpu).
-# Run in the background during k6 and the settle, killed afterwards.
+# RabbitMQ management API of the load compose, reached from the host (user from docker-compose.load.yml)
+RABBIT_API=http://127.0.0.1:15673/api
+RABBIT_API_USER=coupon:coupon
+
+# Stage s4: about every second one line {"time": <epoch>, "queue_depth": <messages of coupon.issued, ready + unacked>,
+# "ready", "unacked", "channels", "connections": <broker totals>} from the management API (null for anything unreadable; 2 s
+# timeout per request, no proxy). It runs on the host, not on the broker's cpu. Run in the background during k6 and the
+# settle, killed afterwards (exec: the background pid is the sampler itself).
 load_sample_queue() {
-    local out=$1 now depth
-    while :; do
-        python3 -I -c 'import time; time.sleep(1 - time.time() % 1)'
-        now=$(date +%s)
-        depth=$(docker exec "${LOAD_PREFIX}rabbitmq" rabbitmqctl list_queues -q name messages 2>/dev/null | awk '$1 == "coupon.issued" { print $2 }')
-        [[ "$depth" =~ ^[0-9]+$ ]] || depth=null
-        printf '{"time":%s,"queue_depth":%s}\n' "$now" "$depth" >>"$out"
-    done
+    exec python3 -I -c '
+import base64, json, sys, time, urllib.request
+out, api, user = sys.argv[1:4]
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+auth = "Basic " + base64.b64encode(user.encode()).decode()
+def get(path):
+    try:
+        return json.load(opener.open(urllib.request.Request(api + path, headers={"Authorization": auth}), timeout=2))
+    except Exception:
+        return {}
+while True:
+    time.sleep(1 - time.time() % 1)
+    now = int(time.time())
+    queue = get("/queues/%2F/coupon.issued")
+    totals = get("/overview").get("object_totals") or {}
+    line = {"time": now, "queue_depth": queue.get("messages"), "ready": queue.get("messages_ready"),
+            "unacked": queue.get("messages_unacknowledged"), "channels": totals.get("channels"),
+            "connections": totals.get("connections")}
+    with open(out, "a") as f:
+        f.write(json.dumps(line, separators=(",", ":")) + "\n")
+' "$1" "$RABBIT_API" "$RABBIT_API_USER"
 }
 
 # Stage s4, after k6: polls `SELECT <arg>` (a row count) every second until 5 polls in a row return the same number, at most
-# 120 s. Prints the seconds spent (the 5-poll window included); returns 1 when the count never settled. Needs load_mysql.
+# 600 s. Prints the seconds spent (the 5-poll window included); returns 1 when the count never settled. Needs load_mysql.
 load_settle() {   # <count query>
     local started rows last="" same=0
     started=$(date +%s)
-    while [ $(($(date +%s) - started)) -lt 120 ]; do
+    while [ $(($(date +%s) - started)) -lt 600 ]; do
         rows=$(load_mysql "SELECT $1")
         if ! [[ "$rows" =~ ^[0-9]+$ ]]; then same=0; last=""
         elif [ "$rows" = "$last" ]; then same=$((same + 1))
@@ -316,6 +342,44 @@ try:
     print(int(next(m["value"] for m in body["measurements"] if m["statistic"] == "COUNT")))
 except Exception:
     pass'
+}
+
+# The Micrometer counter coupon_s4_publish_failures of the running app per reason tag, as JSON {"<reason>": N, ...}: {} when the
+# counter does not exist (no publish ever failed: actuator answers 404), nothing when it cannot be read.
+load_publish_failures() {
+    python3 -I -c '
+import json, urllib.error, urllib.parse, urllib.request
+base = "http://127.0.0.1:18080/actuator/metrics/coupon_s4_publish_failures"
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+def count(body):
+    return int(next(m["value"] for m in body["measurements"] if m["statistic"] == "COUNT"))
+try:
+    try:
+        body = json.load(opener.open(base, timeout=5))
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+        print("{}")
+        raise SystemExit
+    reasons = next((t["values"] for t in body.get("availableTags", []) if t["tag"] == "reason"), [])
+    print(json.dumps({r: count(json.load(opener.open(base + "?tag=" + urllib.parse.quote("reason:" + r), timeout=5)))
+                      for r in reasons}, sort_keys=True))
+except SystemExit:
+    pass
+except Exception:
+    pass'
+}
+
+# Before the containers go away: the app ERROR headlines (every stage) to <dir>/app-errors.log and, for s4, the broker log lines
+# that tell errors, warnings, closed connections/channels, flow control and alarms apart to <dir>/rabbitmq.log
+# (400 characters each, at most 2000 lines; stack traces are not kept).
+load_keep_logs() {   # <dir>
+    if docker logs "${LOAD_PREFIX}app" >"$1/app.log" 2>&1; then
+        grep ' ERROR ' "$1/app.log" | cut -c1-400 | head -n 2000 >"$1/app-errors.log"
+    fi
+    if [ "$stage" = s4 ] && docker logs "${LOAD_PREFIX}rabbitmq" >"$1/rabbitmq-full.log" 2>&1; then
+        grep -iE 'error|warn|closing|flow|alarm' "$1/rabbitmq-full.log" | cut -c1-400 | head -n 2000 >"$1/rabbitmq.log"
+    fi
 }
 
 # verify.sh load: for each run, compose up (app + mysql), seed one event, k6 from the host, postprocess,
@@ -473,6 +537,7 @@ run_load() {
         kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""
         kill "$innodb_pid" 2>/dev/null; wait "$innodb_pid" 2>/dev/null; innodb_pid=""
         if [ "$k6_rc" -ne 0 ]; then
+            load_keep_logs "$work"
             # docker itself failed (125 daemon error, 126/127 cannot start the command) is infra, not a k6 script error
             if [ "$k6_mode" = container ] && [ "$k6_rc" -ge 125 ] && [ "$k6_rc" -le 127 ]; then
                 run_status=INFRA_DOWN; run_note="docker run of the k6 container failed with $k6_rc (see $log)"; return
@@ -485,11 +550,15 @@ run_load() {
             if settle_s=$(load_settle "COUNT(*) FROM coupon_issue WHERE event_id IN ($event_ids)"); then
                 settle_arg=(--settle-s "$settle_s" --settled true)
             else
-                echo "run $1/$runs: coupon_issue rows still changing 120 s after k6 ended"
-                settle_arg=(--settle-s 120 --settled false)
+                echo "run $1/$runs: coupon_issue rows still changing 600 s after k6 ended"
+                settle_arg=(--settle-s 600 --settled false)
             fi
             kill "$queue_pid" 2>/dev/null; wait "$queue_pid" 2>/dev/null; queue_pid=""
+            local publish_failures
+            publish_failures=$(load_publish_failures)
+            [ -z "$publish_failures" ] || settle_arg+=(--publish-failures "$publish_failures")
         fi
+        load_keep_logs "$work"
         local issued_rows nano cpus_app cpus_mysql cpus_redis redis_image heap hikari cpus_rabbitmq rabbitmq_image
         issued_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_issue WHERE event_id IN ($event_ids)")
         if ! [[ "$issued_rows" =~ ^[0-9]+$ ]]; then
@@ -559,6 +628,8 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/load.json")
             [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
             [ ! -f "$work/innodb.jsonl" ] || cp "$work/innodb.jsonl" "$run_evidence/"
             [ ! -f "$work/queue.jsonl" ] || cp "$work/queue.jsonl" "$run_evidence/"
+            [ ! -f "$work/app-errors.log" ] || cp "$work/app-errors.log" "$run_evidence/"
+            [ ! -f "$work/rabbitmq.log" ] || cp "$work/rabbitmq.log" "$run_evidence/"
             [ ! -f "$work/gc/gc.log" ] || cp "$work/gc/gc.log" "$run_evidence/"
             [ ! -f "$work/raw-filtered.json.gz" ] || cp "$work/raw-filtered.json.gz" "$run_evidence/raw.json.gz"
             evidence_dirs+=("$run_evidence")
@@ -685,10 +756,10 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
         done
     }
 
-    # After k6: true once the last 5 samples taken after <base> are equal and not null (db_rows stopped changing); gives up after 120 s.
+    # After k6: true once the last 5 samples taken after <base> are equal and not null (db_rows stopped changing); gives up after 600 s.
     rec_wait_settled() {   # <number of samples when k6 ended>
         local waited=0 total vals
-        while [ "$waited" -lt 120 ]; do
+        while [ "$waited" -lt 600 ]; do
             total=$(wc -l <"$work/db-samples.jsonl")
             if [ "$total" -ge $(($1 + 5)) ]; then
                 vals=$(tail -n 5 "$work/db-samples.jsonl" | sed -n 's/.*"db_rows":\([0-9a-z]*\)}.*/\1/p' | sort -u)
@@ -816,7 +887,7 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
         local base settle_started settle_s
         base=$(wc -l <"$work/db-samples.jsonl")
         settle_started=$(date +%s)
-        rec_wait_settled "$base" || echo "recovery $scenario: db_rows still changing 120 s after the load ended (recovery_time_s will be null)"
+        rec_wait_settled "$base" || echo "recovery $scenario: db_rows still changing 600 s after the load ended (recovery_time_s will be null)"
         settle_s=$(($(date +%s) - settle_started))
         kill "$dbpoll_pid" 2>/dev/null; wait "$dbpoll_pid" 2>/dev/null; dbpoll_pid=""
         if [ -n "$queue_pid" ]; then kill "$queue_pid" 2>/dev/null; wait "$queue_pid" 2>/dev/null; queue_pid=""; fi
@@ -828,20 +899,23 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
         fi
         counter=$(docker exec "${LOAD_PREFIX}redis" redis-cli --raw GET "coupon:event:$event_id:issued" 2>>"$log")
         [[ "$counter" =~ ^[0-9]+$ ]] && counter_arg=(--redis-counter "$counter")
-        # S4: the depth samples and the consumer's redelivery counter (read before the app container goes away)
-        local s4_arg=() redeliveries
+        # S4: the depth samples, the consumer's redelivery counter and the publish failures per reason (read before the app
+        # container goes away)
+        local s4_arg=() redeliveries publish_failures
         if [ "$stage" = s4 ]; then
             s4_arg=(--queue-samples "$work/queue.jsonl")
             redeliveries=$(load_redeliveries)
             [[ "$redeliveries" =~ ^[0-9]+$ ]] && s4_arg+=(--redeliveries "$redeliveries")
+            publish_failures=$(load_publish_failures)
+            [ -z "$publish_failures" ] || s4_arg+=(--publish-failures "$publish_failures")
         fi
         # The app log goes away with the container. Count the S3 "insert failed after winning the counter" ERROR lines over the whole
-        # log, keep only the ERROR headlines (no stack traces, 400 characters each, at most 2000) as evidence.
+        # log; keep the ERROR headlines (and for s4 the broker log lines) as evidence.
         local failures_arg=() insert_failures
-        if docker logs "${LOAD_PREFIX}app" >"$work/app.log" 2>&1; then
+        load_keep_logs "$work"
+        if [ -f "$work/app.log" ]; then
             insert_failures=$(grep -c 'coupon_issue insert failed after winning the counter' "$work/app.log")
             [[ "$insert_failures" =~ ^[0-9]+$ ]] && failures_arg=(--insert-failures "$insert_failures")
-            grep ' ERROR ' "$work/app.log" | cut -c1-400 | head -n 2000 >"$work/app-errors.log"
         fi
 
         python3 -I scripts/load/recovery_postprocess.py --raw "$work/raw.json.gz" --scenario "$scenario" --stage "$stage" --stock "$stock" \
@@ -884,6 +958,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/recovery.json")
         [ ! -f "$work/summary.json" ] || cp "$work/summary.json" "$run_evidence/"
         [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
         [ ! -f "$work/app-errors.log" ] || cp "$work/app-errors.log" "$run_evidence/"
+        [ ! -f "$work/rabbitmq.log" ] || cp "$work/rabbitmq.log" "$run_evidence/"
         evidence_dirs+=("$run_evidence")
         echo "recovery $scenario on $stage: evidence in $run_evidence"
     fi
@@ -916,7 +991,7 @@ run_reprocess_recovery() {
     if [ -e "$dest" ]; then echo "$dest already exists; evidence is never overwritten" >&2; exit 2; fi
     mkdir -p "$dest"
     cp "$tmp/recovery.json" "$dest/"
-    for name in timeline.json fault.log summary.json stats.jsonl app-errors.log queue.jsonl; do
+    for name in timeline.json fault.log summary.json stats.jsonl app-errors.log queue.jsonl rabbitmq.log; do
         [ ! -f "$source_dir/$name" ] || cp "$source_dir/$name" "$dest/"
     done
     evidence_dirs+=("$dest")

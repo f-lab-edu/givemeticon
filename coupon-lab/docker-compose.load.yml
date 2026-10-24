@@ -2,7 +2,8 @@
 # Started and removed (down -v) by verify.sh; the manual-run docker-compose.yml is unrelated.
 # redis (S3/S4 decision counter) is up for every stage; S0/S1 do not use it. 1 cpu, no snapshots; AOF only with
 # verify.sh --redis-aof (REDIS_APPENDONLY=yes, appendfsync everysec), off by default.
-# rabbitmq (S4 durable publish and consumer) is up for every stage; S0/S1/S3 do not use it. 1 cpu.
+# rabbitmq (S4 durable publish and consumer) is up for every stage; S0/S1/S3 do not use it. 1 cpu. The management image's
+# HTTP API (host port 15673) is what verify.sh samples the queue depth and channel count from; user coupon/coupon.
 # Required variables (set by verify.sh): COUPON_LAB_DB_PASSWORD, COUPON_STRATEGY, LOAD_GC_DIR.
 # Optional (test C diagnostics, verify.sh load --pool / --flush-log): HIKARI_POOL_SIZE (default 10),
 # FLUSH_LOG (default 1 = MySQL's own default). FLUSH_LOG=2 relaxes durability and is a diagnostic only.
@@ -38,9 +39,14 @@ services:
       retries: 30
 
   rabbitmq:
-    image: rabbitmq:3-alpine
+    image: rabbitmq:3-management-alpine
     container_name: coupon-lab-load-rabbitmq
     cpus: 1
+    ports:
+      - "15673:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: coupon
+      RABBITMQ_DEFAULT_PASS: coupon
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
@@ -68,6 +74,8 @@ services:
       COUPON_LAB_REDIS_PORT: 6379
       COUPON_LAB_RABBIT_HOST: rabbitmq
       COUPON_LAB_RABBIT_PORT: 5672
+      COUPON_LAB_RABBIT_USERNAME: coupon
+      COUPON_LAB_RABBIT_PASSWORD: coupon
       COUPON_STRATEGY: ${COUPON_STRATEGY:?set COUPON_STRATEGY}
       SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${HIKARI_POOL_SIZE:-10}
       # S4 only (inert for other stages): publisher-confirm wait, and the test-D consumer-redeliver hook (0 = off; verify.sh sets it)

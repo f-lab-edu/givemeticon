@@ -5,6 +5,7 @@ usage: python3 -I recovery_postprocess.py --raw raw.json.gz --scenario db-down|r
            --fault-log fault.log --db-samples db-samples.jsonl --issues issues.tsv --db-rows N [--redis-counter N]
            --k6-exit N --out recovery.json --timeline-out timeline.json [--fault-at S] [--fault-duration S]
            [--profiles profiles.json] [--insert-failures N] [--settle-s S] [--queue-samples queue.jsonl] [--redeliveries N]
+           [--publish-failures '{"<reason>": N, ...}']
            [--env key=value ...]
        python3 -I recovery_postprocess.py --reprocess-from <evidence dir> --out recovery.json
 
@@ -16,7 +17,8 @@ Inputs written by the runner:
                    healthy again), k6_ended_at. --fault-duration is the time between stop_returned_at and docker start.
   db-samples.jsonl {"time": <epoch s>, "db_rows": <count of coupon_issue rows of the event, null while MySQL is unreachable>}, every second.
   issues.tsv       "member_id<TAB>seq" for every coupon_issue row of the event, read after the run settled.
-  queue.jsonl      (S4) {"time": <epoch s>, "queue_depth": <messages of coupon.issued, ready + unacked; null when unreadable>}, about every second.
+  queue.jsonl      (S4) {"time": <epoch s>, "queue_depth": <messages of coupon.issued, ready + unacked; null when unreadable>, ...}, about
+                   every second; other fields (ready, unacked, channels, connections) are kept in the file and not aggregated.
 
 consumer-redeliver (S4) injects no container fault: the app's consumer throws after every 50th new row, before the ack. There are
 no fault events, so validity is k6_completed alone (fault_observed is null) and recovery_time_s is measured from the load end.
@@ -53,6 +55,8 @@ Definitions (the numbers are OUTCOMES: they never decide PASS/FAIL, only validit
                              (the last sample taken in that second).
   redeliveries               the app's coupon_s4_redeliveries counter (messages the broker delivered again) read after the settle; null
                              when not read (stages without a consumer).
+  publish_failures           the app's coupon_s4_publish_failures counter per reason tag (S4): {"total", "by_reason"}; null when not read
+                             (other stages, or the counter could not be read).
   validity                   k6_completed (k6 exited 0 and the main phase ran to its last second) and fault_observed (the fault events were logged,
                              in order, and the fault was injected while the main phase was running; null for consumer-redeliver).
 Requests are bucketed by the second they started in, counted from the start of the main phase (the warmup is seconds -10..-1).
@@ -196,7 +200,7 @@ def reprocess(source_dir):
     report.update(loss_axes(report))
     report.setdefault("insert_failures_logged", None)
     report.setdefault("error_codes", None)
-    for name in ("settle_s", "queue_depth_max", "redeliveries"):
+    for name in ("settle_s", "queue_depth_max", "redeliveries", "publish_failures"):
         report.setdefault(name, None)
     report["reprocessed_from"] = source_dir
     return report
@@ -322,7 +326,7 @@ def _env(pairs):
 
 def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lines, db_rows, redis_counter, k6_exit,
                  fault_at, fault_duration, target, env, insert_failures=None, settle_s=None, queue_samples=None,
-                 redeliveries=None):
+                 redeliveries=None, publish_failures=None):
     no_fault = scenario == "consumer-redeliver"
     if no_fault:
         fault_at = fault_duration = None
@@ -375,6 +379,7 @@ def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lin
         "rows_final_after_fault_end_s": after_fault,
         "queue_depth_max": _max_depth(queue_samples),
         "redeliveries": redeliveries,
+        "publish_failures": _publish_failures(publish_failures),
         "timeline": timeline,
         "validity": {"k6_completed": k6_completed, "fault_observed": fault_observed,
                      "valid": bool(k6_completed and (no_fault or fault_observed))},
@@ -382,6 +387,12 @@ def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lin
     })
     report.update(loss_axes(report))
     return report
+
+
+def _publish_failures(by_reason):
+    if by_reason is None:
+        return None
+    return {"total": sum(by_reason.values()), "by_reason": dict(sorted(by_reason.items()))}
 
 
 def _max_depth(queue_samples):
@@ -405,6 +416,7 @@ def main(argv=None):
     parser.add_argument("--settle-s", type=float)
     parser.add_argument("--queue-samples")
     parser.add_argument("--redeliveries", type=int)
+    parser.add_argument("--publish-failures", type=json.loads, metavar="JSON")
     parser.add_argument("--reprocess-from", metavar="EVIDENCE_DIR")
     parser.add_argument("--fault-at", type=int)
     parser.add_argument("--fault-duration", type=int)
@@ -438,7 +450,7 @@ def main(argv=None):
                           read_samples(args.db_samples), issue_lines, args.db_rows, args.redis_counter, args.k6_exit,
                           args.fault_at, args.fault_duration if args.scenario == "db-down" else None, args.target,
                           _env(args.env), args.insert_failures, args.settle_s, read_queue_samples(args.queue_samples),
-                          args.redeliveries)
+                          args.redeliveries, args.publish_failures)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
         f.write("\n")

@@ -17,6 +17,12 @@ spring:
     password: ${COUPON_LAB_RABBIT_PASSWORD:guest}
     publisher-confirm-type: simple
     publisher-returns: true
+    # S4: up to 200 Tomcat threads publish at once. With the default cache of 25, every publisher beyond it opened and
+    # closed its own channel per request (channel churn). 200 = server.tomcat.threads.max. No checkout-timeout, so it stays
+    # a cache and never blocks a request waiting for a channel.
+    cache:
+      channel:
+        size: 200
     listener:
       simple:
         acknowledge-mode: auto

@@ -494,6 +494,33 @@ class PostprocessTest(unittest.TestCase):
                 again = json.load(f)
         self.assertEqual((again["settle_s"], again["settled"]), (7, True))
 
+    def test_publish_failures_are_recorded_per_reason_and_null_when_not_read(self):
+        lines = synthetic()
+        with tempfile.TemporaryDirectory() as tmp:
+            write_raw(os.path.join(tmp, "raw.json.gz"), lines)
+            with open(os.path.join(tmp, "profiles.json"), "w", encoding="utf-8") as f:
+                json.dump(LAYOUT, f)
+            reports = {}
+            for label, extra in (("s4", ["--publish-failures", '{"timeout": 2, "AmqpConnectException": 5}']), ("s3", [])):
+                out = os.path.join(tmp, label + ".json")
+                postprocess.main(["--raw", os.path.join(tmp, "raw.json.gz"), "--profile", "ramping", "--stage", label,
+                                  "--db-issued-rows", str(issued_count(lines)), "--out", out,
+                                  "--profiles", os.path.join(tmp, "profiles.json")] + extra)
+                with open(out, encoding="utf-8") as f:
+                    reports[label] = json.load(f)
+            self.assertEqual(reports["s4"]["publish_failures"],
+                             {"total": 7, "by_reason": {"AmqpConnectException": 5, "timeout": 2}})
+            self.assertTrue(reports["s4"]["validity"]["valid"])  # an outcome, never part of validity
+            self.assertIsNone(reports["s3"]["publish_failures"])
+            source = os.path.join(tmp, "source")
+            os.mkdir(source)
+            os.rename(os.path.join(tmp, "s4.json"), os.path.join(source, "load.json"))
+            os.rename(os.path.join(tmp, "raw.json.gz"), os.path.join(source, "raw.json.gz"))
+            out = os.path.join(tmp, "new.json")
+            self.assertEqual(postprocess.main(["--reprocess-from", source, "--out", out]), 0)
+            with open(out, encoding="utf-8") as f:
+                self.assertEqual(json.load(f)["publish_failures"]["total"], 7)
+
     def test_filtered_raw_reproduces_the_report(self):
         with tempfile.TemporaryDirectory() as tmp:
             filtered = os.path.join(tmp, "filtered.json.gz")

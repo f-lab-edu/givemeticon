@@ -398,7 +398,8 @@ fi
 
 # 22. the S4 runner arguments pass the argument checks and reach the docker preconditions, against stand-ins for docker and k6 like
 #     items 13 and 21 (no container, no load, no Docker): recovery --stage s4 --scenario consumer-redeliver (exit 2 with other containers
-#     up, INFRA_DOWN when compose fails), and --redis-aof for load and recovery (INFRA_DOWN when compose fails).
+#     up, INFRA_DOWN when compose fails), and --redis-aof for load and recovery (INFRA_DOWN when compose fails). The header line
+#     shows the effective AOF knob: yes by default for s4, no with --no-redis-aof, no by default for every other stage.
 shim=$(mk)
 rm -f "$shim"
 mkdir "$shim"
@@ -424,14 +425,19 @@ msg_aof_rec=$(tail -n 1 <<<"$out")
 out=$(SMOKE_PS=$'coupon-lab-load-app\n' PATH="$shim:$PATH" scripts/verify.sh load --stage s4 --profile spike --redis-aof 2>&1)
 rc_aof_load=$?
 msg_aof_load=$(tail -n 1 <<<"$out")
+aof_s4=$(SMOKE_PS=$'coupon-lab-load-app\n' PATH="$shim:$PATH" scripts/verify.sh recovery --stage s4 --scenario db-down 2>&1 | head -n 1)
+aof_s4_off=$(SMOKE_PS=$'coupon-lab-load-app\n' PATH="$shim:$PATH" scripts/verify.sh load --stage s4 --profile spike --no-redis-aof 2>&1 | head -n 1)
+aof_s3=$(SMOKE_PS=$'coupon-lab-load-app\n' PATH="$shim:$PATH" scripts/verify.sh recovery --stage s3 --scenario db-down 2>&1 | head -n 1)
 rm -rf "$shim"
 if [ "$rc_busy" -eq 2 ] && [[ "$msg_busy" == *"stop other containers first"* ]] \
     && [ "$rc_infra" -eq 3 ] && [[ "$msg_infra" == "VERIFY recovery-consumer-redeliver INFRA_DOWN "* ]] \
     && [ "$rc_aof_rec" -eq 3 ] && [[ "$msg_aof_rec" == "VERIFY recovery-redis-restart INFRA_DOWN "* ]] \
-    && [ "$rc_aof_load" -eq 3 ] && [[ "$msg_aof_load" == "VERIFY load-spike INFRA_DOWN "* ]]; then
-    ok "22 verify s4 arguments: consumer-redeliver on s4 and --redis-aof (load, recovery) reach the docker preconditions"
+    && [ "$rc_aof_load" -eq 3 ] && [[ "$msg_aof_load" == "VERIFY load-spike INFRA_DOWN "* ]] \
+    && [[ "$aof_s4" == *" stage=s4 redis_aof=yes" ]] && [[ "$aof_s4_off" == *" stage=s4 redis_aof=no" ]] \
+    && [[ "$aof_s3" == *" stage=s3 redis_aof=no" ]]; then
+    ok "22 verify s4 arguments: consumer-redeliver on s4 and --redis-aof/--no-redis-aof reach the docker preconditions; AOF default yes for s4, no for s3"
 else
-    fail "22 verify s4 arguments" "busy exit=$rc_busy ($msg_busy), infra exit=$rc_infra ($msg_infra), aof recovery exit=$rc_aof_rec ($msg_aof_rec), aof load exit=$rc_aof_load ($msg_aof_load)"
+    fail "22 verify s4 arguments" "busy exit=$rc_busy ($msg_busy), infra exit=$rc_infra ($msg_infra), aof recovery exit=$rc_aof_rec ($msg_aof_rec), aof load exit=$rc_aof_load ($msg_aof_load), headers: '$aof_s4' '$aof_s4_off' '$aof_s3'"
 fi
 
 total=$((22 - skipped))

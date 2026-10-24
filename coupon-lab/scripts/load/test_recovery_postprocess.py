@@ -324,6 +324,7 @@ class ReportTest(unittest.TestCase):
     def test_without_queue_samples_or_a_counter_the_s4_fields_are_null(self):
         report = self.report(self.raw())
         self.assertEqual((report["settle_s"], report["queue_depth_max"], report["redeliveries"]), (None, None, None))
+        self.assertIsNone(report["publish_failures"])
         self.assertNotIn("queue_depth", report["timeline"][0])
 
     def test_the_report_carries_the_loss_axes_and_the_logged_insert_failures(self):
@@ -466,6 +467,7 @@ class CommandLineTest(unittest.TestCase):
         self.assertEqual((new["seats_lost"], new["client_unknown"], new["recorded_despite_unknown"]), (2, 3, 2))
         self.assertEqual((new["not_admitted"], new["blackout_s"]), (5, 0))
         self.assertEqual((new["settle_s"], new["queue_depth_max"], new["redeliveries"]), (None, None, None))
+        self.assertIsNone(new["publish_failures"])
 
     def test_the_s4_inputs_from_the_command_line_end_up_in_the_report(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -477,6 +479,10 @@ class CommandLineTest(unittest.TestCase):
             with open(at("queue.jsonl"), "w", encoding="utf-8") as f:
                 for sec, depth in ((0, 3), (1, "null"), (2, 41), (3, 0)):
                     f.write('{"time":%d,"queue_depth":%s}\n' % (int(MAIN) + sec, depth))
+                # the management-API sampler adds ready/unacked/channels/connections; only queue_depth is aggregated
+                f.write('{"time":%d,"queue_depth":40,"ready":30,"unacked":10,"channels":200,"connections":1}\n' % (int(MAIN) + 4))
+                f.write('{"time":%d,"queue_depth":null,"ready":null,"unacked":null,"channels":null,"connections":null}\n'
+                        % (int(MAIN) + 5))
                 f.write("not json\n")
             for name in ("db-samples.jsonl", "issues.tsv"):
                 open(at(name), "w").close()
@@ -484,11 +490,14 @@ class CommandLineTest(unittest.TestCase):
                     "--fault-log", at("fault.log"), "--db-samples", at("db-samples.jsonl"), "--issues", at("issues.tsv"),
                     "--db-rows", "30000", "--redis-counter", "30000", "--k6-exit", "0", "--fault-at", "20", "--fault-duration", "10",
                     "--target", "coupon-lab-load-app", "--settle-s", "6", "--queue-samples", at("queue.jsonl"), "--redeliveries", "600",
+                    "--publish-failures", '{"nack": 1, "timeout": 3}',
                     "--out", at("recovery.json"), "--timeline-out", at("timeline.json")]
             self.assertEqual(rp.main(argv), 0)
             with open(at("recovery.json"), encoding="utf-8") as f:
                 report = json.load(f)
         self.assertEqual((report["settle_s"], report["queue_depth_max"], report["redeliveries"]), (6.0, 41, 600))
+        self.assertEqual([e["queue_depth"] for e in report["timeline"] if 0 <= e["sec"] <= 5], [3, None, 41, 0, 40, None])
+        self.assertEqual(report["publish_failures"], {"total": 4, "by_reason": {"nack": 1, "timeout": 3}})
         self.assertEqual(report["scenario"], "consumer-redeliver")
         self.assertTrue(report["validity"]["valid"])
 
