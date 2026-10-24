@@ -290,16 +290,17 @@ run_load() {
             run_status=INFRA_DOWN; run_note="docker compose up failed (see $log)"; return
         fi
         up_epoch=$(date +%s)
-        local waited=0 health=""
+        local waited=0 health="" redis_health=""
         while [ "$waited" -lt "$LOAD_HEALTH_TIMEOUT_S" ]; do
             health=$(load_inspect '{{.State.Health.Status}}' app)
-            [ "$health" != healthy ] || break
+            redis_health=$(load_inspect '{{.State.Health.Status}}' redis)
+            [ "$health" != healthy ] || [ "$redis_health" != healthy ] || break
             sleep 2
             waited=$((waited + 2))
         done
-        if [ "$health" != healthy ]; then
+        if [ "$health" != healthy ] || [ "$redis_health" != healthy ]; then
             docker logs --tail 40 "${LOAD_PREFIX}app" >>"$log" 2>&1
-            run_status=INFRA_DOWN; run_note="app not healthy after ${LOAD_HEALTH_TIMEOUT_S}s (see $log)"; return
+            run_status=INFRA_DOWN; run_note="app (${health:-?}) or redis (${redis_health:-?}) not healthy after ${LOAD_HEALTH_TIMEOUT_S}s (see $log)"; return
         fi
 
         # 3. seed the events (one per row of the test-C spread; ramping measures the issue path only, spike the sold-out path)
@@ -359,7 +360,7 @@ run_load() {
             fi
             run_status=BUILD_ERROR; run_note="k6 exited $k6_rc (see $log)"; return
         fi
-        local issued_rows nano cpus_app cpus_mysql heap hikari
+        local issued_rows nano cpus_app cpus_mysql cpus_redis redis_image heap hikari
         issued_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_issue WHERE event_id IN ($event_ids)")
         if ! [[ "$issued_rows" =~ ^[0-9]+$ ]]; then
             run_status=INFRA_DOWN; run_note="counting coupon_issue rows failed (see $log)"; return
@@ -368,12 +369,14 @@ run_load() {
         nano=$(load_inspect '{{.HostConfig.NanoCpus}}' mysql); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_mysql=$((nano / 1000000000))
         heap=$(load_inspect '{{json .Config.Entrypoint}}' app | grep -o -- '-Xmx[0-9]*[kKmMgG]' | head -n 1 | sed 's/^-Xmx//')
         hikari=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=//p')
+        nano=$(load_inspect '{{.HostConfig.NanoCpus}}' redis); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_redis=$((nano / 1000000000))
+        redis_image=$(load_inspect '{{.Config.Image}}' redis)
         python3 -I scripts/load/postprocess.py --raw "$work/raw.json.gz" --profile "$profile" --stage "$stage" \
             --db-issued-rows "$issued_rows" --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
             --stats "$work/stats.jsonl" --summary "$work/summary.json" --gc-log "$work/gc/gc.log" --innodb "$work/innodb.jsonl" \
             --run-order "$run_order" --minutes-since-up "$minutes_up" ${clock_offset:+--clock-offset-s "$clock_offset"} \
             --rows "$rows" ${max_vus:+--max-vus "$max_vus"} --env "max_vus=${max_vus:-$vus_max_default}" \
-            --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "jvm_heap=$heap" \
+            --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "redis_image=$redis_image" --env "redis_cpus=$cpus_redis" --env "jvm_heap=$heap" \
             --env "hikari_pool_size=$hikari" --env "k6_version=$k6_version" --env "k6_mode=$k6_mode" ${k6_env[@]+"${k6_env[@]}"} ${mysql_env[@]+"${mysql_env[@]}"} \
             >>"$log" 2>&1
         if [ $? -ne 0 ]; then

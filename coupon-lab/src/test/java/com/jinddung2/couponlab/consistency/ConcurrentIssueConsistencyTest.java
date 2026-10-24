@@ -30,6 +30,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -59,10 +60,17 @@ class ConcurrentIssueConsistencyTest {
     private static final int EXPECTED_ISSUED = Math.min(THREADS, TOTAL_QUANTITY);
 
     private static final String MYSQL_IMAGE = "mysql:8.0";
+    private static final String REDIS_IMAGE = "redis:7-alpine";
+    private static final int REDIS_PORT = 6379;
     private static final Path EVIDENCE_FILE = Path.of("build", "evidence", "consistency.json");
 
     @Container
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>(DockerImageName.parse(MYSQL_IMAGE));
+
+    // Always started (cheap); only S3 uses it.
+    @Container
+    static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse(REDIS_IMAGE))
+            .withExposedPorts(REDIS_PORT);
 
     private static final List<Map<String, Object>> RUNS = new ArrayList<>();
     private static String stage = System.getProperty("coupon.strategy", "s0");
@@ -73,6 +81,8 @@ class ConcurrentIssueConsistencyTest {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
+        registry.add("spring.data.redis.host", REDIS::getHost);
+        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(REDIS_PORT));
     }
 
     @Autowired
@@ -197,6 +207,7 @@ class ConcurrentIssueConsistencyTest {
         env.put("java", System.getProperty("java.version"));
         env.put("spring_boot", SpringBootVersion.getVersion());
         env.put("mysql_image", MYSQL_IMAGE);
+        env.put("redis_image", REDIS_IMAGE);
         env.put("hikari_pool_size", hikariPoolSize);
         env.put("cpu", Runtime.getRuntime().availableProcessors());
         env.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version")
