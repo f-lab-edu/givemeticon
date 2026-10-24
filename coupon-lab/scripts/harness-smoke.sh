@@ -348,8 +348,8 @@ else
     fail "19 pre-commit hook append-only" "modify=$rc_mod ($msg_mod) delete=$rc_del rename=$rc_ren index=$rc_index ($msg_index) new=$rc_new"
 fi
 
-# 20. verify.sh recovery refuses bad requests before touching docker: unknown scenario (usage), the consumer scenario (no stage has a
-#     consumer yet), a stage that does not exist on this branch, and a fault that would not end before the load does.
+# 20. verify.sh recovery refuses bad requests before touching docker: unknown scenario (usage), the consumer scenario on a stage without a
+#     consumer (s3), a stage that does not exist on this branch, and a fault that would not end before the load does.
 run scripts/verify.sh recovery --stage s3 --scenario nope
 rc_scenario=$rc; msg_scenario=$out
 run scripts/verify.sh recovery --stage s3 --scenario consumer-redeliver
@@ -396,7 +396,45 @@ else
     fail "21 verify recovery" "busy exit=$rc_busy ($msg_busy), infra exit=$rc_infra ($msg_infra)"
 fi
 
-total=$((21 - skipped))
+# 22. the S4 runner arguments pass the argument checks and reach the docker preconditions, against stand-ins for docker and k6 like
+#     items 13 and 21 (no container, no load, no Docker): recovery --stage s4 --scenario consumer-redeliver (exit 2 with other containers
+#     up, INFRA_DOWN when compose fails), and --redis-aof for load and recovery (INFRA_DOWN when compose fails).
+shim=$(mk)
+rm -f "$shim"
+mkdir "$shim"
+printf '#!/bin/sh\necho "k6 v0.0.0 (smoke)"\n' >"$shim/k6"
+cat >"$shim/docker" <<'SHIM'
+#!/bin/sh
+case "$1" in
+    info) exit 0 ;;
+    ps) printf '%s' "$SMOKE_PS"; exit 0 ;;
+    *) exit 1 ;;
+esac
+SHIM
+chmod +x "$shim/k6" "$shim/docker"
+out=$(SMOKE_PS=$'legacy-redis\n' PATH="$shim:$PATH" scripts/verify.sh recovery --stage s4 --scenario consumer-redeliver 2>&1)
+rc_busy=$?
+msg_busy=$out
+out=$(SMOKE_PS=$'coupon-lab-load-app\n' PATH="$shim:$PATH" scripts/verify.sh recovery --stage s4 --scenario consumer-redeliver 2>&1)
+rc_infra=$?
+msg_infra=$(tail -n 1 <<<"$out")
+out=$(SMOKE_PS=$'coupon-lab-load-app\n' PATH="$shim:$PATH" scripts/verify.sh recovery --stage s4 --redis-aof --scenario redis-restart 2>&1)
+rc_aof_rec=$?
+msg_aof_rec=$(tail -n 1 <<<"$out")
+out=$(SMOKE_PS=$'coupon-lab-load-app\n' PATH="$shim:$PATH" scripts/verify.sh load --stage s4 --profile spike --redis-aof 2>&1)
+rc_aof_load=$?
+msg_aof_load=$(tail -n 1 <<<"$out")
+rm -rf "$shim"
+if [ "$rc_busy" -eq 2 ] && [[ "$msg_busy" == *"stop other containers first"* ]] \
+    && [ "$rc_infra" -eq 3 ] && [[ "$msg_infra" == "VERIFY recovery-consumer-redeliver INFRA_DOWN "* ]] \
+    && [ "$rc_aof_rec" -eq 3 ] && [[ "$msg_aof_rec" == "VERIFY recovery-redis-restart INFRA_DOWN "* ]] \
+    && [ "$rc_aof_load" -eq 3 ] && [[ "$msg_aof_load" == "VERIFY load-spike INFRA_DOWN "* ]]; then
+    ok "22 verify s4 arguments: consumer-redeliver on s4 and --redis-aof (load, recovery) reach the docker preconditions"
+else
+    fail "22 verify s4 arguments" "busy exit=$rc_busy ($msg_busy), infra exit=$rc_infra ($msg_infra), aof recovery exit=$rc_aof_rec ($msg_aof_rec), aof load exit=$rc_aof_load ($msg_aof_load)"
+fi
+
+total=$((22 - skipped))
 suffix=""
 [ "$skipped" -eq 0 ] || suffix=" skipped=$skipped"
 echo "harness-smoke: $((total - fails))/$total OK in ${SECONDS}s$suffix"

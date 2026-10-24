@@ -466,6 +466,34 @@ class PostprocessTest(unittest.TestCase):
         self.assertTrue(with_counter["validity"]["valid"])
         self.assertNotIn("redis_counter", without["db"])
 
+    def test_settle_of_an_async_stage_is_recorded_and_is_not_part_of_validity(self):
+        lines = synthetic()
+        with tempfile.TemporaryDirectory() as tmp:
+            write_raw(os.path.join(tmp, "raw.json.gz"), lines)
+            with open(os.path.join(tmp, "profiles.json"), "w", encoding="utf-8") as f:
+                json.dump(LAYOUT, f)
+            reports = {}
+            for label, extra in (("s4", ["--settle-s", "7", "--settled", "true"]), ("s3", [])):
+                out = os.path.join(tmp, label + ".json")
+                postprocess.main(["--raw", os.path.join(tmp, "raw.json.gz"), "--profile", "ramping", "--stage", label,
+                                  "--db-issued-rows", str(issued_count(lines)), "--out", out,
+                                  "--profiles", os.path.join(tmp, "profiles.json")] + extra)
+                with open(out, encoding="utf-8") as f:
+                    reports[label] = json.load(f)
+            self.assertEqual((reports["s4"]["settle_s"], reports["s4"]["settled"]), (7, True))
+            self.assertTrue(reports["s4"]["validity"]["valid"])
+            self.assertNotIn("settle_s", reports["s3"])
+            # a reprocess keeps what the run recorded
+            source = os.path.join(tmp, "source")
+            os.mkdir(source)
+            os.rename(os.path.join(tmp, "s4.json"), os.path.join(source, "load.json"))
+            os.rename(os.path.join(tmp, "raw.json.gz"), os.path.join(source, "raw.json.gz"))
+            out = os.path.join(tmp, "new.json")
+            self.assertEqual(postprocess.main(["--reprocess-from", source, "--out", out]), 0)
+            with open(out, encoding="utf-8") as f:
+                again = json.load(f)
+        self.assertEqual((again["settle_s"], again["settled"]), (7, True))
+
     def test_filtered_raw_reproduces_the_report(self):
         with tempfile.TemporaryDirectory() as tmp:
             filtered = os.path.join(tmp, "filtered.json.gz")

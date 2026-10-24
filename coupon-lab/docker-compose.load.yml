@@ -70,7 +70,11 @@ services:
       COUPON_LAB_RABBIT_PORT: 5672
       COUPON_STRATEGY: ${COUPON_STRATEGY:?set COUPON_STRATEGY}
       SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${HIKARI_POOL_SIZE:-10}
-      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+      # S4 only (inert for other stages): publisher-confirm wait, and the test-D consumer-redeliver hook (0 = off; verify.sh sets it)
+      COUPON_S4_CONFIRM_TIMEOUT_MS: ${COUPON_S4_CONFIRM_TIMEOUT_MS:-2000}
+      COUPON_S4_CONSUMER_FAIL_EVERY: ${COUPON_S4_CONSUMER_FAIL_EVERY:-0}
+      # metrics: verify.sh recovery reads coupon_s4_redeliveries from /actuator/metrics
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics
     volumes:
       - ${LOAD_GC_DIR:?set LOAD_GC_DIR}:/var/log/app
     healthcheck:

@@ -2,7 +2,7 @@
 """Aggregate the k6 JSON output of issue.js into load.json (test B). Standard library only.
 
 usage: python3 -I postprocess.py --raw raw.json.gz --profile ramping|spike --stage sN --db-issued-rows N
-           --out load.json [--filtered-raw out.json.gz] [--env key=value ...] [--redis-counter N]
+           --out load.json [--filtered-raw out.json.gz] [--env key=value ...] [--redis-counter N] [--settle-s S --settled true|false]
        python3 -I postprocess.py --reprocess-from <evidence dir> --out load.json
 
 Only the measure phase is aggregated, per target_rps. A request belongs to the step it started in (tag set by
@@ -11,7 +11,8 @@ profiles.json anchored at the start of the first request.
 
 Validity is per stage: dropped_iterations / (requests + dropped_iterations) < 1%. A run is valid when its first stage
 is valid and the DB row count matches the 200 responses. --redis-counter (S3 only) is recorded as db.redis_counter and
-never enters the validity rule.
+never enters the validity rule. --settle-s / --settled (S4 only: the runner waited for the asynchronously written rows to
+stop changing before counting them) are recorded as settle_s and settled; the validity rule is unchanged.
 
 Every stage also gets a kind:
   saturated  achieved_rps < 0.95 * target_rps, or p50 > 100 ms (the system cannot keep up; requests queue)
@@ -413,6 +414,8 @@ def main(argv=None):
     parser.add_argument("--stage")
     parser.add_argument("--db-issued-rows", type=int)
     parser.add_argument("--redis-counter", type=int)
+    parser.add_argument("--settle-s", type=int)
+    parser.add_argument("--settled", choices=("true", "false"))
     parser.add_argument("--out", required=True)
     parser.add_argument("--filtered-raw")
     parser.add_argument("--profiles", default=DEFAULT_PROFILES)
@@ -442,6 +445,9 @@ def main(argv=None):
         args.stage = old["stage"]
         args.db_issued_rows = old["db"]["issued_rows"]
         args.redis_counter = old["db"].get("redis_counter")
+        if "settle_s" in old:
+            args.settle_s = old["settle_s"]
+            args.settled = str(old["settled"]).lower()
         env_pairs = ["%s=%s" % (k, v) for k, v in old["env"].items()]
         layout = layout_from_report(old)
         args.stats = os.path.join(source, "stats.jsonl")
@@ -478,6 +484,9 @@ def main(argv=None):
     report = build_report(args.raw, layout, args.profile, args.stage, args.db_issued_rows,
                           _env(env_pairs), args.filtered_raw, args.stats, args.summary, args.gc_log, run_info,
                           args.innodb, args.rows, args.redis_counter)
+    if args.settle_s is not None:
+        report["settle_s"] = args.settle_s
+        report["settled"] = args.settled == "true"
     if reprocessed_from:
         report["reprocessed_from"] = reprocessed_from
     with open(args.out, "w", encoding="utf-8") as f:
