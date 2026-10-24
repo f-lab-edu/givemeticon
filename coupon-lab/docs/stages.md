@@ -330,7 +330,7 @@ Evidence: `coupon-lab/evidence/s0/consistency/20261024-031516-aa357e0/`, `.../s1
   * `db-down`(재고 기본 10,000,000): `--fault-at` 초에 `docker stop coupon-lab-load-mysql`, stop 이 돌아온 뒤 `--fault-duration` 초 지나 `docker start`, 헬스체크가 healthy 가 될 때까지 기다린다. 앱 컨테이너는 건드리지 않는다.
   * `redis-restart`(재고 기본 20,000): `--fault-at` 초에 `docker restart coupon-lab-load-redis`. 영속성이 없어 카운터가 0 으로 돌아간다. 재고를 2만으로 둔 것은 리셋 뒤에 초과 발급이 보이게 하기 위해서다.
   * `consumer-redeliver`(S4 전용, 재고 기본 10,000,000): 컨테이너 결함은 없다. 앱을 `COUPON_S4_CONSUMER_FAIL_EVERY=50` 으로 띄워 소비자가 새 행 50개마다 INSERT 뒤, ack 전에 예외를 던진다(쓰기 뒤의 크래시 흉내). 러너는 컨테이너의 그 값을 확인한다. 결함 이벤트가 없으므로 `validity` 는 `k6_completed` 만 보고(`fault_observed` null) `recovery_time_s` 는 부하 종료 기준이다. 다른 stage 는 여전히 종료 코드 2 로 거부한다.
-* 부하가 끝난 뒤 `db_rows`(그 이벤트의 `coupon_issue` 행 수)가 5번 연속 변하지 않을 때까지 1초마다 확인한다(최대 120초). 그 값과 Redis 카운터, 이벤트의 `(member_id, seq)` 전체를 읽어 후처리한다.
+* 부하가 끝난 뒤 `db_rows`(그 이벤트의 `coupon_issue` 행 수)가 5번 연속 변하지 않을 때까지 1초마다 확인한다(최대 600초. S4 후속에서 120초에서 올렸다). 그 값과 Redis 카운터, 이벤트의 `(member_id, seq)` 전체를 읽어 후처리한다.
 * 지표(`recovery.json`; `timeline.json` 은 같은 `timeline` 배열):
 
 | 필드 | 정의 |
@@ -509,7 +509,7 @@ S4 에 주는 시사점: S3 의 자리 손실은 "도착률 × 중단 길이"가
 * 환경 변화(모든 stage): 부하 compose 에 `rabbitmq:3-alpine`(cpus 1, 헬스체크 `rabbitmq-diagnostics -q ping`)이 뜨고 앱은 그것이 healthy 가 된 뒤 뜬다. env 에 `rabbitmq_image`, `rabbitmq_cpus` 가 기록되고 `stats.jsonl` 에 rabbitmq CPU 도 샘플링한다(집계는 하지 않는다). `load.json` env 에도 `redis_appendonly` 가 생겼다. 앱 액추에이터는 `health,metrics` 를 노출한다. 그래서 이전 run 과 env 블록이 다르다.
 * Redis 노브: `verify.sh load|recovery ... --redis-aof` 는 Redis 를 `appendonly yes`, `appendfsync everysec` 로 띄우고(설정이지 코드가 아니다), 실행 중 값이 요청과 다르면 INFRA_DOWN, env `redis_appendonly=yes`, evidence 경로에 `-aof` 접미사(`load/<variant>-aof/`, `recovery/<scenario>-aof/`). 기본은 그대로 `appendonly no`(compose 명령에 `--appendfsync everysec` 가 붙었지만 AOF 가 꺼져 있으면 효과가 없다).
 * 테스트 A v3+settle: 반복마다 폭주가 끝난 뒤 이벤트의 행 수를 100 ms 마다 읽어 1초 동안 변하지 않을 때까지(최대 30초) 기다린 다음 잰다. 단언은 그대로이고 `settle_ms` 를 반복마다 기록한다(동기 stage 는 약 1초). evidence 에 `"procedure": "v3+settle"`. s4 는 `redis_counter`(`remaining_source` redis), 정착 뒤 `queue_depth`(0 이어야 하지만 단언하지 않는다), `redeliveries`(카운터 증가분)도 기록한다. 절차가 바뀌었으므로 S0/S1/S3 를 한 번씩 다시 기록하고 v3 와 v3+settle evidence 는 비교하지 않는다. 테스트 A 는 RabbitMQ Testcontainer(`rabbitmq:3-alpine`)를 항상 띄운다.
-* 실행기(s4): `load`(ramping/spike/ramping-rows)와 `recovery` 는 k6 뒤 행 수를 세기 전에 1초마다 읽어 5번 연속 같을 때까지(최대 120초) 기다리고 `settle_s` 를 남긴다(`load.json` 은 `settle_s`, `settled`). 큐 깊이는 약 1초마다 `docker exec ... rabbitmqctl list_queues name messages` 로 읽어 `queue.jsonl`(evidence)과 `timeline.queue_depth` 에 남긴다. `recovery.json` 은 `queue_depth_max`, `redeliveries`, `settle_s` 를 더한다. `load` 의 유효성 규칙(`db.issued_rows == http_issued`)은 그대로이고 정착을 기다린 뒤 센다.
+* 실행기(s4): `load`(ramping/spike/ramping-rows)와 `recovery` 는 k6 뒤 행 수를 세기 전에 1초마다 읽어 5번 연속 같을 때까지(최대 600초. 첫 측정 때는 120초) 기다리고 `settle_s` 를 남긴다(`load.json` 은 `settle_s`, `settled`). 큐 깊이는 약 1초마다 읽어 `queue.jsonl`(evidence)과 `timeline.queue_depth` 에 남긴다. 첫 측정 때는 `docker exec ... rabbitmqctl list_queues name messages` 로 읽었고, 후속부터는 관리 API 로 읽는다(아래 "S4 후속"). `recovery.json` 은 `queue_depth_max`, `redeliveries`, `settle_s` 를 더한다. `load` 의 유효성 규칙(`db.issued_rows == http_issued`)은 그대로이고 정착을 기다린 뒤 센다.
 
 ### S4 예측 (측정 전에 적는다)
 
@@ -527,3 +527,54 @@ S4 에 주는 시사점: S3 의 자리 손실은 "도착률 × 중단 길이"가
 * **큐 깊이 샘플링의 간섭.** `rabbitmqctl` 은 rabbitmq 컨테이너(cpus 1) 안에서 1초마다 Erlang VM 을 새로 띄운다. 이 CPU 가 브로커와 같은 한도를 나눠 쓰므로 S4 의 B p50 을 밀어 올릴 수 있다. `stats.jsonl` 의 rabbitmq CPU 로 확인한다.
 * **채널 캐시.** `CachingConnectionFactory` 의 채널 캐시는 기본 25 이고 바꾸지 않았다. 동시에 발행하는 스레드가 25를 넘으면 넘는 채널은 요청마다 열고 닫힌다(그때마다 confirm 모드 전환 왕복). 800rps 이상에서 "+약 1 ms" 가 낙관적일 수 있다.
 * **consumer-redeliver 의 `redeliveries`.** 카운터는 모든 재배달을 센다. 훅 말고 다른 실패(위 DB 재시도 포함)가 섞이면 wins / 50 보다 커진다. 그 run 에는 결함이 없으므로 차이가 나면 다른 원인이다.
+
+### S4 첫 측정에서 찾은 문제 (`a74c542` 까지의 evidence)
+
+첫 측정(사용자 Mac, 각 n=1)에서 DB 가 요청 경로에서 빠진 것은 확인됐다. db-down 49초(`evidence/s4/recovery/db-down/20261024-105055-8db5c56/`)에서 타임아웃 0, `blackout_s` 0, 큐가 22,244건을 받아 두었다가 69.6초에 다 썼다. 남은 문제는 셋이다.
+
+1. **장애 없이 생기는 빠른 503.**
+   * `ramping-rows1`(`evidence/s4/load/ramping-rows1/20261024-104656-62dc319/`): 400rps 에서 오류 240건(2%), 800rps 에서 11,871건(51%), 503 의 p50 약 5 ms.
+   * 결함이 없는 consumer-redeliver 에서도 5xx 6,159건이고, 모든 S4 recovery run 에서 `seats_lost == 5xx` 다.
+   * ERROR 줄은 전부 `publish unconfirmed after winning the counter` 인데 머리글에 예외 클래스가 없다(원인은 스택 트레이스에만 있고 evidence 는 머리글만 남긴다). load run 은 앱 로그를 남기지 않았고 rabbitmq 로그도 없었다.
+   * 1초 큐 샘플러가 브로커의 cpu 1개 위에서 `docker exec … rabbitmqctl list_queues` 를 돌렸으므로 샘플러 자체가 포화의 원인일 수 있다.
+   * 후보: 채널 churn(채널 캐시 기본 25 대 Tomcat 스레드 200), nack, 브로커 포화. 셋을 가를 자료가 없었다.
+2. **Redis 재시작 뒤 소비자의 멱등성 키 `(event_id, seq)` 가 틀린다.** AOF 가 없으면 카운터가 0 에서 다시 시작해 새 당첨이 seq 1..N 을 재사용하고, 존재 확인이 "이미 있다"로 답해 진짜 당첨을 조용히 버린다. redis-restart(`evidence/s4/recovery/redis-restart/20261024-105657-b81de97/`)에서 확인된 당첨 6,981건이 DB 에 닿지 못했다(클라이언트가 받은 seq 24,316개 중 서로 다른 값 17,335개 = DB 행 17,335). 키는 자리가 아니라 메시지를 가리켜야 한다.
+3. **settle 상한 120초는 약 250 행/초로 비우는 적체에 짧다**(`existsIssue` 가 인덱스 없이 `coupon_issue` 를 훑는다). `ramping`, `ramping-rows1` 이 정착 전에 끊겨 무효가 되었다(행 52,760 / 200 응답 62,805, 행 46,938 / 200 응답 71,646).
+
+### S4 후속 변경 (재측정 전에 적는다)
+
+* **A. 발행 실패의 원인을 남긴다(`S4CouponIssueService`).**
+  * 결과를 셋으로 나눈다: `confirmed == false` → `nack`, `AmqpTimeoutException` → `timeout`, 그 밖의 `RuntimeException` → 예외의 단순 클래스 이름.
+  * `timeout` 근거: spring-rabbit 3.1.7(Boot 3.3.5 관리 버전) 소스에서 `RabbitTemplate.waitForConfirms(long)` 이 `TimeoutException` 을 `RabbitExceptionTranslator` 로 바꾸고, 그것이 `new AmqpTimeoutException(ex)` 를 돌려준다.
+  * ERROR 머리글 한 줄에 `reason=… eventId=… memberId=… seq=… messageId=… cause=<루트 원인 클래스>: <메시지 첫 줄>` 을 남긴다(스택 트레이스는 계속 로그로 간다).
+  * Micrometer 카운터 `coupon_s4_publish_failures{reason}` 를 실패한 요청마다 1씩 올린다.
+* **B. 멱등성은 message_id 로 한다.**
+  * `CouponIssued` 에 `messageId`(당첨 뒤, 발행 전에 만든 UUID)가 생기고 AMQP `messageId` 속성에도 같은 값을 넣는다.
+  * Flyway `V2__coupon_issue_message_id.sql` 은 `message_id CHAR(36) NULL` 과 비유니크 인덱스 `idx_coupon_issue_message_id` 를 추가한다. V1 은 그대로이고, (event_id, seq) 인덱스는 없다.
+  * 매퍼에 `insertIssued`(message_id 포함)와 `existsIssueByMessageId` 를 추가했다. 기존 `insertIssue`(S0/S1/S3)는 바이트 단위로 그대로이고, `existsIssue(eventId, seq)` 는 지웠다.
+  * 소비자는 message_id 로 확인하고 message_id 와 함께 쓴다. 카운터가 되감기는 Redis 재시작은 이제 당첨을 버리는 대신 초과 발급 행(같은 (event_id, seq), 다른 message_id)을 만들고, 테스트 A/D 가 그것을 `over_issue`/`dup_seq` 로 센다.
+  * 동시성 1 과 FAIL_EVERY 훅은 그대로다.
+* **C. 브로커와 샘플러.**
+  * 채널 캐시는 `spring.rabbitmq.cache.channel.size: 200`(= Tomcat 최대 스레드)이다. checkout-timeout 은 없으므로 세마포어가 아니라 캐시다.
+  * rabbitmq 이미지는 `rabbitmq:3-management-alpine` 으로 바꾸고 관리 API 를 호스트 15673 에 연다. 사용자는 `coupon`/`coupon` 이고 앱에도 같은 값을 준다. cpus 는 그대로 1 이다.
+  * 큐 샘플러는 `rabbitmqctl` 대신 호스트에서 관리 API 를 읽는다(2초 타임아웃, 프록시 없음). 한 줄에 `queue_depth`(messages), `ready`, `unacked`, `channels`, `connections` 가 들어간다. 집계는 계속 `queue_depth` 만 한다.
+  * evidence 에 s4 load/recovery 의 `rabbitmq.log`(error/warn/closing/flow/alarm 줄, 400자, 최대 2000줄)를 남긴다. 모든 stage 의 load run 에 `app-errors.log` 를 남긴다.
+  * s4 run 끝에 `coupon_s4_publish_failures` 를 reason 별로 읽어 `load.json`/`recovery.json` 의 `publish_failures` {`total`, `by_reason`} 에 넣는다. 다른 stage 이거나 읽지 못하면 null 이고, 실패가 없어 카운터가 없으면 `total` 0 이다.
+  * `--redis-aof` 가 `--stage s4` 의 기본이 되었다(load, recovery). 대조 run 은 `--no-redis-aof` 다. 다른 stage 의 기본은 그대로 no 이다. 실행 머리 줄에 `redis_aof=` 가 찍히고, `-aof` 접미사 규칙도 그대로라서 s4 evidence 는 `…/recovery/db-down-aof/…` 처럼 된다.
+  * settle 상한은 120 → 600초(`load_settle`, `rec_wait_settled`)다. 상한에 닿으면 `settled: false` 다.
+* **S4 의 전제: Redis AOF(everysec)는 설계의 일부이지 선택이 아니다.** AOF 없는 run 은 대조용으로만 있다.
+* **V2 의 영향:** V2 부터는 S0/S1/S3 의 INSERT 도 message_id 인덱스(NULL 항목)를 갱신한다. 동결된 S0/S1/S3 의 B 수치는 V1 에서 쟀다. V2 에서 S3 `ramping-rows1` 을 한 번 돌리는 것은 사용자가 할 수 있는 확인이고, 재기 전까지 "아무것도 바꾸지 않는다"고 주장하지 않는다.
+* 바꾸지 않은 것: 결정 Lua, 회원 중복 방지 없음, 소비자 동시성 1, 배치 소비 없음(S4.1), confirm 타임아웃 2000 ms, 유니크 키 없음.
+* 측정 영향(해석할 때 주의):
+  * 관리 플러그인은 브로커(cpu 1개)에서 통계를 모으는 비용이 있다. 첫 측정과는 이미지, 채널 캐시, 샘플러가 한꺼번에 바뀌므로, 503 이 줄어도 어느 변경 때문인지는 `by_reason`, `channels`, `rabbitmq.log` 로 가려야 한다.
+  * 관리 API 의 큐 통계는 기본 5초 간격으로 갱신되므로, 1초 샘플이라도 `queue_depth` 는 계단 모양으로 바뀔 수 있다(추정, 설정은 바꾸지 않았다).
+
+### S4 재측정 예측 (측정 전에 적는다, 반증 가능하게)
+
+1. **consumer-redeliver (FAIL_EVERY 50, 결함 없음):** `coupon_s4_redeliveries` ≈ http_200 / 50 (±10%), 중복 행 0, 정착 뒤 DB 행 == http_200.
+2. **db-down 45초:** 타임아웃 0, blackout 0, DB 행 == http_200. DB 복귀 뒤 비우는 시간 < 35초(이전 69.6초). 존재 확인이 이제 인덱스 조회이기 때문이다. 비우는 시간이 줄지 않으면 약 250 행/초의 한계는 테이블 훑기가 아니라 소비자의 직렬 커밋이다(→ S4.1 배치 소비).
+   * 실행 명령은 `--fault-at 5 --fault-duration 45` 다. `--fault-duration 45` 만 주면 기본 `--fault-at 20` 과 합쳐 결함이 65초에 끝나서 러너가 종료 코드 2 로 거부한다.
+3. **redis-restart, AOF everysec:** 카운터는 최대 약 1초 분량의 INCR(500rps 에서 ≤ 약 500)만큼 되감긴다 → `over_issue` ≤ 약 500, `recorded_despite_unknown`/조용히 잃은 확인된 당첨 = 0(message_id). AOF 없음(`--no-redis-aof`, 대조): `over_issue` ≈ 재시작 뒤 다시 팔린 자리 수, 잃은 당첨은 여전히 0.
+4. **503 폭발:** 원인은 예측하지 않는다. 진단이 정한다.
+   * `by_reason` 이 채널/연결 계열 클래스로 채워지고 캐시 200 에서 폭발이 사라지면, 원인은 채널 churn 이었다.
+   * `timeout` 이 대부분인데 `queue.jsonl` 의 `channels` 가 평평하고 `rabbitmq.log` 에 flow/alarm 이 보이면, 브로커 포화다.
