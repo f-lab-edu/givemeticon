@@ -1,5 +1,6 @@
 # Environment for `scripts/verify.sh load`: app and MySQL with pinned CPU limits, k6 runs on the host.
 # Started and removed (down -v) by verify.sh; the manual-run docker-compose.yml is unrelated.
+# redis (S3 decision counter) is up for every stage; S0/S1 do not use it. No persistence, 1 cpu.
 # Required variables (set by verify.sh): COUPON_LAB_DB_PASSWORD, COUPON_STRATEGY, LOAD_GC_DIR.
 # Optional (test C diagnostics, verify.sh load --pool / --flush-log): HIKARI_POOL_SIZE (default 10),
 # FLUSH_LOG (default 1 = MySQL's own default). FLUSH_LOG=2 relaxes durability and is a diagnostic only.
@@ -21,6 +22,19 @@ services:
       timeout: 3s
       retries: 30
 
+  redis:
+    image: redis:7-alpine
+    container_name: coupon-lab-load-redis
+    cpus: 1
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
   app:
     build: .
     container_name: coupon-lab-load-app
@@ -30,10 +44,14 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       COUPON_LAB_DB_URL: jdbc:mysql://mysql:3306/coupon_lab?useSSL=false&allowPublicKeyRetrieval=true
       COUPON_LAB_DB_USER: root
       COUPON_LAB_DB_PASSWORD: ${COUPON_LAB_DB_PASSWORD:?set COUPON_LAB_DB_PASSWORD}
+      COUPON_LAB_REDIS_HOST: redis
+      COUPON_LAB_REDIS_PORT: 6379
       COUPON_STRATEGY: ${COUPON_STRATEGY:?set COUPON_STRATEGY}
       SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${HIKARI_POOL_SIZE:-10}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health

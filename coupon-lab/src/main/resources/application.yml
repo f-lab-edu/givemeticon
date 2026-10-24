@@ -6,6 +6,10 @@ spring:
     url: ${COUPON_LAB_DB_URL}
     username: ${COUPON_LAB_DB_USER}
     password: ${COUPON_LAB_DB_PASSWORD}
+  data:
+    redis:
+      host: ${COUPON_LAB_REDIS_HOST:localhost}
+      port: ${COUPON_LAB_REDIS_PORT:6379}
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

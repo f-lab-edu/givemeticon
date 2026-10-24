@@ -27,9 +27,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootVersion;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.env.Environment;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -42,10 +44,16 @@ import com.jinddung2.couponlab.coupon.service.CouponIssueService;
 import com.zaxxer.hikari.HikariDataSource;
 
 /**
- * Test A: THREADS members race for TOTAL_QUANTITY coupons, REPETITIONS times, each time on a fresh event.
- * The invariants are no over-issue, no member issued twice, and remaining matching the issued rows.
- * A run only counts as healthy if it also threw no exceptions and issued exactly min(THREADS, TOTAL_QUANTITY)
- * coupons; without that, a service that fails every call would pass the negative checks above.
+ * Test A (v3): THREADS members race for TOTAL_QUANTITY coupons, REPETITIONS times, each time on a fresh event.
+ * Per repetition exactly four things are asserted: over_issue == 0, dup_members == 0,
+ * issued == min(THREADS, TOTAL_QUANTITY) and exceptions == 0. The last two keep a service that fails every call
+ * from passing the negative checks.
+ * <p>
+ * v3 changes the yardstick: v2 also asserted that coupon_event.remaining_quantity matched the issued rows, which
+ * only holds for stages that maintain that column. S3 decides in Redis and never touches it, so "remaining" is now
+ * recorded as information, not asserted, and its source depends on the stage: s0/s1 read
+ * coupon_event.remaining_quantity ("db"); s3 reports total - min(redis counter, total) plus the raw redis_counter
+ * ("redis"). Because of that, S0 and S1 are re-recorded once with v3; v2 and v3 evidence are not compared.
  * Expected to FAIL on S0, whose read-then-decrement has no protection; the numbers are the evidence.
  */
 @Tag("consistency")
@@ -59,20 +67,30 @@ class ConcurrentIssueConsistencyTest {
     private static final int EXPECTED_ISSUED = Math.min(THREADS, TOTAL_QUANTITY);
 
     private static final String MYSQL_IMAGE = "mysql:8.0";
+    private static final String REDIS_IMAGE = "redis:7-alpine";
+    private static final int REDIS_PORT = 6379;
     private static final Path EVIDENCE_FILE = Path.of("build", "evidence", "consistency.json");
 
     @Container
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>(DockerImageName.parse(MYSQL_IMAGE));
 
+    // Always started (cheap); only S3 uses it.
+    @Container
+    static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse(REDIS_IMAGE))
+            .withExposedPorts(REDIS_PORT);
+
     private static final List<Map<String, Object>> RUNS = new ArrayList<>();
     private static String stage = System.getProperty("coupon.strategy", "s0");
     private static int hikariPoolSize = -1;
+    private static String remainingSource = "db";
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
+        registry.add("spring.data.redis.host", REDIS::getHost);
+        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(REDIS_PORT));
     }
 
     @Autowired
@@ -85,6 +103,9 @@ class ConcurrentIssueConsistencyTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    @Autowired
     private DataSource dataSource;
 
     @Autowired
@@ -93,6 +114,7 @@ class ConcurrentIssueConsistencyTest {
     @Test
     void issuedNeverExceedsStockUnderConcurrency() throws Exception {
         stage = environment.getProperty("coupon.strategy", stage);
+        remainingSource = "s3".equals(stage) ? "redis" : "db";
         hikariPoolSize = dataSource.unwrap(HikariDataSource.class).getMaximumPoolSize();
 
         for (int run = 1; run <= REPETITIONS; run++) {
@@ -142,16 +164,29 @@ class ConcurrentIssueConsistencyTest {
 
         int issued = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM coupon_issue WHERE event_id = ?", Integer.class, eventId);
-        int remaining = jdbcTemplate.queryForObject(
-                "SELECT remaining_quantity FROM coupon_event WHERE id = ?", Integer.class, eventId);
         int dupMembers = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM (SELECT member_id FROM coupon_issue WHERE event_id = ? "
                         + "GROUP BY member_id HAVING COUNT(*) > 1) d", Integer.class, eventId);
+
+        // Information only, never asserted (see the class comment).
+        Long redisCounter = null;
+        int remaining;
+        if ("redis".equals(remainingSource)) {
+            String counter = redisTemplate.opsForValue().get("coupon:event:" + eventId + ":issued");
+            redisCounter = counter == null ? 0L : Long.parseLong(counter);
+            remaining = TOTAL_QUANTITY - (int) Math.min(redisCounter, TOTAL_QUANTITY);
+        } else {
+            remaining = jdbcTemplate.queryForObject(
+                    "SELECT remaining_quantity FROM coupon_event WHERE id = ?", Integer.class, eventId);
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("run", run);
         result.put("issued", issued);
         result.put("remaining", remaining);
+        if (redisCounter != null) {
+            result.put("redis_counter", redisCounter);
+        }
         result.put("over_issue", Math.max(0, issued - TOTAL_QUANTITY));
         result.put("dup_members", dupMembers);
         result.put("remaining_mismatch", TOTAL_QUANTITY - remaining != issued);
@@ -161,9 +196,7 @@ class ConcurrentIssueConsistencyTest {
     }
 
     private static boolean isBroken(Map<String, Object> run) {
-        return (int) run.get("over_issue") > 0
-                || (int) run.get("dup_members") > 0
-                || (boolean) run.get("remaining_mismatch");
+        return (int) run.get("over_issue") > 0 || (int) run.get("dup_members") > 0;
     }
 
     private static boolean isUnhealthy(Map<String, Object> run) {
@@ -197,6 +230,7 @@ class ConcurrentIssueConsistencyTest {
         env.put("java", System.getProperty("java.version"));
         env.put("spring_boot", SpringBootVersion.getVersion());
         env.put("mysql_image", MYSQL_IMAGE);
+        env.put("redis_image", REDIS_IMAGE);
         env.put("hikari_pool_size", hikariPoolSize);
         env.put("cpu", Runtime.getRuntime().availableProcessors());
         env.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version")
@@ -208,6 +242,7 @@ class ConcurrentIssueConsistencyTest {
         evidence.put("repetitions", REPETITIONS);
         evidence.put("threads", THREADS);
         evidence.put("total_quantity", TOTAL_QUANTITY);
+        evidence.put("remaining_source", remainingSource);
         evidence.put("runs", RUNS);
         evidence.put("summary", summary);
         evidence.put("env", env);

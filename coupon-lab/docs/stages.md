@@ -206,3 +206,115 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 * **S2(Redis 분산 락)는 건너뛴다.** 직렬화 지점이 하나 남는 구조라 천장이 움직이지 않는다. 임계 구역을 DB 행 락에서 다른 락으로 옮길 뿐이라는 뜻이다.
 * **다음 단계는 S3**: Redis 원자적 카운터가 당첨을 결정하고 DB 에는 당첨자만 저장한다. 1단(한 행의 직렬화)을 구조에서 없애는 단계다.
 * 2단(MySQL CPU / 커밋 경로)은 S3/S4 결과를 해석할 때 다시 중요해진다. fsync/binlog 분해는 그때까지 보류한다.
+
+## S2 - 생략
+
+* Redis 분산 락 단계는 만들지 않는다. 근거는 테스트 C(위 C5 "결정"): 락을 DB 행에서 Redis 로 옮겨도 이벤트당 직렬화 지점이 하나 남아 1단 천장(약 650rps)이 움직이지 않는다. 임계 구역의 위치만 바뀐다.
+* Evidence: `coupon-lab/evidence/s1/load/ramping-rows1/`, `.../ramping-rows4/`, `.../ramping-rows16/` (행 수를 늘리면 천장이 오른다 = 직렬화 지점이 천장), `coupon-lab/evidence/s0/load/ramping-rows4/`. 판단은 C2/C4 표 1~4행.
+
+## S3 - Redis 원자 카운터가 결정, DB 는 당첨자만 저장
+
+* Changed: 발급 결정을 `coupon_event` 행에서 Redis 로 옮겼다. `S3CouponIssueService` 가 Lua 스크립트 한 번(`INCR coupon:event:{eventId}:issued`, 결과 n 이 total 을 넘으면 -1)으로 결정한다. n <= total 이면 당첨(seq = n), 아니면 DB 호출 없이 `SoldOut`. 카운터는 total 을 넘어 올라갈 수 있고 줄이지 않는다(품절 = n > total). total 은 이벤트당 한 번 `selectTotal` 로 읽어 `ConcurrentHashMap` 에 둔다(이 실험에서 이벤트는 불변). 모르는 이벤트는 S0/S1 과 같은 `IllegalArgumentException`.
+* Did NOT change: 회원 중복 방지 없음(후속 단계), 요청마다 `coupon_event` 를 읽거나 쓰지 않는다(`remaining_quantity` 는 S3 가 건드리지 않는다), 당첨자의 `coupon_issue` INSERT 는 동기 단일 문장(`insertIssue` 그대로, `@Transactional` 없음), 락·트랜잭션·제약 계약은 그대로, S0/S1 서비스는 동결.
+* Known gap: 카운터를 이긴 뒤 INSERT 가 실패하면 ERROR 로그(eventId/memberId/seq)를 남기고 예외를 다시 던져 컨트롤러가 500 을 돌려준다. 자리는 이미 소모된 상태로 남는다(발급 행 수 < 당첨 수). S4 의 동기.
+* 환경 변화: 부하 compose 에 `redis:7-alpine`(cpus 1, appendonly no, 스냅샷 없음)이 모든 stage 에서 뜨고 `env.redis_image`/`env.redis_cpus` 가 기록된다. 그래서 이전 S0/S1 부하 evidence 와 env 블록이 다르다. 짝 비교용으로 S1 spike 를 새 실행기로 다시 잰다. docker stats 샘플링은 app 과 mysql 만 대상이라 Redis CPU 는 기록되지 않는다.
+* 테스트 A v3: 반복마다 `over_issue == 0`, `dup_members == 0`, `issued == min(THREADS, TOTAL_QUANTITY)`, `exceptions == 0` 만 단언한다. `remaining_mismatch` 는 단언하지 않는다. `remaining` 은 정보로만 기록하고 출처를 JSON 의 `remaining_source` 에 남긴다(`db`: s0/s1 은 `coupon_event.remaining_quantity`, `redis`: s3 는 total - min(redis 카운터, total) 과 `redis_counter`). 기준이 바뀌었으므로 S0/S1 은 v3 로 한 번 다시 기록한다.
+* 부하 실행기: stage s3 는 시드한 이벤트의 Redis 카운터 합을 `load.json` 의 `db.redis_counter` 로 기록한다(정보용). 유효성 규칙은 그대로 `db.issued_rows == http_issued`. 시드는 그대로(DB INSERT), S3 는 첫 요청에서 DB 로 total 을 읽는다.
+
+### S3 예측 (측정 전에 적는다)
+
+* **A (consistency, 1000 threads, stock 100, 10회):** 깨진 반복 0/10, 매 회 `issued` 100, `exceptions` 0, `dup_members` 0. `redis_counter` 는 1000.
+* **B ramping (stock 10M, 모든 요청이 당첨):** 650 과 800rps 에서 p50 이 약 2ms 로 유지된다(`row_lock_wait_ratio` ≈ 0, 1단 소멸). 천장은 2단 값(약 1,100~1,200rps)까지 오르고 `mysql_cpu_pct_mean` 은 높다(당첨자마다 INSERT + 커밋 비용이 든다).
+* **B spike (stock 100, 3,000rps):** `db.issued_rows == 100`, `redis_counter` ≫ 100, 달성 rps 는 S1 spike(1,311)보다 훨씬 높다(패자는 MySQL 을 거치지 않는다).
+
+### S3 결과
+
+* 같은 Mac, 같은 실행기(env 에 `redis_image=redis:7-alpine`, `redis_cpus=1`). 테스트 A 는 v3 로 S0/S1/S3 를 다시 기록했다(v2 와 비교하지 않는다). S3 consistency 2회, ramping 2회, spike 2회, 짝 비교용 S1 spike 1회(n=1).
+
+#### 테스트 A (consistency, v3)
+
+| stage | 깨진 반복 | issued | 초과 발급 | dup_members | exceptions | 비고 |
+|---|---|---|---|---|---|---|
+| S0 | 10/10 | 107 | 7 | 0 | 0 | 예상대로 깨짐 |
+| S1 | 0/10 | 100 | 0 | 0 | 0 | |
+| S3 (2회) | 0/10 | 100 | 0 | 0 | 0 | `remaining_source` redis, `redis_counter` 1000 (매 반복) |
+
+Evidence: `coupon-lab/evidence/s0/consistency/20261024-031516-aa357e0/`, `.../s1/consistency/20261024-031537-fa1a0a6/`, `.../s3/consistency/20261024-031011-cb34bf8/`, `.../s3/consistency/20261024-031557-ee60088/`. 반복 한 번의 `elapsed_ms` 는 S3 65~432, S1 615~925.
+
+#### 테스트 B ramping (S3, stock 10M, 모든 요청이 당첨)
+
+| run | 650rps p50 | 800rps p50 / p95 | 800rps 달성 | 800rps MySQL CPU 평균 | sustained_limit_rps | 비고 |
+|---|---|---|---|---|---|---|
+| 1 | 1.56 ms | 1.74 / 44.1 ms | 799.8 | 34.8 | 800 | 모든 단계 ok |
+| 2 | 1.39 ms | 1.49 / 17.5 ms | 799.8 | 30.6 | 800 | 400rps 단계 stall 1회(p95 518 ms), 이후 정상 |
+
+* `row_lock_wait_ratio` 는 650rps 이하 모든 단계에서 0.0 (800rps 단계는 값이 비어 있다, null). 기준선 S1 rows=1(테스트 C 1행)은 800rps 에서 p50 3361.87 ms, 대기율 0.8329.
+* 두 run 모두 `db.issued_rows == db.http_issued == db.redis_counter == 89646`. 모든 요청이 당첨되는 프로필에서 유실이 없다.
+* 400rps stall 의 원인은 모른다(n=2).
+* Evidence: `coupon-lab/evidence/s3/load/ramping/20261024-041032-81a92fc/`, `.../ramping/20261024-041443-463f160/`.
+
+#### 테스트 B spike (stock 100, 3,000rps)
+
+| run | 달성 rps | p50 | 버려진 요청 비율 | MySQL CPU 평균 | 앱 CPU 평균 (한도 200) | db.issued_rows | redis_counter |
+|---|---|---|---|---|---|---|---|
+| S1 (같은 실행기, n=1) | 1,517.0 | 1,799.94 ms | 0.494 | 88.3 | 204.0 | 100 | - |
+| S3 run 1 | 2,016.0 | 1,313.84 ms | 0.327 | 5.0 | 212.5 | 100 | 43,200 |
+| S3 run 2 | 2,158.3 | 1,107.91 ms | 0.281 | 7.9 | 214.5 | 100 | 46,205 |
+
+* 세 run 모두 `validity.valid: false` 다. spike 는 과부하가 목적이라 첫 단계의 버려진 요청이 1% 를 넘기 때문이고 이전 S0/S1 spike 도 같다. 의미 있는 확인인 `db.match`(DB 행 수 == HTTP 당첨 수)는 모두 true.
+* Evidence: `coupon-lab/evidence/s1/load/spike/20261024-041540-ea6af92/`, `coupon-lab/evidence/s3/load/spike/20261024-041641-d92f304/`, `.../spike/20261024-041743-d6ab2f9/`.
+
+#### 천장 확인 (`ramping-rows`, rows=1, S3)
+
+`scripts/verify.sh load --stage s3 --profile ramping-rows --rows 1` 1회(n=1). 재고 1천만, 이벤트 1개, 모든 요청이 당첨. 이 run 부터 실행기가 Redis 컨테이너의 CPU 도 `stats.jsonl` 에 샘플링한다(`load.json` 에는 집계하지 않는다). Evidence: `coupon-lab/evidence/s3/load/ramping-rows1/20261024-052202-fd4d338/`. run 은 유효하고 `db.issued_rows == db.http_issued == db.redis_counter == 246211`, 에러 0.
+
+| 목표 rps | 달성 | p50 ms | p95 ms | kind | 버려진 비율 | MySQL CPU 평균/최대 (한도 200) | 앱 CPU 평균/최대 (한도 200) | Redis CPU 평균/최대 (한도 100) | 요청당 fsync |
+|---|---|---|---|---|---|---|---|---|---|
+| 200 | 200.0 | 2.0 | 7.91 | ok | 0 | 13.3 / 19.0 | 35.7 / 91.0 | 1.9 / 3.2 | 4.283 |
+| 400 | 400.0 | 1.56 | 13.85 | ok | 0 | 20.5 / 50.5 | 39.9 / 179.0 | 3.1 / 9.7 | 3.876 |
+| 800 | 800.0 | 1.45 | 13.33 | ok | 0 | 26.1 / 46.9 | 32.9 / 83.7 | 3.9 / 8.1 | 3.204 |
+| 1200 | 1200.0 | 1.59 | 15.32 | ok | 0 | 36.3 / 48.5 | 45.8 / 74.0 | 5.4 / 9.5 | 2.001 |
+| 1600 | 1600.0 | 2.20 | 29.13 | ok | 0 | 55.2 / 72.3 | 68.0 / 86.4 | 7.4 / 9.1 | 1.756 |
+| 2400 | 2225.2 | 89.62 | 1457.78 | saturated | 0.0731 | 83.7 / 99.1 | 117.2 / 154.9 | 9.3 / 12.6 | 0.782 |
+| 3200 | 1792.4 | 1605.09 | 2212.66 | saturated | 0.4395 | 84.2 / 109.2 | 126.1 / 167.6 | 8.8 / 12.4 | 값 없음 |
+
+`row_lock_wait_ratio` 는 3200 단계(값 없음) 외에 모두 0.0. Redis CPU 는 `stats.jsonl` 의 redis 샘플을 단계 측정 구간(`postprocess.py` 와 같은 창)으로 잘라 구한 값이다.
+
+같은 프로필(`compare.py` 로 비교, 모두 n=1, host k6, pool 10):
+
+| 단계 | 행 수 | sustained_limit_rps | max_achieved_rps (at target) | 1200rps p95 ms | 1600rps p95 ms |
+|---|---|---|---|---|---|
+| S1 | 1 | 400 | 656.1 (at 800) | 8467.9 | 9568.3 |
+| S1 | 4 | 800 | 1136.7 (at 1200) | 1661.9 | 3525.4 |
+| S1 | 16 | 1200 | 1200 (at 1200) | 184.0 | 3103.2 |
+| S3 | 1 | 1600 | 2225.2 (at 2400) | 15.3 | 29.1 |
+
+* 쓸 수 있는 말: S3 는 1,600rps 까지 p50 2.2 ms, 락 대기 0 으로 유지했다(ok). 같은 프로필의 S1(행 1개)은 sustained 400 / max 656. 1단(한 행의 직렬화)이 사라졌다는 직접 증거이다. 배수를 쓰려면 sustained 끼리 400 → 1,600(n=1)이다.
+* 최대 달성 2,225rps(목표 2,400)에서 포화한다. 그 지점에서 앱 117/200, MySQL 84/200, Redis 9/100 이고 샘플링한 자원 중 한도에 닿은 것이 없다. **천장의 원인은 미상이다.** 후보(측정하지 않음, 이 규모에서 그럴듯한 순서): ① k6 호스트 CPU(같은 Mac 에서 컨테이너 5코어를 떼고 남은 자원으로 부하와 JSON 출력을 만든다), ② Docker Desktop 포트 포워딩 경로, ③ Tomcat `maxThreads` 200(2,400rps × p50 90ms ≈ 216 동시), ④ Hikari 풀 10 대기.
+* 천장은 MySQL 이 아니다: 그 지점에서 MySQL CPU 84/200, 요청당 fsync 0.78(부하가 오르며 줄었다: 커밋이 묶여 나간다는 해석과 일관되지만 직접 재지는 않았다), `row_lock_wait_ratio` 0. 같은 프로필에서 S1 행 16개는 1,200rps 근처에서 MySQL CPU 평균 165 였다.
+* 쓰지 않는 말: "S3 의 천장은 2,225rps 다"(시스템 속성처럼. 장비와 생성기 한계일 수 있다), "병목은 앱(또는 k6)이다"(측정하지 않았다), "S1 대비 3.4배"(분자가 원인 미상의 상한이라 sustained 끼리가 아니면 비교 단위가 다르다).
+* 한계: n=1, 이 장비(앱 2 / MySQL 2 / Redis 1 cpu). `vus_max_reached: true`(상한 3000)지만 어느 단계에서 찼는지 모르므로 생성기 한계의 증거로도 반증으로도 쓰지 않는다. 2400 단계의 p50 89.62 ms 는 "p50 이 100ms 아래인데 dropped 가 생기면 k6 한계 의심" 기준 바로 아래이고, 그 의미는 모른다.
+
+#### 예측과 비교
+
+| 예측 | 판정 |
+|---|---|
+| A: 0/10, issued 100, exceptions 0 | **확인** |
+| B ramping: 650/800rps p50 약 2ms 유지, `row_lock_wait_ratio` ≈ 0 (1단 소멸) | **확인** (p50 1.39~1.74 ms, 대기율 0.0) |
+| B ramping: 천장이 2단 값(약 1,100~1,200rps)까지 오르고 `mysql_cpu_pct_mean` 이 높다 | **기각.** `ramping` 프로필은 800rps 에서 끝나 못 봤고, `ramping-rows` 실험(위)에서 sustained 1,600 / 최대 2,225rps, 천장 단계의 MySQL CPU 평균 83.7/200 이었다 |
+| B spike: `db.issued_rows == 100`, `redis_counter` ≫ 100 | **확인** (100, 43,200 / 46,205) |
+| B spike: 달성 rps 가 S1 spike(1,311)보다 훨씬 높다 | 방향은 **확인**, 폭은 크지 않다. 같은 실행기의 S1 은 1,517 이고 S3 는 2,016 / 2,158 (+33 ~ +42%). 이전 S1(1,311)과 비교하면 +54 ~ +65% |
+
+#### 해석과 한계
+
+* 1단(한 행의 직렬화)은 구조에서 사라졌다: `ramping` 으로는 800rps 까지, `ramping-rows`(위)로는 1,600rps 까지 대기가 생기지 않았다.
+* S1 spike 는 같은 코드인데 1,311(이전 기록)과 1,517(이번)로 15% 달랐다. 한 번씩 잰 값이므로 S3 가 더 빠르다는 방향은 믿되 정확한 배수는 주장하지 않는다. S1 은 n=1, S3 spike 는 n=2.
+* S3 spike 에서 앱 CPU 가 한도(2 cpu) 근처다(212.5 / 214.5). 패자는 DB 를 거의 안 건드려(MySQL CPU 5.0 / 7.9) 병목이 DB 에서 앱으로 옮겨 갔다는 해석과 맞는다. Redis CPU 는 샘플링하지 않아 Redis 쪽 한계는 이 evidence 로 가릴 수 없다.
+* 당첨자당 DB 문장이 5개에서 1개로 줄어든 것은 S1 의 2단(약 1,200rps)이 S3 의 천장이 아니라는 결과와 일관된다. 다만 CPU 를 문장 수로 환산해 비교하지는 않았다(가설 수준).
+* 알려진 갭(INSERT 실패 시 자리 소모)은 이번 실험에서 유발하지 않았다. 즉 `exceptions` 0 은 갭이 없다는 증거가 아니라 실패를 주입하지 않았다는 뜻이다. S4 에서 다룬다.
+
+#### 결정 (S3 마감)
+
+* **천장 원인은 더 파지 않고 "원인 미상(후보 ①~④)"으로 기록한다.** 어느 후보가 맞아도 S4 결정이 달라지지 않는다. DB 커밋 경로가 이 천장의 원인이 아니라는 것은 확정이고, S4 설계에 영향을 주는 것은 그것뿐이다. 가장 싼 추가 실험은 코드 변경 없는 `--k6 container` 1회(오르면 ①②, 같으면 ③④)이지만 하지 않는다.
+* **S4 의 동기는 내구성이다.** Redis `INCR` 로 당첨이 확정된 뒤 INSERT 실패, 앱 크래시, DB 장애가 나면 자리가 소모되고 기록이 남지 않는다. S4 의 본질은 당첨 결정을 내구성 있게 보존한 뒤 응답하는 것(MQ 발행 또는 outbox)이고, 당첨자 INSERT 를 비동기로 묶는 처리량 논거는 약해졌다(모든 요청이 당첨되는 2,225rps 에서도 MySQL CPU 84/200, 요청당 fsync 0.78). 배치 소비는 선택적 최적화로 낮춘다. S4 는 recovery 번들로 잰다.
+* 모름: 2,225rps 천장의 원인, `vus` 상한이 찬 단계, 2400 단계 p50 89.62 ms 가 생성기 한계 기준 바로 아래인 것의 의미, run 간 편차(n=1), S1 spike 1,311 대 1,517 차이의 원인.

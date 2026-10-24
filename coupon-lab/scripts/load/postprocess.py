@@ -2,7 +2,7 @@
 """Aggregate the k6 JSON output of issue.js into load.json (test B). Standard library only.
 
 usage: python3 -I postprocess.py --raw raw.json.gz --profile ramping|spike --stage sN --db-issued-rows N
-           --out load.json [--filtered-raw out.json.gz] [--env key=value ...]
+           --out load.json [--filtered-raw out.json.gz] [--env key=value ...] [--redis-counter N]
        python3 -I postprocess.py --reprocess-from <evidence dir> --out load.json
 
 Only the measure phase is aggregated, per target_rps. A request belongs to the step it started in (tag set by
@@ -10,7 +10,8 @@ issue.js). Dropped iterations carry no tags, so they are assigned to a step by t
 profiles.json anchored at the start of the first request.
 
 Validity is per stage: dropped_iterations / (requests + dropped_iterations) < 1%. A run is valid when its first stage
-is valid and the DB row count matches the 200 responses.
+is valid and the DB row count matches the 200 responses. --redis-counter (S3 only) is recorded as db.redis_counter and
+never enters the validity rule.
 
 Every stage also gets a kind:
   saturated  achieved_rps < 0.95 * target_rps, or p50 > 100 ms (the system cannot keep up; requests queue)
@@ -257,7 +258,7 @@ def classify(stage):
 
 
 def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, filtered_path=None,
-                 stats_path=None, summary_path=None, gc_path=None, run_info=None, innodb_path=None, rows=1):
+                 stats_path=None, summary_path=None, gc_path=None, run_info=None, innodb_path=None, rows=1, redis_counter=None):
     profile = layout["profiles"][profile_name]
     rates = [step["rps"] for step in profile["steps"]]
     if len(set(rates)) != len(rates):
@@ -343,6 +344,9 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
 
     http_issued = sum(n for (_, _, result), n in counts.items() if result == "issued")
     match = db_issued_rows == http_issued
+    db = {"issued_rows": db_issued_rows, "http_issued": http_issued, "match": match}
+    if redis_counter is not None:  # S3 only: the decision counter, summed over the seeded events (informational)
+        db["redis_counter"] = redis_counter
 
     return {
         "test": "B",
@@ -360,7 +364,7 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         "max_achieved_rps": {"achieved_rps": best["achieved_rps"], "target_rps": best["target_rps"]},
         "stalls": stalls,
         "limit_rps_first_violation": first_violation,
-        "db": {"issued_rows": db_issued_rows, "http_issued": http_issued, "match": match},
+        "db": db,
         "vus": read_vus(summary_path, layout),
         "rows": rows,
         "mysql": {"threads_connected_max": _max_or_none(innodb.get("Threads_connected"))},
@@ -408,6 +412,7 @@ def main(argv=None):
     parser.add_argument("--profile")
     parser.add_argument("--stage")
     parser.add_argument("--db-issued-rows", type=int)
+    parser.add_argument("--redis-counter", type=int)
     parser.add_argument("--out", required=True)
     parser.add_argument("--filtered-raw")
     parser.add_argument("--profiles", default=DEFAULT_PROFILES)
@@ -436,6 +441,7 @@ def main(argv=None):
         args.profile = old["profile"]
         args.stage = old["stage"]
         args.db_issued_rows = old["db"]["issued_rows"]
+        args.redis_counter = old["db"].get("redis_counter")
         env_pairs = ["%s=%s" % (k, v) for k, v in old["env"].items()]
         layout = layout_from_report(old)
         args.stats = os.path.join(source, "stats.jsonl")
@@ -471,7 +477,7 @@ def main(argv=None):
                 run_info[key] = value
     report = build_report(args.raw, layout, args.profile, args.stage, args.db_issued_rows,
                           _env(env_pairs), args.filtered_raw, args.stats, args.summary, args.gc_log, run_info,
-                          args.innodb, args.rows)
+                          args.innodb, args.rows, args.redis_counter)
     if reprocessed_from:
         report["reprocessed_from"] = reprocessed_from
     with open(args.out, "w", encoding="utf-8") as f:

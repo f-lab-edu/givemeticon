@@ -198,12 +198,13 @@ load_next_run_order() {
 }
 
 # Every 2 s one line per container into <outfile>: {"time": <epoch>, "stat": <docker stats object>}. Run in the
-# background during k6 and killed afterwards; postprocess.py turns it into per-stage CPU figures.
+# background during k6 and killed afterwards; postprocess.py turns the app and mysql lines into per-stage CPU figures
+# (redis lines are kept in stats.jsonl for reading by hand and are not aggregated).
 load_sample_stats() {
     local out=$1 started now
     while :; do
         started=$(date +%s)
-        docker stats --no-stream --format json "${LOAD_PREFIX}app" "${LOAD_PREFIX}mysql" 2>/dev/null | while IFS= read -r line; do
+        docker stats --no-stream --format json "${LOAD_PREFIX}app" "${LOAD_PREFIX}mysql" "${LOAD_PREFIX}redis" 2>/dev/null | while IFS= read -r line; do
             [ -z "$line" ] || printf '{"time":%s,"stat":%s}\n' "$(date +%s)" "$line" >>"$out"
         done
         now=$(date +%s)
@@ -290,16 +291,17 @@ run_load() {
             run_status=INFRA_DOWN; run_note="docker compose up failed (see $log)"; return
         fi
         up_epoch=$(date +%s)
-        local waited=0 health=""
+        local waited=0 health="" redis_health=""
         while [ "$waited" -lt "$LOAD_HEALTH_TIMEOUT_S" ]; do
             health=$(load_inspect '{{.State.Health.Status}}' app)
-            [ "$health" != healthy ] || break
+            redis_health=$(load_inspect '{{.State.Health.Status}}' redis)
+            [ "$health" != healthy ] || [ "$redis_health" != healthy ] || break
             sleep 2
             waited=$((waited + 2))
         done
-        if [ "$health" != healthy ]; then
+        if [ "$health" != healthy ] || [ "$redis_health" != healthy ]; then
             docker logs --tail 40 "${LOAD_PREFIX}app" >>"$log" 2>&1
-            run_status=INFRA_DOWN; run_note="app not healthy after ${LOAD_HEALTH_TIMEOUT_S}s (see $log)"; return
+            run_status=INFRA_DOWN; run_note="app (${health:-?}) or redis (${redis_health:-?}) not healthy after ${LOAD_HEALTH_TIMEOUT_S}s (see $log)"; return
         fi
 
         # 3. seed the events (one per row of the test-C spread; ramping measures the issue path only, spike the sold-out path)
@@ -359,21 +361,34 @@ run_load() {
             fi
             run_status=BUILD_ERROR; run_note="k6 exited $k6_rc (see $log)"; return
         fi
-        local issued_rows nano cpus_app cpus_mysql heap hikari
+        local issued_rows nano cpus_app cpus_mysql cpus_redis redis_image heap hikari
         issued_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_issue WHERE event_id IN ($event_ids)")
         if ! [[ "$issued_rows" =~ ^[0-9]+$ ]]; then
             run_status=INFRA_DOWN; run_note="counting coupon_issue rows failed (see $log)"; return
+        fi
+        # S3 only: the decision counter of the seeded events (informational; the validity rule stays db rows == http issued)
+        local redis_counter_arg=() redis_counter id value
+        if [ "$stage" = s3 ]; then
+            redis_counter=0
+            for id in ${event_ids//,/ }; do
+                value=$(docker exec "${LOAD_PREFIX}redis" redis-cli --raw GET "coupon:event:$id:issued" 2>>"$log")
+                [[ "${value:-0}" =~ ^[0-9]+$ ]] || { run_status=INFRA_DOWN; run_note="reading the redis counter of event $id failed (got '$value'; see $log)"; return; }
+                redis_counter=$((redis_counter + ${value:-0}))
+            done
+            redis_counter_arg=(--redis-counter "$redis_counter")
         fi
         nano=$(load_inspect '{{.HostConfig.NanoCpus}}' app); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_app=$((nano / 1000000000))
         nano=$(load_inspect '{{.HostConfig.NanoCpus}}' mysql); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_mysql=$((nano / 1000000000))
         heap=$(load_inspect '{{json .Config.Entrypoint}}' app | grep -o -- '-Xmx[0-9]*[kKmMgG]' | head -n 1 | sed 's/^-Xmx//')
         hikari=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=//p')
+        nano=$(load_inspect '{{.HostConfig.NanoCpus}}' redis); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_redis=$((nano / 1000000000))
+        redis_image=$(load_inspect '{{.Config.Image}}' redis)
         python3 -I scripts/load/postprocess.py --raw "$work/raw.json.gz" --profile "$profile" --stage "$stage" \
-            --db-issued-rows "$issued_rows" --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
+            --db-issued-rows "$issued_rows" ${redis_counter_arg[@]+"${redis_counter_arg[@]}"} --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
             --stats "$work/stats.jsonl" --summary "$work/summary.json" --gc-log "$work/gc/gc.log" --innodb "$work/innodb.jsonl" \
             --run-order "$run_order" --minutes-since-up "$minutes_up" ${clock_offset:+--clock-offset-s "$clock_offset"} \
             --rows "$rows" ${max_vus:+--max-vus "$max_vus"} --env "max_vus=${max_vus:-$vus_max_default}" \
-            --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "jvm_heap=$heap" \
+            --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "redis_image=$redis_image" --env "redis_cpus=$cpus_redis" --env "jvm_heap=$heap" \
             --env "hikari_pool_size=$hikari" --env "k6_version=$k6_version" --env "k6_mode=$k6_mode" ${k6_env[@]+"${k6_env[@]}"} ${mysql_env[@]+"${mysql_env[@]}"} \
             >>"$log" 2>&1
         if [ $? -ne 0 ]; then

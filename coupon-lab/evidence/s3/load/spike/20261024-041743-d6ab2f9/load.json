@@ -1,0 +1,107 @@
+{
+  "test": "B",
+  "profile": "spike",
+  "stage": "s3",
+  "stock": 100,
+  "layout": {
+    "warmup": {
+      "rps": 100,
+      "seconds": 15
+    },
+    "transition_seconds": 1,
+    "vus": {
+      "pre_allocated": 500,
+      "max": 3000
+    },
+    "steps": [
+      {
+        "rps": 3000,
+        "seconds": 21
+      }
+    ]
+  },
+  "stages": [
+    {
+      "target_rps": 3000,
+      "requests": 43167,
+      "achieved_rps": 2158.3,
+      "achieved_ratio": 0.7194,
+      "p50_ms": 1107.91,
+      "p95_ms": 2268.04,
+      "p95_margin_ms": -1768.04,
+      "p99_ms": 2415.02,
+      "issued": 0,
+      "sold_out": 43167,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 16833,
+      "dropped_ratio": 0.28055,
+      "valid": false,
+      "after_first_violation": true,
+      "kind": "saturated",
+      "app_cpu_pct_mean": 214.5,
+      "app_cpu_pct_max": 238.0,
+      "mysql_cpu_pct_mean": 7.9,
+      "mysql_cpu_pct_max": 17.6,
+      "gc_pauses_over_200ms": 0,
+      "row_lock_waits_delta": null,
+      "row_lock_time_ms_delta": null,
+      "row_lock_wait_ratio": null,
+      "row_lock_time_per_request_ms": null,
+      "fsyncs_delta": null,
+      "log_fsyncs_delta": null,
+      "fsyncs_per_request": null
+    }
+  ],
+  "sustained_limit_rps": null,
+  "max_achieved_rps": {
+    "achieved_rps": 2158.3,
+    "target_rps": 3000
+  },
+  "stalls": [],
+  "limit_rps_first_violation": "below_min_stage",
+  "db": {
+    "issued_rows": 100,
+    "http_issued": 100,
+    "match": true,
+    "redis_counter": 46205
+  },
+  "vus": {
+    "max_vus": 3000,
+    "vus_max": 3000,
+    "vus_peak": 3000,
+    "vus_max_reached": true
+  },
+  "rows": 1,
+  "mysql": {
+    "threads_connected_max": 11
+  },
+  "run": {
+    "run_order": 5,
+    "minutes_since_compose_up": 0.1,
+    "container_clock_offset_s": 0
+  },
+  "validity": {
+    "stage0_dropped_ratio": 0.28055,
+    "stage0_valid": false,
+    "db_match": true,
+    "valid": false
+  },
+  "env": {
+    "max_vus": 3000,
+    "app_cpus": 2,
+    "mysql_cpus": 2,
+    "redis_image": "redis:7-alpine",
+    "redis_cpus": 1,
+    "jvm_heap": "1g",
+    "hikari_pool_size": 10,
+    "k6_version": "v2.2.0",
+    "k6_mode": "host",
+    "innodb_buffer_pool_size": 134217728,
+    "innodb_flush_log_at_trx_commit": 1,
+    "innodb_log_file_size": 50331648,
+    "innodb_redo_log_capacity": 104857600,
+    "cpu": 8,
+    "os": "Darwin 25.3.0 arm64"
+  }
+}
