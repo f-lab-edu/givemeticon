@@ -229,4 +229,55 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 
 ### S3 결과
 
-* 로컬 실행 후 기입 (실행 명령과 evidence 경로는 사용자 로컬 계획에 따른다)
+* 같은 Mac, 같은 실행기(env 에 `redis_image=redis:7-alpine`, `redis_cpus=1`). 테스트 A 는 v3 로 S0/S1/S3 를 다시 기록했다(v2 와 비교하지 않는다). S3 consistency 2회, ramping 2회, spike 2회, 짝 비교용 S1 spike 1회(n=1).
+
+#### 테스트 A (consistency, v3)
+
+| stage | 깨진 반복 | issued | 초과 발급 | dup_members | exceptions | 비고 |
+|---|---|---|---|---|---|---|
+| S0 | 10/10 | 107 | 7 | 0 | 0 | 예상대로 깨짐 |
+| S1 | 0/10 | 100 | 0 | 0 | 0 | |
+| S3 (2회) | 0/10 | 100 | 0 | 0 | 0 | `remaining_source` redis, `redis_counter` 1000 (매 반복) |
+
+Evidence: `coupon-lab/evidence/s0/consistency/20261024-031516-aa357e0/`, `.../s1/consistency/20261024-031537-fa1a0a6/`, `.../s3/consistency/20261024-031011-cb34bf8/`, `.../s3/consistency/20261024-031557-ee60088/`. 반복 한 번의 `elapsed_ms` 는 S3 65~432, S1 615~925.
+
+#### 테스트 B ramping (S3, stock 10M, 모든 요청이 당첨)
+
+| run | 650rps p50 | 800rps p50 / p95 | 800rps 달성 | 800rps MySQL CPU 평균 | sustained_limit_rps | 비고 |
+|---|---|---|---|---|---|---|
+| 1 | 1.56 ms | 1.74 / 44.1 ms | 799.8 | 34.8 | 800 | 모든 단계 ok |
+| 2 | 1.39 ms | 1.49 / 17.5 ms | 799.8 | 30.6 | 800 | 400rps 단계 stall 1회(p95 518 ms), 이후 정상 |
+
+* `row_lock_wait_ratio` 는 650rps 이하 모든 단계에서 0.0 (800rps 단계는 값이 비어 있다, null). 기준선 S1 rows=1(테스트 C 1행)은 800rps 에서 p50 3361.87 ms, 대기율 0.8329.
+* 두 run 모두 `db.issued_rows == db.http_issued == db.redis_counter == 89646`. 모든 요청이 당첨되는 프로필에서 유실이 없다.
+* 400rps stall 의 원인은 모른다(n=2).
+* Evidence: `coupon-lab/evidence/s3/load/ramping/20261024-041032-81a92fc/`, `.../ramping/20261024-041443-463f160/`.
+
+#### 테스트 B spike (stock 100, 3,000rps)
+
+| run | 달성 rps | p50 | 버려진 요청 비율 | MySQL CPU 평균 | 앱 CPU 평균 (한도 200) | db.issued_rows | redis_counter |
+|---|---|---|---|---|---|---|---|
+| S1 (같은 실행기, n=1) | 1,517.0 | 1,799.94 ms | 0.494 | 88.3 | 204.0 | 100 | - |
+| S3 run 1 | 2,016.0 | 1,313.84 ms | 0.327 | 5.0 | 212.5 | 100 | 43,200 |
+| S3 run 2 | 2,158.3 | 1,107.91 ms | 0.281 | 7.9 | 214.5 | 100 | 46,205 |
+
+* 세 run 모두 `validity.valid: false` 다. spike 는 과부하가 목적이라 첫 단계의 버려진 요청이 1% 를 넘기 때문이고 이전 S0/S1 spike 도 같다. 의미 있는 확인인 `db.match`(DB 행 수 == HTTP 당첨 수)는 모두 true.
+* Evidence: `coupon-lab/evidence/s1/load/spike/20261024-041540-ea6af92/`, `coupon-lab/evidence/s3/load/spike/20261024-041641-d92f304/`, `.../spike/20261024-041743-d6ab2f9/`.
+
+#### 예측과 비교
+
+| 예측 | 판정 |
+|---|---|
+| A: 0/10, issued 100, exceptions 0 | **확인** |
+| B ramping: 650/800rps p50 약 2ms 유지, `row_lock_wait_ratio` ≈ 0 (1단 소멸) | **확인** (p50 1.39~1.74 ms, 대기율 0.0) |
+| B ramping: 천장이 2단 값(약 1,100~1,200rps)까지 오르고 `mysql_cpu_pct_mean` 이 높다 | **측정하지 않음.** `ramping` 프로필이 800rps 에서 끝나 천장을 보지 못했다. 800rps 에서 MySQL CPU 는 30.6~34.8 로 높지 않았다 |
+| B spike: `db.issued_rows == 100`, `redis_counter` ≫ 100 | **확인** (100, 43,200 / 46,205) |
+| B spike: 달성 rps 가 S1 spike(1,311)보다 훨씬 높다 | 방향은 **확인**, 폭은 크지 않다. 같은 실행기의 S1 은 1,517 이고 S3 는 2,016 / 2,158 (+33 ~ +42%). 이전 S1(1,311)과 비교하면 +54 ~ +65% |
+
+#### 해석과 한계
+
+* 1단(한 행의 직렬화)은 구조에서 사라졌다고 볼 수 있다: 800rps 에서도 대기가 생기지 않았다. 확인된 것은 800rps 까지이다.
+* S1 spike 는 같은 코드인데 1,311(이전 기록)과 1,517(이번)로 15% 달랐다. 한 번씩 잰 값이므로 S3 가 더 빠르다는 방향은 믿되 정확한 배수는 주장하지 않는다. S1 은 n=1, S3 spike 는 n=2.
+* S3 spike 에서 앱 CPU 가 한도(2 cpu) 근처다(212.5 / 214.5). 패자는 DB 를 거의 안 건드려(MySQL CPU 5.0 / 7.9) 병목이 DB 에서 앱으로 옮겨 갔다는 해석과 맞는다. Redis CPU 는 샘플링하지 않아 Redis 쪽 한계는 이 evidence 로 가릴 수 없다.
+* 당첨자당 SQL 이 INSERT 한 문장(S1 은 5문장)이라 2단 천장이 S1 보다 높을 수 있다는 것은 가설일 뿐이다. 확인하려면 `ramping-rows`(3,200rps 까지) 프로필로 S3 를 한 번 재야 하고, 이번에는 하지 않았다.
+* 알려진 갭(INSERT 실패 시 자리 소모)은 이번 실험에서 유발하지 않았다. 즉 `exceptions` 0 은 갭이 없다는 증거가 아니라 실패를 주입하지 않았다는 뜻이다. S4 에서 다룬다.
