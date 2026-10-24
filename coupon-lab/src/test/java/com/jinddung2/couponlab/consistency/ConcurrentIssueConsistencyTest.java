@@ -31,6 +31,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -42,7 +43,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinddung2.couponlab.coupon.mapper.CouponMapper;
 import com.jinddung2.couponlab.coupon.model.CouponEvent;
 import com.jinddung2.couponlab.coupon.service.CouponIssueService;
+import com.jinddung2.couponlab.coupon.service.S4RabbitConfiguration;
 import com.zaxxer.hikari.HikariDataSource;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 
 /**
  * Test A (v3): THREADS members race for TOTAL_QUANTITY coupons, REPETITIONS times, each time on a fresh event.
@@ -55,6 +60,13 @@ import com.zaxxer.hikari.HikariDataSource;
  * recorded as information, not asserted, and its source depends on the stage: s0/s1 read
  * coupon_event.remaining_quantity ("db"); s3 reports total - min(redis counter, total) plus the raw redis_counter
  * ("redis"). Because of that, S0 and S1 are re-recorded once with v3; v2 and v3 evidence are not compared.
+ * <p>
+ * v3+settle (procedure "v3+settle" in the evidence; assertions unchanged): S4 writes coupon_issue asynchronously, so after
+ * each burst the test polls the event's rows every SETTLE_POLL until they stay unchanged for SETTLE_STABLE (at most
+ * SETTLE_MAX) and only then measures. settle_ms is recorded per run; for the synchronous stages it is about SETTLE_STABLE.
+ * s4 also records redis_counter, queue_depth after the settle (messages of coupon.issued, ready plus unacked; expected 0,
+ * not asserted) and redeliveries (delta of the coupon_s4_redeliveries counter). The procedure changed, so S0, S1 and S3
+ * are re-recorded once with it; v3 and v3+settle evidence are not compared.
  * Expected to FAIL on S0, whose read-then-decrement has no protection; the numbers are the evidence.
  */
 @Tag("consistency")
@@ -66,6 +78,10 @@ class ConcurrentIssueConsistencyTest {
     private static final int THREADS = 1000;
     private static final int TOTAL_QUANTITY = 100;
     private static final int EXPECTED_ISSUED = Math.min(THREADS, TOTAL_QUANTITY);
+    private static final Duration SETTLE_POLL = Duration.ofMillis(100);
+    private static final Duration SETTLE_STABLE = Duration.ofSeconds(1);
+    private static final Duration SETTLE_MAX = Duration.ofSeconds(30);
+    private static final String PROCEDURE = "v3+settle";
 
     private static final String MYSQL_IMAGE = "mysql:8.0";
     private static final String REDIS_IMAGE = "redis:7-alpine";
@@ -92,6 +108,8 @@ class ConcurrentIssueConsistencyTest {
     private static String stage = System.getProperty("coupon.strategy", "s0");
     private static int hikariPoolSize = -1;
     private static String remainingSource = "db";
+    private static String s4ConfirmTimeoutMs;
+    private static String s4ConsumerFailEvery;
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
@@ -122,10 +140,17 @@ class ConcurrentIssueConsistencyTest {
     @Autowired
     private Environment environment;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
     @Test
     void issuedNeverExceedsStockUnderConcurrency() throws Exception {
         stage = environment.getProperty("coupon.strategy", stage);
-        remainingSource = "s3".equals(stage) ? "redis" : "db";
+        remainingSource = "s3".equals(stage) || "s4".equals(stage) ? "redis" : "db";
+        if ("s4".equals(stage)) {
+            s4ConfirmTimeoutMs = environment.getProperty("COUPON_S4_CONFIRM_TIMEOUT_MS", "2000");
+            s4ConsumerFailEvery = environment.getProperty("COUPON_S4_CONSUMER_FAIL_EVERY", "0");
+        }
         hikariPoolSize = dataSource.unwrap(HikariDataSource.class).getMaximumPoolSize();
 
         for (int run = 1; run <= REPETITIONS; run++) {
@@ -145,6 +170,7 @@ class ConcurrentIssueConsistencyTest {
         couponMapper.insertEvent(event);
         long eventId = event.getId();
 
+        double redeliveriesBefore = redeliveries();
         AtomicInteger exceptions = new AtomicInteger();
         AtomicReference<Throwable> firstError = new AtomicReference<>();
         CountDownLatch ready = new CountDownLatch(THREADS);
@@ -173,8 +199,9 @@ class ConcurrentIssueConsistencyTest {
             System.err.println("run " + run + ": " + exceptions.get() + " exceptions, first: " + firstError.get());
         }
 
-        int issued = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM coupon_issue WHERE event_id = ?", Integer.class, eventId);
+        long settleMs = settle(eventId);
+
+        int issued = countIssued(eventId);
         int dupMembers = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM (SELECT member_id FROM coupon_issue WHERE event_id = ? "
                         + "GROUP BY member_id HAVING COUNT(*) > 1) d", Integer.class, eventId);
@@ -198,12 +225,60 @@ class ConcurrentIssueConsistencyTest {
         if (redisCounter != null) {
             result.put("redis_counter", redisCounter);
         }
+        if ("s4".equals(stage)) {
+            result.put("queue_depth", queueDepth());
+            result.put("redeliveries", (long) (redeliveries() - redeliveriesBefore));
+        }
         result.put("over_issue", Math.max(0, issued - TOTAL_QUANTITY));
         result.put("dup_members", dupMembers);
         result.put("remaining_mismatch", TOTAL_QUANTITY - remaining != issued);
         result.put("exceptions", exceptions.get());
         result.put("elapsed_ms", elapsedMs);
+        result.put("settle_ms", settleMs);
         return result;
+    }
+
+    private int countIssued(long eventId) {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM coupon_issue WHERE event_id = ?", Integer.class, eventId);
+    }
+
+    /** Polls the event's rows until they stay unchanged for SETTLE_STABLE (at most SETTLE_MAX); returns the time spent. */
+    private long settle(long eventId) throws InterruptedException {
+        long started = System.nanoTime();
+        int last = countIssued(eventId);
+        long unchangedSince = System.nanoTime();
+        while (System.nanoTime() - unchangedSince < SETTLE_STABLE.toNanos()
+                && System.nanoTime() - started < SETTLE_MAX.toNanos()) {
+            Thread.sleep(SETTLE_POLL.toMillis());
+            int now = countIssued(eventId);
+            if (now != last) {
+                last = now;
+                unchangedSince = System.nanoTime();
+            }
+        }
+        return Duration.ofNanos(System.nanoTime() - started).toMillis();
+    }
+
+    /** Messages (ready + unacked) of coupon.issued as rabbitmqctl reports them; null when the queue is not listed. */
+    private static Long queueDepth() throws InterruptedException {
+        ExecResult listing;
+        try {
+            listing = RABBITMQ.execInContainer("rabbitmqctl", "list_queues", "-q", "name", "messages");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        for (String line : listing.getStdout().split("\\R")) {
+            String[] fields = line.trim().split("\\s+");
+            if (fields.length == 2 && fields[0].equals(S4RabbitConfiguration.QUEUE)) {
+                return Long.parseLong(fields[1]);
+            }
+        }
+        return null;
+    }
+
+    private double redeliveries() {
+        Counter counter = meterRegistry.find("coupon_s4_redeliveries").counter();
+        return counter == null ? 0 : counter.count();
     }
 
     private static boolean isBroken(Map<String, Object> run) {
@@ -244,6 +319,10 @@ class ConcurrentIssueConsistencyTest {
         env.put("redis_image", REDIS_IMAGE);
         env.put("rabbitmq_image", RABBITMQ_IMAGE);
         env.put("hikari_pool_size", hikariPoolSize);
+        if (s4ConfirmTimeoutMs != null) {
+            env.put("s4_confirm_timeout_ms", Long.parseLong(s4ConfirmTimeoutMs));
+            env.put("s4_consumer_fail_every", Integer.parseInt(s4ConsumerFailEvery));
+        }
         env.put("cpu", Runtime.getRuntime().availableProcessors());
         env.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version")
                 + " " + System.getProperty("os.arch"));
@@ -251,6 +330,7 @@ class ConcurrentIssueConsistencyTest {
         Map<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("test", "A");
         evidence.put("stage", stage);
+        evidence.put("procedure", PROCEDURE);
         evidence.put("repetitions", REPETITIONS);
         evidence.put("threads", THREADS);
         evidence.put("total_quantity", TOTAL_QUANTITY);
