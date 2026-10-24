@@ -20,4 +20,6 @@ public interface CouponMapper {
     int decrementRemaining(@Param("eventId") long eventId);
 
     void insertIssue(@Param("eventId") long eventId, @Param("memberId") long memberId, @Param("seq") int seq);
+
+    boolean existsIssue(@Param("eventId") long eventId, @Param("seq") int seq);
 }
