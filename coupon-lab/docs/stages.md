@@ -320,3 +320,176 @@ Evidence: `coupon-lab/evidence/s0/consistency/20261024-031516-aa357e0/`, `.../s1
 * **천장 원인은 더 파지 않고 "원인 미상(후보 ①~④)"으로 기록한다.** 어느 후보가 맞아도 S4 결정이 달라지지 않는다. DB 커밋 경로가 이 천장의 원인이 아니라는 것은 확정이고, S4 설계에 영향을 주는 것은 그것뿐이다. 가장 싼 추가 실험은 코드 변경 없는 `--k6 container` 1회(오르면 ①②, 같으면 ③④)이지만 하지 않는다.
 * **S4 의 동기는 내구성이다.** Redis `INCR` 로 당첨이 확정된 뒤 INSERT 실패, 앱 크래시, DB 장애가 나면 자리가 소모되고 기록이 남지 않는다. S4 의 본질은 당첨 결정을 내구성 있게 보존한 뒤 응답하는 것(MQ 발행 또는 outbox)이고, 당첨자 INSERT 를 비동기로 묶는 처리량 논거는 약해졌다(모든 요청이 당첨되는 2,225rps 에서도 MySQL CPU 84/200, 요청당 fsync 0.78). 배치 소비는 선택적 최적화로 낮춘다. S4 는 recovery 번들로 잰다.
 * 모름: 2,225rps 천장의 원인, `vus` 상한이 찬 단계, 2400 단계 p50 89.62 ms 가 생성기 한계 기준 바로 아래인 것의 의미, run 간 편차(n=1), S1 spike 1,311 대 1,517 차이의 원인.
+
+## 테스트 D - 장애 복구 (S3 에서 먼저 잰다)
+
+* 목적: S3 의 알려진 갭(카운터를 이긴 뒤 INSERT 가 실패하면 자리가 소모되고 기록이 없다, Redis 에 영속성이 없다)을 S4 가 고치기 전에 숫자로 만든다. S4 의 전후 비교 기준선이다. 정합성(테스트 A)이나 한계 처리량(테스트 B/C)과 달리 여기서 재는 것은 **손실의 크기**이고, 손실 수치는 PASS/FAIL 이 아니라 결과다.
+* 실행: `scripts/verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at 20] [--fault-duration 10] [--stock N]`. 테스트 B 의 `docker-compose.load.yml` 과 "idle machine" 검사를 그대로 쓰고(앱 2cpu, MySQL 2cpu, Redis 1cpu, Hikari 풀 10), k6 는 호스트에서 돌린다. 한 번에 약 6분. 마지막 줄은 `VERIFY recovery-<scenario> PASS|FAIL|INFRA_DOWN|BUILD_ERROR ...`, 종료 코드는 `load` 와 같다.
+* 부하(`scripts/load/recovery.js`, `profiles.json` 의 `recovery`): 10초 워밍업(100rps) 뒤 `constant-arrival-rate` 500rps 를 60초, `preAllocatedVUs` 200, `maxVUs` 2000, 요청 타임아웃 5초. 이벤트는 1개, 요청마다 다른 회원. 결과는 200(issued, seq 를 `recovery_seq` 로 수집), 409, 5xx, 타임아웃/네트워크 오류(status 0)로 센다. 요청은 **시작한 초**에 센다. 시간 0 은 500rps 구간의 시작이고 워밍업은 -10..-1초다. `setup()` 이 러너가 정한 벽시계 시각까지 시작을 붙들어 두므로 러너는 그 시각에서 결함 시점(`--fault-at`)을 계산한다.
+* 결함 주입(러너가 호스트에서 실행하고 모든 단계를 `fault.log` 에 시각과 함께 남긴다):
+  * `db-down`(재고 기본 10,000,000): `--fault-at` 초에 `docker stop coupon-lab-load-mysql`, stop 이 돌아온 뒤 `--fault-duration` 초 지나 `docker start`, 헬스체크가 healthy 가 될 때까지 기다린다. 앱 컨테이너는 건드리지 않는다.
+  * `redis-restart`(재고 기본 20,000): `--fault-at` 초에 `docker restart coupon-lab-load-redis`. 영속성이 없어 카운터가 0 으로 돌아간다. 재고를 2만으로 둔 것은 리셋 뒤에 초과 발급이 보이게 하기 위해서다.
+  * `consumer-redeliver`: 소비자가 있는 단계(S4 이상)가 필요하다. 지금은 종료 코드 2 로 거부하고, S4 작업에서 구현한다.
+* 부하가 끝난 뒤 `db_rows`(그 이벤트의 `coupon_issue` 행 수)가 5번 연속 변하지 않을 때까지 1초마다 확인한다(최대 120초). 그 값과 Redis 카운터, 이벤트의 `(member_id, seq)` 전체를 읽어 후처리한다.
+* 지표(`recovery.json`; `timeline.json` 은 같은 `timeline` 배열):
+
+| 필드 | 정의 |
+|---|---|
+| `totals` | 워밍업을 포함한 모든 요청을 클라이언트가 본 결과별로 센 값: `requests`, `http_200`, `http_409`, `http_5xx`, `timeouts`, `http_other`, `dropped_iterations`(k6 가 VU 부족으로 못 시작한 요청, 참고용) |
+| `redis_counter` | 실행이 끝난 뒤 `coupon:event:{id}:issued`. 카운터가 없는 stage 는 null, `redis-restart` 에서는 리셋 이후의 값이라 `redis_counter_meaningful: false` |
+| `wins` | `min(redis_counter, stock)`. 카운터가 의미 없으면 null |
+| `consumed_but_unconfirmed` (legacy, 파생) | `wins - http_200`: 결정은 자리를 가져갔는데 어떤 클라이언트도 성공으로 확인하지 못한 수. 요구 정의는 `redis_counter - http_200` 이고 카운터가 재고를 넘지 않으면 같다. 재고를 넘으면 패자(409)가 "미확인"으로 섞이므로 `wins` 로 계산한다. DB 행이 있어도 클라이언트가 못 받았으면 센다 |
+| `confirmed_but_missing` (legacy, 파생) | `http_200 - db_rows`: "발급됨"이라 답했는데 DB 기록이 없는 수. 음수는 클라이언트는 포기(타임아웃)했지만 INSERT 가 나중에 끝난 행 |
+| `over_issue` | `max(0, db_rows - stock)`. 재고로만 한정된다: 요청 수가 재고보다 적으면(재고 1천만) 구조상 0 이며 `over_issue_note` 가 이를 적는다 |
+| `dup_seq` | 이벤트의 행 수 - 서로 다른 `seq` 수(다른 행과 `seq` 를 나눠 가진 잉여 행). `seq` 가 1 로 다시 시작하면 되돌아간 구간만큼 쌓인다 |
+| `dup_members` | 행이 둘 이상인 회원 수 |
+| `seats_lost` | `wins - db_rows`: 결정이 자리를 가져갔는데 행이 없는 수. **내구성의 1차 지표.** `wins` 가 null 이면 null |
+| `client_unknown` | `timeouts + http_5xx`: 클라이언트가 결과를 알지 못한 요청 수 |
+| `recorded_despite_unknown` | `db_rows - http_200`: 클라이언트는 확인하지 못했지만 행이 있는 수("모르지만 사실은 당첨"). 중복이 있으면(`dup_seq` 또는 `dup_members` > 0) 잉여 행이 섞이므로 null. `confirmed_but_missing` 의 부호를 뒤집은 값 |
+| `not_admitted` | `requests - redis_counter`: 결정 지점(카운터)에 도달하지 못한 요청 수. 카운터가 의미 없으면 null. `client_unknown` 에서 이 값을 빼면 "자리를 쓰고도 클라이언트는 모르는" 요청에 가깝다 |
+| `blackout_s` | 부하 구간(0~59초)에서 그 초에 시작한 요청 중 200 이 하나도 없는 초가 이어진 가장 긴 길이. 사용자 체감 중단 |
+| `error_codes` | 응답을 받지 못한 요청의 k6 `error_code` 별 건수. 기록이 생기기 전의 run 은 null(k6 원본은 보관하지 않아 소급할 수 없다) |
+| `insert_failures_logged` | 앱 로그의 S3 ERROR 줄(`coupon_issue insert failed after winning the counter`) 수. 로그를 읽지 못했거나 로그 저장이 생기기 전의 run 은 null |
+| `recovery_time_s` | 결함이 끝난 시각(`started_at`)과 부하가 끝난 시각 중 **늦은 쪽**에서 `db_rows` 가 최종값에 도달할 때까지의 초. 부하가 끝난 뒤에도 행이 계속 들어오면(밀린 일을 처리 중) 양수다. 값이 최종값에 머문 샘플이 5개 미만이면 null(`settled: false`). 같은 값을 결함 종료 시각만 기준으로 잰 `rows_final_after_fault_end_s` 도 남긴다(부하가 계속되는 동안 행이 늘어나므로 부하 길이가 섞여 들어간다) |
+| `timeline` | 초마다 `http_200`, `http_409`, `http_5xx`, `timeouts`, `db_rows`(그 초의 마지막 샘플, MySQL 이 죽어 있으면 null) |
+| `validity` | `k6_completed`(k6 종료 코드 0, 500rps 구간이 마지막 초까지 돌았다), `fault_observed`(결함 이벤트가 순서대로 기록되었고 500rps 구간 안에서 주입되었다). 둘 다여야 `valid` |
+
+  `fault.observed` 의 `stopped_at` 은 결함 주입 직전(`docker stop`/`docker restart` 실행 직전), `stop_returned_at` 은 `docker stop` 이 돌아온 때, `started_at` 은 결함이 끝난 때(`docker start` 실행, 또는 `docker restart` 가 돌아온 때), `healthy_at` 은 헬스체크가 healthy 가 된 때다. `at_s` 는 500rps 구간 시작 대비 `stopped_at` 이다. 증거 경로: `evidence/<stage>/recovery/<scenario>/<ts>-<sha>/`(`recovery.json`, `timeline.json`, `fault.log`, `summary.json`, `stats.jsonl`, `app-errors.log`). 원본 k6 출력은 보관하지 않아서 k6 출력부터 다시 집계할 수는 없지만, `scripts/verify.sh reprocess evidence/<stage>/recovery/<scenario>/<dir>` 가 저장된 `recovery.json` 에 손실 축(`seats_lost`, `client_unknown`, `recorded_despite_unknown`)을 더해 새 `-reprocessed` 디렉터리를 만든다(원본 불변). 러너는 앱 로그가 사라지기 전에 `insert_failures_logged` 를 세고 ERROR 줄의 머리글만(400자, 최대 2000줄, 스택 트레이스 제외) `app-errors.log` 로 남긴다.
+* env 에는 `hikari_connection_timeout_ms`(이 작업에서 설정하지 않았으므로 라이브러리 기본값 30000, 컨테이너가 환경변수로 바꾸면 그 값)와 `redis_appendonly`(실행 중인 Redis 에서 읽은 값), `tomcat_max_threads`(200)와 `virtual_threads`(false)를 기록한다. `hikari_connection_timeout_ms`, `tomcat_max_threads`, `virtual_threads` 는 Spring Boot 3.3.5 의 기본값이고 컨테이너가 환경변수로 바꾸지 않은 한 그 값이다(실행 중인 앱에서 읽은 값이 아니다). 이 작업에서는 둘 다 바꾸지 않는다.
+* 한계: 한 run 은 n=1 이다. k6 호스트 CPU 는 샘플링하지 않는다. k6 의 요청 타임아웃(5초)이 Hikari 의 연결 대기(30초)보다 짧아서, 클라이언트가 포기한 뒤 서버가 나중에 처리를 끝내는 경우가 생길 수 있고 그 수치는 위 표대로 음수 `confirmed_but_missing` 으로 나타난다.
+
+### 테스트 D 예측 (S3, 측정 전에 적는다)
+
+* **db-down (재고 1천만):** `consumed_but_unconfirmed` ≈ 500rps × 10초 ≈ 5,000 (`INCR` 은 성공하고 INSERT 가 실패해 5xx). `confirmed_but_missing` 0. `recovery_time_s` ≈ 0 (밀린 일이 없다). `dup_seq`, `dup_members` 0.
+* **redis-restart (재고 2만):** 약 10,000건 당첨된 20초 시점에 카운터가 0 으로 돌아가고 그 뒤 최대 20,000건이 더 당첨된다 → `over_issue` ≈ 10,000, `dup_seq` ≈ 10,000 (`seq` 가 1 부터 다시 시작). 이것이 `appendonly=no` 의 비용이다.
+* 예측이 틀릴 수 있는 지점(예측 자체는 위 그대로 둔다): (1) 연결 대기 30초 대 요청 타임아웃 5초 때문에 INSERT 실패가 즉시 5xx 가 아니라 타임아웃으로 보일 수 있다. 이 경우 `consumed_but_unconfirmed` 에는 타임아웃도 들어가고, DB 복구 뒤에 끝난 INSERT 는 `confirmed_but_missing` 을 음수로 만들 수 있다. (2) 서버 스레드가 연결 대기로 막히면 500rps 가 유지되지 않을 수 있고(VU 2000 은 500rps × 4초에 해당) `dropped_iterations` 가 생겨 5,000 보다 작게 나올 수 있다. (3) redis-restart 의 "약 10,000건"은 20초 시점의 당첨 수이고 워밍업 약 1,000건이 앞에 더해진다(약 11,000건).
+
+### S4 개요와 예측 (측정 전에 적는다)
+
+* S4 개요(RabbitMQ): 응답하기 전에 publisher confirm 으로 메시지를 발행하고, 큐는 durable 로 둔다. 소비자가 `coupon_issue` 에 INSERT 하며 `UNIQUE(event_id, seq)` 로 재전달에 안전하게 한다.
+* 예측(S3 결과를 본 뒤 지표 이름을 새 정의로 바꿔 다시 적었다. 처음에는 `consumed_but_unconfirmed` 0, `confirmed_but_missing` 은 큐가 비면 0 이라고 적었고 그 문구는 git 이력에 있다): **db-down** → `seats_lost` 0, `client_unknown` ≈ 0(발행이 성공하면 200 이므로 DB 가 죽어 있어도 클라이언트는 결과를 안다), `recorded_despite_unknown` 0, `not_admitted` ≈ 0, `blackout_s` ≈ 0(DB 중단 중에도 200 이 나온다), `confirmed_but_missing`(= `http_200 - db_rows`)은 중단 동안 양수로 쌓였다가 큐가 비면 0, `recovery_time_s` = 큐를 비우는 데 걸린 시간(0 보다 크다). 목표는 중단 길이와 무관하게 `seats_lost` 0. **redis-restart** → AOF 를 켜지 않는 한 S3 와 같다(별도 환경 노브이며 S4 에서 잰다).
+* 메커니즘에 대한 S4 의 예상(S3 의 49초 run 에서 읽은 것): S3 는 DB 가 요청 경로 안에 있어서 서버 스레드와 풀이 DB 에 묶인다. S4 는 요청 경로를 `INCR` → publish(confirm) → 200 으로 바꿔 DB 를 경로 밖으로 뺀다. 따라서 DB 중단 중에도 스레드가 묶이지 않아야 한다. 단, 같은 메커니즘이 MQ 중단에서 재현된다(publish confirm 대기가 스레드를 묶는다). 그래서 confirm 타임아웃은 짧게(예: 2초) 두고, 실패하면 즉시 503 과 ERROR 로그(자리 소모의 기록)로 끝나게 설계한다.
+* S4 가 고치지 못하는 것: Redis 리셋(영속성 문제), `INCR` 과 publish confirm 사이의 앱 크래시 창(작다, 측정은 보류), MQ 자체의 장애(발행 실패 → 503, 자리 소모: 갭이 DB 에서 MQ 가용성으로 옮겨 간다).
+
+### 테스트 D 결과 (S3)
+
+같은 Mac, 같은 실행기. 세 run 모두 `validity.valid: true`. 손실 축은 `verify.sh reprocess` 로 저장된 `recovery.json` 에 더했다(원본 run 은 그대로, `-reprocessed` 디렉터리가 새 필드를 가진다).
+
+Evidence: db-down `coupon-lab/evidence/s3/recovery/db-down/20261024-074234-7b26006/`(run 1), `.../20261024-074435-88b71f0/`(run 2), redis-restart `.../redis-restart/20261024-074629-757ba9f/`. 재처리본은 같은 부모 아래 `20261024-0811*-7a1fb6f-reprocessed/`.
+
+#### db-down (재고 1천만, 20초에 `docker stop` mysql, 10초 뒤 start)
+
+| | run 1 | run 2 |
+|---|---|---|
+| 관측한 중단(`stopped_at` → `started_at`) | 13.2초(stop 이 돌아오는 데 3.0초 + 10초) | 13.5초 |
+| 보낸 요청(k6 가 못 시작한 요청 `dropped_iterations`) | 28,183 (2,819) | 28,137 (2,865) |
+| 200 / 5xx / 타임아웃 | 22,475 / **0** / 5,708 | 22,197 / **0** / 5,940 |
+| `redis_counter` / `db_rows` | 28,183 / 28,173 | 28,137 / 28,127 |
+| `seats_lost` | **10** | **10** |
+| `client_unknown` | 5,708 | 5,940 |
+| `recorded_despite_unknown` | 5,698 | 5,930 |
+| (legacy) `consumed_but_unconfirmed` / `confirmed_but_missing` | 5,708 / −5,698 | 5,940 / −5,930 |
+| `dup_seq` / `dup_members` | 0 / 0 | 0 / 0 |
+| `recovery_time_s` (`rows_final_after_fault_end_s`) | 0.0 (26.8) | 0.0 (26.5) |
+| `insert_failures_logged` | 없음(앱 로그 저장이 생기기 전의 run) | 없음 |
+
+* 타임라인(두 run 이 같은 모양): 20~35초 구간에 200 응답이 거의 없고 타임아웃이 초당 약 240~450건, `db_rows` 는 MySQL 이 죽어 있는 동안 null. 36초부터 200 이 돌아오고 약 42초에 500/s 로 복귀한다. 복구 직후에는 `db_rows` 가 따라잡는다(run 1: 11,353 → 18,697, 36~42초).
+* 5xx 가 0 인 것은 Hikari `connectionTimeout` 30초(`hikari_connection_timeout_ms` 30000, env 에 기록)가 중단(약 13초)보다 길어서, 걸린 요청이 클라이언트의 5초 타임아웃으로 버려진 뒤 DB 복구 후 INSERT 가 끝났기 때문으로 보인다. 5xx 0 과 `recorded_despite_unknown` 5,698 / 5,930 이 이 설명과 맞지만 서버 쪽 동작은 로그로 확인하지 않았다.
+* `redis_counter − db_rows` = 10 은 두 run 이 같다. Hikari 풀 크기도 10 이다. 원인은 이 두 run 의 증거로는 확인하지 못했다(당시에는 앱 로그를 저장하지 않았다). 처음 세운 가설("`docker stop` 순간 10개 커넥션에서 진행 중이던 INSERT 가 즉시 실패")은 45초 run 의 로그와 맞지 않는다: stop 직후의 실패는 없었고 10건은 MySQL 이 다시 뜨기 직전에 실패했다(아래 "중단 길이 후속 실험 결과").
+* `recovery_time_s` 0.0 은 정의상 0 이다(행 수가 부하 종료 시점에 최종값에 도달). 복구 뒤 행이 따라잡는 구간(`rows_final_after_fault_end_s` 약 26초)을 함께 읽어야 한다.
+
+#### redis-restart (재고 2만, 20초에 `docker restart` redis)
+
+| 항목 | 값 |
+|---|---|
+| 관측한 재시작 | 0.34초, healthy 까지 +3.2초 |
+| 보낸 요청(`dropped_iterations`) | 30,795 (207) |
+| 200 / 409 / 5xx / 타임아웃 | 30,794 / 0 / 1 / 0 |
+| `redis_counter` | 19,737 (리셋 이후 값이라 `redis_counter_meaningful: false`) |
+| `db_rows` / `over_issue` | 30,794 / **10,794** |
+| `dup_seq` / `dup_members` | **11,057** / 0 |
+| 클라이언트가 확인한 seq | 30,794개 중 서로 다른 값 19,737개, 최대 19,737 |
+| `seats_lost` / `recorded_despite_unknown` | null / null(카운터 리셋, 중복 존재) |
+| `client_unknown` | 1 |
+
+* 409 가 0 인 것은 리셋 뒤 카운터가 재고에 도달하지 못했기 때문이다(19,737 < 20,000).
+
+#### 예측과 비교
+
+| 예측 | 판정 |
+|---|---|
+| db-down: `consumed_but_unconfirmed` ≈ 5,000 | **크기는 맞고 메커니즘은 틀렸다.** 5,708 / 5,940 이지만 예측은 "INSERT 실패 → 5xx"였고 실제는 5xx 0, 타임아웃이다. 그리고 그중 5,698 / 5,930 건은 DB 복구 후 행이 생겼다 |
+| db-down: 자리 손실 ≈ 5,000 | **기각.** 실제로 자리가 소모되고 행이 없는 것은 `seats_lost` 10 건 |
+| db-down: `confirmed_but_missing` 0 | 정의상 틀렸다(−5,698 / −5,930). 음수는 클라이언트는 포기했지만 행이 생긴 경우다 |
+| db-down: `recovery_time_s` ≈ 0, dup 0 | **확인** (0.0, 0). 단 위의 주의 참고 |
+| redis-restart: `over_issue` ≈ 10,000, `dup_seq` ≈ 10,000 | **확인** (10,794 / 11,057). 메커니즘(카운터 리셋 → seq 가 1 부터 다시 시작)도 예측대로 |
+
+#### 쓸 수 있는 말과 쓰면 안 되는 말
+
+* 쓸 수 있음: "DB 13초 중단 동안 요청 5,700~5,900건이 5초 타임아웃으로 결과를 모른 채 끝났다. 그중 5,698 / 5,930건은 DB 복구 후 행이 생겼다(Hikari 30초 대기). 실제로 자리가 소모되고 행이 없는 것은 10건(두 run 동일, 원인 미확인, 풀 크기와 일치)이다." / "Redis 재시작(`appendonly no`)으로 카운터가 리셋되어 재고 2만에 30,794건이 발급되었다. 초과 10,794건, seq 중복 11,057건."
+* 쓰면 안 됨: "db-down 에서 5,700건이 손실됐다", "S3 는 DB 장애 때 수천 건을 잃는다"(이 설정에서는 10건), "10건은 풀 크기 때문이다"(가설), "복구 시간 0"(정의상 0 일 뿐이므로 복구 뒤 행이 따라잡은 약 26초 구간을 함께 적는다).
+* 한계: db-down n=2, redis-restart n=1. 부하가 500rps 로 유지되지 않았다(`dropped_iterations` 약 2,800, 유효 부하 약 450rps). 이 결과는 중단(약 13초)이 Hikari 대기(30초)보다 짧은 설정에 묶여 있다.
+
+#### 중단 길이에 대한 후속 실험 (측정 전에 적는다)
+
+* 명령: `scripts/verify.sh recovery --stage s3 --scenario db-down --fault-at 5 --fault-duration 45`. `--fault-duration 45` 만 쓰면(기본 `--fault-at 20`) 결함이 부하 종료(60초) 뒤에 끝나므로 러너가 종료 코드 2 로 거부한다. 중단 길이는 stop 이 돌아오는 시간(약 3초)을 더해 약 48초가 된다.
+* 예측: `seats_lost` ≈ 500rps × (중단 길이 − 30초) ≈ 9,000(중단을 45초로 본 단순 계산은 7,000~7,500). `insert_failures_logged` > 0. 이 값은 1차 근사이고 서버 스레드가 연결 대기로 막혀 요청이 앱에 도달하지 못하면 더 작을 수 있다.
+* 나오면: S3 의 자리 손실은 중단 길이에 비례하고 풀 대기 창(30초)을 넘는 순간부터 생긴다. 서술이 설정 하나가 아니라 곡선이 된다. S4 의 목표는 "중단 길이와 무관하게 `seats_lost` 0". 여전히 10건 안팎이면: Hikari 대기 말고 다른 경로가 있다는 뜻이므로 "모름"으로 적는다. 어느 쪽이든 S4 설계는 바뀌지 않는다.
+* 결과: 아래.
+
+#### 중단 길이 후속 실험 결과 (db-down, 중단 약 49초)
+
+Evidence: `coupon-lab/evidence/s3/recovery/db-down/20261024-081538-3b51148/`(`recovery.json` 에 `seats_lost` 등이 처음부터 있고 `app-errors.log` 포함), `not_admitted` 와 `blackout_s` 를 더한 재처리본은 `.../20261024-083118-17a2f2a-reprocessed/`. 다른 run 의 재처리본도 `-17a2f2a-reprocessed`(13초 run: `083103`, `083116`, redis-restart: `083103`)가 가장 최신이다(앞서의 `0811*-7a1fb6f-reprocessed` 에는 `not_admitted` 와 `blackout_s` 가 없다). `validity.valid: true`, n=1.
+
+| 항목 | 값 |
+|---|---|
+| 관측한 중단 | `stopped_at` = 500rps 구간 시작 +5.0초, stop 이 돌아옴 +3.4초, `started_at` +48.8초(중단 약 49초), healthy +52.0초 |
+| 보낸 요청(`dropped_iterations`) | 24,660 (6,342) |
+| 200 / 5xx / 타임아웃 | 3,533 / **0** / 21,127 |
+| `redis_counter`(= wins) / `db_rows` | 15,455 / 15,255 |
+| `seats_lost` / `insert_failures_logged` | **200** / **200** |
+| `client_unknown` / `recorded_despite_unknown` | 21,127 / 11,722 |
+| `not_admitted` | **9,205** (13초 run 둘은 0) |
+| `blackout_s` | **54** (13초 run 은 14, 15) |
+| (legacy) `consumed_but_unconfirmed` / `confirmed_but_missing` | 11,922 / −11,722 |
+| `dup_seq` / `dup_members` | 0 / 0 |
+| `recovery_time_s` (`rows_final_after_fault_end_s`) | 9.6 (21.2) |
+
+* 200 응답 3,533건은 모두 중단 시작 전이다. 중단이 시작된 5초 이후에는 부하가 끝날 때까지 200 이 한 건도 없었다(복구 뒤에도 밀린 요청 때문에 5초 안에 응답하지 못했다). 실제 중단은 약 49초인데 클라이언트가 겪은 중단(`blackout_s`)은 54초이고 꼬리는 더 길다: `db_rows` 는 MySQL 이 죽어 있는 동안 null 이고 54초에 3,533 으로 돌아온 뒤 부하가 끝난 다음에도 계속 늘었다(60초 7,101 → 64초 10,915 → 68초 15,238 → 76초 15,255). 그래서 `recovery_time_s` 가 9.6초로 양수다(밀린 일을 처리하는 시간). 이것도 S3 의 결함 서술에 들어간다.
+* `seats_lost` 200 은 앱 로그의 ERROR 200건과 같다(`insert_failures_logged` 200). 실패한 스레드는 `exec-1` 부터 `exec-200` 까지 **서로 다른 스레드 200개 전부**이고, 잃은 자리는 seq 3,534~3,733, 회원 1,002,533~1,002,732 로 **연속 200개**다. 확인된 마지막 seq(3,533) 바로 다음, 즉 중단이 시작된 직후 도착한 첫 200개 요청이다. 실패 시각은 `stopped_at` 기준 **30.1~31초에 190건, 약 51초에 10건**이다(51초는 `started_at` 48.8초 뒤, healthy 52.0초 직전).
+* `redis_counter` 15,455 < 보낸 요청 24,660 이라 요청 9,205건은 카운터에 도달하지 못했다(`not_admitted`). 13초 run 둘은 `not_admitted` 가 0 이었다. 도달하지 못한 요청이 어떤 형태로 실패했는지는 확인하지 못했다(아래 확인 항목).
+
+예측과 비교:
+
+| 예측 | 판정 |
+|---|---|
+| `seats_lost` ≈ 500rps × (중단 − 30초) ≈ 9,000 | **기각.** 실제 200. 비례가 아니라 스레드 한도에 묶인 계단으로 보인다(아래 모델) |
+| `insert_failures_logged` > 0 | **확인** (200, `seats_lost` 와 같다) |
+
+**모델(가설, 아래 두 점과 시각·seq 분포가 강하게 지지한다).** 자리 손실 = 풀 커넥션을 쥔 요청(10) + 커넥션을 기다린 요청(스레드 200 − 10 = 190) × (중단 중 Hikari 30초 대기 창이 끝난 횟수).
+
+* 13초 중단(n=2): 대기 요청은 30초 안에 MySQL 이 돌아와 성공하고, 커넥션을 쥔 10개만 복구 시점에 실패한다 → 10. 실제 10, 10.
+* 49초 중단(n=1): 대기 요청 190 이 약 30초에 실패하고, 커넥션을 쥔 10 이 약 51초(MySQL 복귀)에 실패한다 → 200. 실제 200(190 + 10).
+* 이 모델이 설명하는 것: 연속 seq/회원 200개, 190/10 의 시각 분포, 200 = Tomcat 기본 `maxThreads`(실패 스레드 이름이 `exec-1`~`exec-200`), 10 = Hikari 풀 크기, 190 = 200 − 10, 13초 run 의 10건. 약 35초 이후에는 풀린 스레드가 뒤의 요청을 받아 카운터를 올렸고, Hikari 대기가 다시 30초를 넘기기 전에 DB 가 돌아와서 복구 후 INSERT 가 끝났다(행 11,722건).
+* 검증 가능한 예측: 중단이 약 65초를 넘으면 두 번째 190개가 30초 대기 창을 넘겨 손실이 한 번 더 생긴다(약 390). 하지 않은 실험이고 하지 않기로 했다(모델이 맞으면 390 이 나올 뿐 S4 설계가 바뀌지 않고, 러너는 결함이 60초 부하 안에 끝나야 한다).
+* 10건이 실패하는 시각이 stop 직후가 아니라 MySQL 이 다시 뜰 때인 것은 "컨테이너 네트워크가 사라져 보유 커넥션의 패킷이 버려지다가, 새로 뜬 MySQL 이 모르는 연결에 RST 를 보내 그때 깨졌다"로 설명할 수 있다. TCP 수준의 추정이고 확인하지 않았다.
+
+확인 항목:
+
+* (a) 스레드 한도: `env` 에 `tomcat_max_threads` 200 과 `virtual_threads` false 를 기록한다(Spring Boot 기본값, 실행 중 앱에서 읽은 값이 아님). 직접적인 증거는 로그의 실패 스레드 이름이 `exec-1`~`exec-200` 전부라는 것이다.
+* (b) `not_admitted` 9,205건의 실패 종류: `recovery.js` 가 k6 `error_code` 를 태그하고 보고서가 `error_codes` 로 센다. **이 run 에는 소급되지 않는다**(k6 원본을 보관하지 않으므로 이 run 의 `error_codes` 는 null). 확인하려면 다음 실행부터 나온다. "9,205건은 연결 단계에서 거부되거나 타임아웃됐다"는 확정 전까지 가설이다(서버 스레드가 모두 묶인 동안 들어온 요청이 Tomcat 의 대기열을 넘쳤을 가능성).
+
+쓸 수 있는 말:
+
+* "DB 49초 중단에서 요청 24,660건 중 21,127건이 5초 타임아웃으로 결과를 모른 채 끝났고, 그중 11,722건은 복구 뒤 행이 생겼다. 실제로 자리가 소모되고 행이 없는 것은 200건이고 앱 로그 ERROR 200건과 같다."
+* "자리 손실 200 은 Tomcat 스레드 한도(200)와 같다. 손실은 중단 길이가 아니라 동시성 한도에 묶인다(가설)."
+* "클라이언트는 49초 중단 동안 54초 연속으로 200 을 받지 못했고, 부하가 끝난 뒤에도 밀린 일이 약 16초 더 처리되었다."
+
+쓰면 안 되는 말:
+
+* "손실 200 이 S3 의 최대다"(한 30초 창당 상한이 200 이라는 모델일 뿐이고, 더 긴 중단은 재지 않았다).
+* "스레드를 늘리면 손실이 는다"(재지 않았다).
+* "9,205건은 연결이 거부된 것이다"(`error_codes` 를 확인하기 전).
+* "손실이 중단 길이에 비례한다"(비례 모델은 기각되었다).
+
+S4 에 주는 시사점: S3 의 자리 손실은 "도착률 × 중단 길이"가 아니라 중단 직후 서버가 쥐고 있던 요청 수(스레드·커넥션 한도)와 Hikari 대기 창에 묶여 있다. 반면 클라이언트가 겪는 중단은 훨씬 크다(54초 연속 200 없음, 부하가 끝난 뒤에도 밀린 일 처리). S4 의 목표는 "중단 길이와 무관하게 `seats_lost` 0, DB 중단 중에도 200 응답"이고 설계는 바뀌지 않는다.

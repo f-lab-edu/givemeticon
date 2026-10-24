@@ -2,6 +2,11 @@
   "warmup": { "rps": 100, "seconds": 15 },
   "transition_seconds": 1,
   "vus": { "pre_allocated": 500, "max": 3000 },
+  "recovery": {
+    "warmup": { "rps": 100, "seconds": 10, "pre_allocated_vus": 50, "max_vus": 200 },
+    "load": { "rps": 500, "seconds": 60, "pre_allocated_vus": 200, "max_vus": 2000 },
+    "http_timeout_seconds": 5
+  },
   "profiles": {
     "ramping": {
       "stock": 10000000,
