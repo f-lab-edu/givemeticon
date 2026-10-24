@@ -329,7 +329,7 @@ Evidence: `coupon-lab/evidence/s0/consistency/20261024-031516-aa357e0/`, `.../s1
 * 결함 주입(러너가 호스트에서 실행하고 모든 단계를 `fault.log` 에 시각과 함께 남긴다):
   * `db-down`(재고 기본 10,000,000): `--fault-at` 초에 `docker stop coupon-lab-load-mysql`, stop 이 돌아온 뒤 `--fault-duration` 초 지나 `docker start`, 헬스체크가 healthy 가 될 때까지 기다린다. 앱 컨테이너는 건드리지 않는다.
   * `redis-restart`(재고 기본 20,000): `--fault-at` 초에 `docker restart coupon-lab-load-redis`. 영속성이 없어 카운터가 0 으로 돌아간다. 재고를 2만으로 둔 것은 리셋 뒤에 초과 발급이 보이게 하기 위해서다.
-  * `consumer-redeliver`: 소비자가 있는 단계(S4 이상)가 필요하다. 지금은 종료 코드 2 로 거부하고, S4 작업에서 구현한다.
+  * `consumer-redeliver`(S4 전용, 재고 기본 10,000,000): 컨테이너 결함은 없다. 앱을 `COUPON_S4_CONSUMER_FAIL_EVERY=50` 으로 띄워 소비자가 새 행 50개마다 INSERT 뒤, ack 전에 예외를 던진다(쓰기 뒤의 크래시 흉내). 러너는 컨테이너의 그 값을 확인한다. 결함 이벤트가 없으므로 `validity` 는 `k6_completed` 만 보고(`fault_observed` null) `recovery_time_s` 는 부하 종료 기준이다. 다른 stage 는 여전히 종료 코드 2 로 거부한다.
 * 부하가 끝난 뒤 `db_rows`(그 이벤트의 `coupon_issue` 행 수)가 5번 연속 변하지 않을 때까지 1초마다 확인한다(최대 120초). 그 값과 Redis 카운터, 이벤트의 `(member_id, seq)` 전체를 읽어 후처리한다.
 * 지표(`recovery.json`; `timeline.json` 은 같은 `timeline` 배열):
 
@@ -351,8 +351,11 @@ Evidence: `coupon-lab/evidence/s0/consistency/20261024-031516-aa357e0/`, `.../s1
 | `error_codes` | 응답을 받지 못한 요청의 k6 `error_code` 별 건수. 기록이 생기기 전의 run 은 null(k6 원본은 보관하지 않아 소급할 수 없다) |
 | `insert_failures_logged` | 앱 로그의 S3 ERROR 줄(`coupon_issue insert failed after winning the counter`) 수. 로그를 읽지 못했거나 로그 저장이 생기기 전의 run 은 null |
 | `recovery_time_s` | 결함이 끝난 시각(`started_at`)과 부하가 끝난 시각 중 **늦은 쪽**에서 `db_rows` 가 최종값에 도달할 때까지의 초. 부하가 끝난 뒤에도 행이 계속 들어오면(밀린 일을 처리 중) 양수다. 값이 최종값에 머문 샘플이 5개 미만이면 null(`settled: false`). 같은 값을 결함 종료 시각만 기준으로 잰 `rows_final_after_fault_end_s` 도 남긴다(부하가 계속되는 동안 행이 늘어나므로 부하 길이가 섞여 들어간다) |
-| `timeline` | 초마다 `http_200`, `http_409`, `http_5xx`, `timeouts`, `db_rows`(그 초의 마지막 샘플, MySQL 이 죽어 있으면 null) |
-| `validity` | `k6_completed`(k6 종료 코드 0, 500rps 구간이 마지막 초까지 돌았다), `fault_observed`(결함 이벤트가 순서대로 기록되었고 500rps 구간 안에서 주입되었다). 둘 다여야 `valid` |
+| `timeline` | 초마다 `http_200`, `http_409`, `http_5xx`, `timeouts`, `db_rows`(그 초의 마지막 샘플, MySQL 이 죽어 있으면 null). S4 는 `queue_depth`(그 초의 마지막 큐 샘플)도 |
+| `settle_s` | 부하가 끝난 뒤 `db_rows` 가 5번 연속 같아질 때까지 러너가 기다린 초(5회 창 포함). 이 필드가 생기기 전의 run 은 없다 |
+| `queue_depth_max` | S4: `coupon.issued` 의 메시지 수(ready + unacked, `rabbitmqctl list_queues name messages`, 약 1초마다, `queue.jsonl`) 중 최댓값. 다른 stage 는 null |
+| `redeliveries` | S4: 정착 뒤 앱의 Micrometer 카운터 `coupon_s4_redeliveries`(`/actuator/metrics`, AMQP redelivered 플래그). 다른 stage 는 null |
+| `validity` | `k6_completed`(k6 종료 코드 0, 500rps 구간이 마지막 초까지 돌았다), `fault_observed`(결함 이벤트가 순서대로 기록되었고 500rps 구간 안에서 주입되었다). 둘 다여야 `valid`. `consumer-redeliver` 는 `k6_completed` 만(`fault_observed` null) |
 
   `fault.observed` 의 `stopped_at` 은 결함 주입 직전(`docker stop`/`docker restart` 실행 직전), `stop_returned_at` 은 `docker stop` 이 돌아온 때, `started_at` 은 결함이 끝난 때(`docker start` 실행, 또는 `docker restart` 가 돌아온 때), `healthy_at` 은 헬스체크가 healthy 가 된 때다. `at_s` 는 500rps 구간 시작 대비 `stopped_at` 이다. 증거 경로: `evidence/<stage>/recovery/<scenario>/<ts>-<sha>/`(`recovery.json`, `timeline.json`, `fault.log`, `summary.json`, `stats.jsonl`, `app-errors.log`). 원본 k6 출력은 보관하지 않아서 k6 출력부터 다시 집계할 수는 없지만, `scripts/verify.sh reprocess evidence/<stage>/recovery/<scenario>/<dir>` 가 저장된 `recovery.json` 에 손실 축(`seats_lost`, `client_unknown`, `recorded_despite_unknown`)을 더해 새 `-reprocessed` 디렉터리를 만든다(원본 불변). 러너는 앱 로그가 사라지기 전에 `insert_failures_logged` 를 세고 ERROR 줄의 머리글만(400자, 최대 2000줄, 스택 트레이스 제외) `app-errors.log` 로 남긴다.
 * env 에는 `hikari_connection_timeout_ms`(이 작업에서 설정하지 않았으므로 라이브러리 기본값 30000, 컨테이너가 환경변수로 바꾸면 그 값)와 `redis_appendonly`(실행 중인 Redis 에서 읽은 값), `tomcat_max_threads`(200)와 `virtual_threads`(false)를 기록한다. `hikari_connection_timeout_ms`, `tomcat_max_threads`, `virtual_threads` 는 Spring Boot 3.3.5 의 기본값이고 컨테이너가 환경변수로 바꾸지 않은 한 그 값이다(실행 중인 앱에서 읽은 값이 아니다). 이 작업에서는 둘 다 바꾸지 않는다.
@@ -493,3 +496,34 @@ Evidence: `coupon-lab/evidence/s3/recovery/db-down/20261024-081538-3b51148/`(`re
 * "손실이 중단 길이에 비례한다"(비례 모델은 기각되었다).
 
 S4 에 주는 시사점: S3 의 자리 손실은 "도착률 × 중단 길이"가 아니라 중단 직후 서버가 쥐고 있던 요청 수(스레드·커넥션 한도)와 Hikari 대기 창에 묶여 있다. 반면 클라이언트가 겪는 중단은 훨씬 크다(54초 연속 200 없음, 부하가 끝난 뒤에도 밀린 일 처리). S4 의 목표는 "중단 길이와 무관하게 `seats_lost` 0, DB 중단 중에도 200 응답"이고 설계는 바뀌지 않는다.
+
+## S4 - RabbitMQ: 당첨을 내구성 있게 기록한 뒤 응답, DB 쓰기는 요청 경로 밖으로
+
+* 동기(테스트 D 의 S3, 위): DB 가 요청 경로 안에 있어서 DB 중단이 Tomcat 스레드(200)와 Hikari 풀(10)을 묶는다. `seats_lost` = 10 + 190 × (중단 중 끝난 30초 대기 창 수)(13초 → 10, 49초 → 200), `blackout_s` 54~55, `not_admitted` 약 9,200.
+* Changed: `S4CouponIssueService`(`coupon.strategy=s4`)는 결정을 S3 와 똑같이 한다(같은 Lua, 같은 키 `coupon:event:{id}:issued`, 같은 total 캐시, 모르는 이벤트는 같은 `IllegalArgumentException`). 당첨이면 `CouponIssued{eventId, memberId, seq}` 를 persistent 메시지(deliveryMode 2)로 direct exchange `coupon.direct` 를 거쳐 durable 큐 `coupon.issued` 에 발행하고, `rabbitTemplate.invoke(ops -> { ops.convertAndSend(...); return ops.waitForConfirms(CONFIRM_TIMEOUT_MS); })` 로 publisher confirm 을 기다린 뒤에야 200 `{ISSUED, seq}` 를 돌려준다. `CONFIRM_TIMEOUT_MS` 는 2000(환경변수 `COUPON_S4_CONFIRM_TIMEOUT_MS`, env 에 `s4_confirm_timeout_ms` 로 기록). nack, 타임아웃, 예외는 ERROR `publish unconfirmed after winning the counter: eventId memberId seq` 를 남기고 503(`ResponseStatusException`; 컨트롤러는 그대로). 패자는 `SoldOut`(409), DB 도 MQ 도 건드리지 않는다. 요청 경로는 `INCR` → publish(confirm) → 200 이고 DB 는 경로 밖이다(total 은 이벤트당 한 번 읽는다).
+* 소비자: `S4CouponIssuedConsumer`, `@RabbitListener(queues = "coupon.issued")`, 리스너 스레드 1개(`concurrency: 1`, `prefetch: 50`, `acknowledge-mode: auto`). `insertIssueIfAbsent(eventId, memberId, seq)` = 새 매퍼 문장 `existsIssue`(`SELECT EXISTS (SELECT 1 FROM coupon_issue WHERE event_id = ? AND seq = ?)`)로 확인하고 없으면 기존 `insertIssue`(기존 문장은 그대로). 실패하면 WARN(누적 실패 횟수 포함)을 남기고 1,000 ms 자고 다시 던진다. AUTO ack 이므로 메시지는 큐로 돌아가 다시 배달된다(DB 중단 중에는 재시도, 헛도는 루프 없음). 다시 배달된 메시지(AMQP redelivered 플래그)는 Micrometer 카운터 `coupon_s4_redeliveries`(`/actuator/metrics`)와 INFO 로그로 센다.
+* 테스트 D 훅: `COUPON_S4_CONSUMER_FAIL_EVERY=N`(기본 0 = 꺼짐). 새 행을 쓴 뒤 N번째마다 ack 전에 예외를 던진다(쓰기 뒤의 크래시). 재배달은 존재 확인에 걸려 건너뛰어야 한다. 설정하지 않으면 아무 일도 하지 않고, 실행기는 매 run 에 값을 명시적으로 넣고 env 에 `s4_consumer_fail_every` 로 기록한다.
+* Did NOT change: 결정 Lua, 회원 중복 방지 없음, `coupon_event` 는 읽기만(요청마다 읽지도 않는다), 마이그레이션 없음, 락·트랜잭션·제약 계약 그대로, S0/S1/S3 서비스는 동결.
+* 유니크 인덱스가 없는 이유: 앞의 "S4 개요" 는 `UNIQUE(event_id, seq)` 를 적었지만 넣지 않았다. 마이그레이션은 모든 stage 의 스키마를 바꾸고, 그러면 동결된 S0 의 재기록(read-then-decrement 의 초과 발급이 같은 seq 를 만든다)이 INSERT 에서 실패해 다른 실험이 된다. 그래서 멱등성은 "소비자 스레드 1개 + 존재 확인 뒤 INSERT" 로만 지킨다. **운영이라면 (event_id, seq) 유니크 인덱스를 쓴다.**
+* Known gaps: (1) MQ 장애: 발행이 확인되지 않으면 503 이고 자리는 소모된 채로 남는다. 갭이 DB 가용성에서 MQ 가용성으로 옮겨 간다(MQ 결함 시나리오는 이 작업에 없다). (2) `INCR` 과 confirm 사이의 앱 크래시는 자리를 잃는다(창은 작고 재지 않는다). (3) 존재 확인은 소비자가 하나일 때만 안전하다(둘이면 확인과 INSERT 사이에 끼어들 수 있다). (4) 라우팅되지 않은 메시지(바인딩이 없어진 경우)도 브로커는 confirm 한다. returns 콜백이 ERROR `publish returned unroutable` 을 남길 뿐 응답은 200 이다(큐와 바인딩은 앱이 연결할 때 선언하므로 이 실험에서는 생기지 않아야 한다). (5) 기존 `coupon_issue` 에는 (event_id, seq) 인덱스가 없어서 존재 확인은 테이블 전체를 훑는다(아래 빌더 메모).
+* 환경 변화(모든 stage): 부하 compose 에 `rabbitmq:3-alpine`(cpus 1, 헬스체크 `rabbitmq-diagnostics -q ping`)이 뜨고 앱은 그것이 healthy 가 된 뒤 뜬다. env 에 `rabbitmq_image`, `rabbitmq_cpus` 가 기록되고 `stats.jsonl` 에 rabbitmq CPU 도 샘플링한다(집계는 하지 않는다). `load.json` env 에도 `redis_appendonly` 가 생겼다. 앱 액추에이터는 `health,metrics` 를 노출한다. 그래서 이전 run 과 env 블록이 다르다.
+* Redis 노브: `verify.sh load|recovery ... --redis-aof` 는 Redis 를 `appendonly yes`, `appendfsync everysec` 로 띄우고(설정이지 코드가 아니다), 실행 중 값이 요청과 다르면 INFRA_DOWN, env `redis_appendonly=yes`, evidence 경로에 `-aof` 접미사(`load/<variant>-aof/`, `recovery/<scenario>-aof/`). 기본은 그대로 `appendonly no`(compose 명령에 `--appendfsync everysec` 가 붙었지만 AOF 가 꺼져 있으면 효과가 없다).
+* 테스트 A v3+settle: 반복마다 폭주가 끝난 뒤 이벤트의 행 수를 100 ms 마다 읽어 1초 동안 변하지 않을 때까지(최대 30초) 기다린 다음 잰다. 단언은 그대로이고 `settle_ms` 를 반복마다 기록한다(동기 stage 는 약 1초). evidence 에 `"procedure": "v3+settle"`. s4 는 `redis_counter`(`remaining_source` redis), 정착 뒤 `queue_depth`(0 이어야 하지만 단언하지 않는다), `redeliveries`(카운터 증가분)도 기록한다. 절차가 바뀌었으므로 S0/S1/S3 를 한 번씩 다시 기록하고 v3 와 v3+settle evidence 는 비교하지 않는다. 테스트 A 는 RabbitMQ Testcontainer(`rabbitmq:3-alpine`)를 항상 띄운다.
+* 실행기(s4): `load`(ramping/spike/ramping-rows)와 `recovery` 는 k6 뒤 행 수를 세기 전에 1초마다 읽어 5번 연속 같을 때까지(최대 120초) 기다리고 `settle_s` 를 남긴다(`load.json` 은 `settle_s`, `settled`). 큐 깊이는 약 1초마다 `docker exec ... rabbitmqctl list_queues name messages` 로 읽어 `queue.jsonl`(evidence)과 `timeline.queue_depth` 에 남긴다. `recovery.json` 은 `queue_depth_max`, `redeliveries`, `settle_s` 를 더한다. `load` 의 유효성 규칙(`db.issued_rows == http_issued`)은 그대로이고 정착을 기다린 뒤 센다.
+
+### S4 예측 (측정 전에 적는다)
+
+* **A (consistency, 1000 threads, stock 100, 10회):** 깨진 반복 0/10, 정착 뒤 `issued` 100, `queue_depth` 0, `redeliveries` 0. `settle_ms` < 2,000.
+* **B ramping (stock 10M):** 800rps 의 p50 ≈ S3 + 약 1 ms(발행 왕복), 모든 단계 ok. `ramping-rows`(rows=1) sustained ≥ 1,600(천장 원인은 S3 와 같이 미상). MySQL CPU 는 이제 소비자의 몫이다. 소비자가 따라가는 동안 `queue_depth` 는 0 근처에 머문다.
+* **B spike (stock 100):** S3 와 같다(2,000rps 이상, `db_rows` 100).
+* **D db-down 13초와 45초:** `seats_lost` 0, `insert_failures_logged` 0, `blackout_s` ≈ 0, `not_admitted` ≈ 0, `client_unknown` ≈ 0, `http_200` ≈ 요청 수. `confirmed_but_missing` 은 중단 동안 양수이고 다 비운 뒤 0. `queue_depth_max` ≈ 500 × 중단 초. `recovery_time_s` ≈ 비우는 시간(`queue_depth_max` / 소비자 INSERT 속도).
+* **D consumer-redeliver:** `dup_seq` 0, `dup_members` 0, `db_rows == wins`, `redeliveries` ≈ wins / 50.
+* **D redis-restart:** AOF 없이는 S3 와 같다(초과 발급, seq 재시작). `--redis-aof` 면 `over_issue` ≤ 약 500(everysec 의 1초 이내), `dup_seq` ≤ 약 500. S3 에 `--redis-aof` 를 줘도 같다(코드가 아니라 설정).
+
+#### 예측이 틀릴 수 있는 지점 (빌더 메모, 측정 전에 적는다. 예측 자체는 위 그대로 둔다)
+
+* **존재 확인의 비용.** `coupon_issue` 에는 (event_id, seq) 인덱스가 없다(PK 뿐). `existsIssue` 는 메시지마다 테이블 전체를 훑고 그 비용은 행 수에 비례해 커진다. 여기에 소비자 스레드 1개가 autocommit INSERT 를 하나씩 커밋한다(행마다 커밋 1회, 묶이지 않는다). ramping(약 9만 행)·ramping-rows(약 25만 행)·db-down(약 3만 행)에서 소비자가 도착률(500~1,600rps)을 따라가지 못할 수 있다. 그러면 큐가 쌓이고(`queue_depth` 가 0 근처가 아니다), 정착이 120초 안에 끝나지 않으면 `load` 는 `db.match` false 로 무효, `recovery` 는 `recovery_time_s` null 이 된다. 판별: `queue.jsonl` 의 기울기, `settle_s`/`settled`, `mysql_cpu_pct_*`.
+* **DB 중단 중 재시도 간격.** 소비자의 "약 1초마다 재시도"는 예외가 바로 나올 때의 값이다. MySQL 이 멈추면 `getConnection` 이 Hikari `connectionTimeout`(30초)까지 기다리고, 풀에 남은 커넥션은 S3 의 10건처럼 MySQL 이 돌아올 때까지 걸려 있을 수 있다. 그래서 db-down 의 `redeliveries` 는 중단 초 수보다 훨씬 작을 것이다(수 건). 손실과는 무관하다.
+* **큐 깊이 샘플링의 간섭.** `rabbitmqctl` 은 rabbitmq 컨테이너(cpus 1) 안에서 1초마다 Erlang VM 을 새로 띄운다. 이 CPU 가 브로커와 같은 한도를 나눠 쓰므로 S4 의 B p50 을 밀어 올릴 수 있다. `stats.jsonl` 의 rabbitmq CPU 로 확인한다.
+* **채널 캐시.** `CachingConnectionFactory` 의 채널 캐시는 기본 25 이고 바꾸지 않았다. 동시에 발행하는 스레드가 25를 넘으면 넘는 채널은 요청마다 열고 닫힌다(그때마다 confirm 모드 전환 왕복). 800rps 이상에서 "+약 1 ms" 가 낙관적일 수 있다.
+* **consumer-redeliver 의 `redeliveries`.** 카운터는 모든 재배달을 센다. 훅 말고 다른 실패(위 DB 재시도 포함)가 섞이면 wins / 50 보다 커진다. 그 run 에는 결함이 없으므로 차이가 나면 다른 원인이다.
