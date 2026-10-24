@@ -125,7 +125,7 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 
 ## 테스트 C - 병목 분해
 
-테스트 B 의 가설: 650~750rps 천장은 `coupon_event` 한 행에 대한 직렬화다(임계 구역 = S0 은 UPDATE 부터 커밋까지, S1 은 SELECT FOR UPDATE 부터 커밋까지). 가설이 맞다면 어떤 관측이 나와야 하는지 실험마다 미리 적어 두고, 결과는 로컬 실행 후 아래 표에 기입한다. 같은 부하 실행기(`verify.sh load`)를 재사용하며 evidence 는 append-only 다.
+테스트 B 의 가설: 650~750rps 천장은 `coupon_event` 한 행에 대한 직렬화다(임계 구역 = S0 은 UPDATE 부터 커밋까지, S1 은 SELECT FOR UPDATE 부터 커밋까지). 가설이 맞다면 어떤 관측이 나와야 하는지 실험마다 미리 적어 두었고, 결과는 C4 의 표에 기입하고 해석과 결정은 C5 에 적었다. 같은 부하 실행기(`verify.sh load`)를 재사용하며 evidence 는 append-only 다.
 
 ### C1. 단계별 InnoDB 행 락·fsync 카운터 (실험 a, 항상 켜짐)
 
@@ -152,7 +152,7 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 ### C4. 비교와 판정
 
 * 비교: `python3 -I scripts/load/compare.py --out build/load/compare-c.md 'evidence/s*/load/ramping*/*'` (재처리본이 섞이면 거부되므로 필요한 디렉터리만 고른다). run 을 (stage, profile, rows, flush_log, pool) 그룹으로 묶어, 그룹마다 `max_achieved_rps`, `sustained_limit_rps` 의 중앙값과 범위, 그리고 **모든 그룹이 공유하는 가장 높은 target**에서의 p50 과 `row_lock_wait_ratio` 를 낸다. `ramping`(100~800)과 `ramping-rows`(200~3200)처럼 단계가 다른 그룹은 그 공통 target 에서만 직접 비교한다. 테스트 B 의 기본 설정 run(flush 1, pool 10, rows 1)은 새 run 과 같은 그룹이므로 기준선으로 그대로 쓴다. 설정 변수가 기록되기 전의 run 은 flush_log 1(기본값)로 센다.
-* 한 run 씩 먼저 돌리고(약 4분), 결과가 모호한 곳에서만 반복한다. 테스트 B 에서 같은 설정의 run 사이 편차가 컸으므로(sustained 400~650), 반복 없이 한 run 으로 "N 에 비례해 오른다/오르지 않는다"를 단정하지 않는다. 판단은 `max_achieved_rps` 와 p50 의 방향과 크기로 한다.
+* 각 변형은 run 1회(n=1)로 마감했고 반복이나 추가 실험은 하지 않았다(결정, C5). 테스트 B 에서 같은 설정끼리도 편차가 컸으므로(sustained 400~650) 자릿수 차이는 믿되 작은 차이는 구분하지 않는다.
 * 판정 요약
 
 | 관측 | 해석 |
@@ -163,16 +163,46 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 | C3: `--pool 5`/`20` 에서 천장은 그대로, 지연만 변한다 | 풀은 한계가 아니다 |
 | C1: p50 이 오르는 단계에서 `row_lock_wait_ratio` 가 1 쪽으로 간다 | 요청이 한 행에서 줄을 선다 |
 
-* 결과 (로컬 실행 후 기입). 실행 순서대로 한 줄씩이며, 각 run 은 `git add evidence && git commit` 으로 남긴다.
+* 결과 (일곱 run 모두 `validity.valid: true`, 각 1회, 같은 Mac). 공통 target 은 `ramping`(100~800)과 `ramping-rows`(200~3200)가 공유하는 가장 높은 값인 800rps 이고, `sustained_limit_rps`/`max_achieved_rps` 는 각 프로필 안의 값이다.
 
-| # | 실험 | 명령 | sustained_limit_rps | max_achieved_rps | 공통 target 의 p50 | row_lock_wait_ratio | fsyncs_per_request | 판정 |
-|---|---|---|---|---|---|---|---|---|
-| 1 | C1/C2 기준선 | `--stage s1 --profile ramping-rows --rows 1` | 로컬 실행 후 기입 | | | | | |
-| 2 | C2 | `--stage s1 --profile ramping-rows --rows 4` | | | | | | |
-| 3 | C2 | `--stage s1 --profile ramping-rows --rows 16` | | | | | | |
-| 4 | C2 | `--stage s0 --profile ramping-rows --rows 4` | | | | | | |
-| 5 | C3 (진단 전용) | `--stage s1 --profile ramping --flush-log 2` | | | | | | |
-| 6 | C3 | `--stage s1 --profile ramping --pool 20` | | | | | | |
-| 7 | C3 | `--stage s1 --profile ramping --pool 5` | | | | | | |
+| # | 실험 | 명령 (`scripts/verify.sh load …`) | sustained_limit_rps | max_achieved_rps (at target) | p50@800 ms | row_lock_wait_ratio@800 | fsyncs_per_request@800 | row_lock_time_per_request_ms@800 | CPU 평균, 포화 stage (한도 200) | 판정 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | C1/C2 기준선 | `--stage s1 --profile ramping-rows --rows 1` | 400 | 656.1 (800) | 3361.87 | 0.8329 | 3.416 | 13.11 | mysql 55.8–59.6 / app 41.3–44.0 | 테스트 B 재현 (`ramping` S1 n=5: max_achieved 670.4 (587.5–720.3)). 800rps 부터 포화, 대기율 ≈ 1 |
+| 2 | C2 | `--stage s1 --profile ramping-rows --rows 4` | 800 | 1136.7 (1200) | 2.39 | 0.1955 | 3.103 | 0.936 | mysql 121.5–133.1 / app 95.4–109.3 | 800rps 큐잉 없음(p50 2.39ms). 천장 ×1.7. 1,200rps 에서 포화 |
+| 3 | C2 | `--stage s1 --profile ramping-rows --rows 16` | 1200 | 1200.0 (1200) | 2.32 | 0.0045 | 3.054 | 0.016 | mysql 165.2–182.1 / app 150.8–163.3 | 천장 ×1.8, 1,200rps 까지 ok. 1,600 이상은 MySQL CPU 가 한도 근처 |
+| 4 | C2 | `--stage s0 --profile ramping-rows --rows 4` | 800 | 1123.6 (1200) | 2.35 | 0.1767 | 3.009 | 0.694 | mysql 130.4–141.3 / app 106.9–116.7 | S1 rows=4 와 같음 (락 방식이 아니라 행이 천장을 정한다) |
+| 5 | C3 (진단 전용) | `--stage s1 --profile ramping --flush-log 2` | 650 | 795.2 (800) | 56.61 | 0.9165 | 0.065 | 9.086 | mysql 59.5 / app 47.6 (포화 stage 없음, 800rps) | 800rps 큐잉 없음(p50 56.61ms), fsync 거의 0, 락 대기율은 그대로. 프로필이 800 에서 끝나 천장 미확인 |
+| 6 | C3 | `--stage s1 --profile ramping --pool 20` | 500 | 608.3 (650) | 5312.01 | 0.9259 | 3.887 | 32.568 | mysql 59.0–60.6 / app 42.7–44.4 | 천장 불변, 락 대기 시간 ↑ (풀이 클수록 줄이 길다) |
+| 7 | C3 | `--stage s1 --profile ramping --pool 5` | 500 | 612.6 (800) | 5063.84 | 0.9106 | 3.741 | 6.076 | mysql 60.0–60.3 / app 43.5–44.6 | 천장 불변, 락 대기 시간 ↓ |
 
 * 이벤트 선택 로직(`events.js`)은 k6 모듈과 분리된 순수 함수이고 `scripts/load/test_events.py` 가 node 로 직접 실행해 검증한다(node 가 없으면 건너뛴다). N 행 시드와 부하 자체는 Docker 가 필요해 단위 테스트 대상이 아니다.
+
+### C5. 결론 (테스트 C 마감)
+
+테스트 C 는 위 일곱 run 으로 마친다. 추가 실험과 반복은 하지 않는다(`--binlog`, `--mysql-cpus` 같은 노브도 만들지 않는다). n=1 이므로 p50 이 자릿수로 달라지는 차이(3361.87 → 2.39 ms)는 믿을 수 있지만 1,137 대 1,200 같은 작은 차이는 구분하지 않는다.
+
+#### 천장은 두 단이다
+
+* **1단 - 한 개의 뜨거운 행 (약 650rps): 확인.** 800rps 에서 행을 1개에서 4개로 나누면 p50 이 3361.87 → 2.39 ms, `row_lock_wait_ratio` 가 0.8329 → 0.1955 가 된다(16개: 2.32 ms, 0.0045). rows=1 에서 대기율은 p50 이 오르는 800rps 에서 0.8329 로 뛰고 그 위 단계에서는 1.0 안팎(1.0125~1.0167)이다. 천장 `max_achieved_rps` 는 656.1 → 1,136.7(×1.7) → 1,200.0(×1.8). 풀 크기 5/10/20 에서 포화 구간(800rps)의 `row_lock_time_per_request_ms` 는 6.08 / 13.11 / 32.57 ms 로 풀 크기 ÷ 처리량(8.16 / 15.24 / 34.26 ms)을 따라간다(Little 의 법칙). 거의 모든 연결이 한 행의 락 앞에서 줄을 서 있다는 뜻이다. S0 도 같다(rows=4 에서 1,123.6 vs 1,136.7, 대기율 0.1767 vs 0.1955).
+* **2단 - MySQL CPU / 커밋 경로 (이 2 cpu 장비에서 약 1,200rps).** rows=16 은 1,200rps 이상에서 정체하며 `mysql_cpu_pct_mean` 이 165.2(1200) / 165.2(1600) / 174.9(2400) / 182.1(3200), 최대 표본이 188~195 (한도 200)이다. rows=4 도 같은 대역에서 포화한다(1,200rps `kind` saturated, p50 797.36 ms, 대기율 0.774). 800 → 1,200rps 에서 `mysql_cpu_pct_mean` 이 72.2 → 121.5(최대 138.4)로 오르는 동안 요청당 행 락 대기 `row_lock_time_per_request_ms` 가 0.936 → 4.993 ms 로 늘었다. 행당 부하는 300rps 로 1단 천장(약 650)보다 훨씬 낮은데도 줄이 서는 것은, 부하가 커질수록 임계 구역이 길어진다는 해석과 맞는다. 단 rows=4 의 MySQL CPU 는 한도에 닿지 않았으므로(최대 138.4 / 200) 임계 구역의 길이는 직접 재지 않았고, rows=4 에서 CPU 한계를 입증한 것은 아니다. CPU 한계에 가까운 직접 증거는 rows=16 쪽이다.
+* **판정.** "rows=4 에서 2,000rps 를 훨씬 넘는다"는 **크기 예측은 반증**됐다(1,136.7). **단일 행 직렬화라는 메커니즘은 확인**됐다.
+
+#### fsync 는 임계 구역의 큰 몫이다
+
+`--flush-log 2`(진단 전용, `ramping` 프로필, S1)에서 800rps 의 p50 이 56.61 ms 다(rows=1 기준선 3361.87 ms, 테스트 B S1 n=5 의 2666.71 (2300–5525.23)). 달성률 `achieved_ratio` 는 0.994. 요청당 fsync 는 같은 부하끼리 200/400rps 에서 5.148/5.196 → 0.066/0.069, 800rps 에서 3.416 → 0.065 로 줄어 설정이 적용됐음이 확인된다. 다만 프로필이 800rps 에서 끝나 **flush-log=2 의 천장은 800 이상이라는 것밖에 모른다**(`max_achieved_rps` 795.2). 행 락 대기율은 800rps 에서 0.9165 로 남아 있어 직렬화는 그대로이고 임계 구역만 짧아졌다.
+
+**binlog 기본값 가설: 측정하지 않음.** MySQL 8.0 은 기본으로 binary log 를 켜 두므로, 낮은 부하에서 요청당 redo fsync 가 2.5회 안팎(`Innodb_os_log_fsyncs` 델타 / 요청, 200/400rps 에서 2.53/2.57)인 것이 binlog 를 낀 2단계 커밋 때문일 수 있다. `log_bin`, `sync_binlog` 값도 기록하지 않았고 binlog fsync 카운터도 샘플링하지 않았다.
+
+#### 풀 크기는 대기열의 길이를 정할 뿐 용량이 아니다
+
+`max_achieved_rps` 는 pool 5/10/20 에서 612.6 / 656.1 / 608.3 로, 테스트 B 의 pool 10(n=5) 670.4 (587.5–720.3)와 구분되지 않는다. `mysql.threads_connected_max` 가 7 / 11 / 22 라 설정은 적용됐다. 800rps 의 p50 은 5063.84 / 3361.87 / 5312.01 ms 로 테스트 B 의 run 간 편차(2300~5525) 안이라 풀이 지연을 바꾼다고는 주장하지 않는다. 풀이 바꾸는 것은 락 앞의 줄 길이다(위 Little 의 법칙).
+
+#### 도출하지 않는 결론
+
+1,137 대 1,200 같은 작은 차이, 풀 크기의 지연 효과, flush-log=2 의 천장, rows=4 에서의 CPU 한계, binlog 의 비중.
+
+#### 결정
+
+* **S2(Redis 분산 락)는 건너뛴다.** 직렬화 지점이 하나 남는 구조라 천장이 움직이지 않는다. 임계 구역을 DB 행 락에서 다른 락으로 옮길 뿐이라는 뜻이다.
+* **다음 단계는 S3**: Redis 원자적 카운터가 당첨을 결정하고 DB 에는 당첨자만 저장한다. 1단(한 행의 직렬화)을 구조에서 없애는 단계다.
+* 2단(MySQL CPU / 커밋 경로)은 S3/S4 결과를 해석할 때 다시 중요해진다. fsync/binlog 분해는 그때까지 보류한다.
