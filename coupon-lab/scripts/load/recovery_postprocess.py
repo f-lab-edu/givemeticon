@@ -4,7 +4,8 @@
 usage: python3 -I recovery_postprocess.py --raw raw.json.gz --scenario db-down|redis-restart --stage sN --stock N
            --fault-log fault.log --db-samples db-samples.jsonl --issues issues.tsv --db-rows N [--redis-counter N]
            --k6-exit N --out recovery.json --timeline-out timeline.json [--fault-at S] [--fault-duration S]
-           [--profiles profiles.json] [--env key=value ...]
+           [--profiles profiles.json] [--insert-failures N] [--env key=value ...]
+       python3 -I recovery_postprocess.py --reprocess-from <evidence dir> --out recovery.json
 
 Inputs written by the runner:
   raw.json.gz      k6 JSON output of recovery.js (recovery_results by result, recovery_seq, http_req_duration, dropped_iterations).
@@ -28,6 +29,13 @@ Definitions (the numbers are OUTCOMES: they never decide PASS/FAIL, only validit
   recovery_time_s            seconds from the later of (fault end = started_at, load end = k6_ended_at) until db_rows reached the value it
                              finally kept; "settled" needs 5 consecutive unchanged non-null polls. Rows still arriving after the load ended
                              (a backlog being drained) make it positive. rows_final_after_fault_end_s is the same measured from the fault end alone.
+  seats_lost                 wins - db_rows: seats the decision took that have no row (the durability figure). null when wins is null.
+  client_unknown             timeouts + http_5xx: requests whose client did not learn the outcome.
+  recorded_despite_unknown   db_rows - http_200: rows no client saw confirmed ("unknown to the client, but it did win"); null when
+                             duplicates exist (dup_seq or dup_members > 0), because surplus rows are then not such wins. It is
+                             confirmed_but_missing with the sign reversed.
+  consumed_but_unconfirmed, confirmed_but_missing   the first-generation figures, kept as derived (legacy) fields; see legacy_fields.
+  insert_failures_logged     ERROR lines "coupon_issue insert failed after winning the counter" in the app log (S3); null when no log was read.
   validity                   k6_completed (k6 exited 0 and the main phase ran to its last second) and fault_observed (the fault events were logged,
                              in order, and the fault was injected while the main phase was running).
 Requests are bucketed by the second they started in, counted from the start of the main phase (the warmup is seconds -10..-1).
@@ -131,6 +139,29 @@ def accounting(scenario, stock, totals, redis_counter, db_rows):
     return result
 
 
+def loss_axes(report):
+    """seats_lost, client_unknown, recorded_despite_unknown (see the docstring), derived from fields already in a report."""
+    totals = report["totals"]
+    wins = report.get("wins")
+    no_duplicates = report["dup_seq"] == 0 and report["dup_members"] == 0
+    return {
+        "seats_lost": wins - report["db_rows"] if wins is not None else None,
+        "client_unknown": totals["timeouts"] + totals["http_5xx"],
+        "recorded_despite_unknown": report["db_rows"] - totals["http_200"] if no_duplicates else None,
+        "legacy_fields": ["consumed_but_unconfirmed", "confirmed_but_missing"],
+    }
+
+
+def reprocess(source_dir):
+    """A saved recovery.json with the loss axes added. Everything else is kept as recorded; the source is not touched."""
+    with open(os.path.join(source_dir, "recovery.json"), encoding="utf-8") as f:
+        report = json.load(f)
+    report.update(loss_axes(report))
+    report.setdefault("insert_failures_logged", None)
+    report["reprocessed_from"] = source_dir
+    return report
+
+
 def dup_counts(lines):
     """issues.tsv lines "member<TAB>seq" -> (dup_seq, dup_members, rows)."""
     members = Counter()
@@ -222,7 +253,7 @@ def _env(pairs):
 
 
 def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lines, db_rows, redis_counter, k6_exit,
-                 fault_at, fault_duration, target, env):
+                 fault_at, fault_duration, target, env, insert_failures=None):
     warmup = layout["warmup"]
     load = layout["load"]
     totals = totals_of(raw["per_sec"], raw["dropped"])
@@ -264,6 +295,7 @@ def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lin
         "dup_members": dup_members,
         "issue_rows_read": issue_rows,
         "seq": {"confirmed": len(confirmed), "distinct": len(set(confirmed)), "max": max(confirmed) if confirmed else None},
+        "insert_failures_logged": insert_failures,
         "settled": settled,
         "recovery_time_s": recovery_time,
         "rows_final_after_fault_end_s": after_fault,
@@ -272,29 +304,45 @@ def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lin
                      "valid": bool(k6_completed and fault_observed)},
         "env": env,
     })
+    report.update(loss_axes(report))
     return report
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--raw", required=True)
-    parser.add_argument("--scenario", required=True, choices=("db-down", "redis-restart"))
-    parser.add_argument("--stage", required=True)
-    parser.add_argument("--stock", required=True, type=int)
-    parser.add_argument("--fault-log", required=True)
-    parser.add_argument("--db-samples", required=True)
-    parser.add_argument("--issues", required=True)
-    parser.add_argument("--db-rows", required=True, type=int)
+    parser.add_argument("--raw")
+    parser.add_argument("--scenario", choices=("db-down", "redis-restart"))
+    parser.add_argument("--stage")
+    parser.add_argument("--stock", type=int)
+    parser.add_argument("--fault-log")
+    parser.add_argument("--db-samples")
+    parser.add_argument("--issues")
+    parser.add_argument("--db-rows", type=int)
     parser.add_argument("--redis-counter", type=int)
-    parser.add_argument("--k6-exit", required=True, type=int)
+    parser.add_argument("--k6-exit", type=int)
+    parser.add_argument("--insert-failures", type=int)
+    parser.add_argument("--reprocess-from", metavar="EVIDENCE_DIR")
     parser.add_argument("--fault-at", type=int)
     parser.add_argument("--fault-duration", type=int)
     parser.add_argument("--target")
     parser.add_argument("--profiles", default=os.path.join(HERE, "profiles.json"))
     parser.add_argument("--env", action="append", default=[], metavar="KEY=VALUE")
     parser.add_argument("--out", required=True)
-    parser.add_argument("--timeline-out", required=True)
+    parser.add_argument("--timeline-out")
     args = parser.parse_args(argv)
+
+    if args.reprocess_from:
+        report = reprocess(args.reprocess_from.rstrip("/"))
+        with open(args.out, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2)
+            f.write("\n")
+        print("recovery_postprocess: reprocessed %s: seats_lost=%s client_unknown=%s recorded_despite_unknown=%s" % (
+            args.reprocess_from, report["seats_lost"], report["client_unknown"], report["recorded_despite_unknown"]))
+        return 0
+    required = ("raw", "scenario", "stage", "stock", "fault_log", "db_samples", "issues", "db_rows", "k6_exit", "timeline_out")
+    missing = [name for name in required if getattr(args, name) is None]
+    if missing:
+        parser.error("missing: " + ", ".join("--" + name.replace("_", "-") for name in missing))
 
     with open(args.profiles, encoding="utf-8") as f:
         layout = json.load(f)["recovery"]
@@ -305,7 +353,7 @@ def main(argv=None):
     report = build_report(args.scenario, args.stage, args.stock, layout, collect_raw(args.raw), events,
                           read_samples(args.db_samples), issue_lines, args.db_rows, args.redis_counter, args.k6_exit,
                           args.fault_at, args.fault_duration if args.scenario == "db-down" else None, args.target,
-                          _env(args.env))
+                          _env(args.env), args.insert_failures)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
         f.write("\n")
@@ -314,10 +362,10 @@ def main(argv=None):
         f.write("\n")
     totals = report["totals"]
     print("recovery_postprocess: scenario=%s stage=%s requests=%d http_200=%d http_5xx=%d timeouts=%d db_rows=%d "
-          "consumed_but_unconfirmed=%s confirmed_but_missing=%d recovery_time_s=%s valid=%s" % (
+          "seats_lost=%s client_unknown=%s recorded_despite_unknown=%s recovery_time_s=%s valid=%s" % (
               report["scenario"], report["stage"], totals["requests"], totals["http_200"], totals["http_5xx"],
-              totals["timeouts"], report["db_rows"], report["consumed_but_unconfirmed"], report["confirmed_but_missing"],
-              report["recovery_time_s"], str(report["validity"]["valid"]).lower()))
+              totals["timeouts"], report["db_rows"], report["seats_lost"], report["client_unknown"],
+              report["recorded_despite_unknown"], report["recovery_time_s"], str(report["validity"]["valid"]).lower()))
     return 0
 
 

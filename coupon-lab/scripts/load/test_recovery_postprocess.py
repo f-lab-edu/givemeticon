@@ -280,6 +280,67 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(report["over_issue"], 9_500)
 
 
+    def test_the_report_carries_the_loss_axes_and_the_logged_insert_failures(self):
+        report = self.report(self.raw())
+        self.assertEqual(report["seats_lost"], 1_000)  # 30,000 wins, 29,000 rows
+        self.assertEqual(report["client_unknown"], 1_500)  # the three failing seconds of the synthetic run, 500 each
+        self.assertEqual(report["recorded_despite_unknown"], -500)  # 29,000 rows, 29,500 confirmed
+        self.assertIsNone(report["insert_failures_logged"])
+        raw = self.raw()
+        with_log = rp.build_report("db-down", "s3", 10_000_000, LAYOUT, raw, events(), self.samples(), [], 29_000, 30_000, 0,
+                                   20, 3, "coupon-lab-load-mysql", {}, insert_failures=10)
+        self.assertEqual(with_log["insert_failures_logged"], 10)
+
+    def test_reprocess_adds_the_axes_to_an_old_report_and_leaves_the_source_alone(self):
+        full = self.report(self.raw())
+        old = {k: v for k, v in full.items()
+               if k not in ("seats_lost", "client_unknown", "recorded_despite_unknown", "legacy_fields", "insert_failures_logged")}
+        with tempfile.TemporaryDirectory() as tmp:
+            source = os.path.join(tmp, "recovery.json")
+            with open(source, "w", encoding="utf-8") as f:
+                json.dump(old, f)
+            with open(source, "rb") as f:
+                before = f.read()
+            again = rp.reprocess(tmp)
+            with open(source, "rb") as f:
+                self.assertEqual(f.read(), before)
+        self.assertEqual(again["seats_lost"], full["seats_lost"])
+        self.assertEqual(again["client_unknown"], full["client_unknown"])
+        self.assertEqual(again["recorded_despite_unknown"], full["recorded_despite_unknown"])
+        self.assertIsNone(again["insert_failures_logged"])
+        self.assertEqual(again["reprocessed_from"], tmp)
+        self.assertEqual(again["consumed_but_unconfirmed"], old["consumed_but_unconfirmed"])  # recorded values are kept
+        self.assertEqual(again["validity"], old["validity"])
+
+
+class LossAxesTest(unittest.TestCase):
+    def report(self, wins, db_rows, http_200, timeouts=0, http_5xx=0, dup_seq=0, dup_members=0):
+        return {"totals": {"http_200": http_200, "timeouts": timeouts, "http_5xx": http_5xx}, "wins": wins,
+                "db_rows": db_rows, "dup_seq": dup_seq, "dup_members": dup_members}
+
+    def test_the_numbers_of_the_s3_db_down_run(self):
+        # test D, S3, db-down run 1: 28,183 wins, 28,173 rows, 22,475 confirmed, 5,708 timeouts
+        axes = rp.loss_axes(self.report(28_183, 28_173, 22_475, timeouts=5_708))
+        self.assertEqual((axes["seats_lost"], axes["client_unknown"], axes["recorded_despite_unknown"]), (10, 5_708, 5_698))
+
+    def test_timeouts_and_5xx_both_leave_the_client_not_knowing(self):
+        self.assertEqual(rp.loss_axes(self.report(100, 100, 90, timeouts=3, http_5xx=4))["client_unknown"], 7)
+
+    def test_a_reset_counter_gives_no_seats_lost_and_duplicates_give_no_recorded_despite_unknown(self):
+        axes = rp.loss_axes(self.report(None, 30_794, 30_794, http_5xx=1, dup_seq=11_057))
+        self.assertEqual((axes["seats_lost"], axes["client_unknown"], axes["recorded_despite_unknown"]), (None, 1, None))
+
+    def test_duplicate_members_alone_also_withhold_recorded_despite_unknown(self):
+        self.assertIsNone(rp.loss_axes(self.report(10, 10, 9, dup_members=1))["recorded_despite_unknown"])
+
+    def test_a_stage_without_a_counter_still_has_the_client_side_axes(self):
+        axes = rp.loss_axes(self.report(None, 480, 500, timeouts=20))
+        self.assertEqual((axes["seats_lost"], axes["client_unknown"], axes["recorded_despite_unknown"]), (None, 20, -20))
+
+    def test_the_first_generation_fields_are_named_as_legacy(self):
+        self.assertEqual(rp.loss_axes(self.report(1, 1, 1))["legacy_fields"], ["consumed_but_unconfirmed", "confirmed_but_missing"])
+
+
 class CommandLineTest(unittest.TestCase):
     def test_main_writes_recovery_json_and_timeline_json(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -311,6 +372,40 @@ class CommandLineTest(unittest.TestCase):
         self.assertEqual(report["env"]["redis_appendonly"], "no")
         self.assertEqual(report["timeline"], timeline)
         self.assertTrue(report["validity"]["valid"])
+
+    def test_reprocess_from_writes_a_new_report_and_needs_no_other_arguments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old = {"totals": {"http_200": 10, "timeouts": 2, "http_5xx": 1}, "wins": 14, "db_rows": 12, "dup_seq": 0,
+                   "dup_members": 0, "validity": {"valid": True}}
+            with open(os.path.join(tmp, "recovery.json"), "w", encoding="utf-8") as f:
+                json.dump(old, f)
+            out = os.path.join(tmp, "new.json")
+            self.assertEqual(rp.main(["--reprocess-from", tmp + "/", "--out", out]), 0)
+            with open(out, encoding="utf-8") as f:
+                new = json.load(f)
+        self.assertEqual((new["seats_lost"], new["client_unknown"], new["recorded_despite_unknown"]), (2, 3, 2))
+
+    def test_a_fresh_run_without_its_inputs_is_a_usage_error(self):
+        with self.assertRaises(SystemExit):
+            rp.main(["--scenario", "db-down", "--out", "x.json"])
+
+    def test_insert_failures_from_the_command_line_end_up_in_the_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            def at(name):
+                return os.path.join(tmp, name)
+            write_raw(at("raw.json.gz"), synthetic_raw())
+            with open(at("fault.log"), "w", encoding="utf-8") as f:
+                for name, epoch in events().items():
+                    f.write("%s %s epoch=%.3f note\n" % (iso(epoch), name, epoch))
+            for name in ("db-samples.jsonl", "issues.tsv"):
+                open(at(name), "w").close()
+            argv = ["--raw", at("raw.json.gz"), "--scenario", "db-down", "--stage", "s3", "--stock", "10000000",
+                    "--fault-log", at("fault.log"), "--db-samples", at("db-samples.jsonl"), "--issues", at("issues.tsv"),
+                    "--db-rows", "29000", "--redis-counter", "30000", "--k6-exit", "0", "--insert-failures", "10",
+                    "--out", at("recovery.json"), "--timeline-out", at("timeline.json")]
+            self.assertEqual(rp.main(argv), 0)
+            with open(at("recovery.json"), encoding="utf-8") as f:
+                self.assertEqual(json.load(f)["insert_failures_logged"], 10)
 
     def test_profiles_json_has_the_recovery_layout_of_the_spec(self):
         with open(os.path.join(HERE, "profiles.json"), encoding="utf-8") as f:

@@ -7,6 +7,7 @@
 #                  [--flush-log 1|2] [--pool N]    (--flush-log 2 relaxes durability: a DIAGNOSTIC, never a configuration)
 #                  (tests B and C: k6 against docker compose, see docs/stages.md)
 #   verify.sh reprocess evidence/<stage>/load/<profile>/<dir>        (test B: re-aggregate a saved run into a new -reprocessed dir)
+#   verify.sh reprocess evidence/<stage>/recovery/<scenario>/<dir>   (test D: add the loss axes to a saved recovery.json, new -reprocessed dir)
 #   verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at 20] [--fault-duration 10] [--stock N]
 #                  (test D: 500 rps for 60 s while a fault is injected, then the loss accounting; see docs/stages.md. consumer-redeliver is refused until S4)
 # Last stdout line:
@@ -27,7 +28,7 @@ LOAD_HIKARI_POOL_SIZE=${HIKARI_POOL_SIZE:-10}
 usage() {
     echo "usage: scripts/verify.sh compile | unit [--tests <pattern>] | bundle <$(echo "$BUNDLES" | tr ' ' '|')> [--stage sN]" >&2
     echo "       scripts/verify.sh load --stage sN --profile ramping|spike|ramping-rows [--runs N] [--k6 host|container] [--rows N] [--max-vus N] [--flush-log 1|2] [--pool N]" >&2
-    echo "       scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir>" >&2
+    echo "       scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir> | evidence/<stage>/recovery/<scenario>/<dir>" >&2
     echo "       scripts/verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at S] [--fault-duration S] [--stock N]" >&2
     exit 2
 }
@@ -156,13 +157,22 @@ case "$mode" in
     reprocess)
         [ $# -eq 1 ] || usage
         source_dir=${1%/}
-        [[ "$source_dir" =~ ^evidence/(s[0-9]+)/load/((ramping|spike)(-[a-z0-9]+)*)/[^/]+$ ]] \
-            || { echo "expected evidence/<stage>/load/<profile>/<dir>, got: $1" >&2; exit 2; }
-        stage=${BASH_REMATCH[1]}
-        profile=${BASH_REMATCH[2]}   # the directory name, e.g. ramping-rows4; the result goes next to the source
-        [ -f "$source_dir/load.json" ] && [ -f "$source_dir/raw.json.gz" ] \
-            || { echo "$source_dir needs load.json and raw.json.gz" >&2; exit 2; }
-        tier=load-reprocess
+        reprocess_kind=load
+        if [[ "$source_dir" =~ ^evidence/(s[0-9]+)/recovery/(db-down|redis-restart)/[^/]+$ ]]; then
+            reprocess_kind=recovery
+            stage=${BASH_REMATCH[1]}
+            scenario=${BASH_REMATCH[2]}
+            [ -f "$source_dir/recovery.json" ] || { echo "$source_dir needs recovery.json" >&2; exit 2; }
+            tier=recovery-reprocess
+        else
+            [[ "$source_dir" =~ ^evidence/(s[0-9]+)/load/((ramping|spike)(-[a-z0-9]+)*)/[^/]+$ ]] \
+                || { echo "expected evidence/<stage>/load/<profile>/<dir> or evidence/<stage>/recovery/<scenario>/<dir>, got: $1" >&2; exit 2; }
+            stage=${BASH_REMATCH[1]}
+            profile=${BASH_REMATCH[2]}   # the directory name, e.g. ramping-rows4; the result goes next to the source
+            [ -f "$source_dir/load.json" ] && [ -f "$source_dir/raw.json.gz" ] \
+                || { echo "$source_dir needs load.json and raw.json.gz" >&2; exit 2; }
+            tier=load-reprocess
+        fi
         ;;
     *) usage ;;
 esac
@@ -695,10 +705,18 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
         fi
         counter=$(docker exec "${LOAD_PREFIX}redis" redis-cli --raw GET "coupon:event:$event_id:issued" 2>>"$log")
         [[ "$counter" =~ ^[0-9]+$ ]] && counter_arg=(--redis-counter "$counter")
+        # The app log goes away with the container. Count the S3 "insert failed after winning the counter" ERROR lines over the whole
+        # log, keep only the ERROR headlines (no stack traces, 400 characters each, at most 2000) as evidence.
+        local failures_arg=() insert_failures
+        if docker logs "${LOAD_PREFIX}app" >"$work/app.log" 2>&1; then
+            insert_failures=$(grep -c 'coupon_issue insert failed after winning the counter' "$work/app.log")
+            [[ "$insert_failures" =~ ^[0-9]+$ ]] && failures_arg=(--insert-failures "$insert_failures")
+            grep ' ERROR ' "$work/app.log" | cut -c1-400 | head -n 2000 >"$work/app-errors.log"
+        fi
 
         python3 -I scripts/load/recovery_postprocess.py --raw "$work/raw.json.gz" --scenario "$scenario" --stage "$stage" --stock "$stock" \
             --fault-log "$work/fault.log" --db-samples "$work/db-samples.jsonl" --issues "$work/issues.tsv" --db-rows "$db_rows" \
-            ${counter_arg[@]+"${counter_arg[@]}"} --k6-exit "$k6_rc" --fault-at "$fault_at" --fault-duration "$fault_duration" \
+            ${counter_arg[@]+"${counter_arg[@]}"} ${failures_arg[@]+"${failures_arg[@]}"} --k6-exit "$k6_rc" --fault-at "$fault_at" --fault-duration "$fault_duration" \
             --target "${LOAD_PREFIX}$fault_target" --out "$work/recovery.json" --timeline-out "$work/timeline.json" \
             --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "redis_image=$redis_image" --env "redis_cpus=$cpus_redis" \
             --env "jvm_heap=$heap" --env "hikari_pool_size=$hikari" --env "hikari_connection_timeout_ms=$hikari_timeout" \
@@ -712,9 +730,10 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
 import json, sys
 d = json.load(open(sys.argv[1]))
 t = d["totals"]
-print("http_200=%s http_409=%s http_5xx=%s timeouts=%s db_rows=%s redis_counter=%s consumed_but_unconfirmed=%s confirmed_but_missing=%s over_issue=%s dup_seq=%s dup_members=%s recovery_time_s=%s k6_completed=%s fault_observed=%s" % (
-    t["http_200"], t["http_409"], t["http_5xx"], t["timeouts"], d["db_rows"], d["redis_counter"], d["consumed_but_unconfirmed"],
-    d["confirmed_but_missing"], d["over_issue"], d["dup_seq"], d["dup_members"], d["recovery_time_s"],
+print("http_200=%s http_409=%s http_5xx=%s timeouts=%s db_rows=%s redis_counter=%s seats_lost=%s client_unknown=%s recorded_despite_unknown=%s over_issue=%s dup_seq=%s dup_members=%s insert_failures_logged=%s recovery_time_s=%s k6_completed=%s fault_observed=%s" % (
+    t["http_200"], t["http_409"], t["http_5xx"], t["timeouts"], d["db_rows"], d["redis_counter"], d["seats_lost"],
+    d["client_unknown"], d["recorded_despite_unknown"], d["over_issue"], d["dup_seq"], d["dup_members"],
+    d["insert_failures_logged"], d["recovery_time_s"],
     str(d["validity"]["k6_completed"]).lower(), str(d["validity"]["fault_observed"]).lower()))
 print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/recovery.json")
         echo "recovery $scenario on $stage: $(head -n 1 <<<"$summary")"
@@ -731,6 +750,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/recovery.json")
         cp "$work/recovery.json" "$work/timeline.json" "$work/fault.log" "$run_evidence/"
         [ ! -f "$work/summary.json" ] || cp "$work/summary.json" "$run_evidence/"
         [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
+        [ ! -f "$work/app-errors.log" ] || cp "$work/app-errors.log" "$run_evidence/"
         evidence_dirs+=("$run_evidence")
         echo "recovery $scenario on $stage: evidence in $run_evidence"
     fi
@@ -741,6 +761,47 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/recovery.json")
         INFRA_DOWN) load_finish INFRA_DOWN 3 ;;
         *) load_finish BUILD_ERROR 5 ;;
     esac
+}
+
+# verify.sh reprocess evidence/<stage>/recovery/<scenario>/<dir>: the loss axes (seats_lost, client_unknown,
+# recorded_despite_unknown) added to a saved recovery.json. The source stays untouched; the result goes to a new
+# <ts>-<sha>[-dirty]-reprocessed directory next to it, together with copies of the other files of the run.
+run_reprocess_recovery() {
+    set +e
+    local passed=0 failed=0 evidence_dirs=() failures=() dest tmp=build/recovery/reprocess verdict name
+    : >"$log"
+    rm -rf "$tmp"
+    mkdir -p "$tmp"
+    if ! python3 -I scripts/load/recovery_postprocess.py --reprocess-from "$source_dir" --out "$tmp/recovery.json" >>"$log" 2>&1; then
+        failures+=("recovery_postprocess failed for $source_dir (see $log)")
+        echo "recovery_postprocess failed for $source_dir (see $log)"
+        load_finish BUILD_ERROR 5
+    fi
+    dest="evidence/$stage/recovery/$scenario/$stamp-$sha"
+    [ "$dirty" = false ] || dest="$dest-dirty"
+    dest="$dest-reprocessed"
+    if [ -e "$dest" ]; then echo "$dest already exists; evidence is never overwritten" >&2; exit 2; fi
+    mkdir -p "$dest"
+    cp "$tmp/recovery.json" "$dest/"
+    for name in timeline.json fault.log summary.json stats.jsonl app-errors.log; do
+        [ ! -f "$source_dir/$name" ] || cp "$source_dir/$name" "$dest/"
+    done
+    evidence_dirs+=("$dest")
+    verdict=$(python3 -I -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("seats_lost=%s client_unknown=%s recorded_despite_unknown=%s db_rows=%s valid=%s" % (
+    d["seats_lost"], d["client_unknown"], d["recorded_despite_unknown"], d["db_rows"], str(d["validity"]["valid"]).lower()))
+print("PASS" if d["validity"]["valid"] else "FAIL")' "$dest/recovery.json")
+    echo "reprocessed $source_dir: $(head -n 1 <<<"$verdict")"
+    echo "evidence in $dest"
+    if [ "$(tail -n 1 <<<"$verdict")" = PASS ]; then
+        passed=1
+        load_finish PASS 0
+    fi
+    failed=1
+    failures+=("run invalid: $(head -n 1 <<<"$verdict")")
+    load_finish FAIL 1
 }
 
 # verify.sh reprocess <evidence dir>: aggregate a saved run again with the current rules. The source stays untouched;
@@ -789,7 +850,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$dest/load.json")
 case "$mode" in
     load) run_load ;;
     recovery) run_recovery ;;
-    reprocess) run_reprocess ;;
+    reprocess) if [ "$reprocess_kind" = recovery ]; then run_reprocess_recovery; else run_reprocess; fi ;;
 esac
 
 # Remove artifacts of earlier runs so a stale result can never be mistaken for this run.
