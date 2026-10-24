@@ -217,7 +217,7 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 * Changed: 발급 결정을 `coupon_event` 행에서 Redis 로 옮겼다. `S3CouponIssueService` 가 Lua 스크립트 한 번(`INCR coupon:event:{eventId}:issued`, 결과 n 이 total 을 넘으면 -1)으로 결정한다. n <= total 이면 당첨(seq = n), 아니면 DB 호출 없이 `SoldOut`. 카운터는 total 을 넘어 올라갈 수 있고 줄이지 않는다(품절 = n > total). total 은 이벤트당 한 번 `selectTotal` 로 읽어 `ConcurrentHashMap` 에 둔다(이 실험에서 이벤트는 불변). 모르는 이벤트는 S0/S1 과 같은 `IllegalArgumentException`.
 * Did NOT change: 회원 중복 방지 없음(후속 단계), 요청마다 `coupon_event` 를 읽거나 쓰지 않는다(`remaining_quantity` 는 S3 가 건드리지 않는다), 당첨자의 `coupon_issue` INSERT 는 동기 단일 문장(`insertIssue` 그대로, `@Transactional` 없음), 락·트랜잭션·제약 계약은 그대로, S0/S1 서비스는 동결.
 * Known gap: 카운터를 이긴 뒤 INSERT 가 실패하면 ERROR 로그(eventId/memberId/seq)를 남기고 예외를 다시 던져 컨트롤러가 500 을 돌려준다. 자리는 이미 소모된 상태로 남는다(발급 행 수 < 당첨 수). S4 의 동기.
-* 환경 변화: 부하 compose 에 `redis:7-alpine`(cpus 1, appendonly no, 스냅샷 없음)이 모든 stage 에서 뜨고 `env.redis_image`/`env.redis_cpus` 가 기록된다. 그래서 이전 S0/S1 부하 evidence 와 env 블록이 다르다. 짝 비교용으로 S1 spike 를 새 실행기로 다시 잰다. docker stats 샘플링은 app 과 mysql 만 대상이라 Redis CPU 는 기록되지 않는다.
+* 환경 변화: 부하 compose 에 `redis:7-alpine`(cpus 1, appendonly no, 스냅샷 없음)이 모든 stage 에서 뜨고 `env.redis_image`/`env.redis_cpus` 가 기록된다. 그래서 이전 S0/S1 부하 evidence 와 env 블록이 다르다. 짝 비교용으로 S1 spike 를 새 실행기로 다시 잰다. docker stats 샘플링은 처음에는 app 과 mysql 만 대상이어서 Redis CPU 가 기록되지 않았다(테스트 A, ramping, spike 의 S1/S3 run). 천장 확인 run(`fd4d338`)부터 redis 도 `stats.jsonl` 에 샘플링한다(아래 "천장 확인" 참고).
 * 테스트 A v3: 반복마다 `over_issue == 0`, `dup_members == 0`, `issued == min(THREADS, TOTAL_QUANTITY)`, `exceptions == 0` 만 단언한다. `remaining_mismatch` 는 단언하지 않는다. `remaining` 은 정보로만 기록하고 출처를 JSON 의 `remaining_source` 에 남긴다(`db`: s0/s1 은 `coupon_event.remaining_quantity`, `redis`: s3 는 total - min(redis 카운터, total) 과 `redis_counter`). 기준이 바뀌었으므로 S0/S1 은 v3 로 한 번 다시 기록한다.
 * 부하 실행기: stage s3 는 시드한 이벤트의 Redis 카운터 합을 `load.json` 의 `db.redis_counter` 로 기록한다(정보용). 유효성 규칙은 그대로 `db.issued_rows == http_issued`. 시드는 그대로(DB INSERT), S3 는 첫 요청에서 DB 로 total 을 읽는다.
 
@@ -239,7 +239,7 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 | S1 | 0/10 | 100 | 0 | 0 | 0 | |
 | S3 (2회) | 0/10 | 100 | 0 | 0 | 0 | `remaining_source` redis, `redis_counter` 1000 (매 반복) |
 
-Evidence: `coupon-lab/evidence/s0/consistency/20261024-031516-aa357e0/`, `.../s1/consistency/20261024-031537-fa1a0a6/`, `.../s3/consistency/20261024-031011-cb34bf8/`, `.../s3/consistency/20261024-031557-ee60088/`. 반복 한 번의 `elapsed_ms` 는 S3 65~432, S1 615~925.
+Evidence: `coupon-lab/evidence/s0/consistency/20261024-031516-aa357e0/`, `.../s1/consistency/20261024-031537-fa1a0a6/`, `.../s3/consistency/20261024-031011-cb34bf8/`, `.../s3/consistency/20261024-031557-ee60088/`. 반복 한 번의 `elapsed_ms` 는 S3 54~432(run 1) / 58~379(run 2), S1 575~925.
 
 #### 테스트 B ramping (S3, stock 10M, 모든 요청이 당첨)
 
@@ -288,6 +288,8 @@ Evidence: `coupon-lab/evidence/s0/consistency/20261024-031516-aa357e0/`, `.../s1
 | S1 | 4 | 800 | 1136.7 (at 1200) | 1661.9 | 3525.4 |
 | S1 | 16 | 1200 | 1200 (at 1200) | 184.0 | 3103.2 |
 | S3 | 1 | 1600 | 2225.2 (at 2400) | 15.3 | 29.1 |
+
+* 각주: S1 행(`evidence/s1/load/ramping-rows{1,4,16}/`)은 부하 compose 에 Redis 컨테이너가 없던 환경에서 잰 run 이고, S3 행은 `redis:7-alpine`(cpus 1)이 함께 떠 있는 환경(env 블록에 `redis_image`/`redis_cpus` 가 있는 쪽)에서 잰 run 이다. 같은 env 블록끼리의 비교가 아니다. Redis 는 이 부하에서 거의 놀고 있어(CPU 평균 최대 9.3) 영향은 작다고 보지만, S1 을 같은 환경에서 다시 재지는 않았다.
 
 * 쓸 수 있는 말: S3 는 1,600rps 까지 p50 2.2 ms, 락 대기 0 으로 유지했다(ok). 같은 프로필의 S1(행 1개)은 sustained 400 / max 656. 1단(한 행의 직렬화)이 사라졌다는 직접 증거이다. 배수를 쓰려면 sustained 끼리 400 → 1,600(n=1)이다.
 * 최대 달성 2,225rps(목표 2,400)에서 포화한다. 그 지점에서 앱 117/200, MySQL 84/200, Redis 9/100 이고 샘플링한 자원 중 한도에 닿은 것이 없다. **천장의 원인은 미상이다.** 후보(측정하지 않음, 이 규모에서 그럴듯한 순서): ① k6 호스트 CPU(같은 Mac 에서 컨테이너 5코어를 떼고 남은 자원으로 부하와 JSON 출력을 만든다), ② Docker Desktop 포트 포워딩 경로, ③ Tomcat `maxThreads` 200(2,400rps × p50 90ms ≈ 216 동시), ④ Hikari 풀 10 대기.
