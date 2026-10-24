@@ -1,0 +1,14 @@
+2026-10-24T15:29:01.105Z ERROR 1 --- [nio-8080-exec-3] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed: org.springframework.data.redis.RedisSystemException: Redis exception] with root cause
+2026-10-24T15:29:01.191Z  INFO 1 --- [xecutorLoop-1-1] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/172.19.0.3:6379
+2026-10-24T15:29:01.192Z  INFO 1 --- [xecutorLoop-1-2] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/172.19.0.3:6379
+2026-10-24T15:29:01.202Z  WARN 1 --- [ioEventLoop-4-2] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: redis
+2026-10-24T15:29:01.202Z  WARN 1 --- [ioEventLoop-4-1] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: redis: Name or service not known
+2026-10-24T15:29:10.189Z  INFO 1 --- [xecutorLoop-1-2] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/<unresolved>:6379
+2026-10-24T15:29:10.189Z  INFO 1 --- [xecutorLoop-1-1] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/<unresolved>:6379
+2026-10-24T15:29:10.190Z  WARN 1 --- [ioEventLoop-4-1] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: redis
+2026-10-24T15:29:10.190Z  WARN 1 --- [ioEventLoop-4-2] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: redis
+2026-10-24T15:29:18.390Z  INFO 1 --- [xecutorLoop-1-2] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/<unresolved>:6379
+2026-10-24T15:29:18.390Z  INFO 1 --- [xecutorLoop-1-1] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/<unresolved>:6379
+2026-10-24T15:29:18.410Z  INFO 1 --- [ioEventLoop-4-2] i.l.core.protocol.ReconnectionHandler    : Reconnected to redis/<unresolved>:6379
+2026-10-24T15:29:18.419Z  INFO 1 --- [ioEventLoop-4-1] i.l.core.protocol.ReconnectionHandler    : Reconnected to redis/<unresolved>:6379
+2026-10-24T15:29:18.423Z  WARN 1 --- [io-8080-exec-21] o.s.b.a.health.HealthEndpointSupport     : Health contributor org.springframework.boot.actuate.autoconfigure.health.HealthEndpointConfiguration$AdaptedReactiveHealthContributors$1 (redis) took 17292ms to respond

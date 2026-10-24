@@ -1,0 +1,15 @@
+2026-10-24T15:26:50.088Z ERROR 1 --- [io-8080-exec-26] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed: org.springframework.data.redis.RedisSystemException: Redis exception] with root cause
+2026-10-24T15:26:50.189Z  INFO 1 --- [xecutorLoop-1-2] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/172.19.0.4:6379
+2026-10-24T15:26:50.189Z  INFO 1 --- [xecutorLoop-1-1] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/172.19.0.4:6379
+2026-10-24T15:26:50.198Z  WARN 1 --- [ioEventLoop-4-1] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: redis: Name or service not known
+2026-10-24T15:26:50.201Z  WARN 1 --- [ioEventLoop-4-2] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: redis
+2026-10-24T15:26:59.188Z  INFO 1 --- [xecutorLoop-1-2] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/<unresolved>:6379
+2026-10-24T15:26:59.188Z  INFO 1 --- [xecutorLoop-1-1] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/<unresolved>:6379
+2026-10-24T15:26:59.190Z  WARN 1 --- [ioEventLoop-4-1] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: redis
+2026-10-24T15:26:59.190Z  WARN 1 --- [ioEventLoop-4-2] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: redis
+2026-10-24T15:27:07.388Z  INFO 1 --- [xecutorLoop-1-2] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/<unresolved>:6379
+2026-10-24T15:27:07.388Z  INFO 1 --- [xecutorLoop-1-1] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/<unresolved>:6379
+2026-10-24T15:27:07.394Z  WARN 1 --- [ioEventLoop-4-1] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: redis
+2026-10-24T15:27:07.408Z  INFO 1 --- [ioEventLoop-4-2] i.l.core.protocol.ReconnectionHandler    : Reconnected to redis/<unresolved>:6379
+2026-10-24T15:27:23.788Z  INFO 1 --- [xecutorLoop-1-1] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/<unresolved>:6379
+2026-10-24T15:27:23.810Z  INFO 1 --- [ioEventLoop-4-1] i.l.core.protocol.ReconnectionHandler    : Reconnected to redis/<unresolved>:6379

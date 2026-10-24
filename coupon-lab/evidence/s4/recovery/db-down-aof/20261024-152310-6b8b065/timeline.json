@@ -1,0 +1,929 @@
+[
+  {
+    "sec": -10,
+    "http_200": 100,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 105,
+    "queue_depth": 0
+  },
+  {
+    "sec": -9,
+    "http_200": 100,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 205,
+    "queue_depth": 0
+  },
+  {
+    "sec": -8,
+    "http_200": 100,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 306,
+    "queue_depth": 0
+  },
+  {
+    "sec": -7,
+    "http_200": 100,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 405,
+    "queue_depth": 0
+  },
+  {
+    "sec": -6,
+    "http_200": 100,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 505,
+    "queue_depth": 0
+  },
+  {
+    "sec": -5,
+    "http_200": 100,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 606,
+    "queue_depth": 1
+  },
+  {
+    "sec": -4,
+    "http_200": 100,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 705,
+    "queue_depth": 1
+  },
+  {
+    "sec": -3,
+    "http_200": 100,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 806,
+    "queue_depth": 1
+  },
+  {
+    "sec": -2,
+    "http_200": 100,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 905,
+    "queue_depth": 1
+  },
+  {
+    "sec": -1,
+    "http_200": 100,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 1012,
+    "queue_depth": 1
+  },
+  {
+    "sec": 0,
+    "http_200": 501,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 1281,
+    "queue_depth": 65
+  },
+  {
+    "sec": 1,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 1612,
+    "queue_depth": 65
+  },
+  {
+    "sec": 2,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 1963,
+    "queue_depth": 65
+  },
+  {
+    "sec": 3,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 2341,
+    "queue_depth": 65
+  },
+  {
+    "sec": 4,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 65
+  },
+  {
+    "sec": 5,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 848
+  },
+  {
+    "sec": 6,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 848
+  },
+  {
+    "sec": 7,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 848
+  },
+  {
+    "sec": 8,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 848
+  },
+  {
+    "sec": 9,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 848
+  },
+  {
+    "sec": 10,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 3349
+  },
+  {
+    "sec": 11,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 3349
+  },
+  {
+    "sec": 12,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 3349
+  },
+  {
+    "sec": 13,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 3349
+  },
+  {
+    "sec": 14,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 3349
+  },
+  {
+    "sec": 15,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 5850
+  },
+  {
+    "sec": 16,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 5850
+  },
+  {
+    "sec": 17,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 5850
+  },
+  {
+    "sec": 18,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 5850
+  },
+  {
+    "sec": 19,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 5850
+  },
+  {
+    "sec": 20,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 8350
+  },
+  {
+    "sec": 21,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 8350
+  },
+  {
+    "sec": 22,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 8350
+  },
+  {
+    "sec": 23,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 8350
+  },
+  {
+    "sec": 24,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 8350
+  },
+  {
+    "sec": 25,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 10851
+  },
+  {
+    "sec": 26,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 10851
+  },
+  {
+    "sec": 27,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 10851
+  },
+  {
+    "sec": 28,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 10851
+  },
+  {
+    "sec": 29,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 10851
+  },
+  {
+    "sec": 30,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 13351
+  },
+  {
+    "sec": 31,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 13351
+  },
+  {
+    "sec": 32,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 13351
+  },
+  {
+    "sec": 33,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 13351
+  },
+  {
+    "sec": 34,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 13351
+  },
+  {
+    "sec": 35,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 15850
+  },
+  {
+    "sec": 36,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 15850
+  },
+  {
+    "sec": 37,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 15850
+  },
+  {
+    "sec": 38,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 15850
+  },
+  {
+    "sec": 39,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 15850
+  },
+  {
+    "sec": 40,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 18363
+  },
+  {
+    "sec": 41,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 18363
+  },
+  {
+    "sec": 42,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 18363
+  },
+  {
+    "sec": 43,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 18363
+  },
+  {
+    "sec": 44,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 18363
+  },
+  {
+    "sec": 45,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 20864
+  },
+  {
+    "sec": 46,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 20864
+  },
+  {
+    "sec": 47,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 20864
+  },
+  {
+    "sec": 48,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 20864
+  },
+  {
+    "sec": 49,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 20864
+  },
+  {
+    "sec": 50,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 23364
+  },
+  {
+    "sec": 51,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 23364
+  },
+  {
+    "sec": 52,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 23364
+  },
+  {
+    "sec": 53,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": null,
+    "queue_depth": 23364
+  },
+  {
+    "sec": 54,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 2747,
+    "queue_depth": 23364
+  },
+  {
+    "sec": 55,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 3170,
+    "queue_depth": 25865
+  },
+  {
+    "sec": 56,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 3703,
+    "queue_depth": 25865
+  },
+  {
+    "sec": 57,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 4131,
+    "queue_depth": 25865
+  },
+  {
+    "sec": 58,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 4756,
+    "queue_depth": 25865
+  },
+  {
+    "sec": 59,
+    "http_200": 500,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 5386,
+    "queue_depth": 25865
+  },
+  {
+    "sec": 60,
+    "http_200": 1,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 6207,
+    "queue_depth": 25482
+  },
+  {
+    "sec": 61,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 7142,
+    "queue_depth": 25482
+  },
+  {
+    "sec": 62,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 8016,
+    "queue_depth": 25482
+  },
+  {
+    "sec": 63,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 8860,
+    "queue_depth": 25482
+  },
+  {
+    "sec": 64,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 9791,
+    "queue_depth": 25482
+  },
+  {
+    "sec": 65,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 10723,
+    "queue_depth": 21061
+  },
+  {
+    "sec": 66,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 11601,
+    "queue_depth": 21061
+  },
+  {
+    "sec": 67,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 12527,
+    "queue_depth": 21061
+  },
+  {
+    "sec": 68,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 13402,
+    "queue_depth": 21061
+  },
+  {
+    "sec": 69,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 14342,
+    "queue_depth": 21061
+  },
+  {
+    "sec": 70,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 15285,
+    "queue_depth": 16497
+  },
+  {
+    "sec": 71,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 16222,
+    "queue_depth": 16497
+  },
+  {
+    "sec": 72,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 17110,
+    "queue_depth": 16497
+  },
+  {
+    "sec": 73,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 18029,
+    "queue_depth": 16497
+  },
+  {
+    "sec": 74,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 18902,
+    "queue_depth": 16497
+  },
+  {
+    "sec": 75,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 19862,
+    "queue_depth": 11939
+  },
+  {
+    "sec": 76,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 20807,
+    "queue_depth": 11939
+  },
+  {
+    "sec": 77,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 21739,
+    "queue_depth": 11939
+  },
+  {
+    "sec": 78,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 22675,
+    "queue_depth": 11939
+  },
+  {
+    "sec": 79,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 23532,
+    "queue_depth": 11939
+  },
+  {
+    "sec": 80,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 24491,
+    "queue_depth": 7306
+  },
+  {
+    "sec": 81,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 25433,
+    "queue_depth": 7306
+  },
+  {
+    "sec": 82,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 26294,
+    "queue_depth": 7306
+  },
+  {
+    "sec": 83,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 27223,
+    "queue_depth": 7306
+  },
+  {
+    "sec": 84,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 28176,
+    "queue_depth": 7306
+  },
+  {
+    "sec": 85,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 29007,
+    "queue_depth": 2696
+  },
+  {
+    "sec": 86,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 29921,
+    "queue_depth": 2696
+  },
+  {
+    "sec": 87,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 30890,
+    "queue_depth": 2696
+  },
+  {
+    "sec": 88,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 31002,
+    "queue_depth": 2696
+  },
+  {
+    "sec": 89,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 31002,
+    "queue_depth": 2696
+  },
+  {
+    "sec": 90,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 31002,
+    "queue_depth": 0
+  },
+  {
+    "sec": 91,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 31002,
+    "queue_depth": 0
+  },
+  {
+    "sec": 92,
+    "http_200": 0,
+    "http_409": 0,
+    "http_5xx": 0,
+    "timeouts": 0,
+    "db_rows": 31002,
+    "queue_depth": 0
+  }
+]
