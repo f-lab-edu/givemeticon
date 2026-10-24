@@ -15,6 +15,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 import com.jinddung2.couponlab.coupon.mapper.CouponMapper;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 class StrategySelectionTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
@@ -22,6 +25,7 @@ class StrategySelectionTest {
             .withBean(CouponMapper.class, () -> mock(CouponMapper.class))
             .withBean(StringRedisTemplate.class, () -> mock(StringRedisTemplate.class))
             .withBean(RabbitTemplate.class, () -> mock(RabbitTemplate.class))
+            .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
             .withUserConfiguration(S0CouponIssueService.class, S1CouponIssueService.class, S3CouponIssueService.class,
                     S4CouponIssueService.class);
 

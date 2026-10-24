@@ -21,9 +21,13 @@ import io.micrometer.core.instrument.MeterRegistry;
  * S4: writes coupon_issue for every CouponIssued message. AUTO ack: the message is acked when this method returns and
  * requeued when it throws. A failed write is logged, waits RETRY_DELAY_MS (no hot loop while the database is down) and
  * is rethrown, so the broker delivers it again.
- * Idempotency is a single consumer thread (listener concurrency 1) plus insertIssueIfAbsent: an existence check on
- * (event_id, seq), then the INSERT. It is only safe with one consumer; production would use a unique index on
- * (event_id, seq), which this lab does not add because it would change the frozen S0 re-records.
+ * Idempotency is a single consumer thread (listener concurrency 1) plus insertIssueIfAbsent: an existence check on the
+ * message id generated at publish time (message_id, indexed but not unique), then the INSERT with that id. The key is the
+ * message, not the seat: a redelivery carries the same id and is skipped, while a Redis restart that rewinds the counter
+ * reuses seq values under new ids, so those wins are written as over-issue rows (the same (event_id, seq), a different
+ * message_id) instead of being dropped as duplicates; over-issue is what tests A and D then count. It is only safe with one
+ * consumer; production would use a unique index on message_id, which this lab does not add (no UNIQUE keys, S0
+ * reproducibility).
  * COUPON_S4_CONSUMER_FAIL_EVERY=N (test D consumer-redeliver; default 0 = off) throws after every Nth new row and before
  * the ack, which is a crash after the write: the redelivery must hit the existence check and skip.
  */
@@ -54,15 +58,16 @@ public class S4CouponIssuedConsumer {
     public void onIssued(CouponIssued issued, @Header(name = AmqpHeaders.REDELIVERED, required = false) Boolean redelivered) {
         if (Boolean.TRUE.equals(redelivered)) {
             redeliveries.increment();
-            log.info("redelivered: eventId={} memberId={} seq={}", issued.eventId(), issued.memberId(), issued.seq());
+            log.info("redelivered: eventId={} memberId={} seq={} messageId={}", issued.eventId(), issued.memberId(), issued.seq(),
+                    issued.messageId());
         }
         boolean wrote;
         try {
-            wrote = insertIssueIfAbsent(issued.eventId(), issued.memberId(), issued.seq());
+            wrote = insertIssueIfAbsent(issued.eventId(), issued.memberId(), issued.seq(), issued.messageId());
         } catch (RuntimeException e) {
-            log.warn("consumer insert failed, retrying in {} ms (failure #{}): eventId={} memberId={} seq={}: {}",
+            log.warn("consumer insert failed, retrying in {} ms (failure #{}): eventId={} memberId={} seq={} messageId={}: {}",
                     RETRY_DELAY_MS, insertFailures.incrementAndGet(), issued.eventId(), issued.memberId(), issued.seq(),
-                    e.toString());
+                    issued.messageId(), e.toString());
             pause();
             throw e;
         }
@@ -72,12 +77,12 @@ public class S4CouponIssuedConsumer {
         }
     }
 
-    /** True when the row was written, false when a row with this (eventId, seq) already existed. */
-    boolean insertIssueIfAbsent(long eventId, long memberId, int seq) {
-        if (couponMapper.existsIssue(eventId, seq)) {
+    /** True when the row was written, false when a row with this message id already existed. */
+    boolean insertIssueIfAbsent(long eventId, long memberId, int seq, String messageId) {
+        if (couponMapper.existsIssueByMessageId(messageId)) {
             return false;
         }
-        couponMapper.insertIssue(eventId, memberId, seq);
+        couponMapper.insertIssued(eventId, memberId, seq, messageId);
         return true;
     }
 

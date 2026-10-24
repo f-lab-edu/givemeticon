@@ -21,5 +21,9 @@ public interface CouponMapper {
 
     void insertIssue(@Param("eventId") long eventId, @Param("memberId") long memberId, @Param("seq") int seq);
 
-    boolean existsIssue(@Param("eventId") long eventId, @Param("seq") int seq);
+    // S4 only: the consumer writes the publish-time message id, its idempotency key.
+    void insertIssued(@Param("eventId") long eventId, @Param("memberId") long memberId, @Param("seq") int seq,
+            @Param("messageId") String messageId);
+
+    boolean existsIssueByMessageId(@Param("messageId") String messageId);
 }
