@@ -353,6 +353,7 @@ class PostprocessTest(unittest.TestCase):
         start, end = window_of("ramping", 1)  # the 500 rps step
         stats = [stat_line(start + 2, "coupon-lab-load-app", 150.0), stat_line(start + 4, "coupon-lab-load-app", 190.0),
                  stat_line(start + 2, "coupon-lab-load-mysql", 80.5), stat_line(start + 4, "coupon-lab-load-mysql", 99.5),
+                 stat_line(start + 2, "coupon-lab-load-redis", 77.0),  # sampled, not aggregated
                  stat_line(5, "coupon-lab-load-app", 5.0),  # during warmup: in no stage window
                  stat_line(end + 1, "coupon-lab-load-app", 5.0),  # after the window
                  "not json", json.dumps({"time": 1, "stat": {"Name": "other", "CPUPerc": "1%"}})]

@@ -198,12 +198,13 @@ load_next_run_order() {
 }
 
 # Every 2 s one line per container into <outfile>: {"time": <epoch>, "stat": <docker stats object>}. Run in the
-# background during k6 and killed afterwards; postprocess.py turns it into per-stage CPU figures.
+# background during k6 and killed afterwards; postprocess.py turns the app and mysql lines into per-stage CPU figures
+# (redis lines are kept in stats.jsonl for reading by hand and are not aggregated).
 load_sample_stats() {
     local out=$1 started now
     while :; do
         started=$(date +%s)
-        docker stats --no-stream --format json "${LOAD_PREFIX}app" "${LOAD_PREFIX}mysql" 2>/dev/null | while IFS= read -r line; do
+        docker stats --no-stream --format json "${LOAD_PREFIX}app" "${LOAD_PREFIX}mysql" "${LOAD_PREFIX}redis" 2>/dev/null | while IFS= read -r line; do
             [ -z "$line" ] || printf '{"time":%s,"stat":%s}\n' "$(date +%s)" "$line" >>"$out"
         done
         now=$(date +%s)
