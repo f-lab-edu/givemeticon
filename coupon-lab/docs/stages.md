@@ -148,3 +148,31 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 * 두 값은 `load.json` 의 `env.innodb_flush_log_at_trx_commit`(실행 시점에 MySQL 에서 읽은 값), `env.hikari_pool_size` 에 기록되고 evidence 경로 접미사가 된다: `ramping-flush2`, `ramping-pool5`, `ramping-pool20` (`ramping-rows` 와 함께 쓰면 `ramping-rows4-flush2-pool20`). 실행기는 MySQL 이 실제로 요청한 `innodb_flush_log_at_trx_commit` 으로 돌고 있지 않으면 측정하지 않고 INFRA_DOWN 으로 멈춘다. 풀 크기가 실제로 적용됐는지는 `mysql.threads_connected_max`(풀 크기에 샘플러의 연결 한두 개를 더한 값 근처여야 한다)로 확인한다.
 * **`--flush-log 2` 는 진단 전용이다.** 커밋마다 redo 로그를 디스크에 동기화하지 않고 초당 한 번만 하므로 내구성이 약해져, 서버가 죽으면 최대 약 1초 분량의 커밋을 잃을 수 있다. 천장이 어디서 오는지 보려는 실험일 뿐 이 값을 설정 후보로 삼지 않는다.
 * **예측.** `--flush-log 2` 로 천장이 크게 오르면 fsync 가 임계 구역을 지배한다는 뜻이다(`fsyncs_per_request` 와 `row_lock_time_per_request_ms` 도 함께 떨어져야 한다). 천장이 그대로면 fsync 는 주된 원인이 아니다. `--pool 5` / `--pool 20` 에서 천장이 그대로이고 지연만 달라지면 풀은 한계가 아니다. 풀이 한계였다면 5 에서는 천장이 내려가고 20 에서는 올라간다.
+
+### C4. 비교와 판정
+
+* 비교: `python3 -I scripts/load/compare.py --out build/load/compare-c.md 'evidence/s*/load/ramping*/*'` (재처리본이 섞이면 거부되므로 필요한 디렉터리만 고른다). run 을 (stage, profile, rows, flush_log, pool) 그룹으로 묶어, 그룹마다 `max_achieved_rps`, `sustained_limit_rps` 의 중앙값과 범위, 그리고 **모든 그룹이 공유하는 가장 높은 target**에서의 p50 과 `row_lock_wait_ratio` 를 낸다. `ramping`(100~800)과 `ramping-rows`(200~3200)처럼 단계가 다른 그룹은 그 공통 target 에서만 직접 비교한다. 테스트 B 의 기본 설정 run(flush 1, pool 10, rows 1)은 새 run 과 같은 그룹이므로 기준선으로 그대로 쓴다. 설정 변수가 기록되기 전의 run 은 flush_log 1(기본값)로 센다.
+* 한 run 씩 먼저 돌리고(약 4분), 결과가 모호한 곳에서만 반복한다. 테스트 B 에서 같은 설정의 run 사이 편차가 컸으므로(sustained 400~650), 반복 없이 한 run 으로 "N 에 비례해 오른다/오르지 않는다"를 단정하지 않는다. 판단은 `max_achieved_rps` 와 p50 의 방향과 크기로 한다.
+* 판정 요약
+
+| 관측 | 해석 |
+|---|---|
+| C2: 천장이 `--rows` 에 비례해 오른다 (그리고 `row_lock_wait_ratio` 는 내려간다) | 단일 행 직렬화 가설 **확인** |
+| C2: 천장이 `--rows` 와 무관하게 700rps 안팎 | 가설 **반증**. 한계는 전역적이다(커밋/fsync, Hikari, Tomcat). C3 가 가른다 |
+| C3: `--flush-log 2` 에서 천장이 크게 오른다 | fsync 가 임계 구역을 지배한다 |
+| C3: `--pool 5`/`20` 에서 천장은 그대로, 지연만 변한다 | 풀은 한계가 아니다 |
+| C1: p50 이 오르는 단계에서 `row_lock_wait_ratio` 가 1 쪽으로 간다 | 요청이 한 행에서 줄을 선다 |
+
+* 결과 (로컬 실행 후 기입). 실행 순서대로 한 줄씩이며, 각 run 은 `git add evidence && git commit` 으로 남긴다.
+
+| # | 실험 | 명령 | sustained_limit_rps | max_achieved_rps | 공통 target 의 p50 | row_lock_wait_ratio | fsyncs_per_request | 판정 |
+|---|---|---|---|---|---|---|---|---|
+| 1 | C1/C2 기준선 | `--stage s1 --profile ramping-rows --rows 1` | 로컬 실행 후 기입 | | | | | |
+| 2 | C2 | `--stage s1 --profile ramping-rows --rows 4` | | | | | | |
+| 3 | C2 | `--stage s1 --profile ramping-rows --rows 16` | | | | | | |
+| 4 | C2 | `--stage s0 --profile ramping-rows --rows 4` | | | | | | |
+| 5 | C3 (진단 전용) | `--stage s1 --profile ramping --flush-log 2` | | | | | | |
+| 6 | C3 | `--stage s1 --profile ramping --pool 20` | | | | | | |
+| 7 | C3 | `--stage s1 --profile ramping --pool 5` | | | | | | |
+
+* 이벤트 선택 로직(`events.js`)은 k6 모듈과 분리된 순수 함수이고 `scripts/load/test_events.py` 가 node 로 직접 실행해 검증한다(node 가 없으면 건너뛴다). N 행 시드와 부하 자체는 Docker 가 필요해 단위 테스트 대상이 아니다.
