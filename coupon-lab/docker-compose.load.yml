@@ -1,11 +1,14 @@
 # Environment for `scripts/verify.sh load`: app and MySQL with pinned CPU limits, k6 runs on the host.
 # Started and removed (down -v) by verify.sh; the manual-run docker-compose.yml is unrelated.
-# Required variables (set by verify.sh): COUPON_LAB_DB_PASSWORD, COUPON_STRATEGY, LOAD_GC_DIR. Optional: HIKARI_POOL_SIZE.
+# Required variables (set by verify.sh): COUPON_LAB_DB_PASSWORD, COUPON_STRATEGY, LOAD_GC_DIR.
+# Optional (test C diagnostics, verify.sh load --pool / --flush-log): HIKARI_POOL_SIZE (default 10),
+# FLUSH_LOG (default 1 = MySQL's own default). FLUSH_LOG=2 relaxes durability and is a diagnostic only.
 services:
   mysql:
     image: mysql:8.0
     container_name: coupon-lab-load-mysql
     cpus: 2
+    command: ["--innodb_flush_log_at_trx_commit=${FLUSH_LOG:-1}"]
     ports:
       - "13307:3306"
     environment:

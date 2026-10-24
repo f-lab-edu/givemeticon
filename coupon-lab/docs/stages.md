@@ -141,3 +141,10 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 * evidence 경로는 `evidence/<stage>/load/ramping-rows<N>/<ts>-<sha>/`, `load.json` 에 `rows: N`.
 * VU 상한: 기본 `maxVUs` 는 3000. p50 이 100ms 아래인데 `dropped_iterations` 가 생기면 k6 가 부하 생성 한계에 걸린 것이므로 `--max-vus 6000` 으로 올려 다시 돌리고, 값은 `env.max_vus` 와 `layout.vus.max` 에 기록된다(`vus.vus_max_reached` 는 이 값 기준).
 * **예측.** 천장이 N 에 비례해 오르면(행 4개면 CPU 나 풀이 걸리기 전까지 2,000rps 를 훨씬 넘고, 16개면 그보다 더) 한 행의 직렬화가 천장이라는 가설이 **확인**된다. 천장이 N 과 상관없이 700rps 안팎에 머물면 가설은 **반증**된다. 이 경우 한계는 전역적인 것(커밋/fsync, Hikari 풀, Tomcat)이고 C3 가 어느 쪽인지 가른다. C1 의 `row_lock_wait_ratio` 는 N 이 커질수록 낮아져야 한다.
+
+### C3. 진단 노브: 커밋 fsync 와 커넥션 풀 (실험 c, d)
+
+* `scripts/verify.sh load ... --flush-log 1|2` 는 MySQL 컨테이너를 `--innodb_flush_log_at_trx_commit=N` 으로 띄운다(기본 1 = MySQL 기본값, 기존 동작과 같다). `--pool N` 은 앱의 Hikari 최대 풀 크기를 정한다(환경변수 `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE`, 기본 10; 실행기의 `HIKARI_POOL_SIZE` 환경변수로도 줄 수 있다). Spring Boot 의 relaxed binding 으로 이 이름이 `spring.datasource.hikari.maximum-pool-size` 에 닿는다는 것과, 짧은 이름 `HIKARI_MAXIMUM_POOL_SIZE` 는 닿지 않는다는 것을 `HikariPoolBindingTest` 가 고정한다.
+* 두 값은 `load.json` 의 `env.innodb_flush_log_at_trx_commit`(실행 시점에 MySQL 에서 읽은 값), `env.hikari_pool_size` 에 기록되고 evidence 경로 접미사가 된다: `ramping-flush2`, `ramping-pool5`, `ramping-pool20` (`ramping-rows` 와 함께 쓰면 `ramping-rows4-flush2-pool20`). 실행기는 MySQL 이 실제로 요청한 `innodb_flush_log_at_trx_commit` 으로 돌고 있지 않으면 측정하지 않고 INFRA_DOWN 으로 멈춘다. 풀 크기가 실제로 적용됐는지는 `mysql.threads_connected_max`(풀 크기에 샘플러의 연결 한두 개를 더한 값 근처여야 한다)로 확인한다.
+* **`--flush-log 2` 는 진단 전용이다.** 커밋마다 redo 로그를 디스크에 동기화하지 않고 초당 한 번만 하므로 내구성이 약해져, 서버가 죽으면 최대 약 1초 분량의 커밋을 잃을 수 있다. 천장이 어디서 오는지 보려는 실험일 뿐 이 값을 설정 후보로 삼지 않는다.
+* **예측.** `--flush-log 2` 로 천장이 크게 오르면 fsync 가 임계 구역을 지배한다는 뜻이다(`fsyncs_per_request` 와 `row_lock_time_per_request_ms` 도 함께 떨어져야 한다). 천장이 그대로면 fsync 는 주된 원인이 아니다. `--pool 5` / `--pool 20` 에서 천장이 그대로이고 지연만 달라지면 풀은 한계가 아니다. 풀이 한계였다면 5 에서는 천장이 내려가고 20 에서는 올라간다.

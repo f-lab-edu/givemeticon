@@ -4,6 +4,7 @@
 #   verify.sh unit [--tests <pattern>]
 #   verify.sh bundle <consistency|load|bottleneck|recovery|fairness> [--stage sN]
 #   verify.sh load --stage sN --profile <ramping|spike|ramping-rows> [--runs N] [--k6 host|container] [--rows N] [--max-vus N]
+#                  [--flush-log 1|2] [--pool N]    (--flush-log 2 relaxes durability: a DIAGNOSTIC, never a configuration)
 #                  (tests B and C: k6 against docker compose, see docs/stages.md)
 #   verify.sh reprocess evidence/<stage>/load/<profile>/<dir>        (test B: re-aggregate a saved run into a new -reprocessed dir)
 # Last stdout line:
@@ -17,10 +18,12 @@ set -euo pipefail
 command -v python3 >/dev/null || { echo "python3 required" >&2; exit 2; }
 
 BUNDLES="consistency load bottleneck recovery fairness"
+# Connection pool size of the load-test app: the environment, then verify.sh load --pool N, then 10. Set before the arguments are parsed.
+LOAD_HIKARI_POOL_SIZE=${HIKARI_POOL_SIZE:-10}
 
 usage() {
     echo "usage: scripts/verify.sh compile | unit [--tests <pattern>] | bundle <$(echo "$BUNDLES" | tr ' ' '|')> [--stage sN]" >&2
-    echo "       scripts/verify.sh load --stage sN --profile ramping|spike|ramping-rows [--runs N] [--k6 host|container] [--rows N] [--max-vus N]" >&2
+    echo "       scripts/verify.sh load --stage sN --profile ramping|spike|ramping-rows [--runs N] [--k6 host|container] [--rows N] [--max-vus N] [--flush-log 1|2] [--pool N]" >&2
     echo "       scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir>" >&2
     exit 2
 }
@@ -75,6 +78,8 @@ case "$mode" in
         k6_mode=host
         rows=1
         max_vus=""
+        flush_log=1
+        pool=""
         while [ $# -gt 0 ]; do
             [ $# -ge 2 ] || usage
             case "$1" in
@@ -84,6 +89,8 @@ case "$mode" in
                 --k6) k6_mode=$2 ;;
                 --rows) rows=$2 ;;
                 --max-vus) max_vus=$2 ;;
+                --flush-log) flush_log=$2 ;;
+                --pool) pool=$2 ;;
                 *) usage ;;
             esac
             shift 2
@@ -95,12 +102,17 @@ case "$mode" in
         [[ "$rows" =~ ^[1-9][0-9]*$ ]] && [ "$rows" -le 64 ] || usage
         [ "$rows" -eq 1 ] || [ "$profile" = ramping-rows ] || { echo "--rows $rows needs --profile ramping-rows" >&2; exit 2; }
         [ -z "$max_vus" ] || [[ "$max_vus" =~ ^[1-9][0-9]*$ ]] || usage
+        case "$flush_log" in 1|2) ;; *) usage ;; esac
+        [ -z "$pool" ] || { [[ "$pool" =~ ^[1-9][0-9]*$ ]] && [ "$pool" -le 200 ]; } || usage
+        [ -z "$pool" ] || LOAD_HIKARI_POOL_SIZE=$pool
         [[ "$runs" =~ ^[1-9][0-9]*$ ]] || usage
         require_stage_class "$stage"
         tier="load-$profile"
         # evidence/<stage>/load/<variant>/: the profile plus whatever distinguishes the run (the row count is part of ramping-rows)
         variant=$profile
         [ "$profile" != ramping-rows ] || variant="ramping-rows$rows"
+        [ "$flush_log" = 1 ] || variant="$variant-flush$flush_log"
+        [ "$LOAD_HIKARI_POOL_SIZE" = 10 ] || variant="$variant-pool$LOAD_HIKARI_POOL_SIZE"
         ;;
     reprocess)
         [ $# -eq 1 ] || usage
@@ -157,7 +169,6 @@ LOAD_PREFIX=coupon-lab-load-
 LOAD_NETWORK=coupon-lab-load_default
 K6_IMAGE=${K6_IMAGE:-grafana/k6:latest}
 LOAD_HEALTH_TIMEOUT_S=${LOAD_HEALTH_TIMEOUT_S:-60}
-LOAD_HIKARI_POOL_SIZE=${HIKARI_POOL_SIZE:-10}
 
 # Every 2 s one line with MySQL's cumulative InnoDB lock and fsync counters:
 #   {"time": <epoch>, "status": {"Innodb_row_lock_waits": n, ...}}
@@ -255,7 +266,7 @@ run_load() {
         rm -rf "$work"
         mkdir -p "$work"
         mkdir -p "$work/gc"
-        export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE LOAD_GC_DIR="$PWD/$work/gc"
+        export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE FLUSH_LOG=$flush_log LOAD_GC_DIR="$PWD/$work/gc"
         local run_order up_epoch
         run_order=$(load_next_run_order)
         COUPON_LAB_DB_PASSWORD=$(python3 -I -c 'import secrets; print(secrets.token_hex(12))')
@@ -308,6 +319,13 @@ run_load() {
         while IFS=$'\t' read -r var_name var_value; do
             [ -z "$var_name" ] || mysql_env+=(--env "$var_name=$var_value")
         done < <(load_mysql "SHOW VARIABLES WHERE Variable_name IN ('innodb_flush_log_at_trx_commit','innodb_buffer_pool_size','innodb_log_file_size','innodb_redo_log_capacity')")
+
+        # The diagnostic knob must really be in effect, otherwise the run measures something else than its path says.
+        local flush_effective
+        flush_effective=$(load_mysql "SELECT @@GLOBAL.innodb_flush_log_at_trx_commit")
+        if [ "$flush_effective" != "$flush_log" ]; then
+            run_status=INFRA_DOWN; run_note="mysql runs innodb_flush_log_at_trx_commit=${flush_effective:-?}, requested $flush_log (see $log)"; return
+        fi
 
         # 4. k6, postprocess, DB check
         local container_epoch clock_offset="" minutes_up
