@@ -33,6 +33,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -69,6 +70,8 @@ class ConcurrentIssueConsistencyTest {
     private static final String MYSQL_IMAGE = "mysql:8.0";
     private static final String REDIS_IMAGE = "redis:7-alpine";
     private static final int REDIS_PORT = 6379;
+    private static final String RABBITMQ_IMAGE = "rabbitmq:3-alpine";
+    private static final int RABBITMQ_PORT = 5672;
     private static final Path EVIDENCE_FILE = Path.of("build", "evidence", "consistency.json");
 
     @Container
@@ -78,6 +81,12 @@ class ConcurrentIssueConsistencyTest {
     @Container
     static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse(REDIS_IMAGE))
             .withExposedPorts(REDIS_PORT);
+
+    // Always started; only S4 uses it. The port opens before the broker accepts clients, so wait for the startup line.
+    @Container
+    static final GenericContainer<?> RABBITMQ = new GenericContainer<>(DockerImageName.parse(RABBITMQ_IMAGE))
+            .withExposedPorts(RABBITMQ_PORT)
+            .waitingFor(Wait.forLogMessage(".*Server startup complete.*", 1));
 
     private static final List<Map<String, Object>> RUNS = new ArrayList<>();
     private static String stage = System.getProperty("coupon.strategy", "s0");
@@ -91,6 +100,8 @@ class ConcurrentIssueConsistencyTest {
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(REDIS_PORT));
+        registry.add("spring.rabbitmq.host", RABBITMQ::getHost);
+        registry.add("spring.rabbitmq.port", () -> RABBITMQ.getMappedPort(RABBITMQ_PORT));
     }
 
     @Autowired
@@ -231,6 +242,7 @@ class ConcurrentIssueConsistencyTest {
         env.put("spring_boot", SpringBootVersion.getVersion());
         env.put("mysql_image", MYSQL_IMAGE);
         env.put("redis_image", REDIS_IMAGE);
+        env.put("rabbitmq_image", RABBITMQ_IMAGE);
         env.put("hikari_pool_size", hikariPoolSize);
         env.put("cpu", Runtime.getRuntime().availableProcessors());
         env.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version")

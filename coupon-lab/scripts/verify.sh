@@ -4,12 +4,14 @@
 #   verify.sh unit [--tests <pattern>]
 #   verify.sh bundle <consistency|load|bottleneck|recovery|fairness> [--stage sN]
 #   verify.sh load --stage sN --profile <ramping|spike|ramping-rows> [--runs N] [--k6 host|container] [--rows N] [--max-vus N]
-#                  [--flush-log 1|2] [--pool N]    (--flush-log 2 relaxes durability: a DIAGNOSTIC, never a configuration)
+#                  [--flush-log 1|2] [--pool N] [--redis-aof]    (--flush-log 2 relaxes durability: a DIAGNOSTIC, never a configuration)
 #                  (tests B and C: k6 against docker compose, see docs/stages.md)
 #   verify.sh reprocess evidence/<stage>/load/<profile>/<dir>        (test B: re-aggregate a saved run into a new -reprocessed dir)
 #   verify.sh reprocess evidence/<stage>/recovery/<scenario>/<dir>   (test D: add the loss axes to a saved recovery.json, new -reprocessed dir)
-#   verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at 20] [--fault-duration 10] [--stock N]
+#   verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at 20] [--fault-duration 10] [--stock N] [--redis-aof]
 #                  (test D: 500 rps for 60 s while a fault is injected, then the loss accounting; see docs/stages.md. consumer-redeliver is refused until S4)
+#   --redis-aof (load, recovery): Redis runs with appendonly yes, appendfsync everysec (a configuration, not code); env.redis_appendonly=yes
+#                  and the evidence directory gets an -aof suffix. Default: appendonly no.
 # Last stdout line:
 #   VERIFY <tier> <PASS|FAIL|INFRA_DOWN|BUILD_ERROR|TIMEOUT|NO_TESTS> passed=N failed=N skipped=N duration=Ns sha=<short> dirty=<bool> report=<path>
 # Exit codes: 0 PASS, 1 FAIL, 2 usage/config error, 3 INFRA_DOWN, 4 TIMEOUT, 5 BUILD_ERROR, 6 NO_TESTS.
@@ -27,9 +29,9 @@ LOAD_HIKARI_POOL_SIZE=${HIKARI_POOL_SIZE:-10}
 
 usage() {
     echo "usage: scripts/verify.sh compile | unit [--tests <pattern>] | bundle <$(echo "$BUNDLES" | tr ' ' '|')> [--stage sN]" >&2
-    echo "       scripts/verify.sh load --stage sN --profile ramping|spike|ramping-rows [--runs N] [--k6 host|container] [--rows N] [--max-vus N] [--flush-log 1|2] [--pool N]" >&2
+    echo "       scripts/verify.sh load --stage sN --profile ramping|spike|ramping-rows [--runs N] [--k6 host|container] [--rows N] [--max-vus N] [--flush-log 1|2] [--pool N] [--redis-aof]" >&2
     echo "       scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir> | evidence/<stage>/recovery/<scenario>/<dir>" >&2
-    echo "       scripts/verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at S] [--fault-duration S] [--stock N]" >&2
+    echo "       scripts/verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at S] [--fault-duration S] [--stock N] [--redis-aof]" >&2
     exit 2
 }
 
@@ -51,6 +53,7 @@ shift
 tests_pattern=""
 stage=""
 bundle=""
+redis_aof=no
 case "$mode" in
     compile)
         [ $# -eq 0 ] || usage
@@ -86,6 +89,7 @@ case "$mode" in
         flush_log=1
         pool=""
         while [ $# -gt 0 ]; do
+            if [ "$1" = --redis-aof ]; then redis_aof=yes; shift; continue; fi
             [ $# -ge 2 ] || usage
             case "$1" in
                 --stage) stage=$2 ;;
@@ -118,6 +122,7 @@ case "$mode" in
         [ "$profile" != ramping-rows ] || variant="ramping-rows$rows"
         [ "$flush_log" = 1 ] || variant="$variant-flush$flush_log"
         [ "$LOAD_HIKARI_POOL_SIZE" = 10 ] || variant="$variant-pool$LOAD_HIKARI_POOL_SIZE"
+        [ "$redis_aof" = no ] || variant="$variant-aof"
         ;;
     recovery)
         scenario=""
@@ -125,6 +130,7 @@ case "$mode" in
         fault_duration=10
         stock=""
         while [ $# -gt 0 ]; do
+            if [ "$1" = --redis-aof ]; then redis_aof=yes; shift; continue; fi
             [ $# -ge 2 ] || usage
             case "$1" in
                 --stage) stage=$2 ;;
@@ -153,15 +159,18 @@ case "$mode" in
         [ "$fault_end_s" -lt "$recovery_seconds" ] || { echo "the fault ends at second $fault_end_s of ${recovery_seconds}; it must end before the load does" >&2; exit 2; }
         require_stage_class "$stage"
         tier="recovery-$scenario"
+        # evidence/<stage>/recovery/<scenario dir>/: the scenario plus the configuration knob that distinguishes the run
+        scenario_dir=$scenario
+        [ "$redis_aof" = no ] || scenario_dir="$scenario-aof"
         ;;
     reprocess)
         [ $# -eq 1 ] || usage
         source_dir=${1%/}
         reprocess_kind=load
-        if [[ "$source_dir" =~ ^evidence/(s[0-9]+)/recovery/(db-down|redis-restart)/[^/]+$ ]]; then
+        if [[ "$source_dir" =~ ^evidence/(s[0-9]+)/recovery/((db-down|redis-restart)(-aof)?)/[^/]+$ ]]; then
             reprocess_kind=recovery
             stage=${BASH_REMATCH[1]}
-            scenario=${BASH_REMATCH[2]}
+            scenario_dir=${BASH_REMATCH[2]}
             [ -f "$source_dir/recovery.json" ] || { echo "$source_dir needs recovery.json" >&2; exit 2; }
             tier=recovery-reprocess
         else
@@ -248,12 +257,12 @@ load_next_run_order() {
 
 # Every 2 s one line per container into <outfile>: {"time": <epoch>, "stat": <docker stats object>}. Run in the
 # background during k6 and killed afterwards; postprocess.py turns the app and mysql lines into per-stage CPU figures
-# (redis lines are kept in stats.jsonl for reading by hand and are not aggregated).
+# (redis and rabbitmq lines are kept in stats.jsonl for reading by hand and are not aggregated).
 load_sample_stats() {
     local out=$1 started now
     while :; do
         started=$(date +%s)
-        docker stats --no-stream --format json "${LOAD_PREFIX}app" "${LOAD_PREFIX}mysql" "${LOAD_PREFIX}redis" 2>/dev/null | while IFS= read -r line; do
+        docker stats --no-stream --format json "${LOAD_PREFIX}app" "${LOAD_PREFIX}mysql" "${LOAD_PREFIX}redis" "${LOAD_PREFIX}rabbitmq" 2>/dev/null | while IFS= read -r line; do
             [ -z "$line" ] || printf '{"time":%s,"stat":%s}\n' "$(date +%s)" "$line" >>"$out"
         done
         now=$(date +%s)
@@ -316,7 +325,8 @@ run_load() {
         rm -rf "$work"
         mkdir -p "$work"
         mkdir -p "$work/gc"
-        export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE FLUSH_LOG=$flush_log LOAD_GC_DIR="$PWD/$work/gc"
+        export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE FLUSH_LOG=$flush_log LOAD_GC_DIR="$PWD/$work/gc" \
+            REDIS_APPENDONLY=$redis_aof
         local run_order up_epoch
         run_order=$(load_next_run_order)
         COUPON_LAB_DB_PASSWORD=$(python3 -I -c 'import secrets; print(secrets.token_hex(12))')
@@ -377,6 +387,11 @@ run_load() {
         if [ "$flush_effective" != "$flush_log" ]; then
             run_status=INFRA_DOWN; run_note="mysql runs innodb_flush_log_at_trx_commit=${flush_effective:-?}, requested $flush_log (see $log)"; return
         fi
+        local appendonly
+        appendonly=$(docker exec "${LOAD_PREFIX}redis" redis-cli --raw CONFIG GET appendonly 2>>"$log" | tail -n 1)
+        if [ "$appendonly" != "$redis_aof" ]; then
+            run_status=INFRA_DOWN; run_note="redis runs appendonly=${appendonly:-?}, requested $redis_aof (see $log)"; return
+        fi
 
         # 4. k6, postprocess, DB check
         local container_epoch clock_offset="" minutes_up
@@ -410,7 +425,7 @@ run_load() {
             fi
             run_status=BUILD_ERROR; run_note="k6 exited $k6_rc (see $log)"; return
         fi
-        local issued_rows nano cpus_app cpus_mysql cpus_redis redis_image heap hikari
+        local issued_rows nano cpus_app cpus_mysql cpus_redis redis_image heap hikari cpus_rabbitmq rabbitmq_image
         issued_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_issue WHERE event_id IN ($event_ids)")
         if ! [[ "$issued_rows" =~ ^[0-9]+$ ]]; then
             run_status=INFRA_DOWN; run_note="counting coupon_issue rows failed (see $log)"; return
@@ -432,12 +447,15 @@ run_load() {
         hikari=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=//p')
         nano=$(load_inspect '{{.HostConfig.NanoCpus}}' redis); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_redis=$((nano / 1000000000))
         redis_image=$(load_inspect '{{.Config.Image}}' redis)
+        nano=$(load_inspect '{{.HostConfig.NanoCpus}}' rabbitmq); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_rabbitmq=$((nano / 1000000000))
+        rabbitmq_image=$(load_inspect '{{.Config.Image}}' rabbitmq)
         python3 -I scripts/load/postprocess.py --raw "$work/raw.json.gz" --profile "$profile" --stage "$stage" \
             --db-issued-rows "$issued_rows" ${redis_counter_arg[@]+"${redis_counter_arg[@]}"} --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
             --stats "$work/stats.jsonl" --summary "$work/summary.json" --gc-log "$work/gc/gc.log" --innodb "$work/innodb.jsonl" \
             --run-order "$run_order" --minutes-since-up "$minutes_up" ${clock_offset:+--clock-offset-s "$clock_offset"} \
             --rows "$rows" ${max_vus:+--max-vus "$max_vus"} --env "max_vus=${max_vus:-$vus_max_default}" \
             --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "redis_image=$redis_image" --env "redis_cpus=$cpus_redis" --env "jvm_heap=$heap" \
+            --env "redis_appendonly=$appendonly" --env "rabbitmq_image=$rabbitmq_image" --env "rabbitmq_cpus=$cpus_rabbitmq" \
             --env "hikari_pool_size=$hikari" --env "k6_version=$k6_version" --env "k6_mode=$k6_mode" ${k6_env[@]+"${k6_env[@]}"} ${mysql_env[@]+"${mysql_env[@]}"} \
             >>"$log" 2>&1
         if [ $? -ne 0 ]; then
@@ -615,7 +633,8 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
         rm -rf "$work"
         mkdir -p "$work/gc"
         : >"$work/fault.log"
-        export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE FLUSH_LOG=1 LOAD_GC_DIR="$PWD/$work/gc"
+        export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE FLUSH_LOG=1 LOAD_GC_DIR="$PWD/$work/gc" \
+            REDIS_APPENDONLY=$redis_aof
         COUPON_LAB_DB_PASSWORD=$(python3 -I -c 'import secrets; print(secrets.token_hex(12))')
         local k6_version
         k6_version=$(k6 version 2>/dev/null | head -n 1 | awk '{print $2}')
@@ -648,6 +667,7 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
 
         # settings that decide how the system behaves under the fault, recorded with the run (read, never changed)
         local mysql_env=() var_name var_value nano cpus_app cpus_mysql cpus_redis redis_image heap hikari hikari_timeout appendonly
+        local cpus_rabbitmq rabbitmq_image
         while IFS=$'\t' read -r var_name var_value; do
             [ -z "$var_name" ] || mysql_env+=(--env "$var_name=$var_value")
         done < <(load_mysql "SHOW VARIABLES WHERE Variable_name IN ('innodb_flush_log_at_trx_commit','innodb_buffer_pool_size','innodb_log_file_size','innodb_redo_log_capacity')")
@@ -655,6 +675,8 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
         nano=$(load_inspect '{{.HostConfig.NanoCpus}}' mysql); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_mysql=$((nano / 1000000000))
         nano=$(load_inspect '{{.HostConfig.NanoCpus}}' redis); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_redis=$((nano / 1000000000))
         redis_image=$(load_inspect '{{.Config.Image}}' redis)
+        nano=$(load_inspect '{{.HostConfig.NanoCpus}}' rabbitmq); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; cpus_rabbitmq=$((nano / 1000000000))
+        rabbitmq_image=$(load_inspect '{{.Config.Image}}' rabbitmq)
         heap=$(load_inspect '{{json .Config.Entrypoint}}' app | grep -o -- '-Xmx[0-9]*[kKmMgG]' | head -n 1 | sed 's/^-Xmx//')
         hikari=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=//p')
         # Hikari's connectionTimeout is not set by the compose file: the library default (30000 ms) applies unless the container sets it
@@ -667,6 +689,9 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
         virtual_threads=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_THREADS_VIRTUAL_ENABLED=//p')
         [ "$virtual_threads" = true ] || virtual_threads=false
         appendonly=$(docker exec "${LOAD_PREFIX}redis" redis-cli --raw CONFIG GET appendonly 2>>"$log" | tail -n 1)
+        if [ "$appendonly" != "$redis_aof" ]; then
+            run_status=INFRA_DOWN; run_note="redis runs appendonly=${appendonly:-?}, requested $redis_aof (see $log)"; return
+        fi
 
         # 3. samplers, k6, fault
         : >"$work/stats.jsonl"
@@ -726,7 +751,8 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
             --target "${LOAD_PREFIX}$fault_target" --out "$work/recovery.json" --timeline-out "$work/timeline.json" \
             --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "redis_image=$redis_image" --env "redis_cpus=$cpus_redis" \
             --env "jvm_heap=$heap" --env "hikari_pool_size=$hikari" --env "hikari_connection_timeout_ms=$hikari_timeout" --env "tomcat_max_threads=$tomcat_threads" --env "virtual_threads=$virtual_threads" \
-            --env "redis_appendonly=$appendonly" --env "k6_version=$k6_version" --env "k6_mode=host" ${mysql_env[@]+"${mysql_env[@]}"} \
+            --env "redis_appendonly=$appendonly" --env "rabbitmq_image=$rabbitmq_image" --env "rabbitmq_cpus=$cpus_rabbitmq" \
+            --env "k6_version=$k6_version" --env "k6_mode=host" ${mysql_env[@]+"${mysql_env[@]}"} \
             >>"$log" 2>&1
         if [ $? -ne 0 ]; then
             run_status=BUILD_ERROR; run_note="recovery_postprocess failed (see $log)"; return
@@ -750,7 +776,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/recovery.json")
     rec_body
     rec_cleanup   # always, before anything else touches the result
     if [ -f "$work/recovery.json" ]; then
-        run_evidence="evidence/$stage/recovery/$scenario/$stamp-$sha"
+        run_evidence="evidence/$stage/recovery/$scenario_dir/$stamp-$sha"
         [ "$dirty" = false ] || run_evidence="$run_evidence-dirty"
         mkdir -p "$run_evidence"
         cp "$work/recovery.json" "$work/timeline.json" "$work/fault.log" "$run_evidence/"
@@ -783,7 +809,7 @@ run_reprocess_recovery() {
         echo "recovery_postprocess failed for $source_dir (see $log)"
         load_finish BUILD_ERROR 5
     fi
-    dest="evidence/$stage/recovery/$scenario/$stamp-$sha"
+    dest="evidence/$stage/recovery/$scenario_dir/$stamp-$sha"
     [ "$dirty" = false ] || dest="$dest-dirty"
     dest="$dest-reprocessed"
     if [ -e "$dest" ]; then echo "$dest already exists; evidence is never overwritten" >&2; exit 2; fi

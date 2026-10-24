@@ -10,6 +10,18 @@ spring:
     redis:
       host: ${COUPON_LAB_REDIS_HOST:localhost}
       port: ${COUPON_LAB_REDIS_PORT:6379}
+  rabbitmq:
+    host: ${COUPON_LAB_RABBIT_HOST:localhost}
+    port: ${COUPON_LAB_RABBIT_PORT:5672}
+    username: ${COUPON_LAB_RABBIT_USERNAME:guest}
+    password: ${COUPON_LAB_RABBIT_PASSWORD:guest}
+    publisher-confirm-type: simple
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: auto
+        concurrency: 1
+        prefetch: 50
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
