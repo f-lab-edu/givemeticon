@@ -406,11 +406,21 @@ class LossAxesTest(unittest.TestCase):
         self.assertIsNone(rp.loss_axes(reset)["not_admitted"])
         self.assertIsNone(rp.loss_axes(self.report(None, 5, 5, requests=5))["not_admitted"])
 
-    def test_blackout_is_the_longest_run_of_seconds_without_a_200(self):
+    def test_blackout_is_the_longest_run_of_seconds_without_a_decision(self):
         timeline = self.seconds(*([500] * 5 + [0] * 55))  # a 49 s outage: the 200s stop at second 5 and never return during the load
         self.assertEqual(rp.loss_axes(self.report(1, 1, 1, timeline=timeline))["blackout_s"], 55)
         self.assertEqual(rp.blackout_seconds(self.seconds(5, 0, 0, 5, 0, 0, 0, 5), 60), 3)
         self.assertEqual(rp.blackout_seconds(self.seconds(*([500] * 60)), 60), 0)
+
+    def test_a_sold_out_tail_is_not_a_blackout_and_is_reported_on_its_own(self):
+        # 38 s of 200s, then only 409s: sold out, every request decided (the S3 redis-restart-aof run used to read "21")
+        timeline = [{"sec": s, "http_200": 500 if s < 38 else 0, "http_409": 0 if s < 38 else 500} for s in range(60)]
+        self.assertEqual(rp.blackout_seconds(timeline, 60), 0)
+        self.assertEqual(rp.sold_out_at(timeline, 60), 38)
+        stalled = [{"sec": s, "http_200": 0 if 20 <= s < 38 else 500, "http_409": 0} for s in range(60)]
+        self.assertEqual(rp.blackout_seconds(stalled, 60), 18)  # 18 s with neither a 200 nor a 409
+        self.assertIsNone(rp.sold_out_at(stalled, 60))
+        self.assertIsNone(rp.sold_out_at([{"sec": 61, "http_200": 0, "http_409": 5}], 60))  # after the load
 
     def test_blackout_ignores_seconds_after_the_load_and_a_missing_second_breaks_the_run(self):
         self.assertEqual(rp.blackout_seconds(self.seconds(0, 0, 0, start=58), 60), 2)  # seconds 58 and 59 only
@@ -465,7 +475,7 @@ class CommandLineTest(unittest.TestCase):
             with open(out, encoding="utf-8") as f:
                 new = json.load(f)
         self.assertEqual((new["seats_lost"], new["client_unknown"], new["recorded_despite_unknown"]), (2, 3, 2))
-        self.assertEqual((new["not_admitted"], new["blackout_s"]), (5, 0))
+        self.assertEqual((new["not_admitted"], new["blackout_s"], new["sold_out_at_s"]), (5, 0, None))
         self.assertEqual((new["settle_s"], new["queue_depth_max"], new["redeliveries"]), (None, None, None))
         self.assertIsNone(new["publish_failures"])
 

@@ -15,11 +15,14 @@ spring:
     port: ${COUPON_LAB_RABBIT_PORT:5672}
     username: ${COUPON_LAB_RABBIT_USERNAME:guest}
     password: ${COUPON_LAB_RABBIT_PASSWORD:guest}
-    publisher-confirm-type: simple
+    # S4: correlated confirms complete a CorrelationData future per publish on the template's shared, cached channels.
+    # (simple confirms needed RabbitTemplate.invoke, whose dedicated channel was closed physically, 5 s late: channelMax.)
+    publisher-confirm-type: correlated
     publisher-returns: true
-    # S4: up to 200 Tomcat threads publish at once. With the default cache of 25, every publisher beyond it opened and
-    # closed its own channel per request (channel churn). 200 = server.tomcat.threads.max. No checkout-timeout, so it stays
-    # a cache and never blocks a request waiting for a channel.
+    template:
+      mandatory: true
+    # Up to 200 Tomcat threads publish at once; with correlated confirms the channels come from and return to this cache,
+    # so its size now matters. 200 = server.tomcat.threads.max. No checkout-timeout: a cache, never a semaphore.
     cache:
       channel:
         size: 200

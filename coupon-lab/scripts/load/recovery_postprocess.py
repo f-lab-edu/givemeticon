@@ -39,7 +39,10 @@ Definitions (the numbers are OUTCOMES: they never decide PASS/FAIL, only validit
   not_admitted               requests - redis_counter: requests that never reached the decision (the counter). null when the counter is
                              not meaningful. client_unknown minus not_admitted is roughly "took a seat, client does not know".
   blackout_s                 the longest run of consecutive seconds of the load (0..59) in which no request started in that second
-                             was answered 200 (a second is counted by when its requests started).
+                             got a decision: no 200 and no 409 (a second is counted by when its requests started). A sold-out tail
+                             (409 only) is not a blackout. Until S4 follow-up 2 it counted seconds without a 200, so a sold-out tail
+                             counted; reprocessed runs carry the new definition.
+  sold_out_at_s              the first load second in which a request got a 409 (sold out); null when none did.
   error_codes                {k6 error_code: requests} of the requests that got no HTTP answer; null when the run predates the
                              recording (the raw k6 output is not kept, so older runs cannot be filled in).
   seats_lost                 wins - db_rows: seats the decision took that have no row (the durability figure). null when wins is null.
@@ -175,22 +178,29 @@ def loss_axes(report):
         "recorded_despite_unknown": report["db_rows"] - totals["http_200"] if no_duplicates else None,
         "not_admitted": totals["requests"] - counter if report.get("redis_counter_meaningful") and counter is not None else None,
         "blackout_s": blackout_seconds(report["timeline"], report["load"]["seconds"]),
+        "sold_out_at_s": sold_out_at(report["timeline"], report["load"]["seconds"]),
         "legacy_fields": ["consumed_but_unconfirmed", "confirmed_but_missing"],
     }
 
 
 def blackout_seconds(timeline, load_seconds):
-    """Longest run of consecutive seconds 0..load_seconds-1 with no 200 among the requests started in them."""
+    """Longest run of consecutive seconds 0..load_seconds-1 in which no request started got a decision (no 200, no 409)."""
     longest = current = 0
     by_sec = {entry["sec"]: entry for entry in timeline}
     for sec in range(load_seconds):
         entry = by_sec.get(sec)
-        if entry is not None and entry["http_200"] == 0:
+        if entry is not None and entry["http_200"] + entry.get("http_409", 0) == 0:
             current += 1
             longest = max(longest, current)
         else:
             current = 0
     return longest
+
+
+def sold_out_at(timeline, load_seconds):
+    """The first second 0..load_seconds-1 in which a request started got a 409, or None."""
+    seconds = [entry["sec"] for entry in timeline if 0 <= entry["sec"] < load_seconds and entry.get("http_409", 0) > 0]
+    return min(seconds) if seconds else None
 
 
 def reprocess(source_dir):
@@ -432,8 +442,9 @@ def main(argv=None):
         with open(args.out, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
             f.write("\n")
-        print("recovery_postprocess: reprocessed %s: seats_lost=%s client_unknown=%s not_admitted=%s blackout_s=%s" % (
-            args.reprocess_from, report["seats_lost"], report["client_unknown"], report["not_admitted"], report["blackout_s"]))
+        print("recovery_postprocess: reprocessed %s: seats_lost=%s client_unknown=%s not_admitted=%s blackout_s=%s sold_out_at_s=%s" % (
+            args.reprocess_from, report["seats_lost"], report["client_unknown"], report["not_admitted"], report["blackout_s"],
+            report["sold_out_at_s"]))
         return 0
     required = ("raw", "scenario", "stage", "stock", "fault_log", "db_samples", "issues", "db_rows", "k6_exit", "timeline_out")
     missing = [name for name in required if getattr(args, name) is None]
@@ -459,10 +470,11 @@ def main(argv=None):
         f.write("\n")
     totals = report["totals"]
     print("recovery_postprocess: scenario=%s stage=%s requests=%d http_200=%d http_5xx=%d timeouts=%d db_rows=%d "
-          "seats_lost=%s client_unknown=%s not_admitted=%s blackout_s=%s recovery_time_s=%s valid=%s" % (
+          "seats_lost=%s client_unknown=%s not_admitted=%s blackout_s=%s sold_out_at_s=%s recovery_time_s=%s valid=%s" % (
               report["scenario"], report["stage"], totals["requests"], totals["http_200"], totals["http_5xx"],
               totals["timeouts"], report["db_rows"], report["seats_lost"], report["client_unknown"],
-              report["not_admitted"], report["blackout_s"], report["recovery_time_s"], str(report["validity"]["valid"]).lower()))
+              report["not_admitted"], report["blackout_s"], report["sold_out_at_s"], report["recovery_time_s"],
+              str(report["validity"]["valid"]).lower()))
     return 0
 
 

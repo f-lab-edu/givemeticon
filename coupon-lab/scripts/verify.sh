@@ -21,7 +21,8 @@
 #   VERIFY <tier> <PASS|FAIL|INFRA_DOWN|BUILD_ERROR|TIMEOUT|NO_TESTS> passed=N failed=N skipped=N duration=Ns sha=<short> dirty=<bool> report=<path>
 # Exit codes: 0 PASS, 1 FAIL, 2 usage/config error, 3 INFRA_DOWN, 4 TIMEOUT, 5 BUILD_ERROR, 6 NO_TESTS.
 # For `recovery`: PASS = valid measurement (k6 ran to the end and the fault was injected while it ran); the loss figures are outcomes, never part of PASS/FAIL.
-# For `load`: PASS = valid run (first stage without dropped iterations >= 1% and DB rows == 200 responses),
+# For `load`: PASS = valid run (first stage without dropped iterations >= 1% and DB rows == 200 responses; for s4 DB rows may exceed the
+# 200 responses by at most the publishes that timed out waiting for their confirm, see postprocess.py),
 # FAIL = invalid run, INFRA_DOWN = docker/compose/health/seed problem, BUILD_ERROR = k6 or postprocess failed.
 # Later stages that saturate do not invalidate a run; they are flagged saturated in load.json.
 set -euo pipefail
@@ -370,12 +371,15 @@ except Exception:
     pass'
 }
 
-# Before the containers go away: the app ERROR headlines (every stage) to <dir>/app-errors.log and, for s4, the broker log lines
-# that tell errors, warnings, closed connections/channels, flow control and alarms apart to <dir>/rabbitmq.log
-# (400 characters each, at most 2000 lines; stack traces are not kept).
+# Before the containers go away: from the app log (every stage) the ERROR and WARN headlines plus every line of a Lettuce logger
+# (io.lettuce, abbreviated i.l. by the log pattern, or ConnectionWatchdog: Redis reconnect attempts and their timing, any
+# level) to <dir>/app-errors.log (4000 lines at most); for s4 the broker log lines that tell errors, warnings, closed
+# connections/channels, flow control and alarms apart to <dir>/rabbitmq.log (2000 lines at most). 400 characters per line;
+# stack trace lines (indented) are not kept.
 load_keep_logs() {   # <dir>
     if docker logs "${LOAD_PREFIX}app" >"$1/app.log" 2>&1; then
-        grep ' ERROR ' "$1/app.log" | cut -c1-400 | head -n 2000 >"$1/app-errors.log"
+        grep -v '^[[:space:]]' "$1/app.log" | grep -E ' (ERROR|WARN) |io\.lettuce|i\.l\.[a-z]|ConnectionWatchdog' \
+            | cut -c1-400 | head -n 4000 >"$1/app-errors.log"
     fi
     if [ "$stage" = s4 ] && docker logs "${LOAD_PREFIX}rabbitmq" >"$1/rabbitmq-full.log" 2>&1; then
         grep -iE 'error|warn|closing|flow|alarm' "$1/rabbitmq-full.log" | cut -c1-400 | head -n 2000 >"$1/rabbitmq.log"
@@ -913,6 +917,8 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
         # log; keep the ERROR headlines (and for s4 the broker log lines) as evidence.
         local failures_arg=() insert_failures
         load_keep_logs "$work"
+        # Redis (decision counter) restarts and AOF loading, for the stages that use it; the log is short, kept whole
+        if [ "$stage" = s3 ] || [ "$stage" = s4 ]; then docker logs "${LOAD_PREFIX}redis" >"$work/redis.log" 2>&1; fi
         if [ -f "$work/app.log" ]; then
             insert_failures=$(grep -c 'coupon_issue insert failed after winning the counter' "$work/app.log")
             [[ "$insert_failures" =~ ^[0-9]+$ ]] && failures_arg=(--insert-failures "$insert_failures")
@@ -936,9 +942,9 @@ print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.time
 import json, sys
 d = json.load(open(sys.argv[1]))
 t = d["totals"]
-print("http_200=%s http_409=%s http_5xx=%s timeouts=%s db_rows=%s redis_counter=%s seats_lost=%s client_unknown=%s recorded_despite_unknown=%s not_admitted=%s blackout_s=%s over_issue=%s dup_seq=%s dup_members=%s insert_failures_logged=%s recovery_time_s=%s settle_s=%s queue_depth_max=%s redeliveries=%s k6_completed=%s fault_observed=%s" % (
+print("http_200=%s http_409=%s http_5xx=%s timeouts=%s db_rows=%s redis_counter=%s seats_lost=%s client_unknown=%s recorded_despite_unknown=%s not_admitted=%s blackout_s=%s sold_out_at_s=%s over_issue=%s dup_seq=%s dup_members=%s insert_failures_logged=%s recovery_time_s=%s settle_s=%s queue_depth_max=%s redeliveries=%s k6_completed=%s fault_observed=%s" % (
     t["http_200"], t["http_409"], t["http_5xx"], t["timeouts"], d["db_rows"], d["redis_counter"], d["seats_lost"],
-    d["client_unknown"], d["recorded_despite_unknown"], d["not_admitted"], d["blackout_s"], d["over_issue"], d["dup_seq"], d["dup_members"],
+    d["client_unknown"], d["recorded_despite_unknown"], d["not_admitted"], d["blackout_s"], d["sold_out_at_s"], d["over_issue"], d["dup_seq"], d["dup_members"],
     d["insert_failures_logged"], d["recovery_time_s"], d["settle_s"], d["queue_depth_max"], d["redeliveries"],
     str(d["validity"]["k6_completed"]).lower(), str(d["validity"]["fault_observed"]).lower()))
 print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/recovery.json")
@@ -959,6 +965,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/recovery.json")
         [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
         [ ! -f "$work/app-errors.log" ] || cp "$work/app-errors.log" "$run_evidence/"
         [ ! -f "$work/rabbitmq.log" ] || cp "$work/rabbitmq.log" "$run_evidence/"
+        [ ! -f "$work/redis.log" ] || cp "$work/redis.log" "$run_evidence/"
         evidence_dirs+=("$run_evidence")
         echo "recovery $scenario on $stage: evidence in $run_evidence"
     fi
@@ -991,15 +998,15 @@ run_reprocess_recovery() {
     if [ -e "$dest" ]; then echo "$dest already exists; evidence is never overwritten" >&2; exit 2; fi
     mkdir -p "$dest"
     cp "$tmp/recovery.json" "$dest/"
-    for name in timeline.json fault.log summary.json stats.jsonl app-errors.log queue.jsonl rabbitmq.log; do
+    for name in timeline.json fault.log summary.json stats.jsonl app-errors.log queue.jsonl rabbitmq.log redis.log; do
         [ ! -f "$source_dir/$name" ] || cp "$source_dir/$name" "$dest/"
     done
     evidence_dirs+=("$dest")
     verdict=$(python3 -I -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
-print("seats_lost=%s client_unknown=%s recorded_despite_unknown=%s not_admitted=%s blackout_s=%s db_rows=%s valid=%s" % (
-    d["seats_lost"], d["client_unknown"], d["recorded_despite_unknown"], d["not_admitted"], d["blackout_s"], d["db_rows"], str(d["validity"]["valid"]).lower()))
+print("seats_lost=%s client_unknown=%s recorded_despite_unknown=%s not_admitted=%s blackout_s=%s sold_out_at_s=%s db_rows=%s valid=%s" % (
+    d["seats_lost"], d["client_unknown"], d["recorded_despite_unknown"], d["not_admitted"], d["blackout_s"], d["sold_out_at_s"], d["db_rows"], str(d["validity"]["valid"]).lower()))
 print("PASS" if d["validity"]["valid"] else "FAIL")' "$dest/recovery.json")
     echo "reprocessed $source_dir: $(head -n 1 <<<"$verdict")"
     echo "evidence in $dest"
