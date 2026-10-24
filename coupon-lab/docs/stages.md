@@ -133,3 +133,11 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 * `stages[]` 에 단계 측정 구간의 증가분(누적 카운터를 샘플 사이에서 선형 보간): `row_lock_waits_delta`, `row_lock_time_ms_delta`, `row_lock_wait_ratio` (= waits_delta / requests), `row_lock_time_per_request_ms`, `fsyncs_delta` (= `Innodb_data_fsyncs` + `Innodb_os_log_fsyncs`), `log_fsyncs_delta` (redo 로그 = 커밋 경로만), `fsyncs_per_request`. 샘플이 구간을 덮지 못하거나 서버가 재시작돼 카운터가 줄면 null. run 단위로 `mysql.threads_connected_max`.
 * `compare.py` 는 run 별로 650rps(`--p50-at`)와 최고 target 에서 `row_lock_wait_ratio`, `row_lock_time_per_request_ms`, `fsyncs_per_request` 를 표로 보여 준다.
 * **예측.** 요청이 한 행에서 줄을 선다면 `row_lock_wait_ratio` 가 1 쪽으로 올라가고 `row_lock_time_per_request_ms` 가 단계와 함께 커지되, 정확히 `p50_ms` 가 오르는 단계(테스트 B 에서는 650~800rps)에서 오른다. 낮은 단계(100~400rps)에서 ratio 가 0 에 가깝고 p50 이 오르는 단계에서도 0 에 머물면 행 락 대기는 병목이 아니다. `fsyncs_per_request` 가 1 에 가까우면 커밋마다 fsync 를 하고(그룹 커밋 이득 없음), 1 보다 훨씬 작으면 커밋이 묶여 나간다.
+
+### C2. 이벤트 행 N개로 분산 (실험 b, 결정적)
+
+* 프로필 `ramping-rows`: 15s@100rps 워밍업 후 200/400/800/1200/1600/2400/3200 rps 를 단계당 30s, 이벤트마다 stock 10,000,000. 한 행의 천장이 700rps 안팎이라면 N 행에서는 그보다 훨씬 높은 곳까지 올려야 천장이 보이므로 `ramping` 보다 단계가 높다.
+* 실행: `scripts/verify.sh load --stage sN --profile ramping-rows --rows N` (N 은 1~64, 기본 1; `ramping-rows` 에서만 1 이 아닌 값을 쓸 수 있다). 실행기가 이벤트 N 개를 심고 k6 에 `EVENT_IDS=7,8,9,...` 를 넘기며, `issue.js` 는 iteration i 를 `EVENT_IDS[i % N]` 으로 보낸다(`events.js`, 라운드 로빈이라 모든 이벤트가 같은 몫을 받는다). 회원 번호는 전체 실행에서 유일하므로 이벤트가 달라도 중복 발급이 없다. DB 대조는 N 개 이벤트의 `coupon_issue` 를 합산해 200 응답 수와 비교한다.
+* evidence 경로는 `evidence/<stage>/load/ramping-rows<N>/<ts>-<sha>/`, `load.json` 에 `rows: N`.
+* VU 상한: 기본 `maxVUs` 는 3000. p50 이 100ms 아래인데 `dropped_iterations` 가 생기면 k6 가 부하 생성 한계에 걸린 것이므로 `--max-vus 6000` 으로 올려 다시 돌리고, 값은 `env.max_vus` 와 `layout.vus.max` 에 기록된다(`vus.vus_max_reached` 는 이 값 기준).
+* **예측.** 천장이 N 에 비례해 오르면(행 4개면 CPU 나 풀이 걸리기 전까지 2,000rps 를 훨씬 넘고, 16개면 그보다 더) 한 행의 직렬화가 천장이라는 가설이 **확인**된다. 천장이 N 과 상관없이 700rps 안팎에 머물면 가설은 **반증**된다. 이 경우 한계는 전역적인 것(커밋/fsync, Hikari 풀, Tomcat)이고 C3 가 어느 쪽인지 가른다. C1 의 `row_lock_wait_ratio` 는 N 이 커질수록 낮아져야 한다.

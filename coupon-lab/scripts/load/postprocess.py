@@ -30,7 +30,8 @@ InnoDB row-lock and fsync counters); per stage it gives the deltas over the meas
 linearly between samples) and the ratios per request: row_lock_wait_ratio (waits / requests, near 1 means every request
 waited for a row lock), row_lock_time_per_request_ms, fsyncs_per_request. fsyncs_delta is Innodb_data_fsyncs +
 Innodb_os_log_fsyncs; log_fsyncs_delta is the redo-log (commit path) part alone. --rows is the number of event rows the run
-spread its load over.
+spread its load over. --max-vus is the VU cap k6 was run with when it was raised above profiles.json; it replaces
+vus.max in the layout stored with the report (and so in vus_max_reached).
 --stats is the stats.jsonl sampled by verify.sh (one {"time": epoch, "stat": <docker stats object>} per container
 about every 2 s); every stage gets the mean and max CPU% of the app and mysql containers over its measure window
 (100 = one fully used core). --summary is the k6 summary export; it provides the VU high-water mark. --gc-log is the app JVM's GC log
@@ -416,6 +417,7 @@ def main(argv=None):
     parser.add_argument("--gc-log", metavar="GC_LOG")
     parser.add_argument("--innodb", metavar="INNODB_JSONL")
     parser.add_argument("--rows", type=int, default=1)
+    parser.add_argument("--max-vus", type=int)
     parser.add_argument("--run-order", type=int)
     parser.add_argument("--minutes-since-up", type=float)
     parser.add_argument("--clock-offset-s", type=int)
@@ -451,6 +453,8 @@ def main(argv=None):
             layout = json.load(f)
     if args.profile not in layout["profiles"]:
         parser.error("unknown profile: " + args.profile)
+    if args.max_vus:
+        layout = dict(layout, vus=dict(layout.get("vus") or {}, max=args.max_vus))
     if reprocessed_from and "layout" not in old:
         # No layout was stored with that run: profiles.json may have been retuned since, which would silently
         # apply the wrong step windows to the old data.

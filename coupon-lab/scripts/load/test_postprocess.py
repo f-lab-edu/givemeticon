@@ -474,6 +474,27 @@ class PostprocessTest(unittest.TestCase):
         self.assertEqual(report["stages"][0]["achieved_rps"], round(11 / (end - start), 1))
         self.assertTrue(report["validity"]["valid"])
 
+    def test_max_vus_override_replaces_the_layout_cap(self):
+        lines = synthetic()
+        with tempfile.TemporaryDirectory() as tmp:
+            write_raw(os.path.join(tmp, "raw.json.gz"), lines)
+            for name, content in (("profiles.json", LAYOUT),
+                                  ("summary.json", {"metrics": {"vus_max": {"max": 3000}, "vus": {"max": 2900}}})):
+                with open(os.path.join(tmp, name), "w", encoding="utf-8") as f:
+                    json.dump(content, f)
+            reports = {}
+            for label, extra in (("default", []), ("raised", ["--max-vus", "6000"])):
+                out = os.path.join(tmp, label + ".json")
+                postprocess.main(["--raw", os.path.join(tmp, "raw.json.gz"), "--profile", "ramping", "--stage", "s0",
+                                  "--db-issued-rows", str(issued_count(lines)), "--out", out,
+                                  "--profiles", os.path.join(tmp, "profiles.json"),
+                                  "--summary", os.path.join(tmp, "summary.json")] + extra)
+                with open(out, encoding="utf-8") as f:
+                    reports[label] = json.load(f)
+        self.assertTrue(reports["default"]["vus"]["vus_max_reached"])  # 3000 of 3000
+        self.assertEqual(reports["raised"]["vus"], {"max_vus": 6000, "vus_max": 3000, "vus_peak": 2900, "vus_max_reached": False})
+        self.assertEqual(reports["raised"]["layout"]["vus"]["max"], 6000)  # the effective cap is stored with the report
+
     def test_profiles_json_is_well_formed(self):
         with open(os.path.join(HERE, "profiles.json"), encoding="utf-8") as f:
             real = json.load(f)
@@ -483,6 +504,8 @@ class PostprocessTest(unittest.TestCase):
             self.assertTrue(all(s["seconds"] > real["transition_seconds"] for s in profile["steps"]), name)
             self.assertGreater(profile["stock"], 0, name)
         self.assertGreaterEqual(real["vus"]["max"], real["vus"]["pre_allocated"])
+        self.assertEqual([s["rps"] for s in real["profiles"]["ramping-rows"]["steps"]], [200, 400, 800, 1200, 1600, 2400, 3200])
+        self.assertEqual(real["profiles"]["ramping-rows"]["stock"], 10000000)
 
 
 class ReprocessTest(unittest.TestCase):

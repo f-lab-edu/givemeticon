@@ -3,7 +3,8 @@
 #   verify.sh compile
 #   verify.sh unit [--tests <pattern>]
 #   verify.sh bundle <consistency|load|bottleneck|recovery|fairness> [--stage sN]
-#   verify.sh load --stage sN --profile <ramping|spike> [--runs N] [--k6 host|container]   (test B: k6 against docker compose, see docs/stages.md)
+#   verify.sh load --stage sN --profile <ramping|spike|ramping-rows> [--runs N] [--k6 host|container] [--rows N] [--max-vus N]
+#                  (tests B and C: k6 against docker compose, see docs/stages.md)
 #   verify.sh reprocess evidence/<stage>/load/<profile>/<dir>        (test B: re-aggregate a saved run into a new -reprocessed dir)
 # Last stdout line:
 #   VERIFY <tier> <PASS|FAIL|INFRA_DOWN|BUILD_ERROR|TIMEOUT|NO_TESTS> passed=N failed=N skipped=N duration=Ns sha=<short> dirty=<bool> report=<path>
@@ -19,7 +20,7 @@ BUNDLES="consistency load bottleneck recovery fairness"
 
 usage() {
     echo "usage: scripts/verify.sh compile | unit [--tests <pattern>] | bundle <$(echo "$BUNDLES" | tr ' ' '|')> [--stage sN]" >&2
-    echo "       scripts/verify.sh load --stage sN --profile ramping|spike [--runs N] [--k6 host|container]" >&2
+    echo "       scripts/verify.sh load --stage sN --profile ramping|spike|ramping-rows [--runs N] [--k6 host|container] [--rows N] [--max-vus N]" >&2
     echo "       scripts/verify.sh reprocess evidence/<stage>/load/<profile>/<dir>" >&2
     exit 2
 }
@@ -72,6 +73,8 @@ case "$mode" in
         profile=""
         runs=1
         k6_mode=host
+        rows=1
+        max_vus=""
         while [ $# -gt 0 ]; do
             [ $# -ge 2 ] || usage
             case "$1" in
@@ -79,6 +82,8 @@ case "$mode" in
                 --profile) profile=$2 ;;
                 --runs) runs=$2 ;;
                 --k6) k6_mode=$2 ;;
+                --rows) rows=$2 ;;
+                --max-vus) max_vus=$2 ;;
                 *) usage ;;
             esac
             shift 2
@@ -86,18 +91,24 @@ case "$mode" in
         case "$k6_mode" in host|container) ;; *) usage ;; esac
         [ -n "$stage" ] && [ -n "$profile" ] || usage
         [[ "$stage" =~ ^s[0-9]+$ ]] || { echo "invalid stage: $stage (expected sN)" >&2; exit 2; }
-        case "$profile" in ramping|spike) ;; *) usage ;; esac
+        case "$profile" in ramping|spike|ramping-rows) ;; *) usage ;; esac
+        [[ "$rows" =~ ^[1-9][0-9]*$ ]] && [ "$rows" -le 64 ] || usage
+        [ "$rows" -eq 1 ] || [ "$profile" = ramping-rows ] || { echo "--rows $rows needs --profile ramping-rows" >&2; exit 2; }
+        [ -z "$max_vus" ] || [[ "$max_vus" =~ ^[1-9][0-9]*$ ]] || usage
         [[ "$runs" =~ ^[1-9][0-9]*$ ]] || usage
         require_stage_class "$stage"
         tier="load-$profile"
+        # evidence/<stage>/load/<variant>/: the profile plus whatever distinguishes the run (the row count is part of ramping-rows)
+        variant=$profile
+        [ "$profile" != ramping-rows ] || variant="ramping-rows$rows"
         ;;
     reprocess)
         [ $# -eq 1 ] || usage
         source_dir=${1%/}
-        [[ "$source_dir" =~ ^evidence/(s[0-9]+)/load/(ramping|spike)/[^/]+$ ]] \
+        [[ "$source_dir" =~ ^evidence/(s[0-9]+)/load/((ramping|spike)(-[a-z0-9]+)*)/[^/]+$ ]] \
             || { echo "expected evidence/<stage>/load/<profile>/<dir>, got: $1" >&2; exit 2; }
         stage=${BASH_REMATCH[1]}
-        profile=${BASH_REMATCH[2]}
+        profile=${BASH_REMATCH[2]}   # the directory name, e.g. ramping-rows4; the result goes next to the source
         [ -f "$source_dir/load.json" ] && [ -f "$source_dir/raw.json.gz" ] \
             || { echo "$source_dir needs load.json and raw.json.gz" >&2; exit 2; }
         tier=load-reprocess
@@ -280,12 +291,16 @@ run_load() {
             run_status=INFRA_DOWN; run_note="app not healthy after ${LOAD_HEALTH_TIMEOUT_S}s (see $log)"; return
         fi
 
-        # 3. seed one event: ramping measures the issue path only (no sell-out), spike the sold-out path
-        local stock event_id
+        # 3. seed the events (one per row of the test-C spread; ramping measures the issue path only, spike the sold-out path)
+        local stock event_ids seed_sql="" i vus_max_default
         stock=$(python3 -I -c 'import json, sys; print(json.load(open("scripts/load/profiles.json"))["profiles"][sys.argv[1]]["stock"])' "$profile")
-        event_id=$(load_mysql "INSERT INTO coupon_event (name, total_quantity, remaining_quantity, created_at) VALUES ('load-$profile-$stage', $stock, $stock, NOW(6)); SELECT LAST_INSERT_ID();")
-        if ! [[ "$event_id" =~ ^[0-9]+$ ]]; then
-            run_status=INFRA_DOWN; run_note="seeding the event failed (see $log)"; return
+        vus_max_default=$(python3 -I -c 'import json; print(json.load(open("scripts/load/profiles.json"))["vus"]["max"])')
+        for i in $(seq 1 "$rows"); do
+            seed_sql="$seed_sql INSERT INTO coupon_event (name, total_quantity, remaining_quantity, created_at) VALUES ('load-$profile-$stage-$i', $stock, $stock, NOW(6)); SELECT LAST_INSERT_ID();"
+        done
+        event_ids=$(load_mysql "$seed_sql" | paste -sd, -)
+        if ! [[ "$event_ids" =~ ^[0-9]+(,[0-9]+)*$ ]] || [ "$(awk -F, '{ print NF }' <<<"$event_ids")" -ne "$rows" ]; then
+            run_status=INFRA_DOWN; run_note="seeding $rows event(s) failed (got '$event_ids'; see $log)"; return
         fi
 
         # InnoDB settings that decide how expensive a commit is, recorded with the run
@@ -299,7 +314,7 @@ run_load() {
         container_epoch=$(docker exec "${LOAD_PREFIX}app" date +%s 2>/dev/null)
         [[ "$container_epoch" =~ ^[0-9]+$ ]] && clock_offset=$((container_epoch - $(date +%s)))
         minutes_up=$(awk -v now="$(date +%s)" -v up="$up_epoch" 'BEGIN { printf "%.1f", (now - up) / 60 }')
-        echo "run $1/$runs: k6 ($k6_mode) $profile on $stage, event $event_id, stock $stock"
+        echo "run $1/$runs: k6 ($k6_mode) $profile on $stage, events $event_ids, stock $stock each${max_vus:+, maxVUs $max_vus}"
         : >"$work/stats.jsonl"
         load_sample_stats "$work/stats.jsonl" &
         sampler_pid=$!
@@ -309,11 +324,11 @@ run_load() {
         if [ "$k6_mode" = container ]; then
             docker run --rm --name "${LOAD_PREFIX}k6" --network "$LOAD_NETWORK" --user "$(id -u):$(id -g)" \
                 -v "$PWD/scripts/load:/scripts:ro" -v "$PWD/$work:/out" \
-                -e BASE_URL=http://app:8080 -e EVENT_ID="$event_id" -e PROFILE="$profile" \
+                -e BASE_URL=http://app:8080 -e EVENT_IDS="$event_ids" -e PROFILE="$profile" ${max_vus:+-e MAX_VUS=$max_vus} \
                 "$K6_IMAGE" run --out json=/out/raw.json.gz --summary-export /out/summary.json /scripts/issue.js >>"$log" 2>&1
         else
             k6 run --out json="$work/raw.json.gz" --summary-export "$work/summary.json" \
-                -e BASE_URL=http://127.0.0.1:18080 -e EVENT_ID="$event_id" -e PROFILE="$profile" \
+                -e BASE_URL=http://127.0.0.1:18080 -e EVENT_IDS="$event_ids" -e PROFILE="$profile" ${max_vus:+-e MAX_VUS=$max_vus} \
                 scripts/load/issue.js >>"$log" 2>&1
         fi
         local k6_rc=$?
@@ -327,7 +342,7 @@ run_load() {
             run_status=BUILD_ERROR; run_note="k6 exited $k6_rc (see $log)"; return
         fi
         local issued_rows nano cpus_app cpus_mysql heap hikari
-        issued_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_issue WHERE event_id = $event_id")
+        issued_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_issue WHERE event_id IN ($event_ids)")
         if ! [[ "$issued_rows" =~ ^[0-9]+$ ]]; then
             run_status=INFRA_DOWN; run_note="counting coupon_issue rows failed (see $log)"; return
         fi
@@ -339,6 +354,7 @@ run_load() {
             --db-issued-rows "$issued_rows" --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
             --stats "$work/stats.jsonl" --summary "$work/summary.json" --gc-log "$work/gc/gc.log" --innodb "$work/innodb.jsonl" \
             --run-order "$run_order" --minutes-since-up "$minutes_up" ${clock_offset:+--clock-offset-s "$clock_offset"} \
+            --rows "$rows" ${max_vus:+--max-vus "$max_vus"} --env "max_vus=${max_vus:-$vus_max_default}" \
             --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "jvm_heap=$heap" \
             --env "hikari_pool_size=$hikari" --env "k6_version=$k6_version" --env "k6_mode=$k6_mode" ${k6_env[@]+"${k6_env[@]}"} ${mysql_env[@]+"${mysql_env[@]}"} \
             >>"$log" 2>&1
@@ -366,7 +382,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/load.json")
         # 6. keep what exists, also for an invalid run
         run_evidence=""
         if [ -f "$work/load.json" ]; then
-            run_evidence="evidence/$stage/load/$profile/$(date -u +%Y%m%d-%H%M%S)-$sha"
+            run_evidence="evidence/$stage/load/$variant/$(date -u +%Y%m%d-%H%M%S)-$sha"
             [ "$dirty" = false ] || run_evidence="$run_evidence-dirty"
             mkdir -p "$run_evidence"
             cp "$work/load.json" "$run_evidence/"
