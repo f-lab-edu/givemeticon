@@ -1,0 +1,118 @@
+{
+  "test": "B",
+  "profile": "spike",
+  "stage": "s4",
+  "stock": 100,
+  "layout": {
+    "warmup": {
+      "rps": 100,
+      "seconds": 15
+    },
+    "transition_seconds": 1,
+    "vus": {
+      "pre_allocated": 500,
+      "max": 3000
+    },
+    "steps": [
+      {
+        "rps": 3000,
+        "seconds": 21
+      }
+    ]
+  },
+  "stages": [
+    {
+      "target_rps": 3000,
+      "requests": 58601,
+      "achieved_rps": 2930.1,
+      "achieved_ratio": 0.9767,
+      "p50_ms": 159.96,
+      "p95_ms": 400.8,
+      "p95_margin_ms": 99.2,
+      "p99_ms": 501.26,
+      "issued": 0,
+      "sold_out": 58601,
+      "errors": 0,
+      "error_rate": 0.0,
+      "dropped_iterations": 1407,
+      "dropped_ratio": 0.023447,
+      "valid": false,
+      "after_first_violation": true,
+      "kind": "saturated",
+      "app_cpu_pct_mean": 196.7,
+      "app_cpu_pct_max": 209.3,
+      "mysql_cpu_pct_mean": 1.4,
+      "mysql_cpu_pct_max": 3.7,
+      "gc_pauses_over_200ms": 0,
+      "row_lock_waits_delta": null,
+      "row_lock_time_ms_delta": null,
+      "row_lock_wait_ratio": null,
+      "row_lock_time_per_request_ms": null,
+      "fsyncs_delta": null,
+      "log_fsyncs_delta": null,
+      "fsyncs_per_request": null
+    }
+  ],
+  "sustained_limit_rps": null,
+  "max_achieved_rps": {
+    "achieved_rps": 2930.1,
+    "target_rps": 3000
+  },
+  "stalls": [],
+  "limit_rps_first_violation": "below_min_stage",
+  "db": {
+    "issued_rows": 100,
+    "http_issued": 100,
+    "match": true,
+    "redis_counter": 61632
+  },
+  "vus": {
+    "max_vus": 3000,
+    "vus_max": 1265,
+    "vus_peak": 1140,
+    "vus_max_reached": false
+  },
+  "rows": 1,
+  "mysql": {
+    "threads_connected_max": 11
+  },
+  "run": {
+    "run_order": 2,
+    "minutes_since_compose_up": 0.1,
+    "container_clock_offset_s": 0
+  },
+  "validity": {
+    "stage0_dropped_ratio": 0.023447,
+    "stage0_valid": false,
+    "db_match": true,
+    "valid": false
+  },
+  "env": {
+    "max_vus": 3000,
+    "app_cpus": 2,
+    "mysql_cpus": 2,
+    "redis_image": "redis:7-alpine",
+    "redis_cpus": 1,
+    "jvm_heap": "1g",
+    "redis_appendonly": "yes",
+    "rabbitmq_image": "rabbitmq:3-management-alpine",
+    "rabbitmq_cpus": 1,
+    "hikari_pool_size": 10,
+    "k6_version": "v2.2.0",
+    "k6_mode": "host",
+    "innodb_buffer_pool_size": 134217728,
+    "innodb_flush_log_at_trx_commit": 1,
+    "innodb_log_file_size": 50331648,
+    "innodb_redo_log_capacity": 104857600,
+    "s4_confirm_timeout_ms": 2000,
+    "s4_consumer_fail_every": 0,
+    "cpu": 8,
+    "os": "Darwin 25.3.0 arm64"
+  },
+  "publish_failures": {
+    "total": 0,
+    "by_reason": {}
+  },
+  "settle_s": 4,
+  "settled": true
+}
