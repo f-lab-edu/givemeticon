@@ -521,6 +521,28 @@ class PostprocessTest(unittest.TestCase):
             with open(out, encoding="utf-8") as f:
                 self.assertEqual(json.load(f)["publish_failures"]["total"], 7)
 
+    def test_s4_allows_rows_of_publishes_whose_confirm_came_after_the_wait(self):
+        lines = synthetic()
+        http = issued_count(lines)
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            def run(stage, rows, publish_failures=None):
+                return postprocess.build_report(raw, LAYOUT, "ramping", stage, rows, {}, publish_failures=publish_failures)
+            two = {"timeout": 2, "AmqpResourceNotAvailableException": 9}
+            ok = run("s4", http + 2, two)
+            self.assertEqual(ok["db"]["rows_from_timed_out_publishes"], 2)
+            self.assertFalse(ok["db"]["match"])  # the plain equality stays recorded
+            self.assertTrue(ok["validity"]["db_match"])
+            self.assertTrue(ok["validity"]["valid"])
+            self.assertFalse(run("s4", http + 3, two)["validity"]["valid"])  # more rows than late confirms
+            self.assertFalse(run("s4", http - 1, two)["validity"]["valid"])  # a 200 without a row
+            self.assertFalse(run("s4", http + 1)["validity"]["valid"])  # counter not read: only equality is valid
+            self.assertTrue(run("s4", http)["validity"]["valid"])
+            s3 = run("s3", http + 2, two)
+            self.assertNotIn("rows_from_timed_out_publishes", s3["db"])
+            self.assertFalse(s3["validity"]["valid"])  # other stages: rows == 200 responses, unchanged
+
     def test_filtered_raw_reproduces_the_report(self):
         with tempfile.TemporaryDirectory() as tmp:
             filtered = os.path.join(tmp, "filtered.json.gz")
