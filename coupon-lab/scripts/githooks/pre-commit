@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Git pre-commit hook for coupon-lab/evidence/, which is append-only: written only by scripts/verify.sh.
+#   1. A commit must not modify, delete, rename or change the type of a file that is already committed.
+#      (Corrections go through git revert in a reviewed PR.)
+#   2. Every newly added evidence *.json must parse; it is read from the index, not from the working tree.
+# Install once per clone, from the repository root:
+#   git config core.hooksPath coupon-lab/scripts/githooks
+# (core.hooksPath replaces .git/hooks for this clone.) Escape hatch: git commit --no-verify; CI is the backstop.
+# --no-renames: otherwise a renamed file is reported as R and escapes the filters below.
+set -euo pipefail
+
+evidence=coupon-lab/evidence
+
+changed=$(git diff --cached --no-renames --name-only --diff-filter=MDT -- "$evidence")
+if [ -n "$changed" ]; then
+    echo "$changed" | sed 's/^/  /' >&2
+    echo "evidence is append-only: committed evidence must not be modified or deleted (corrections go through git revert in a reviewed PR)" >&2
+    exit 1
+fi
+
+# The list goes through a variable (not a process substitution) so that a failing git command fails the hook.
+added=$(git -c core.quotepath=off diff --cached --no-renames --name-only --diff-filter=A -- "$evidence")
+failed=0
+while IFS= read -r path; do
+    case "$path" in *.json) ;; *) continue ;; esac
+    command -v python3 >/dev/null || { echo "pre-commit: python3 required to check $path" >&2; exit 1; }
+    if ! error=$(git show ":$path" | python3 -I -c '
+import json, sys
+try:
+    json.load(sys.stdin)
+except ValueError as e:
+    print(e)
+    sys.exit(1)' 2>&1); then
+        echo "INVALID $path (as staged): $error" >&2
+        failed=1
+    fi
+done <<<"$added"
+
+if [ "$failed" -ne 0 ]; then
+    echo "pre-commit: staged evidence contains invalid JSON; evidence is written only by scripts/verify.sh" >&2
+    exit 1
+fi
+exit 0
