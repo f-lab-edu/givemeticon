@@ -14,6 +14,9 @@ test bundle: consistency, load, bottleneck, recovery, fairness.
 * Read the final `VERIFY ...` line and `build/verify/<tier>.json`.
   Never claim a test passed without that line.
 * `evidence/` is written only by `verify.sh`; never edit or delete it.
+* `scripts/check-evidence.sh` fails when any `evidence/**/*.json` is not valid JSON (`scripts/harness-smoke.sh` runs it too).
+  Install the pre-commit hook that runs it whenever a commit stages `evidence/`, once per clone, from the repository root:
+  `git config core.hooksPath coupon-lab/scripts/githooks`
 
 ## Environment
 * Testcontainers requires Docker. If Docker is unavailable, report it; do not fall back to an

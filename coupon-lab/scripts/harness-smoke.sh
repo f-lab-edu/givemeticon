@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self-test of the coupon-lab harness (verify.sh, the three hooks and the non-Docker parts of the load runner). Run from coupon-lab/.
+# Self-test of the coupon-lab harness (verify.sh, the three hooks, the evidence check and the non-Docker parts of the load runner). Run from coupon-lab/.
 # Prints OK/FAIL/SKIP per item; exits 1 if any item failed.
 set -uo pipefail
 
@@ -257,7 +257,60 @@ if [ "$rc" -eq 0 ]; then ok "14 scripts/load unit tests"; else fail "14 scripts/
 run scripts/verify.sh load --stage s0 --profile ramping --k6 nope
 if [ "$rc" -eq 2 ] && [[ "$out" == *usage* ]]; then ok "15 verify load --k6 nope: exit 2 (usage)"; else fail "15 verify load --k6 nope" "exit=$rc"; fi
 
-total=$((15 - skipped))
+# 16. every JSON under the real evidence/ parses
+run scripts/check-evidence.sh
+if [ "$rc" -eq 0 ] && [[ "$out" == *" 0 invalid"* ]]; then ok "16 check-evidence on evidence/: $out"; else fail "16 check-evidence on evidence/" "exit=$rc $out"; fi
+
+# 17. a broken JSON (the "issued": 107 -> 1 hand-edit) is reported with file and position; non-JSON artifacts are ignored.
+#     Works on a scratch tree: evidence/ itself is never written here.
+scratch=$(mk)
+rm -f "$scratch"
+mkdir -p "$scratch/s0/consistency/run-a"
+printf '{\n  "issued" : 107,\n  "remaining" : -7\n}\n' >"$scratch/s0/consistency/run-a/good.json"
+printf '{\n  "issued" : 1\n  "remaining" : -7\n}\n' >"$scratch/s0/consistency/run-a/bad.json"
+printf 'not json at all\n' >"$scratch/s0/consistency/run-a/stats.jsonl"
+printf 'not json either' >"$scratch/s0/consistency/run-a/raw.json.gz"
+run scripts/check-evidence.sh "$scratch"
+rc_bad=$rc
+msg_bad=$out
+rm -f "$scratch/s0/consistency/run-a/bad.json"
+run scripts/check-evidence.sh "$scratch"
+rc_good=$rc
+rm -rf "$scratch"
+run scripts/check-evidence.sh /nonexistent-evidence-dir
+if [ "$rc_bad" -eq 1 ] && [[ "$msg_bad" == *"bad.json"* ]] && [[ "$msg_bad" == *"line 3"* ]] && [[ "$msg_bad" == *"2 json files, 1 invalid"* ]] \
+    && [ "$rc_good" -eq 0 ] && [ "$rc" -eq 2 ]; then
+    ok "17 check-evidence: broken JSON exit 1 (names bad.json, line 3), fixed exit 0, missing dir exit 2"
+else
+    fail "17 check-evidence" "bad exit=$rc_bad ($msg_bad), good exit=$rc_good, missing dir exit=$rc"
+fi
+
+# 18. the pre-commit hook checks evidence only when evidence/ is staged. Runs in a throwaway git repository.
+repo=$(mk)
+rm -f "$repo"
+mkdir -p "$repo/coupon-lab/scripts" "$repo/coupon-lab/evidence/s0/consistency/run-a"
+cp -R scripts/githooks "$repo/coupon-lab/scripts/githooks"
+cp scripts/check-evidence.sh "$repo/coupon-lab/scripts/"
+git -C "$repo" init -q .
+broken="$repo/coupon-lab/evidence/s0/consistency/run-a/consistency.json"
+printf '{\n  "issued" : 1\n  "remaining" : -7\n}\n' >"$broken"
+printf 'notes\n' >"$repo/coupon-lab/notes.txt"
+git -C "$repo" add coupon-lab/notes.txt
+out=$(cd "$repo" && coupon-lab/scripts/githooks/pre-commit 2>&1); rc_unrelated=$?  # broken file exists but is not staged
+git -C "$repo" add coupon-lab/evidence
+out=$(cd "$repo" && coupon-lab/scripts/githooks/pre-commit 2>&1); rc_staged_bad=$?
+msg_hook=$out
+printf '{\n  "issued" : 107,\n  "remaining" : -7\n}\n' >"$broken"
+git -C "$repo" add coupon-lab/evidence
+out=$(cd "$repo" && coupon-lab/scripts/githooks/pre-commit 2>&1); rc_staged_good=$?
+rm -rf "$repo"
+if [ "$rc_unrelated" -eq 0 ] && [ "$rc_staged_bad" -eq 1 ] && [[ "$msg_hook" == *"consistency.json"* ]] && [ "$rc_staged_good" -eq 0 ]; then
+    ok "18 pre-commit hook: skips unrelated commits, blocks staged broken evidence JSON (exit 1), passes once fixed"
+else
+    fail "18 pre-commit hook" "unrelated=$rc_unrelated staged-bad=$rc_staged_bad ($msg_hook) staged-good=$rc_staged_good"
+fi
+
+total=$((18 - skipped))
 suffix=""
 [ "$skipped" -eq 0 ] || suffix=" skipped=$skipped"
 echo "harness-smoke: $((total - fails))/$total OK in ${SECONDS}s$suffix"
