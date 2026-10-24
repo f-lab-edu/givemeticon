@@ -15,9 +15,11 @@ spec.loader.exec_module(compare)
 TARGETS = (100, 200, 300)
 
 
-def report(stage, kinds, p95, achieved, sustained, env=None, order=None, stalls=0, p50=(2.0, 3.0, 4.0)):
+def report(stage, kinds, p95, achieved, sustained, env=None, order=None, stalls=0, p50=(2.0, 3.0, 4.0), locks=None):
     stages = [{"target_rps": t, "kind": k, "p95_ms": p, "achieved_rps": a, "p50_ms": m}
               for t, k, p, a, m in zip(TARGETS, kinds, p95, achieved, p50)]
+    for stage_row, values in zip(stages, locks or []):
+        stage_row.update(values)
     return {"profile": "ramping", "stage": stage, "stages": stages, "sustained_limit_rps": sustained,
             "max_achieved_rps": {"achieved_rps": max(achieved), "target_rps": TARGETS[achieved.index(max(achieved))]},
             "stalls": [{"target_rps": 200}] * stalls, "limit_rps_first_violation": 100,
@@ -76,6 +78,17 @@ class CompareTest(unittest.TestCase):
             low = self.run_compare([os.path.join(root2, "s0-a"), "--p50-at", "100"])
         self.assertIn("p50@100 ms", low)
         self.assertIn("| s0 | s0-a | host | 1 | 200 | 250 (at 300) | 2 | 0 | 100 | yes |", low)  # p50 2.0 at 100 rps
+
+    def test_the_row_lock_table_shows_the_reference_and_the_highest_target(self):
+        locks = [{}, {"row_lock_wait_ratio": 0.12, "row_lock_time_per_request_ms": 0.5, "fsyncs_per_request": 1.0},
+                 {"row_lock_wait_ratio": 0.98, "row_lock_time_per_request_ms": 41.25, "fsyncs_per_request": 0.5}]
+        with tempfile.TemporaryDirectory() as root:
+            self.write(root, "x", report("s1", ["ok", "ok", "saturated"], [5, 9, 700], [100, 200, 250], 200, locks=locks))
+            self.write(root, "y", report("s1", ["ok", "ok", "ok"], [5, 9, 20], [100, 200, 300], 300))  # no counters: dashes
+            text = self.run_compare([os.path.join(root, "x"), os.path.join(root, "y"), "--p50-at", "200"])
+        self.assertIn("wait_ratio@200 | lock ms/req@200 | fsyncs/req@200 | wait_ratio@300 | lock ms/req@300 | fsyncs/req@300", text)
+        self.assertIn("| s1 | x | 0.120 | 0.500 | 1 | 0.980 | 41.250 | 0.500 |", text)
+        self.assertIn("| s1 | y | - | - | - | - | - | - |", text)
 
     def test_runs_can_be_given_as_directories_or_files(self):
         with tempfile.TemporaryDirectory() as root:

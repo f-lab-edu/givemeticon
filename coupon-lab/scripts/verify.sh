@@ -148,6 +148,21 @@ K6_IMAGE=${K6_IMAGE:-grafana/k6:latest}
 LOAD_HEALTH_TIMEOUT_S=${LOAD_HEALTH_TIMEOUT_S:-60}
 LOAD_HIKARI_POOL_SIZE=${HIKARI_POOL_SIZE:-10}
 
+# Every 2 s one line with MySQL's cumulative InnoDB lock and fsync counters:
+#   {"time": <epoch>, "status": {"Innodb_row_lock_waits": n, ...}}
+# postprocess.py turns them into per-stage deltas (test C, experiment a). Needs load_mysql (defined inside run_load);
+# run in the background during k6 and killed afterwards.
+load_sample_innodb() {
+    local out=$1 started now
+    while :; do
+        started=$(date +%s)
+        load_mysql "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_row_lock_waits','Innodb_row_lock_time','Innodb_row_lock_time_avg','Innodb_row_lock_time_max','Innodb_row_lock_current_waits','Innodb_data_fsyncs','Innodb_os_log_fsyncs','Threads_connected')" 2>/dev/null \
+            | awk -F'\t' -v t="$(date +%s)" 'NF == 2 { body = body (body == "" ? "" : ",") "\"" $1 "\":" $2 } END { if (body != "") printf "{\"time\":%s,\"status\":{%s}}\n", t, body }' >>"$out"
+        now=$(date +%s)
+        [ $((now - started)) -ge 2 ] || sleep $((2 - now + started))
+    done
+}
+
 # Position of this run within a batch of back-to-back runs (1..n): the counter file holds "<count> <start epoch of the last
 # run>" and starts again at 1 when the previous run began more than LOAD_SESSION_GAP_MIN (default 60) minutes ago.
 load_next_run_order() {
@@ -182,11 +197,12 @@ load_sample_stats() {
 run_load() {
     set +e
     local compose=(docker compose -p coupon-lab-load -f docker-compose.load.yml)
-    local compose_up=false run_status="" run_note="" work="" run_evidence="" sampler_pid=""
+    local compose_up=false run_status="" run_note="" work="" run_evidence="" sampler_pid="" innodb_pid=""
     local passed=0 failed=0 n evidence_dirs=() failures=()
 
     load_cleanup() {
         if [ -n "$sampler_pid" ]; then kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""; fi
+        if [ -n "$innodb_pid" ]; then kill "$innodb_pid" 2>/dev/null; wait "$innodb_pid" 2>/dev/null; innodb_pid=""; fi
         [ "$k6_mode" != container ] || docker rm -f "${LOAD_PREFIX}k6" >/dev/null 2>&1
         [ "$compose_up" = true ] || return 0
         compose_up=false
@@ -287,6 +303,9 @@ run_load() {
         : >"$work/stats.jsonl"
         load_sample_stats "$work/stats.jsonl" &
         sampler_pid=$!
+        : >"$work/innodb.jsonl"
+        load_sample_innodb "$work/innodb.jsonl" &
+        innodb_pid=$!
         if [ "$k6_mode" = container ]; then
             docker run --rm --name "${LOAD_PREFIX}k6" --network "$LOAD_NETWORK" --user "$(id -u):$(id -g)" \
                 -v "$PWD/scripts/load:/scripts:ro" -v "$PWD/$work:/out" \
@@ -299,6 +318,7 @@ run_load() {
         fi
         local k6_rc=$?
         kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""
+        kill "$innodb_pid" 2>/dev/null; wait "$innodb_pid" 2>/dev/null; innodb_pid=""
         if [ "$k6_rc" -ne 0 ]; then
             # docker itself failed (125 daemon error, 126/127 cannot start the command) is infra, not a k6 script error
             if [ "$k6_mode" = container ] && [ "$k6_rc" -ge 125 ] && [ "$k6_rc" -le 127 ]; then
@@ -317,7 +337,7 @@ run_load() {
         hikari=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=//p')
         python3 -I scripts/load/postprocess.py --raw "$work/raw.json.gz" --profile "$profile" --stage "$stage" \
             --db-issued-rows "$issued_rows" --out "$work/load.json" --filtered-raw "$work/raw-filtered.json.gz" \
-            --stats "$work/stats.jsonl" --summary "$work/summary.json" --gc-log "$work/gc/gc.log" \
+            --stats "$work/stats.jsonl" --summary "$work/summary.json" --gc-log "$work/gc/gc.log" --innodb "$work/innodb.jsonl" \
             --run-order "$run_order" --minutes-since-up "$minutes_up" ${clock_offset:+--clock-offset-s "$clock_offset"} \
             --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "jvm_heap=$heap" \
             --env "hikari_pool_size=$hikari" --env "k6_version=$k6_version" --env "k6_mode=$k6_mode" ${k6_env[@]+"${k6_env[@]}"} ${mysql_env[@]+"${mysql_env[@]}"} \
@@ -352,6 +372,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/load.json")
             cp "$work/load.json" "$run_evidence/"
             [ ! -f "$work/summary.json" ] || cp "$work/summary.json" "$run_evidence/"
             [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
+            [ ! -f "$work/innodb.jsonl" ] || cp "$work/innodb.jsonl" "$run_evidence/"
             [ ! -f "$work/gc/gc.log" ] || cp "$work/gc/gc.log" "$run_evidence/"
             [ ! -f "$work/raw-filtered.json.gz" ] || cp "$work/raw-filtered.json.gz" "$run_evidence/raw.json.gz"
             evidence_dirs+=("$run_evidence")
@@ -394,6 +415,7 @@ run_reprocess() {
     cp "$tmp/load.json" "$dest/"
     [ ! -f "$source_dir/summary.json" ] || cp "$source_dir/summary.json" "$dest/"
     [ ! -f "$source_dir/stats.jsonl" ] || cp "$source_dir/stats.jsonl" "$dest/"
+    [ ! -f "$source_dir/innodb.jsonl" ] || cp "$source_dir/innodb.jsonl" "$dest/"
     [ ! -f "$source_dir/gc.log" ] || cp "$source_dir/gc.log" "$dest/"
     evidence_dirs+=("$dest")
     verdict=$(python3 -I -c '

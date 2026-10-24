@@ -179,6 +179,73 @@ class GcTest(unittest.TestCase):
                                postprocess.parse_time("2026-10-23T03:00:00.5Z"), places=6)
 
 
+def innodb_line(offset_s, **status):
+    return json.dumps({"time": postprocess.parse_time(stamp(offset_s)), "status": status})
+
+
+def linear_innodb(rates, until=260, every=2.0, start=0.0):
+    """Counters that grow linearly: a sample every 'every' seconds, value = rate * time."""
+    lines, t = [], start
+    while t <= until:
+        lines.append(innodb_line(t, **dict((name, rate * t) for name, rate in rates.items())))
+        t += every
+    return lines
+
+
+class InnodbTest(unittest.TestCase):
+    RATES = {"Innodb_row_lock_waits": 10, "Innodb_row_lock_time": 50, "Innodb_os_log_fsyncs": 20, "Innodb_data_fsyncs": 3,
+             "Threads_connected": 0}
+
+    def report(self, innodb_lines, rows=1):
+        lines = synthetic()
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            innodb_path = None
+            if innodb_lines is not None:
+                innodb_path = os.path.join(tmp, "innodb.jsonl")
+                with open(innodb_path, "w", encoding="utf-8") as f:
+                    f.write("\n".join(innodb_lines) + "\n")
+            return postprocess.build_report(raw, LAYOUT, "ramping", "s0", issued_count(lines), {}, None, None, None, None, None,
+                                            innodb_path, rows)
+
+    def test_deltas_and_per_request_ratios_per_stage_window(self):
+        stage = self.report(linear_innodb(self.RATES))["stages"][2]  # 29 s window, 100 requests in the synthetic data
+        self.assertEqual(stage["row_lock_waits_delta"], 290.0)
+        self.assertEqual(stage["row_lock_wait_ratio"], 2.9)
+        self.assertEqual(stage["row_lock_time_ms_delta"], 1450.0)
+        self.assertEqual(stage["row_lock_time_per_request_ms"], 14.5)
+        self.assertEqual(stage["log_fsyncs_delta"], 580.0)
+        self.assertEqual(stage["fsyncs_delta"], 667.0)  # data 3/s + redo log 20/s over 29 s
+        self.assertEqual(stage["fsyncs_per_request"], 6.67)
+
+    def test_the_window_edges_are_interpolated_between_samples(self):
+        # samples every 7 s do not fall on the window edges (76 s .. 105 s); a linear counter must still give the exact delta
+        stage = self.report(linear_innodb(self.RATES, every=7.0))["stages"][2]
+        self.assertAlmostEqual(stage["row_lock_waits_delta"], 290.0, places=1)
+
+    def test_without_samples_all_fields_are_null(self):
+        for report in (self.report(None), self.report([])):
+            stage = report["stages"][0]
+            for key in ("row_lock_waits_delta", "row_lock_time_ms_delta", "row_lock_wait_ratio",
+                        "row_lock_time_per_request_ms", "fsyncs_delta", "log_fsyncs_delta", "fsyncs_per_request"):
+                self.assertIsNone(stage[key], key)
+            self.assertIsNone(report["mysql"]["threads_connected_max"])
+
+    def test_a_window_the_samples_do_not_cover_is_null_and_a_counter_reset_is_null(self):
+        short = self.report(linear_innodb(self.RATES, until=60))  # stops before the later stages
+        self.assertIsNone(short["stages"][3]["row_lock_waits_delta"])
+        reset = [innodb_line(t, Innodb_row_lock_waits=(1000 - t if t < 100 else 0), Innodb_row_lock_time=0, Innodb_os_log_fsyncs=0,
+                             Innodb_data_fsyncs=0) for t in range(0, 261, 2)]
+        self.assertIsNone(self.report(reset)["stages"][2]["row_lock_waits_delta"])  # decreasing: server restarted
+
+    def test_threads_connected_max_and_rows_are_recorded(self):
+        lines = [innodb_line(t, Threads_connected=(5 if t < 100 else 10), Innodb_row_lock_waits=t) for t in range(0, 261, 2)]
+        report = self.report(lines, rows=4)
+        self.assertEqual(report["mysql"], {"threads_connected_max": 10})
+        self.assertEqual(report["rows"], 4)
+
+
 class KindTest(unittest.TestCase):
     def report(self, steps, stats=None):
         lines = mini_lines(steps)
@@ -490,6 +557,23 @@ class ReprocessTest(unittest.TestCase):
                 report = json.load(f)
         self.assertEqual(report["run"], {"run_order": 2, "minutes_since_compose_up": 1.1})
         self.assertEqual(report["stages"][1]["gc_pauses_over_200ms"], 1)
+
+    def test_innodb_samples_and_rows_next_to_the_source_are_used(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.make_source(tmp, True)
+            with open(os.path.join(tmp, "load.json"), encoding="utf-8") as f:
+                old = json.load(f)
+            old["rows"] = 4
+            with open(os.path.join(tmp, "load.json"), "w", encoding="utf-8") as f:
+                json.dump(old, f)
+            with open(os.path.join(tmp, "innodb.jsonl"), "w", encoding="utf-8") as f:
+                f.write("\n".join(linear_innodb(InnodbTest.RATES)) + "\n")
+            out = os.path.join(tmp, "new.json")
+            self.assertEqual(postprocess.main(["--reprocess-from", tmp, "--out", out]), 0)
+            with open(out, encoding="utf-8") as f:
+                report = json.load(f)
+        self.assertEqual(report["rows"], 4)
+        self.assertEqual(report["stages"][2]["row_lock_waits_delta"], 290.0)
 
     def test_stats_and_summary_next_to_the_source_are_used(self):
         with tempfile.TemporaryDirectory() as tmp:

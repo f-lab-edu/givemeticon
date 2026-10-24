@@ -6,6 +6,8 @@ usage: python3 -I compare.py [--out FILE] [--p50-at RPS] <evidence dir | load.js
 Reads the load.json of each run (it must have sustained_limit_rps, i.e. be produced or reprocessed by the current
 postprocess.py) and prints a markdown report, also written to --out:
   Runs            one row per run: sustained_limit_rps, max_achieved_rps, p50 at one target, stalls, run_order, ...
+  Row-lock        per run: row_lock_wait_ratio, row_lock_time_per_request_ms and fsyncs_per_request at the reference target
+                  (--p50-at) and at the highest target (test C: where p50 rises, do requests start to wait on a row lock?)
   Per stage       median and min-max of sustained_limit_rps, max_achieved_rps and the p50 at that target over the runs
                   of each stage. The p50 at a mid-range target (--p50-at, default 650) shows where queueing starts even
                   when both stages still count as ok there.
@@ -82,6 +84,13 @@ def p50_at(report, target):
     return None
 
 
+def stage_value(report, target, key):
+    for stage in report["stages"]:
+        if stage["target_rps"] == target:
+            return stage.get(key)
+    return None
+
+
 def build_markdown(runs, p50_target=650):
     report0 = runs[0]["report"]
     stages = sorted(set(r["report"]["stage"] for r in runs))
@@ -99,6 +108,17 @@ def build_markdown(runs, p50_target=650):
             fmt(rep["sustained_limit_rps"]), fmt(best["achieved_rps"]), fmt(best["target_rps"]),
             fmt(p50_at(rep, p50_target), 2), len(rep["stalls"]),
             rep["limit_rps_first_violation"], "yes" if rep["validity"]["valid"] else "no"))
+
+    top = max(s["target_rps"] for s in report0["stages"])
+    columns = ("row_lock_wait_ratio", "row_lock_time_per_request_ms", "fsyncs_per_request")
+    out += ["", "## Row-lock waits and fsyncs per request (at %d and at the highest target %d rps)" % (p50_target, top), "",
+            "| stage | run | wait_ratio@%d | lock ms/req@%d | fsyncs/req@%d | wait_ratio@%d | lock ms/req@%d | fsyncs/req@%d |" % (
+                p50_target, p50_target, p50_target, top, top, top),
+            "|---|---|---|---|---|---|---|---|"]
+    for r in runs:
+        rep = r["report"]
+        cells = [fmt(stage_value(rep, t, key), 3) for t in (p50_target, top) for key in columns]
+        out.append("| %s | %s | %s |" % (rep["stage"], r["name"], " | ".join(cells)))
 
     out += ["", "## Per stage (median, min-max over runs)", "",
             "| stage | n | sustained_limit_rps | max_achieved_rps | p50@%d ms | stalls (total) |" % p50_target,

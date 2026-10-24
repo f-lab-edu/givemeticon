@@ -122,3 +122,14 @@ Note: the s0 runs are pooled although their env differs - k6_image: (missing), g
 2. 이벤트 행을 1/4/16 개로 나눠 쏘기: 결정적이다. 행 수에 따라 천장이 늘면 단일 행 직렬화, 그대로면 커밋이나 풀이 원인이다.
 3. `innodb_flush_log_at_trx_commit=2` 진단 run 1회(별도 env 블록): 천장이 뛰면 fsync 가 임계 구역을 지배한다.
 4. Hikari 5/10/20: 천장은 그대로이고 지연만 바뀌면 풀이 원인이 아니다.
+
+## 테스트 C - 병목 분해
+
+테스트 B 의 가설: 650~750rps 천장은 `coupon_event` 한 행에 대한 직렬화다(임계 구역 = S0 은 UPDATE 부터 커밋까지, S1 은 SELECT FOR UPDATE 부터 커밋까지). 가설이 맞다면 어떤 관측이 나와야 하는지 실험마다 미리 적어 두고, 결과는 로컬 실행 후 아래 표에 기입한다. 같은 부하 실행기(`verify.sh load`)를 재사용하며 evidence 는 append-only 다.
+
+### C1. 단계별 InnoDB 행 락·fsync 카운터 (실험 a, 항상 켜짐)
+
+* 모든 load run 에서 2초마다 MySQL 의 `SHOW GLOBAL STATUS` 를 읽어 `innodb.jsonl` 로 evidence 에 남긴다: `Innodb_row_lock_waits`, `Innodb_row_lock_time`(ms), `Innodb_row_lock_time_avg`, `Innodb_row_lock_time_max`, `Innodb_row_lock_current_waits`, `Innodb_data_fsyncs`, `Innodb_os_log_fsyncs`, 그리고 연결 수 확인용 `Threads_connected`. 비용은 2초에 쿼리 한 번이다.
+* `stages[]` 에 단계 측정 구간의 증가분(누적 카운터를 샘플 사이에서 선형 보간): `row_lock_waits_delta`, `row_lock_time_ms_delta`, `row_lock_wait_ratio` (= waits_delta / requests), `row_lock_time_per_request_ms`, `fsyncs_delta` (= `Innodb_data_fsyncs` + `Innodb_os_log_fsyncs`), `log_fsyncs_delta` (redo 로그 = 커밋 경로만), `fsyncs_per_request`. 샘플이 구간을 덮지 못하거나 서버가 재시작돼 카운터가 줄면 null. run 단위로 `mysql.threads_connected_max`.
+* `compare.py` 는 run 별로 650rps(`--p50-at`)와 최고 target 에서 `row_lock_wait_ratio`, `row_lock_time_per_request_ms`, `fsyncs_per_request` 를 표로 보여 준다.
+* **예측.** 요청이 한 행에서 줄을 선다면 `row_lock_wait_ratio` 가 1 쪽으로 올라가고 `row_lock_time_per_request_ms` 가 단계와 함께 커지되, 정확히 `p50_ms` 가 오르는 단계(테스트 B 에서는 650~800rps)에서 오른다. 낮은 단계(100~400rps)에서 ratio 가 0 에 가깝고 p50 이 오르는 단계에서도 0 에 머물면 행 락 대기는 병목이 아니다. `fsyncs_per_request` 가 1 에 가까우면 커밋마다 fsync 를 하고(그룹 커밋 이득 없음), 1 보다 훨씬 작으면 커밋이 묶여 나간다.
