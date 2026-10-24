@@ -25,6 +25,13 @@ invalid, p95 > 500 ms or error_rate > 1%) for comparison; stages from that one o
 current rules; the layout stored in its load.json is used when present, otherwise profiles.json, and only if that
 still describes the same stages.
 
+--innodb is the innodb.jsonl sampled by verify.sh (one {"time": epoch, "status": {...}} about every 2 s with MySQL's cumulative
+InnoDB row-lock and fsync counters); per stage it gives the deltas over the measure window (counters are interpolated
+linearly between samples) and the ratios per request: row_lock_wait_ratio (waits / requests, near 1 means every request
+waited for a row lock), row_lock_time_per_request_ms, fsyncs_per_request. fsyncs_delta is Innodb_data_fsyncs +
+Innodb_os_log_fsyncs; log_fsyncs_delta is the redo-log (commit path) part alone. --rows is the number of event rows the run
+spread its load over. --max-vus is the VU cap k6 was run with when it was raised above profiles.json; it replaces
+vus.max in the layout stored with the report (and so in vus_max_reached).
 --stats is the stats.jsonl sampled by verify.sh (one {"time": epoch, "stat": <docker stats object>} per container
 about every 2 s); every stage gets the mean and max CPU% of the app and mysql containers over its measure window
 (100 = one fully used core). --summary is the k6 summary export; it provides the VU high-water mark. --gc-log is the app JVM's GC log
@@ -57,6 +64,7 @@ _TIME = re.compile(r"^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d+))?(Z|[
 # JVM -Xlog:gc*:file=...:time,uptime, e.g. "[2026-10-23T07:49:09.394+0000][1.138s] GC(0) Pause Young (Normal) ... 15.951ms"
 _GC_PAUSE = re.compile(r"^\[([^\]]+)\](?:\[[^\]]*\])* GC\(\d+\) Pause .*? ([\d.]+)ms\s*$")
 GC_PAUSE_LIMIT_MS = 200.0
+INNODB_COUNTERS = ("Innodb_row_lock_waits", "Innodb_row_lock_time", "Innodb_data_fsyncs", "Innodb_os_log_fsyncs")
 
 
 def parse_time(text):
@@ -160,6 +168,49 @@ def cpu_summary(samples, window_start, window_end):
     return round(sum(values) / len(values), 1), round(max(values), 1)
 
 
+def load_innodb(path):
+    """innodb.jsonl -> {status variable: [(epoch, value)]} sorted by time; unreadable lines are skipped."""
+    series = {}
+    if not path or not os.path.exists(path):
+        return series
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            try:
+                item = json.loads(line)
+                when = float(item["time"])
+                status = item["status"]
+            except (ValueError, KeyError, TypeError):
+                continue
+            for name, value in status.items():
+                if isinstance(value, (int, float)):
+                    series.setdefault(name, []).append((when, value))
+    for points in series.values():
+        points.sort()
+    return series
+
+
+def counter_at(points, when):
+    """A cumulative counter at 'when', interpolated linearly between the two samples around it; None outside the samples."""
+    if not points or when < points[0][0] or when > points[-1][0]:
+        return None
+    for (t0, v0), (t1, v1) in zip(points, points[1:]):
+        if t0 <= when <= t1:
+            return v0 if t1 == t0 else v0 + (v1 - v0) * (when - t0) / (t1 - t0)
+    return points[-1][1]
+
+
+def counter_delta(points, start, end):
+    """Increase of a cumulative counter over [start, end]; None without samples around both ends or after a counter reset."""
+    first, last = counter_at(points, start), counter_at(points, end)
+    if first is None or last is None or last < first:
+        return None
+    return last - first
+
+
+def per_request(amount, requests, digits):
+    return None if amount is None or not requests else round(amount / requests, digits)
+
+
 def load_gc_pauses(path):
     """gc.log -> [(epoch of the end of the pause, duration ms)] for every 'Pause ...' line; None without a log."""
     if not path or not os.path.exists(path):
@@ -206,7 +257,7 @@ def classify(stage):
 
 
 def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, filtered_path=None,
-                 stats_path=None, summary_path=None, gc_path=None, run_info=None):
+                 stats_path=None, summary_path=None, gc_path=None, run_info=None, innodb_path=None, rows=1):
     profile = layout["profiles"][profile_name]
     rates = [step["rps"] for step in profile["steps"]]
     if len(set(rates)) != len(rates):
@@ -214,6 +265,7 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
     latencies, counts, dropped, anchor = collect(raw_path, filtered_path)
     stats = load_stats(stats_path)
     gc_pauses = load_gc_pauses(gc_path)
+    innodb = load_innodb(innodb_path)
     if anchor is None:
         raise ValueError("no http_req_duration points in " + raw_path)
 
@@ -234,6 +286,11 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
             1 for when, ms in gc_pauses if window_start <= when < window_end and ms > GC_PAUSE_LIMIT_MS)
         app_mean, app_max = cpu_summary(stats["app"], window_start, window_end)
         mysql_mean, mysql_max = cpu_summary(stats["mysql"], window_start, window_end)
+        waits = counter_delta(innodb.get("Innodb_row_lock_waits"), window_start, window_end)
+        lock_ms = counter_delta(innodb.get("Innodb_row_lock_time"), window_start, window_end)
+        log_fsyncs = counter_delta(innodb.get("Innodb_os_log_fsyncs"), window_start, window_end)
+        data_fsyncs = counter_delta(innodb.get("Innodb_data_fsyncs"), window_start, window_end)
+        fsyncs = None if log_fsyncs is None or data_fsyncs is None else log_fsyncs + data_fsyncs
         achieved = requests / (window_end - window_start)
         p95 = _round(percentile(values, 95))
         stages.append({
@@ -259,6 +316,13 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
             "mysql_cpu_pct_mean": mysql_mean,
             "mysql_cpu_pct_max": mysql_max,
             "gc_pauses_over_200ms": long_pauses,
+            "row_lock_waits_delta": None if waits is None else round(waits, 1),
+            "row_lock_time_ms_delta": None if lock_ms is None else round(lock_ms, 1),
+            "row_lock_wait_ratio": per_request(waits, requests, 4),
+            "row_lock_time_per_request_ms": per_request(lock_ms, requests, 3),
+            "fsyncs_delta": None if fsyncs is None else round(fsyncs, 1),
+            "log_fsyncs_delta": None if log_fsyncs is None else round(log_fsyncs, 1),
+            "fsyncs_per_request": per_request(fsyncs, requests, 3),
         })
 
     first_violation = "not reached"
@@ -298,6 +362,8 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         "limit_rps_first_violation": first_violation,
         "db": {"issued_rows": db_issued_rows, "http_issued": http_issued, "match": match},
         "vus": read_vus(summary_path, layout),
+        "rows": rows,
+        "mysql": {"threads_connected_max": _max_or_none(innodb.get("Threads_connected"))},
         "run": run_info or {},
         "validity": {
             "stage0_dropped_ratio": stages[0]["dropped_ratio"],
@@ -307,6 +373,10 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         },
         "env": env,
     }
+
+
+def _max_or_none(points):
+    return max(value for _, value in points) if points else None
 
 
 def _round(value):
@@ -345,6 +415,9 @@ def main(argv=None):
     parser.add_argument("--stats", metavar="STATS_JSONL")
     parser.add_argument("--summary", metavar="SUMMARY_JSON")
     parser.add_argument("--gc-log", metavar="GC_LOG")
+    parser.add_argument("--innodb", metavar="INNODB_JSONL")
+    parser.add_argument("--rows", type=int, default=1)
+    parser.add_argument("--max-vus", type=int)
     parser.add_argument("--run-order", type=int)
     parser.add_argument("--minutes-since-up", type=float)
     parser.add_argument("--clock-offset-s", type=int)
@@ -368,6 +441,8 @@ def main(argv=None):
         args.stats = os.path.join(source, "stats.jsonl")
         args.summary = os.path.join(source, "summary.json")
         args.gc_log = os.path.join(source, "gc.log")
+        args.innodb = os.path.join(source, "innodb.jsonl")
+        args.rows = old.get("rows", 1)
         run_info = old.get("run") or None
         reprocessed_from = source
     elif None in (args.raw, args.profile, args.stage, args.db_issued_rows):
@@ -378,6 +453,8 @@ def main(argv=None):
             layout = json.load(f)
     if args.profile not in layout["profiles"]:
         parser.error("unknown profile: " + args.profile)
+    if args.max_vus:
+        layout = dict(layout, vus=dict(layout.get("vus") or {}, max=args.max_vus))
     if reprocessed_from and "layout" not in old:
         # No layout was stored with that run: profiles.json may have been retuned since, which would silently
         # apply the wrong step windows to the old data.
@@ -393,7 +470,8 @@ def main(argv=None):
             if value is not None:
                 run_info[key] = value
     report = build_report(args.raw, layout, args.profile, args.stage, args.db_issued_rows,
-                          _env(env_pairs), args.filtered_raw, args.stats, args.summary, args.gc_log, run_info)
+                          _env(env_pairs), args.filtered_raw, args.stats, args.summary, args.gc_log, run_info,
+                          args.innodb, args.rows)
     if reprocessed_from:
         report["reprocessed_from"] = reprocessed_from
     with open(args.out, "w", encoding="utf-8") as f:

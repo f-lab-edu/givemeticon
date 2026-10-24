@@ -1,5 +1,6 @@
 // Test B load scenarios against POST /coupon-events/{eventId}/issue. Started by `scripts/verify.sh load`:
-//   k6 run -e BASE_URL=... -e EVENT_ID=... -e PROFILE=ramping|spike --out json=... --summary-export ... issue.js
+//   k6 run -e BASE_URL=... -e EVENT_IDS=7,8 -e PROFILE=ramping|spike|ramping-rows [-e MAX_VUS=6000] --out json=... --summary-export ... issue.js
+// EVENT_IDS is a comma list: iteration i is sent to EVENT_IDS[i % N] (see events.js); EVENT_ID is still accepted for a single event.
 // The timeline and stock live in profiles.json, which postprocess.py reads as well.
 //
 // One ramping-arrival-rate scenario: a warmup, then for every step a short ramp to its rate followed by a hold.
@@ -9,18 +10,24 @@
 import http from 'k6/http';
 import exec from 'k6/execution';
 import { Counter } from 'k6/metrics';
+import { parseEventIds, pickEventId } from './events.js';
 
 const LAYOUT = JSON.parse(open('./profiles.json'));
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:18080';
-const EVENT_ID = __ENV.EVENT_ID;
+const EVENT_IDS = parseEventIds(__ENV.EVENT_IDS || __ENV.EVENT_ID);
 const PROFILE = __ENV.PROFILE;
+// MAX_VUS raises the VU cap above profiles.json (test C, when iterations are dropped while p50 is still low).
+const MAX_VUS = Number(__ENV.MAX_VUS) || LAYOUT.vus.max;
 
 const profile = LAYOUT.profiles[PROFILE];
 if (!profile) {
   throw new Error(`PROFILE must be one of ${Object.keys(LAYOUT.profiles).join('|')}, got '${PROFILE}'`);
 }
-if (!EVENT_ID) {
-  throw new Error('EVENT_ID is required');
+if (EVENT_IDS.length === 0) {
+  throw new Error('EVENT_IDS (or EVENT_ID) is required');
+}
+if (MAX_VUS < LAYOUT.vus.pre_allocated) {
+  throw new Error(`MAX_VUS ${MAX_VUS} is below preAllocatedVUs ${LAYOUT.vus.pre_allocated}`);
 }
 
 const WARMUP = LAYOUT.warmup;
@@ -53,7 +60,7 @@ export const options = {
       startRate: WARMUP.rps,
       timeUnit: '1s',
       preAllocatedVUs: LAYOUT.vus.pre_allocated,
-      maxVUs: LAYOUT.vus.max,
+      maxVUs: MAX_VUS,
       stages,
     },
   },
@@ -65,7 +72,7 @@ export const options = {
 http.setResponseCallback(http.expectedStatuses(200, 409));
 
 const results = new Counter('coupon_results');
-const URL = `${BASE_URL}/coupon-events/${EVENT_ID}/issue`;
+const issueUrl = (eventId) => `${BASE_URL}/coupon-events/${eventId}/issue`;
 const HEADERS = { 'Content-Type': 'application/json' };
 
 export default function () {
@@ -74,7 +81,8 @@ export default function () {
   // iterationInTest is unique across all VUs of the run, so every request uses a different member.
   const memberId = exec.scenario.iterationInTest + 1;
 
-  const res = http.post(URL, JSON.stringify({ memberId }), { headers: HEADERS, tags });
+  const eventId = pickEventId(EVENT_IDS, exec.scenario.iterationInTest);
+  const res = http.post(issueUrl(eventId), JSON.stringify({ memberId }), { headers: HEADERS, tags });
 
   const result = res.status === 200 ? 'issued' : res.status === 409 ? 'sold_out' : 'error';
   results.add(1, Object.assign({}, tags, { result }));

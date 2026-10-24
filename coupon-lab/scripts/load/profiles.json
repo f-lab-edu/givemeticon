@@ -15,6 +15,18 @@
         { "rps": 800, "seconds": 30 }
       ]
     },
+    "ramping-rows": {
+      "stock": 10000000,
+      "steps": [
+        { "rps": 200, "seconds": 30 },
+        { "rps": 400, "seconds": 30 },
+        { "rps": 800, "seconds": 30 },
+        { "rps": 1200, "seconds": 30 },
+        { "rps": 1600, "seconds": 30 },
+        { "rps": 2400, "seconds": 30 },
+        { "rps": 3200, "seconds": 30 }
+      ]
+    },
     "spike": {
       "stock": 100,
       "steps": [
