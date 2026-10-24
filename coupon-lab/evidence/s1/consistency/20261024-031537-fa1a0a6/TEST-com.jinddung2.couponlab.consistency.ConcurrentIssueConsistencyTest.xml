@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-24T03:15:48" hostname="heojinhyeog-ui-MacBookAir.local" time="7.396">
+  <properties/>
+  <testcase name="issuedNeverExceedsStockUnderConcurrency()" classname="com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest" time="7.396"/>
+  <system-out><![CDATA[12:15:38.456 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest]: ConcurrentIssueConsistencyTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+12:15:38.521 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.jinddung2.couponlab.CouponLabApplication for test class com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest
+12:15:38.578 [Test worker] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+12:15:38.580 [Test worker] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+12:15:38.585 [Test worker] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.21.4
+12:15:38.691 [Test worker] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+12:15:38.809 [Test worker] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+12:15:38.810 [Test worker] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+12:15:38.822 [Test worker] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 29.7.2
+  API Version: 1.55
+  Operating System: Docker Desktop
+  Total Memory: 3916 MB
+  Labels: 
+    com.docker.desktop.address=unix:///Users/jinhyuck/Library/Containers/com.docker.docker/Data/docker-cli.sock
+12:15:38.837 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Creating container for image: testcontainers/ryuk:0.12.0
+12:15:38.960 [Test worker] INFO org.testcontainers.utility.RegistryAuthLocator -- Credential helper/store (docker-credential-desktop) does not have credentials for https://index.docker.io/v1/
+12:15:39.036 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Container testcontainers/ryuk:0.12.0 is starting: 5d5b80afcf37a6ceab08794b68db42f94ac5613f108c98ceb0d07cb2a7f0f682
+12:15:39.175 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Container testcontainers/ryuk:0.12.0 started in PT0.337373S
+12:15:39.178 [Test worker] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
+12:15:39.178 [Test worker] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+12:15:39.178 [Test worker] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+12:15:39.180 [Test worker] INFO tc.mysql:8.0 -- Creating container for image: mysql:8.0
+12:15:39.233 [Test worker] INFO tc.mysql:8.0 -- Container mysql:8.0 is starting: f5c1c9920fe0ec81d31388574f7bcc33640cd1f5c1e0172385865f9fc9c83e9c
+12:15:39.320 [Test worker] INFO tc.mysql:8.0 -- Waiting for database connection to become available at jdbc:mysql://localhost:54692/test using query 'SELECT 1'
+12:15:46.395 [Test worker] INFO tc.mysql:8.0 -- Container mysql:8.0 started in PT7.214855S
+12:15:46.395 [Test worker] INFO tc.mysql:8.0 -- Container is started (JDBC URL: jdbc:mysql://localhost:54692/test)
+12:15:46.395 [Test worker] INFO tc.redis:7-alpine -- Creating container for image: redis:7-alpine
+12:15:46.428 [Test worker] INFO tc.redis:7-alpine -- Container redis:7-alpine is starting: b4470381e315345285e5c57b3489ad742c3124b7512ee752b8069a5fa5b98f74
+12:15:46.592 [Test worker] INFO tc.redis:7-alpine -- Container redis:7-alpine started in PT0.196699S
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.5)
+
+2026-10-24T12:15:46.758+09:00  INFO 20750 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : Starting ConcurrentIssueConsistencyTest using Java 21.0.5 with PID 20750 (started by jinhyuck in /Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab)
+2026-10-24T12:15:46.759+09:00  INFO 20750 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : No active profile set, falling back to 1 default profile: "default"
+2026-10-24T12:15:47.174+09:00  INFO 20750 --- [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-10-24T12:15:47.175+09:00  INFO 20750 --- [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-10-24T12:15:47.186+09:00  INFO 20750 --- [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 4 ms. Found 0 Redis repository interfaces.
+2026-10-24T12:15:47.443+09:00  INFO 20750 --- [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-24T12:15:47.542+09:00  INFO 20750 --- [    Test worker] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@2ae4c424
+2026-10-24T12:15:47.543+09:00  INFO 20750 --- [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-24T12:15:47.567+09:00  INFO 20750 --- [    Test worker] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:54692/test (MySQL 8.0)
+2026-10-24T12:15:47.611+09:00  INFO 20750 --- [    Test worker] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table `test`.`flyway_schema_history` does not exist yet
+2026-10-24T12:15:47.613+09:00  INFO 20750 --- [    Test worker] o.f.core.internal.command.DbValidate     : Successfully validated 1 migration (execution time 00:00.011s)
+2026-10-24T12:15:47.628+09:00  INFO 20750 --- [    Test worker] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table `test`.`flyway_schema_history` ...
+2026-10-24T12:15:47.674+09:00  INFO 20750 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Current version of schema `test`: << Empty Schema >>
+2026-10-24T12:15:47.679+09:00  INFO 20750 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Migrating schema `test` to version "1 - init"
+2026-10-24T12:15:47.718+09:00  INFO 20750 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Successfully applied 1 migration to schema `test`, now at version v1 (execution time 00:00.023s)
+2026-10-24T12:15:48.343+09:00  INFO 20750 --- [    Test worker] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+2026-10-24T12:15:48.387+09:00  INFO 20750 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : Started ConcurrentIssueConsistencyTest in 1.776 seconds (process running for 10.353)
+]]></system-out>
+  <system-err><![CDATA[WARNING: A Java agent has been loaded dynamically (/Users/jinhyuck/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.14.19/154da3a65b4f4a909d3e5bdec55d1b2b4cbb6ce1/byte-buddy-agent-1.14.19.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>
