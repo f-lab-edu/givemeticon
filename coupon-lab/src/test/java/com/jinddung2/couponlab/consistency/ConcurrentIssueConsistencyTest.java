@@ -67,6 +67,7 @@ import io.micrometer.core.instrument.MeterRegistry;
  * s4 also records redis_counter, queue_depth after the settle (messages of coupon.issued, ready plus unacked; expected 0,
  * not asserted) and redeliveries (delta of the coupon_s4_redeliveries counter). The procedure changed, so S0, S1 and S3
  * are re-recorded once with it; v3 and v3+settle evidence are not compared.
+ * s5 (asynchronous like s4) records redis_counter and queue_depth as s4 does; it has no redelivery counter.
  * Expected to FAIL on S0, whose read-then-decrement has no protection; the numbers are the evidence.
  */
 @Tag("consistency")
@@ -146,7 +147,7 @@ class ConcurrentIssueConsistencyTest {
     @Test
     void issuedNeverExceedsStockUnderConcurrency() throws Exception {
         stage = environment.getProperty("coupon.strategy", stage);
-        remainingSource = "s3".equals(stage) || "s4".equals(stage) ? "redis" : "db";
+        remainingSource = "s3".equals(stage) || "s4".equals(stage) || "s5".equals(stage) ? "redis" : "db";
         if ("s4".equals(stage)) {
             s4ConfirmTimeoutMs = environment.getProperty("COUPON_S4_CONFIRM_TIMEOUT_MS", "2000");
             s4ConsumerFailEvery = environment.getProperty("COUPON_S4_CONSUMER_FAIL_EVERY", "0");
@@ -225,8 +226,10 @@ class ConcurrentIssueConsistencyTest {
         if (redisCounter != null) {
             result.put("redis_counter", redisCounter);
         }
-        if ("s4".equals(stage)) {
+        if ("s4".equals(stage) || "s5".equals(stage)) {
             result.put("queue_depth", queueDepth());
+        }
+        if ("s4".equals(stage)) {
             result.put("redeliveries", (long) (redeliveries() - redeliveriesBefore));
         }
         result.put("over_issue", Math.max(0, issued - TOTAL_QUANTITY));

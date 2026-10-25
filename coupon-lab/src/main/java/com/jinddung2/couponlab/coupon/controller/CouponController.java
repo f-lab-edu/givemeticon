@@ -26,6 +26,8 @@ public class CouponController {
             case IssueResult.Issued issued -> ResponseEntity.ok(new IssueResponse("ISSUED", issued.seq()));
             case IssueResult.SoldOut soldOut ->
                     ResponseEntity.status(HttpStatus.CONFLICT).body(new IssueResponse("SOLD_OUT", null));
+            case IssueResult.AlreadyIssued alreadyIssued ->
+                    ResponseEntity.status(HttpStatus.CONFLICT).body(new IssueResponse("ALREADY_ISSUED", null));
         };
     }
 
