@@ -2,3 +2,6 @@ coupon-lab/evidence/
 coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S0CouponIssueService.java
 coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S1CouponIssueService.java
 coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S3CouponIssueService.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S4CouponIssueService.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S4CouponIssuedConsumer.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S4RabbitConfiguration.java
