@@ -47,4 +47,16 @@ class CouponControllerTest {
                 .andExpect(jsonPath("$.result").value("SOLD_OUT"))
                 .andExpect(jsonPath("$.seq").doesNotExist());
     }
+
+    @Test
+    void alreadyIssuedIsMappedTo409WithoutSeq() throws Exception {
+        given(couponIssueService.issue(7L, 42L)).willReturn(new IssueResult.AlreadyIssued());
+
+        mockMvc.perform(post("/coupon-events/7/issue")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":42}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.result").value("ALREADY_ISSUED"))
+                .andExpect(jsonPath("$.seq").doesNotExist());
+    }
 }
