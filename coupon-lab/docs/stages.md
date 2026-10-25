@@ -703,7 +703,7 @@ Evidence(모두 `coupon-lab/evidence/s4/` 아래):
 
 해결책(설명만 하고 **이 단계에는 적용하지 않는다**):
 
-1. `ClientOptions.disconnectedBehavior(REJECT_COMMANDS)`: 끊긴 클라이언트는 명령을 쌓지 않고 즉시 실패(503)한다. 이미 떠난 클라이언트를 위해 `INCR` 이 나중에 실행되지 않고, 스레드도 풀린다.
+ClientOptions.disconnectedBehavior(REJECT_COMMANDS) + 명령 타임아웃 약 1 s: 끊긴 동안 요청이 수 ms 안에 503 으로 끝나 스레드가 바로 풀린다. 그래서 Tomcat 이 받아 둔 연결의 대기열이 쌓이지 않고, 재접속 순간 실행될 요청(위 8,792 건의 대부분)이 남지 않는다. "버퍼링을 안 해서"가 아니라 "대기열이 생기지 않아서" 유령 당첨이 막힌다.
 2. `spring.data.redis.timeout` ≈ 1 s: 요청이 결정을 60초가 아니라 1초 기다린다. 스레드를 쌓아 두지 않는다.
 3. `ClientResources.reconnectDelay(Delay.constant(…))`: 기본(점점 늘어나는) 지연 대신 짧은 고정 지연이다.
 
