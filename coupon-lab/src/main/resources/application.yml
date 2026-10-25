@@ -10,6 +10,27 @@ spring:
     redis:
       host: ${COUPON_LAB_REDIS_HOST:localhost}
       port: ${COUPON_LAB_REDIS_PORT:6379}
+  rabbitmq:
+    host: ${COUPON_LAB_RABBIT_HOST:localhost}
+    port: ${COUPON_LAB_RABBIT_PORT:5672}
+    username: ${COUPON_LAB_RABBIT_USERNAME:guest}
+    password: ${COUPON_LAB_RABBIT_PASSWORD:guest}
+    # S4: correlated confirms complete a CorrelationData future per publish on the template's shared, cached channels.
+    # (simple confirms needed RabbitTemplate.invoke, whose dedicated channel was closed physically, 5 s late: channelMax.)
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    # Up to 200 Tomcat threads publish at once; with correlated confirms the channels come from and return to this cache,
+    # so its size now matters. 200 = server.tomcat.threads.max. No checkout-timeout: a cache, never a semaphore.
+    cache:
+      channel:
+        size: 200
+    listener:
+      simple:
+        acknowledge-mode: auto
+        concurrency: 1
+        prefetch: 50
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

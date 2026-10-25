@@ -1,0 +1,125 @@
+{
+  "test" : "A",
+  "stage" : "s0",
+  "procedure" : "v3+settle",
+  "repetitions" : 10,
+  "threads" : 1000,
+  "total_quantity" : 100,
+  "remaining_source" : "db",
+  "runs" : [ {
+    "run" : 1,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 1122,
+    "settle_ms" : 1070
+  }, {
+    "run" : 2,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 652,
+    "settle_ms" : 1061
+  }, {
+    "run" : 3,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 581,
+    "settle_ms" : 1054
+  }, {
+    "run" : 4,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 560,
+    "settle_ms" : 1060
+  }, {
+    "run" : 5,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 553,
+    "settle_ms" : 1076
+  }, {
+    "run" : 6,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 537,
+    "settle_ms" : 1057
+  }, {
+    "run" : 7,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 585,
+    "settle_ms" : 1050
+  }, {
+    "run" : 8,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 507,
+    "settle_ms" : 1064
+  }, {
+    "run" : 9,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 489,
+    "settle_ms" : 1063
+  }, {
+    "run" : 10,
+    "issued" : 107,
+    "remaining" : -7,
+    "over_issue" : 7,
+    "dup_members" : 0,
+    "remaining_mismatch" : false,
+    "exceptions" : 0,
+    "elapsed_ms" : 483,
+    "settle_ms" : 1066
+  } ],
+  "summary" : {
+    "runs_broken" : 10,
+    "max_over_issue" : 7,
+    "max_dup_members" : 0
+  },
+  "env" : {
+    "java" : "21.0.5",
+    "spring_boot" : "3.3.5",
+    "mysql_image" : "mysql:8.0",
+    "redis_image" : "redis:7-alpine",
+    "rabbitmq_image" : "rabbitmq:3-alpine",
+    "hikari_pool_size" : 10,
+    "cpu" : 8,
+    "os" : "Mac OS X 26.3.1 aarch64"
+  }
+}

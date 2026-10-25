@@ -36,4 +36,14 @@
         INSERT INTO coupon_issue (event_id, member_id, seq, created_at)
         VALUES (#{eventId}, #{memberId}, #{seq}, NOW(6))
     </insert>
+
+    <!-- S4 consumer: idempotency by the publish-time message id (V2, indexed, not unique). -->
+    <insert id="insertIssued">
+        INSERT INTO coupon_issue (event_id, member_id, seq, message_id, created_at)
+        VALUES (#{eventId}, #{memberId}, #{seq}, #{messageId}, NOW(6))
+    </insert>
+
+    <select id="existsIssueByMessageId" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM coupon_issue WHERE message_id = #{messageId})
+    </select>
 </mapper>

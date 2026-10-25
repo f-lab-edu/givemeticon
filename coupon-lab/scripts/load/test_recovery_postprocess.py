@@ -164,6 +164,14 @@ class TimelineTest(unittest.TestCase):
         self.assertEqual(by_sec[3]["http_409"], 7)
         self.assertEqual(by_sec[65]["db_rows"], 99)
 
+    def test_queue_samples_add_the_last_depth_of_each_second(self):
+        timeline = rp.build_timeline({}, [], 1000.0, 10, 60, [(1000.1, 5), (1000.8, 7), (1002.2, None), (1070.0, 0)])
+        by_sec = {entry["sec"]: entry for entry in timeline}
+        self.assertEqual((by_sec[0]["queue_depth"], by_sec[1]["queue_depth"], by_sec[2]["queue_depth"]), (7, None, None))
+        self.assertEqual(timeline[-1], {"sec": 70, "http_200": 0, "http_409": 0, "http_5xx": 0, "timeouts": 0, "db_rows": None,
+                                        "queue_depth": 0})
+        self.assertNotIn("queue_depth", rp.build_timeline({}, [], 1000.0, 10, 60)[0])  # stages without a queue
+
     def test_samples_before_the_warmup_are_left_out(self):
         timeline = rp.build_timeline({}, [(985.0, 0)], 1000.0, 10, 60)
         self.assertEqual((timeline[0]["sec"], timeline[-1]["sec"]), (-10, 59))
@@ -297,6 +305,28 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(report["over_issue"], 9_500)
 
 
+    def test_consumer_redeliver_has_no_fault_and_is_valid_on_k6_alone(self):
+        raw = self.raw(failing=())
+        samples = [(MAIN + sec + 0.05, min(30_000, max(0, sec + 12) * 400)) for sec in range(-12, 90)]
+        queue = [(MAIN + sec + 0.1, max(0, 300 - 10 * (sec - 60)) if sec >= 60 else 40) for sec in range(-10, 90)]
+        report = rp.build_report("consumer-redeliver", "s4", 10_000_000, LAYOUT, raw, {"k6_ended_at": MAIN + 61.0}, samples,
+                                 ["%d\t%d" % (i, i) for i in range(1, 6)], 30_000, 30_000, 0, 20, 10, "coupon-lab-load-app",
+                                 {}, settle_s=12.0, queue_samples=queue, redeliveries=600)
+        self.assertEqual(report["validity"], {"k6_completed": True, "fault_observed": None, "valid": True})
+        self.assertEqual((report["fault"]["at_s"], report["fault"]["duration_s"]), (None, None))
+        self.assertEqual((report["wins"], report["seats_lost"], report["dup_seq"]), (30_000, 0, 0))
+        self.assertTrue(report["settled"])
+        self.assertAlmostEqual(report["recovery_time_s"], 2.05, places=2)  # rows reach 30,000 at 63.05, the load ended at 61
+        self.assertEqual((report["settle_s"], report["queue_depth_max"], report["redeliveries"]), (12.0, 300, 600))
+        self.assertIn("queue_depth", report["timeline"][0])
+        self.assertFalse(self.report(raw, k6_exit=1, scenario="consumer-redeliver")["validity"]["valid"])
+
+    def test_without_queue_samples_or_a_counter_the_s4_fields_are_null(self):
+        report = self.report(self.raw())
+        self.assertEqual((report["settle_s"], report["queue_depth_max"], report["redeliveries"]), (None, None, None))
+        self.assertIsNone(report["publish_failures"])
+        self.assertNotIn("queue_depth", report["timeline"][0])
+
     def test_the_report_carries_the_loss_axes_and_the_logged_insert_failures(self):
         report = self.report(self.raw())
         self.assertEqual(report["seats_lost"], 1_000)  # 30,000 wins, 29,000 rows
@@ -376,11 +406,21 @@ class LossAxesTest(unittest.TestCase):
         self.assertIsNone(rp.loss_axes(reset)["not_admitted"])
         self.assertIsNone(rp.loss_axes(self.report(None, 5, 5, requests=5))["not_admitted"])
 
-    def test_blackout_is_the_longest_run_of_seconds_without_a_200(self):
+    def test_blackout_is_the_longest_run_of_seconds_without_a_decision(self):
         timeline = self.seconds(*([500] * 5 + [0] * 55))  # a 49 s outage: the 200s stop at second 5 and never return during the load
         self.assertEqual(rp.loss_axes(self.report(1, 1, 1, timeline=timeline))["blackout_s"], 55)
         self.assertEqual(rp.blackout_seconds(self.seconds(5, 0, 0, 5, 0, 0, 0, 5), 60), 3)
         self.assertEqual(rp.blackout_seconds(self.seconds(*([500] * 60)), 60), 0)
+
+    def test_a_sold_out_tail_is_not_a_blackout_and_is_reported_on_its_own(self):
+        # 38 s of 200s, then only 409s: sold out, every request decided (the S3 redis-restart-aof run used to read "21")
+        timeline = [{"sec": s, "http_200": 500 if s < 38 else 0, "http_409": 0 if s < 38 else 500} for s in range(60)]
+        self.assertEqual(rp.blackout_seconds(timeline, 60), 0)
+        self.assertEqual(rp.sold_out_at(timeline, 60), 38)
+        stalled = [{"sec": s, "http_200": 0 if 20 <= s < 38 else 500, "http_409": 0} for s in range(60)]
+        self.assertEqual(rp.blackout_seconds(stalled, 60), 18)  # 18 s with neither a 200 nor a 409
+        self.assertIsNone(rp.sold_out_at(stalled, 60))
+        self.assertIsNone(rp.sold_out_at([{"sec": 61, "http_200": 0, "http_409": 5}], 60))  # after the load
 
     def test_blackout_ignores_seconds_after_the_load_and_a_missing_second_breaks_the_run(self):
         self.assertEqual(rp.blackout_seconds(self.seconds(0, 0, 0, start=58), 60), 2)  # seconds 58 and 59 only
@@ -435,7 +475,41 @@ class CommandLineTest(unittest.TestCase):
             with open(out, encoding="utf-8") as f:
                 new = json.load(f)
         self.assertEqual((new["seats_lost"], new["client_unknown"], new["recorded_despite_unknown"]), (2, 3, 2))
-        self.assertEqual((new["not_admitted"], new["blackout_s"]), (5, 0))
+        self.assertEqual((new["not_admitted"], new["blackout_s"], new["sold_out_at_s"]), (5, 0, None))
+        self.assertEqual((new["settle_s"], new["queue_depth_max"], new["redeliveries"]), (None, None, None))
+        self.assertIsNone(new["publish_failures"])
+
+    def test_the_s4_inputs_from_the_command_line_end_up_in_the_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            def at(name):
+                return os.path.join(tmp, name)
+            write_raw(at("raw.json.gz"), synthetic_raw(failing=()))
+            with open(at("fault.log"), "w", encoding="utf-8") as f:
+                f.write("%s k6_ended_at epoch=%.3f k6 exit 0\n" % (iso(MAIN + 61), MAIN + 61))
+            with open(at("queue.jsonl"), "w", encoding="utf-8") as f:
+                for sec, depth in ((0, 3), (1, "null"), (2, 41), (3, 0)):
+                    f.write('{"time":%d,"queue_depth":%s}\n' % (int(MAIN) + sec, depth))
+                # the management-API sampler adds ready/unacked/channels/connections; only queue_depth is aggregated
+                f.write('{"time":%d,"queue_depth":40,"ready":30,"unacked":10,"channels":200,"connections":1}\n' % (int(MAIN) + 4))
+                f.write('{"time":%d,"queue_depth":null,"ready":null,"unacked":null,"channels":null,"connections":null}\n'
+                        % (int(MAIN) + 5))
+                f.write("not json\n")
+            for name in ("db-samples.jsonl", "issues.tsv"):
+                open(at(name), "w").close()
+            argv = ["--raw", at("raw.json.gz"), "--scenario", "consumer-redeliver", "--stage", "s4", "--stock", "10000000",
+                    "--fault-log", at("fault.log"), "--db-samples", at("db-samples.jsonl"), "--issues", at("issues.tsv"),
+                    "--db-rows", "30000", "--redis-counter", "30000", "--k6-exit", "0", "--fault-at", "20", "--fault-duration", "10",
+                    "--target", "coupon-lab-load-app", "--settle-s", "6", "--queue-samples", at("queue.jsonl"), "--redeliveries", "600",
+                    "--publish-failures", '{"nack": 1, "timeout": 3}',
+                    "--out", at("recovery.json"), "--timeline-out", at("timeline.json")]
+            self.assertEqual(rp.main(argv), 0)
+            with open(at("recovery.json"), encoding="utf-8") as f:
+                report = json.load(f)
+        self.assertEqual((report["settle_s"], report["queue_depth_max"], report["redeliveries"]), (6.0, 41, 600))
+        self.assertEqual([e["queue_depth"] for e in report["timeline"] if 0 <= e["sec"] <= 5], [3, None, 41, 0, 40, None])
+        self.assertEqual(report["publish_failures"], {"total": 4, "by_reason": {"nack": 1, "timeout": 3}})
+        self.assertEqual(report["scenario"], "consumer-redeliver")
+        self.assertTrue(report["validity"]["valid"])
 
     def test_a_fresh_run_without_its_inputs_is_a_usage_error(self):
         with self.assertRaises(SystemExit):

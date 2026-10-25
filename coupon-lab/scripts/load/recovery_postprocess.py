@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Aggregate one test-D run (scripts/verify.sh recovery) into recovery.json and timeline.json. Standard library only.
 
-usage: python3 -I recovery_postprocess.py --raw raw.json.gz --scenario db-down|redis-restart --stage sN --stock N
+usage: python3 -I recovery_postprocess.py --raw raw.json.gz --scenario db-down|redis-restart|consumer-redeliver --stage sN --stock N
            --fault-log fault.log --db-samples db-samples.jsonl --issues issues.tsv --db-rows N [--redis-counter N]
            --k6-exit N --out recovery.json --timeline-out timeline.json [--fault-at S] [--fault-duration S]
-           [--profiles profiles.json] [--insert-failures N] [--env key=value ...]
+           [--profiles profiles.json] [--insert-failures N] [--settle-s S] [--queue-samples queue.jsonl] [--redeliveries N]
+           [--publish-failures '{"<reason>": N, ...}']
+           [--env key=value ...]
        python3 -I recovery_postprocess.py --reprocess-from <evidence dir> --out recovery.json
 
 Inputs written by the runner:
@@ -15,6 +17,11 @@ Inputs written by the runner:
                    healthy again), k6_ended_at. --fault-duration is the time between stop_returned_at and docker start.
   db-samples.jsonl {"time": <epoch s>, "db_rows": <count of coupon_issue rows of the event, null while MySQL is unreachable>}, every second.
   issues.tsv       "member_id<TAB>seq" for every coupon_issue row of the event, read after the run settled.
+  queue.jsonl      (S4) {"time": <epoch s>, "queue_depth": <messages of coupon.issued, ready + unacked; null when unreadable>, ...}, about
+                   every second; other fields (ready, unacked, channels, connections) are kept in the file and not aggregated.
+
+consumer-redeliver (S4) injects no container fault: the app's consumer throws after every 50th new row, before the ack. There are
+no fault events, so validity is k6_completed alone (fault_observed is null) and recovery_time_s is measured from the load end.
 
 Definitions (the numbers are OUTCOMES: they never decide PASS/FAIL, only validity does):
   totals                     every request of the run, warmup included, counted by the result its client saw.
@@ -32,7 +39,10 @@ Definitions (the numbers are OUTCOMES: they never decide PASS/FAIL, only validit
   not_admitted               requests - redis_counter: requests that never reached the decision (the counter). null when the counter is
                              not meaningful. client_unknown minus not_admitted is roughly "took a seat, client does not know".
   blackout_s                 the longest run of consecutive seconds of the load (0..59) in which no request started in that second
-                             was answered 200 (a second is counted by when its requests started).
+                             got a decision: no 200 and no 409 (a second is counted by when its requests started). A sold-out tail
+                             (409 only) is not a blackout. Until S4 follow-up 2 it counted seconds without a 200, so a sold-out tail
+                             counted; reprocessed runs carry the new definition.
+  sold_out_at_s              the first load second in which a request got a 409 (sold out); null when none did.
   error_codes                {k6 error_code: requests} of the requests that got no HTTP answer; null when the run predates the
                              recording (the raw k6 output is not kept, so older runs cannot be filled in).
   seats_lost                 wins - db_rows: seats the decision took that have no row (the durability figure). null when wins is null.
@@ -42,8 +52,16 @@ Definitions (the numbers are OUTCOMES: they never decide PASS/FAIL, only validit
                              confirmed_but_missing with the sign reversed.
   consumed_but_unconfirmed, confirmed_but_missing   the first-generation figures, kept as derived (legacy) fields; see legacy_fields.
   insert_failures_logged     ERROR lines "coupon_issue insert failed after winning the counter" in the app log (S3); null when no log was read.
+  settle_s                   seconds the runner waited after the load for db_rows to stop changing (the 5-poll window included); null
+                             when not recorded.
+  queue_depth_max            the largest queue.jsonl sample (S4); null without samples. The timeline then carries queue_depth per second
+                             (the last sample taken in that second).
+  redeliveries               the app's coupon_s4_redeliveries counter (messages the broker delivered again) read after the settle; null
+                             when not read (stages without a consumer).
+  publish_failures           the app's coupon_s4_publish_failures counter per reason tag (S4): {"total", "by_reason"}; null when not read
+                             (other stages, or the counter could not be read).
   validity                   k6_completed (k6 exited 0 and the main phase ran to its last second) and fault_observed (the fault events were logged,
-                             in order, and the fault was injected while the main phase was running).
+                             in order, and the fault was injected while the main phase was running; null for consumer-redeliver).
 Requests are bucketed by the second they started in, counted from the start of the main phase (the warmup is seconds -10..-1).
 """
 import argparse
@@ -160,22 +178,29 @@ def loss_axes(report):
         "recorded_despite_unknown": report["db_rows"] - totals["http_200"] if no_duplicates else None,
         "not_admitted": totals["requests"] - counter if report.get("redis_counter_meaningful") and counter is not None else None,
         "blackout_s": blackout_seconds(report["timeline"], report["load"]["seconds"]),
+        "sold_out_at_s": sold_out_at(report["timeline"], report["load"]["seconds"]),
         "legacy_fields": ["consumed_but_unconfirmed", "confirmed_but_missing"],
     }
 
 
 def blackout_seconds(timeline, load_seconds):
-    """Longest run of consecutive seconds 0..load_seconds-1 with no 200 among the requests started in them."""
+    """Longest run of consecutive seconds 0..load_seconds-1 in which no request started got a decision (no 200, no 409)."""
     longest = current = 0
     by_sec = {entry["sec"]: entry for entry in timeline}
     for sec in range(load_seconds):
         entry = by_sec.get(sec)
-        if entry is not None and entry["http_200"] == 0:
+        if entry is not None and entry["http_200"] + entry.get("http_409", 0) == 0:
             current += 1
             longest = max(longest, current)
         else:
             current = 0
     return longest
+
+
+def sold_out_at(timeline, load_seconds):
+    """The first second 0..load_seconds-1 in which a request started got a 409, or None."""
+    seconds = [entry["sec"] for entry in timeline if 0 <= entry["sec"] < load_seconds and entry.get("http_409", 0) > 0]
+    return min(seconds) if seconds else None
 
 
 def reprocess(source_dir):
@@ -185,6 +210,8 @@ def reprocess(source_dir):
     report.update(loss_axes(report))
     report.setdefault("insert_failures_logged", None)
     report.setdefault("error_codes", None)
+    for name in ("settle_s", "queue_depth_max", "redeliveries", "publish_failures"):
+        report.setdefault(name, None)
     report["reprocessed_from"] = source_dir
     return report
 
@@ -244,19 +271,47 @@ def recovery_times(samples, fault_end, load_end):
     return True, round(after_both, 3), round(after_fault, 3)
 
 
-def build_timeline(per_sec, samples, main_start, warmup_seconds, load_seconds):
-    """One entry per second: the outcomes of the requests started in it and the last db_rows sample taken in it."""
-    rows_by_sec = {}
-    for when, rows in samples:
-        if main_start is not None:
-            rows_by_sec[int(math.floor(when - main_start))] = rows
+def read_queue_samples(path):
+    """queue.jsonl -> [(epoch, depth or None)] in time order; None when there is no file (stages without a queue)."""
+    if not path or not os.path.exists(path):
+        return None
+    samples = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            try:
+                item = json.loads(line)
+                depth = item["queue_depth"]
+                samples.append((float(item["time"]), None if depth is None else int(depth)))
+            except (ValueError, KeyError, TypeError):
+                continue
+    samples.sort(key=lambda s: s[0])
+    return samples
+
+
+def by_second(samples, main_start):
+    """[(epoch, value)] -> {second since the main start: the last value sampled in it}."""
+    values = {}
+    if main_start is not None:
+        for when, value in samples:
+            values[int(math.floor(when - main_start))] = value
+    return values
+
+
+def build_timeline(per_sec, samples, main_start, warmup_seconds, load_seconds, queue_samples=None):
+    """One entry per second: the outcomes of the requests started in it, the last db_rows sample taken in it and, with queue
+    samples (S4), the last queue_depth sample taken in it."""
+    rows_by_sec = by_second(samples, main_start)
+    depth_by_sec = by_second(queue_samples, main_start) if queue_samples is not None else {}
     low = min([-warmup_seconds] + list(per_sec))
-    high = max([load_seconds - 1] + list(per_sec) + list(rows_by_sec))
+    high = max([load_seconds - 1] + list(per_sec) + list(rows_by_sec) + list(depth_by_sec))
     timeline = []
     for sec in range(low, high + 1):
         counts = per_sec.get(sec, Counter())
-        timeline.append({"sec": sec, "http_200": counts["issued"], "http_409": counts["sold_out"],
-                         "http_5xx": counts["http_5xx"], "timeouts": counts["timeout"], "db_rows": rows_by_sec.get(sec)})
+        entry = {"sec": sec, "http_200": counts["issued"], "http_409": counts["sold_out"],
+                 "http_5xx": counts["http_5xx"], "timeouts": counts["timeout"], "db_rows": rows_by_sec.get(sec)}
+        if queue_samples is not None:
+            entry["queue_depth"] = depth_by_sec.get(sec)
+        timeline.append(entry)
     return timeline
 
 
@@ -280,7 +335,11 @@ def _env(pairs):
 
 
 def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lines, db_rows, redis_counter, k6_exit,
-                 fault_at, fault_duration, target, env, insert_failures=None):
+                 fault_at, fault_duration, target, env, insert_failures=None, settle_s=None, queue_samples=None,
+                 redeliveries=None, publish_failures=None):
+    no_fault = scenario == "consumer-redeliver"
+    if no_fault:
+        fault_at = fault_duration = None
     warmup = layout["warmup"]
     load = layout["load"]
     totals = totals_of(raw["per_sec"], raw["dropped"])
@@ -288,13 +347,13 @@ def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lin
     load_end = events.get("k6_ended_at")
     if load_end is None and main_start is not None:
         load_end = main_start + load["seconds"]
-    fault_end = events.get("started_at")
+    fault_end = load_end if no_fault else events.get("started_at")
     if fault_end is not None and load_end is not None:
         settled, recovery_time, after_fault = recovery_times(samples, fault_end, load_end)
     else:
         settled, recovery_time, after_fault = False, None, None
     dup_seq, dup_members, issue_rows = dup_counts(issue_lines)
-    timeline = build_timeline(raw["per_sec"], samples, main_start, warmup["seconds"], load["seconds"])
+    timeline = build_timeline(raw["per_sec"], samples, main_start, warmup["seconds"], load["seconds"], queue_samples)
 
     observed = {name: events.get(name) for name in ("stopped_at", "stop_returned_at", "started_at", "healthy_at")
                 if name != "stop_returned_at" or name in events}
@@ -305,7 +364,7 @@ def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lin
 
     k6_completed = bool(k6_exit == 0 and raw["points"] > 0 and raw["main_max_sec"] is not None
                         and raw["main_max_sec"] >= load["seconds"] - 1)
-    fault_observed = fault_validity(events, main_start, load["seconds"])
+    fault_observed = None if no_fault else fault_validity(events, main_start, load["seconds"])
     confirmed = raw["seq_values"]
     report = {
         "test": "D",
@@ -325,21 +384,36 @@ def build_report(scenario, stage, stock, layout, raw, events, samples, issue_lin
         "insert_failures_logged": insert_failures,
         "error_codes": raw.get("error_codes"),
         "settled": settled,
+        "settle_s": settle_s,
         "recovery_time_s": recovery_time,
         "rows_final_after_fault_end_s": after_fault,
+        "queue_depth_max": _max_depth(queue_samples),
+        "redeliveries": redeliveries,
+        "publish_failures": _publish_failures(publish_failures),
         "timeline": timeline,
         "validity": {"k6_completed": k6_completed, "fault_observed": fault_observed,
-                     "valid": bool(k6_completed and fault_observed)},
+                     "valid": bool(k6_completed and (no_fault or fault_observed))},
         "env": env,
     })
     report.update(loss_axes(report))
     return report
 
 
+def _publish_failures(by_reason):
+    if by_reason is None:
+        return None
+    return {"total": sum(by_reason.values()), "by_reason": dict(sorted(by_reason.items()))}
+
+
+def _max_depth(queue_samples):
+    depths = [depth for _, depth in queue_samples or [] if depth is not None]
+    return max(depths) if depths else None
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--raw")
-    parser.add_argument("--scenario", choices=("db-down", "redis-restart"))
+    parser.add_argument("--scenario", choices=("db-down", "redis-restart", "consumer-redeliver"))
     parser.add_argument("--stage")
     parser.add_argument("--stock", type=int)
     parser.add_argument("--fault-log")
@@ -349,6 +423,10 @@ def main(argv=None):
     parser.add_argument("--redis-counter", type=int)
     parser.add_argument("--k6-exit", type=int)
     parser.add_argument("--insert-failures", type=int)
+    parser.add_argument("--settle-s", type=float)
+    parser.add_argument("--queue-samples")
+    parser.add_argument("--redeliveries", type=int)
+    parser.add_argument("--publish-failures", type=json.loads, metavar="JSON")
     parser.add_argument("--reprocess-from", metavar="EVIDENCE_DIR")
     parser.add_argument("--fault-at", type=int)
     parser.add_argument("--fault-duration", type=int)
@@ -364,8 +442,9 @@ def main(argv=None):
         with open(args.out, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
             f.write("\n")
-        print("recovery_postprocess: reprocessed %s: seats_lost=%s client_unknown=%s not_admitted=%s blackout_s=%s" % (
-            args.reprocess_from, report["seats_lost"], report["client_unknown"], report["not_admitted"], report["blackout_s"]))
+        print("recovery_postprocess: reprocessed %s: seats_lost=%s client_unknown=%s not_admitted=%s blackout_s=%s sold_out_at_s=%s" % (
+            args.reprocess_from, report["seats_lost"], report["client_unknown"], report["not_admitted"], report["blackout_s"],
+            report["sold_out_at_s"]))
         return 0
     required = ("raw", "scenario", "stage", "stock", "fault_log", "db_samples", "issues", "db_rows", "k6_exit", "timeline_out")
     missing = [name for name in required if getattr(args, name) is None]
@@ -381,7 +460,8 @@ def main(argv=None):
     report = build_report(args.scenario, args.stage, args.stock, layout, collect_raw(args.raw), events,
                           read_samples(args.db_samples), issue_lines, args.db_rows, args.redis_counter, args.k6_exit,
                           args.fault_at, args.fault_duration if args.scenario == "db-down" else None, args.target,
-                          _env(args.env), args.insert_failures)
+                          _env(args.env), args.insert_failures, args.settle_s, read_queue_samples(args.queue_samples),
+                          args.redeliveries, args.publish_failures)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
         f.write("\n")
@@ -390,10 +470,11 @@ def main(argv=None):
         f.write("\n")
     totals = report["totals"]
     print("recovery_postprocess: scenario=%s stage=%s requests=%d http_200=%d http_5xx=%d timeouts=%d db_rows=%d "
-          "seats_lost=%s client_unknown=%s not_admitted=%s blackout_s=%s recovery_time_s=%s valid=%s" % (
+          "seats_lost=%s client_unknown=%s not_admitted=%s blackout_s=%s sold_out_at_s=%s recovery_time_s=%s valid=%s" % (
               report["scenario"], report["stage"], totals["requests"], totals["http_200"], totals["http_5xx"],
               totals["timeouts"], report["db_rows"], report["seats_lost"], report["client_unknown"],
-              report["not_admitted"], report["blackout_s"], report["recovery_time_s"], str(report["validity"]["valid"]).lower()))
+              report["not_admitted"], report["blackout_s"], report["sold_out_at_s"], report["recovery_time_s"],
+              str(report["validity"]["valid"]).lower()))
     return 0
 
 

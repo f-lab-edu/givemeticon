@@ -2,7 +2,8 @@
 """Aggregate the k6 JSON output of issue.js into load.json (test B). Standard library only.
 
 usage: python3 -I postprocess.py --raw raw.json.gz --profile ramping|spike --stage sN --db-issued-rows N
-           --out load.json [--filtered-raw out.json.gz] [--env key=value ...] [--redis-counter N]
+           --out load.json [--filtered-raw out.json.gz] [--env key=value ...] [--redis-counter N] [--settle-s S --settled true|false]
+           [--publish-failures '{"<reason>": N, ...}']
        python3 -I postprocess.py --reprocess-from <evidence dir> --out load.json
 
 Only the measure phase is aggregated, per target_rps. A request belongs to the step it started in (tag set by
@@ -10,8 +11,13 @@ issue.js). Dropped iterations carry no tags, so they are assigned to a step by t
 profiles.json anchored at the start of the first request.
 
 Validity is per stage: dropped_iterations / (requests + dropped_iterations) < 1%. A run is valid when its first stage
-is valid and the DB row count matches the 200 responses. --redis-counter (S3 only) is recorded as db.redis_counter and
-never enters the validity rule.
+is valid and the DB row count matches the 200 responses. Stage s4 instead (asynchronous writes): a confirm that arrived
+after the request stopped waiting (2 s) was answered 503 although the message was published, and the consumer writes it, so
+db.rows_from_timed_out_publishes = issued_rows - http_issued must lie in 0..publish_failures.by_reason.timeout (0 when the
+counter was not read). --redis-counter (S3/S4) is recorded as db.redis_counter and never enters the validity rule. --settle-s / --settled (S4 only: the runner waited for the asynchronously written rows to
+stop changing before counting them) are recorded as settle_s and settled; the validity rule is unchanged.
+--publish-failures (S4 only) is the app's coupon_s4_publish_failures counter per reason tag; it is recorded as
+publish_failures {"total", "by_reason"}, null when not given (other stages, or the counter could not be read).
 
 Every stage also gets a kind:
   saturated  achieved_rps < 0.95 * target_rps, or p50 > 100 ms (the system cannot keep up; requests queue)
@@ -258,7 +264,8 @@ def classify(stage):
 
 
 def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, filtered_path=None,
-                 stats_path=None, summary_path=None, gc_path=None, run_info=None, innodb_path=None, rows=1, redis_counter=None):
+                 stats_path=None, summary_path=None, gc_path=None, run_info=None, innodb_path=None, rows=1, redis_counter=None,
+                 publish_failures=None):
     profile = layout["profiles"][profile_name]
     rates = [step["rps"] for step in profile["steps"]]
     if len(set(rates)) != len(rates):
@@ -345,7 +352,12 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
     http_issued = sum(n for (_, _, result), n in counts.items() if result == "issued")
     match = db_issued_rows == http_issued
     db = {"issued_rows": db_issued_rows, "http_issued": http_issued, "match": match}
-    if redis_counter is not None:  # S3 only: the decision counter, summed over the seeded events (informational)
+    db_valid = match
+    if stage_id == "s4":  # see the module docstring: rows of publishes whose confirm came after the 2 s wait are allowed
+        db["rows_from_timed_out_publishes"] = db_issued_rows - http_issued
+        timed_out = (publish_failures or {}).get("timeout", 0)
+        db_valid = 0 <= db["rows_from_timed_out_publishes"] <= timed_out
+    if redis_counter is not None:  # S3/S4: the decision counter, summed over the seeded events (informational)
         db["redis_counter"] = redis_counter
 
     return {
@@ -365,6 +377,7 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         "stalls": stalls,
         "limit_rps_first_violation": first_violation,
         "db": db,
+        "publish_failures": publish_failures_of(publish_failures),
         "vus": read_vus(summary_path, layout),
         "rows": rows,
         "mysql": {"threads_connected_max": _max_or_none(innodb.get("Threads_connected"))},
@@ -372,11 +385,18 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         "validity": {
             "stage0_dropped_ratio": stages[0]["dropped_ratio"],
             "stage0_valid": stages[0]["valid"],
-            "db_match": match,
-            "valid": bool(stages[0]["valid"] and match),
+            "db_match": db_valid,
+            "valid": bool(stages[0]["valid"] and db_valid),
         },
         "env": env,
     }
+
+
+def publish_failures_of(by_reason):
+    """{reason: N} -> {"total": N, "by_reason": {...}}; None when the counter was not read."""
+    if by_reason is None:
+        return None
+    return {"total": sum(by_reason.values()), "by_reason": dict(sorted(by_reason.items()))}
 
 
 def _max_or_none(points):
@@ -413,6 +433,9 @@ def main(argv=None):
     parser.add_argument("--stage")
     parser.add_argument("--db-issued-rows", type=int)
     parser.add_argument("--redis-counter", type=int)
+    parser.add_argument("--settle-s", type=int)
+    parser.add_argument("--settled", choices=("true", "false"))
+    parser.add_argument("--publish-failures", type=json.loads, metavar="JSON")
     parser.add_argument("--out", required=True)
     parser.add_argument("--filtered-raw")
     parser.add_argument("--profiles", default=DEFAULT_PROFILES)
@@ -442,6 +465,11 @@ def main(argv=None):
         args.stage = old["stage"]
         args.db_issued_rows = old["db"]["issued_rows"]
         args.redis_counter = old["db"].get("redis_counter")
+        if "settle_s" in old:
+            args.settle_s = old["settle_s"]
+            args.settled = str(old["settled"]).lower()
+        publish_failures = old.get("publish_failures")
+        args.publish_failures = publish_failures["by_reason"] if publish_failures else None
         env_pairs = ["%s=%s" % (k, v) for k, v in old["env"].items()]
         layout = layout_from_report(old)
         args.stats = os.path.join(source, "stats.jsonl")
@@ -477,7 +505,10 @@ def main(argv=None):
                 run_info[key] = value
     report = build_report(args.raw, layout, args.profile, args.stage, args.db_issued_rows,
                           _env(env_pairs), args.filtered_raw, args.stats, args.summary, args.gc_log, run_info,
-                          args.innodb, args.rows, args.redis_counter)
+                          args.innodb, args.rows, args.redis_counter, args.publish_failures)
+    if args.settle_s is not None:
+        report["settle_s"] = args.settle_s
+        report["settled"] = args.settled == "true"
     if reprocessed_from:
         report["reprocessed_from"] = reprocessed_from
     with open(args.out, "w", encoding="utf-8") as f:

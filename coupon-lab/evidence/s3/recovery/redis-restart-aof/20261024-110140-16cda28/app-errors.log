@@ -1,0 +1,1 @@
+2026-10-24T11:02:51.112Z ERROR 1 --- [io-8080-exec-28] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed: org.springframework.data.redis.RedisSystemException: Redis exception] with root cause

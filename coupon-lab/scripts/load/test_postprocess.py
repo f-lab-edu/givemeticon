@@ -466,6 +466,83 @@ class PostprocessTest(unittest.TestCase):
         self.assertTrue(with_counter["validity"]["valid"])
         self.assertNotIn("redis_counter", without["db"])
 
+    def test_settle_of_an_async_stage_is_recorded_and_is_not_part_of_validity(self):
+        lines = synthetic()
+        with tempfile.TemporaryDirectory() as tmp:
+            write_raw(os.path.join(tmp, "raw.json.gz"), lines)
+            with open(os.path.join(tmp, "profiles.json"), "w", encoding="utf-8") as f:
+                json.dump(LAYOUT, f)
+            reports = {}
+            for label, extra in (("s4", ["--settle-s", "7", "--settled", "true"]), ("s3", [])):
+                out = os.path.join(tmp, label + ".json")
+                postprocess.main(["--raw", os.path.join(tmp, "raw.json.gz"), "--profile", "ramping", "--stage", label,
+                                  "--db-issued-rows", str(issued_count(lines)), "--out", out,
+                                  "--profiles", os.path.join(tmp, "profiles.json")] + extra)
+                with open(out, encoding="utf-8") as f:
+                    reports[label] = json.load(f)
+            self.assertEqual((reports["s4"]["settle_s"], reports["s4"]["settled"]), (7, True))
+            self.assertTrue(reports["s4"]["validity"]["valid"])
+            self.assertNotIn("settle_s", reports["s3"])
+            # a reprocess keeps what the run recorded
+            source = os.path.join(tmp, "source")
+            os.mkdir(source)
+            os.rename(os.path.join(tmp, "s4.json"), os.path.join(source, "load.json"))
+            os.rename(os.path.join(tmp, "raw.json.gz"), os.path.join(source, "raw.json.gz"))
+            out = os.path.join(tmp, "new.json")
+            self.assertEqual(postprocess.main(["--reprocess-from", source, "--out", out]), 0)
+            with open(out, encoding="utf-8") as f:
+                again = json.load(f)
+        self.assertEqual((again["settle_s"], again["settled"]), (7, True))
+
+    def test_publish_failures_are_recorded_per_reason_and_null_when_not_read(self):
+        lines = synthetic()
+        with tempfile.TemporaryDirectory() as tmp:
+            write_raw(os.path.join(tmp, "raw.json.gz"), lines)
+            with open(os.path.join(tmp, "profiles.json"), "w", encoding="utf-8") as f:
+                json.dump(LAYOUT, f)
+            reports = {}
+            for label, extra in (("s4", ["--publish-failures", '{"timeout": 2, "AmqpConnectException": 5}']), ("s3", [])):
+                out = os.path.join(tmp, label + ".json")
+                postprocess.main(["--raw", os.path.join(tmp, "raw.json.gz"), "--profile", "ramping", "--stage", label,
+                                  "--db-issued-rows", str(issued_count(lines)), "--out", out,
+                                  "--profiles", os.path.join(tmp, "profiles.json")] + extra)
+                with open(out, encoding="utf-8") as f:
+                    reports[label] = json.load(f)
+            self.assertEqual(reports["s4"]["publish_failures"],
+                             {"total": 7, "by_reason": {"AmqpConnectException": 5, "timeout": 2}})
+            self.assertTrue(reports["s4"]["validity"]["valid"])  # an outcome, never part of validity
+            self.assertIsNone(reports["s3"]["publish_failures"])
+            source = os.path.join(tmp, "source")
+            os.mkdir(source)
+            os.rename(os.path.join(tmp, "s4.json"), os.path.join(source, "load.json"))
+            os.rename(os.path.join(tmp, "raw.json.gz"), os.path.join(source, "raw.json.gz"))
+            out = os.path.join(tmp, "new.json")
+            self.assertEqual(postprocess.main(["--reprocess-from", source, "--out", out]), 0)
+            with open(out, encoding="utf-8") as f:
+                self.assertEqual(json.load(f)["publish_failures"]["total"], 7)
+
+    def test_s4_allows_rows_of_publishes_whose_confirm_came_after_the_wait(self):
+        lines = synthetic()
+        http = issued_count(lines)
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            def run(stage, rows, publish_failures=None):
+                return postprocess.build_report(raw, LAYOUT, "ramping", stage, rows, {}, publish_failures=publish_failures)
+            two = {"timeout": 2, "AmqpResourceNotAvailableException": 9}
+            ok = run("s4", http + 2, two)
+            self.assertEqual(ok["db"]["rows_from_timed_out_publishes"], 2)
+            self.assertFalse(ok["db"]["match"])  # the plain equality stays recorded
+            self.assertTrue(ok["validity"]["db_match"])
+            self.assertTrue(ok["validity"]["valid"])
+            self.assertFalse(run("s4", http + 3, two)["validity"]["valid"])  # more rows than late confirms
+            self.assertFalse(run("s4", http - 1, two)["validity"]["valid"])  # a 200 without a row
+            self.assertFalse(run("s4", http + 1)["validity"]["valid"])  # counter not read: only equality is valid
+            self.assertTrue(run("s4", http)["validity"]["valid"])
+            s3 = run("s3", http + 2, two)
+            self.assertNotIn("rows_from_timed_out_publishes", s3["db"])
+            self.assertFalse(s3["validity"]["valid"])  # other stages: rows == 200 responses, unchanged
+
     def test_filtered_raw_reproduces_the_report(self):
         with tempfile.TemporaryDirectory() as tmp:
             filtered = os.path.join(tmp, "filtered.json.gz")

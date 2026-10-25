@@ -1,0 +1,6 @@
+2026-10-24T15:26:00.138Z k6_started epoch=1792855560.139 test starts at epoch 1792855580, main phase at epoch 1792855590
+2026-10-24T15:26:00.162Z fault_scheduled epoch=1792855560.163 scenario=redis-restart target=coupon-lab-load-redis at=main+20s
+2026-10-24T15:26:50.030Z stopped_at epoch=1792855610.031 about to docker restart coupon-lab-load-redis
+2026-10-24T15:26:50.347Z started_at epoch=1792855610.347 docker restart coupon-lab-load-redis returned rc=0
+2026-10-24T15:26:53.521Z healthy_at epoch=1792855613.522 coupon-lab-load-redis healthy
+2026-10-24T15:27:30.306Z k6_ended_at epoch=1792855650.306 k6 exit 0

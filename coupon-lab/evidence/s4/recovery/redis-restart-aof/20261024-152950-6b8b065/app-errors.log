@@ -1,0 +1,7 @@
+2026-10-24T15:31:01.125Z ERROR 1 --- [io-8080-exec-18] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed: org.springframework.data.redis.RedisSystemException: Redis exception] with root cause
+2026-10-24T15:31:01.175Z  INFO 1 --- [xecutorLoop-1-1] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/172.19.0.3:6379
+2026-10-24T15:31:01.175Z  INFO 1 --- [xecutorLoop-1-2] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was redis/172.19.0.3:6379
+2026-10-24T15:31:01.178Z  WARN 1 --- [ioEventLoop-4-1] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: Connection refused: redis/172.19.0.3:6379
+2026-10-24T15:31:01.178Z  WARN 1 --- [ioEventLoop-4-2] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [redis/<unresolved>:6379]: Connection refused: redis/172.19.0.3:6379
+2026-10-24T15:31:01.376Z  INFO 1 --- [ioEventLoop-4-1] i.l.core.protocol.ReconnectionHandler    : Reconnected to redis/<unresolved>:6379
+2026-10-24T15:31:01.378Z  INFO 1 --- [ioEventLoop-4-2] i.l.core.protocol.ReconnectionHandler    : Reconnected to redis/<unresolved>:6379
