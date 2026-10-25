@@ -497,10 +497,16 @@ Evidence: `coupon-lab/evidence/s3/recovery/db-down/20261024-081538-3b51148/`(`re
 
 S4 에 주는 시사점: S3 의 자리 손실은 "도착률 × 중단 길이"가 아니라 중단 직후 서버가 쥐고 있던 요청 수(스레드·커넥션 한도)와 Hikari 대기 창에 묶여 있다. 반면 클라이언트가 겪는 중단은 훨씬 크다(54초 연속 200 없음, 부하가 끝난 뒤에도 밀린 일 처리). S4 의 목표는 "중단 길이와 무관하게 `seats_lost` 0, DB 중단 중에도 200 응답"이고 설계는 바뀌지 않는다.
 
-## S4 - RabbitMQ: 당첨을 내구성 있게 기록한 뒤 응답, DB 쓰기는 요청 경로 밖으로
+## S4 - RabbitMQ: 당첨을 내구성 있게 기록한 뒤 응답, DB 쓰기는 요청 경로 밖으로 (frozen)
 
+* **최종 상태 (6b8b065)**: 아래는 첫 구현부터 후속 1·2 까지의 기록이고, 마감된 설계는 이것이다.
+  1. 결정은 S3 와 같은 Lua `INCR`(`coupon:event:{id}:issued`, total 초과면 -1)이다.
+  2. 당첨이면 `CouponIssued{eventId, memberId, seq, messageId}` 를 persistent 로 발행한다. correlated confirm 이고 `CorrelationData(messageId).getFuture().get(2000 ms)` 를 기다린 뒤 200 을 준다.
+  3. nack, timeout, returned, 예외면 503 이다. ERROR 한 줄에 reason 과 루트 원인을 남기고 `coupon_s4_publish_failures{reason}` 로 센다.
+  4. 소비자는 동시성 1 이고 `existsIssueByMessageId` 다음에 `insertIssued` 를 한다(V2 `message_id CHAR(36) NULL`, 비유니크 인덱스).
+  5. Redis AOF everysec 는 전제 조건이다(`verify.sh` 의 s4 기본값).
 * 동기(테스트 D 의 S3, 위): DB 가 요청 경로 안에 있어서 DB 중단이 Tomcat 스레드(200)와 Hikari 풀(10)을 묶는다. `seats_lost` = 10 + 190 × (중단 중 끝난 30초 대기 창 수)(13초 → 10, 49초 → 200), `blackout_s` 54~55, `not_admitted` 약 9,200.
-* Changed: `S4CouponIssueService`(`coupon.strategy=s4`)는 결정을 S3 와 똑같이 한다(같은 Lua, 같은 키 `coupon:event:{id}:issued`, 같은 total 캐시, 모르는 이벤트는 같은 `IllegalArgumentException`). 당첨이면 `CouponIssued{eventId, memberId, seq}` 를 persistent 메시지(deliveryMode 2)로 direct exchange `coupon.direct` 를 거쳐 durable 큐 `coupon.issued` 에 발행하고, `rabbitTemplate.invoke(ops -> { ops.convertAndSend(...); return ops.waitForConfirms(CONFIRM_TIMEOUT_MS); })` 로 publisher confirm 을 기다린 뒤에야 200 `{ISSUED, seq}` 를 돌려준다. `CONFIRM_TIMEOUT_MS` 는 2000(환경변수 `COUPON_S4_CONFIRM_TIMEOUT_MS`, env 에 `s4_confirm_timeout_ms` 로 기록). nack, 타임아웃, 예외는 ERROR `publish unconfirmed after winning the counter: eventId memberId seq` 를 남기고 503(`ResponseStatusException`; 컨트롤러는 그대로). 패자는 `SoldOut`(409), DB 도 MQ 도 건드리지 않는다. 요청 경로는 `INCR` → publish(confirm) → 200 이고 DB 는 경로 밖이다(total 은 이벤트당 한 번 읽는다).
+* (첫 구현, 후속 1·2 로 바뀜 — 아래 참조) Changed: `S4CouponIssueService`(`coupon.strategy=s4`)는 결정을 S3 와 똑같이 한다(같은 Lua, 같은 키 `coupon:event:{id}:issued`, 같은 total 캐시, 모르는 이벤트는 같은 `IllegalArgumentException`). 당첨이면 `CouponIssued{eventId, memberId, seq}` 를 persistent 메시지(deliveryMode 2)로 direct exchange `coupon.direct` 를 거쳐 durable 큐 `coupon.issued` 에 발행하고, `rabbitTemplate.invoke(ops -> { ops.convertAndSend(...); return ops.waitForConfirms(CONFIRM_TIMEOUT_MS); })` 로 publisher confirm 을 기다린 뒤에야 200 `{ISSUED, seq}` 를 돌려준다. `CONFIRM_TIMEOUT_MS` 는 2000(환경변수 `COUPON_S4_CONFIRM_TIMEOUT_MS`, env 에 `s4_confirm_timeout_ms` 로 기록). nack, 타임아웃, 예외는 ERROR `publish unconfirmed after winning the counter: eventId memberId seq` 를 남기고 503(`ResponseStatusException`; 컨트롤러는 그대로). 패자는 `SoldOut`(409), DB 도 MQ 도 건드리지 않는다. 요청 경로는 `INCR` → publish(confirm) → 200 이고 DB 는 경로 밖이다(total 은 이벤트당 한 번 읽는다).
 * 소비자: `S4CouponIssuedConsumer`, `@RabbitListener(queues = "coupon.issued")`, 리스너 스레드 1개(`concurrency: 1`, `prefetch: 50`, `acknowledge-mode: auto`). `insertIssueIfAbsent(eventId, memberId, seq)` = 새 매퍼 문장 `existsIssue`(`SELECT EXISTS (SELECT 1 FROM coupon_issue WHERE event_id = ? AND seq = ?)`)로 확인하고 없으면 기존 `insertIssue`(기존 문장은 그대로). 실패하면 WARN(누적 실패 횟수 포함)을 남기고 1,000 ms 자고 다시 던진다. AUTO ack 이므로 메시지는 큐로 돌아가 다시 배달된다(DB 중단 중에는 재시도, 헛도는 루프 없음). 다시 배달된 메시지(AMQP redelivered 플래그)는 Micrometer 카운터 `coupon_s4_redeliveries`(`/actuator/metrics`)와 INFO 로그로 센다.
 * 테스트 D 훅: `COUPON_S4_CONSUMER_FAIL_EVERY=N`(기본 0 = 꺼짐). 새 행을 쓴 뒤 N번째마다 ack 전에 예외를 던진다(쓰기 뒤의 크래시). 재배달은 존재 확인에 걸려 건너뛰어야 한다. 설정하지 않으면 아무 일도 하지 않고, 실행기는 매 run 에 값을 명시적으로 넣고 env 에 `s4_consumer_fail_every` 로 기록한다.
 * Did NOT change: 결정 Lua, 회원 중복 방지 없음, `coupon_event` 는 읽기만(요청마다 읽지도 않는다), 마이그레이션 없음, 락·트랜잭션·제약 계약 그대로, S0/S1/S3 서비스는 동결.
@@ -653,4 +659,74 @@ Evidence: `coupon-lab/evidence/s4/recovery/consumer-redeliver-aof/20261024-13080
 3. **db-down 45초:** 그대로(타임아웃 0, blackout 0, 행 == http_200, 비우기 < 35초).
 4. **redis-restart, AOF (n=3):** 매번 `over_issue` 0. 18초 blackout 이 다시 나오거나(그러면 `redis.log`/`app-errors.log` 에 재연결 시도와 그 시각이 보여야 하고, 그것이 S4 의 다음 작업이 된다) 나오지 않는다(그러면 설명되지 않은 단일 사건으로 남기고 그렇게 적는다).
 5. **spike:** http_5xx 0, 행 100.
+
+### S4 재측정 결과 (`6b8b065`, 수정 반영, 사용자 Mac)
+
+Evidence(모두 `coupon-lab/evidence/s4/` 아래):
+* `recovery/consumer-redeliver-aof/20261024-143921-6b8b065/`
+* `load/ramping-rows1-aof/20261024-150520-6b8b065/`, `…-151341-6b8b065/`, `…-152203-6b8b065/`
+* `load/spike-aof/20261024-152310-6b8b065/`
+* `recovery/db-down-aof/20261024-152310-6b8b065/`
+* `recovery/redis-restart-aof/20261024-152539-6b8b065/`, `…-152750-6b8b065/`, `…-152950-6b8b065/`
+
+수정 전 코드(`951c8cd`)로 돈 run 도 `7a01c72` 에 남아 있다(`…-134626-951c8cd` 등). 그 run 들은 이 표의 비교 대상이 아니고, `invoke()` 경로의 두 번째 표본이다(consumer-redeliver 5xx 6,118, db-down 5xx 5,576, 모두 `AmqpResourceNotAvailableException`).
+
+| 측정 | 예측 | 결과 (6b8b065) | 판정 |
+|---|---|---|---|
+| consumer-redeliver (FAIL_EVERY 50) | 5xx ≤ 10, channels ≤ ~210, redeliveries ≈ 200/50, 행 == 200 | 요청 31,001 → 200 31,001, **5xx 0**(이전 5,510 `cc348a1`, 6,118 `951c8cd`). `publish_failures` 0, channels 최대 51. redeliveries **620**(31,001/50 = 620.0), 중복 0, 행 31,001. 큐 최대 1,337(이전 3,398) | ✅ |
+| ramping-rows1 ×3 | 1,200 미만 오류 <1%, sustained ≥ 1,200, 천장은 앱 CPU(첫 포화 단계 ≥ 190%) | `publish_failures` **0/0/0**, 모든 단계 errors 0. sustained 1,600 / 2,400 / 800(중앙값 1,600; S3 1,600). 최대 달성 2,981.6 / 2,788.3 / 2,740.7 rps(목표 3,200; S3 2,225.2). 첫 포화 단계(3,200) 앱 CPU 195.3 / 182.5 / 189.2 %(2 cpu). channels 최대 249 / 232 / 251. 행 == 200(284,992 / 281,792 / 276,647). MySQL CPU 단계 평균 ≤ 37.4% | 오류 예측 ✅. sustained ≥ 1,200 은 3회 중 2회다. 3번째 run 은 1,200·1,600 단계에서 dropped 1.59%·1.90% 로 `stall` 이었다(p95 265·494 ms 는 500 ms 기준 아래, p50 3·11 ms). 원인은 k6 쪽 버려진 요청이지 오류가 아니다. 앱 CPU ≥ 190% 는 3회 중 1회(182.5·189.2 는 바로 아래). "천장이 앱 CPU 로 옮겨 간다" 는 방향은 확인이고 190% 문턱은 1/3 |
+| spike (재고 100) | 5xx 0, 행 100 | 5xx 0, 행 100, 달성 2,896.6 rps, p50 309 ms, channels 최대 12. dropped 3.8 % → 유효성 규칙상 무효(k6 VU 쪽) | ✅ |
+| db-down 45 s (관측 48.4 s) | 타임아웃 0, blackout 0, 행 == 200, 비우기 < 35 s | 요청 31,002 → **200 31,002, 5xx 0, 타임아웃 0, blackout 0**, 행 31,002, 큐 최대 25,865, 복구 28.7 s, redeliveries 3 | ✅ — S3 같은 조건(49초 중단): blackout 54 s, seats_lost 200 |
+| redis-restart AOF ×3 (재고 2만) | over_issue 0; blackout 재발 여부 | over_issue 0 / 0 / 0, dup 0, 확인된 seq 최대 20,000(되감김 없음). blackout **32 / 14 / 0 s**, 타임아웃 12,833 / 5,522 / 0, `recorded_despite_unknown` **8,792 / 5,522 / 0**, 5xx 1 / 1 / 1(끊기는 순간 진행 중이던 요청). 첫 run 은 카운터 24,375 대 요청 26,420 → 2,045건은 카운터에 닿지 않았다 | over_issue ✅, blackout 재발 → 아래 |
+
+소비자 처리 속도(직접 잰 값이 아니라 `queue.jsonl` 에서 유도): `ramping-rows1` 의 2,400~3,200rps 단계에서 큐가 205,958~213,760건까지 쌓였고, 정착(`settle_s`)에 244~295초가 걸렸다. 최대치에서 0 이 될 때까지의 기울기는 737 / 862 / 888 행/초다. 즉 소비자는 약 740~890 행/초다(스레드 1개, 메시지당 INSERT 1회, 직렬 커밋).
+
+### Redis 재시작 blackout 의 원인 (로그로 설명, 재측정 없음)
+
+세 run 의 `fault.log`, `app-errors.log`(Lettuce 줄), `redis.log` 로 본 순서다. 시각은 UTC 이고, 부하 초는 500rps 구간 시작 기준이다.
+
+* **152539 (blackout 32 s):**
+  * redis 중지는 15:26:50.030(`stopped_at`), `Ready to accept connections` 는 15:26:50.332 다.
+  * Lettuce `ConnectionWatchdog` 이 15:26:50.189 에 Reconnecting 했고, 15:26:50.198 에 WARN `Cannot reconnect to [redis/<unresolved>:6379]: redis: Name or service not known` 이 났다. 재시작 순간 Docker 내장 DNS 에 `redis` 기록이 없었다.
+  * 그다음 INFO 시도는 15:26:59.188 과 15:27:07.388 이다. 첫 연결은 15:27:07.408 `Reconnected`(중지 뒤 17.4 s)이고, 다른 연결은 15:27:07.394 에도 실패한 뒤 15:27:23.788 Reconnecting → 15:27:23.810 `Reconnected` 였다.
+  * 200 은 부하 53초(= 15:27:23)에 시작한 요청부터 돌아왔다. 즉 blackout 의 끝은 두 번째 연결의 재접속과 맞는다.
+* **152750 (blackout 14 s):** 같은 모양이다. 15:29:01.202 의 첫 시도가 `Name or service not known` 이었고, 다음 시도는 15:29:10.189(+9 s), 15:29:18.390(+17 s)이었다. 두 연결 모두 15:29:18.410/.419 `Reconnected` 다. 부하 35초에 시작한 요청부터 200 이 돌아왔다(재접속까지 5초 안이라 클라이언트가 기다렸다).
+* **152950 (blackout 0):** 첫 시도 15:31:01.178 은 `Connection refused: redis/172.19.0.3:6379` 였다(이름은 아직 풀렸다). 15:31:01.376/.378 에 `Reconnected` 했고, 중지 뒤 0.35 s 다.
+* 두 이름 해석 실패 run 에서 그 뒤의 실패 줄(`Cannot reconnect … : redis`)은 시도 후 1~6 ms 만에 나온다. DNS 를 다시 묻지 않은 것처럼 보인다. JVM 의 음성 DNS 캐시(기본 10초)일 수 있지만 **추정**이고 확인하지 않았다. Lettuce 의 INFO 사이 시도(DEBUG)는 로그 수준 때문에 남지 않았다.
+
+숫자로 보이는 결과:
+
+* 끊긴 동안 Lettuce 는 기본 `DisconnectedBehavior.DEFAULT` 로 명령을 버퍼에 쌓았고, Tomcat 스레드는 Lettuce future(`spring.data.redis.timeout` 미설정이면 명령 타임아웃 60 s)에 묶였다. 클라이언트는 5 s 에 타임아웃했다(k6 `error_code` 1050, 12,833 / 5,522건).
+* 재접속 뒤 자리를 가져간 요청은 8,792 / 5,522건이고, 이들을 기다리는 클라이언트는 없었다(`recorded_despite_unknown`). 재고 2만이 이들로 소진되었다. 첫 run 의 매진은 부하 53초다.
+* 수 계산에서 오는 주의(추정): 동기 호출자는 스레드 200개뿐이라 Lettuce 버퍼에 한꺼번에 들어 있을 수 있는 명령은 약 200개다. 8,792 의 대부분은 버퍼가 아니라, Tomcat 이 이미 받아 둔 연결(기본 `max-connections` 8192)이 재접속 뒤에 처리된 것으로 보는 편이 맞다. 클라이언트가 떠난 요청도 Tomcat 은 응답을 쓰기 전까지 모른다.
+* 어느 쪽이든 결론은 같다: 끊긴 동안 막혀 있던 요청이 나중에 실행되어 아무도 기다리지 않는 자리를 가져갔다.
+
+해결책(설명만 하고 **이 단계에는 적용하지 않는다**):
+
+1. `ClientOptions.disconnectedBehavior(REJECT_COMMANDS)`: 끊긴 클라이언트는 명령을 쌓지 않고 즉시 실패(503)한다. 이미 떠난 클라이언트를 위해 `INCR` 이 나중에 실행되지 않고, 스레드도 풀린다.
+2. `spring.data.redis.timeout` ≈ 1 s: 요청이 결정을 60초가 아니라 1초 기다린다. 스레드를 쌓아 두지 않는다.
+3. `ClientResources.reconnectDelay(Delay.constant(…))`: 기본(점점 늘어나는) 지연 대신 짧은 고정 지연이다.
+
+재측정하지 않는 이유: 메커니즘과 결과가 이미 evidence 에 있다. 해결은 클라이언트 정책을 정하는 일이고, Lettuce 설정은 동결된 S3 와 공유하므로 바꾸면 S3 의 redis-restart run 을 다시 기록해야 한다. 기록: **S3 부터 있던 문제, S4 에서 발견, 설정으로 해결 가능, 미적용.**
+
+### S4 결정 (S4 마감)
+
+**증명된 것**
+
+* **DB 가 요청 경로 밖에 있다.** db-down 48.4 s 에서 요청 31,002건이 모두 200 이고, 클라이언트가 본 영향이 0 이다(타임아웃 0, 5xx 0, blackout 0). 같은 결함에서 S3 는 blackout 54 s, `seats_lost` 200 이었다.
+* **요청 경로의 천장은 앱 2 cpu 이고 브로커나 DB 가 아니다.** 목표 3,200rps 까지 `publish_failures` 0, channels ≤ 251, MySQL CPU 단계 평균 ≤ 37.4%. 3,200 단계 앱 CPU 는 182.5~195.3% 다.
+* **publisher confirm + message_id 멱등성은 소비자 크래시와 Redis 카운터 되감김을 견딘다.** 재전달 620건에 중복 0 이다. AOF 없는 run 에서는 잃은 당첨이 0 이고 초과 발급이 드러났다.
+
+**증명되지 않은 것 / 쓰면 안 되는 말**
+
+* 브로커 장애 아래의 S4 에 대해서는 아무 말도 하지 않는다(재지 않았다).
+* 2,900rps 는 요청 경로의 숫자일 뿐이다. 행은 약 800/초(740~890)로 DB 에 들어가므로, 재고가 1천만이면 큐가 끝없이 자란다. 실제 쿠폰은 재고가 유한하다.
+* `docker restart` 는 정상 종료다. "AOF 가 아무것도 잃지 않았다"는 크래시 결과가 아니다.
+* 표본 수: ramping-rows1 과 redis-restart 는 n=3, 나머지는 n=1 이다. ramping-rows1 의 sustained 는 800~2,400 으로 흩어졌다(중앙값 1,600).
+
+**다음 단계 재료**
+
+* S4.1 배치 소비: 요청 경로 약 2,900rps 대 소비 약 800 행/초의 차이.
+* Redis 클라이언트 정책(위 "Redis 재시작 blackout 의 원인").
+* k6 spike 유효성: 3,000rps, p50 300 ms 에서 버려진 요청은 생성기 한계다. stage 결과가 아니라 하네스 메모다.
 
