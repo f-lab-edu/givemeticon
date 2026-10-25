@@ -730,3 +730,22 @@ ClientOptions.disconnectedBehavior(REJECT_COMMANDS) + 명령 타임아웃 약 1 
 * Redis 클라이언트 정책(위 "Redis 재시작 blackout 의 원인").
 * k6 spike 유효성: 3,000rps, p50 300 ms 에서 버려진 요청은 생성기 한계다. stage 결과가 아니라 하네스 메모다.
 
+
+## S5 - 이벤트당 1인 1매: Lua SADD 회원 확인 + INCR (frozen)
+
+* 코드: `S5CouponIssueService`, `S5CouponIssuedConsumer`, `S5RabbitConfiguration` (`2114649`, tag `stage/s5`). 공유 변경: `IssueResult.AlreadyIssued`, 컨트롤러 409 `ALREADY_ISSUED`.
+* Changed: 판정 스크립트가 먼저 `SADD coupon:event:{id}:members {memberId}` 를 한다. 0 이면 `AlreadyIssued`(자리를 쓰지 않는다), 아니면 S4 의 `INCR` 판정이고 패자는 `SREM` 으로 되돌린다(Set 에는 당첨자만, 품절 회원은 계속 `SOLD_OUT`). 회원 확인과 카운터가 한 스크립트라서 같은 회원의 동시 요청은 자리를 최대 1개 쓴다.
+* Did NOT change: 발행·publisher confirm·503 사유 집계(`coupon_s5_publish_failures`)·consumer 멱등성(message_id)·AUTO ack 은 S4 와 같다. 스키마 변경 없음(UNIQUE 키 없음 유지). S4 의 테스트 훅(`COUPON_S4_CONSUMER_FAIL_EVERY`, 재전달 카운터)은 옮기지 않았다.
+* Known gap: S4 의 것 그대로(미확인 발행 뒤 자리 소모, 판정과 confirm 사이 크래시). 추가로 미확인 발행(503) 뒤에도 회원이 Set 에 남아 재시도는 `ALREADY_ISSUED` 다(행이 없어도). 되돌리면 실제로 도착한 발행에 두 번째 쿠폰을 줄 수 있어서다. 회원 Set 은 Redis 에만 있으므로 영속화 없는 재시작은 카운터와 함께 Set 도 잊는다.
+* 1인 1매 검증: `S5CouponIssueServiceRedisTest`(unit 계층, 실제 Redis): 한 회원 200 동시 요청 → `Issued` 1, `AlreadyIssued` 199, 카운터 1. 100명 × 2요청, 재고 50 → 당첨 50명, 각 1건. 품절 회원은 `SOLD_OUT` 유지. 이벤트가 다르면 같은 회원도 각각 1장. Test A 는 회원이 모두 달라서 1인 1매를 시험하지 않는다.
+
+| stage | evidence | 깨진 반복 | issued | 초과 발급 | dup_members | exceptions | redis_counter | queue_depth | elapsed_ms 중앙값 | settle_ms 중앙값 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| s3 | `20261024-102928-0b39ae8` | 0/10 | 100 | 0 | 0 | 0 | 1000 | n/a | 102 | 1068 |
+| s4 | `20261025-035725-52162fe` | 0/10 | 100 | 0 | 0 | 0 | 1000 | 0 | 52 | 1381 |
+| s5 | `20261025-114419-2114649` | 0/10 | 100 | 0 | 0 | 0 | 1000 | 0 | 48 | 1475 |
+
+Test A v3+settle, 10회, 1000 threads, 재고 100, 같은 env 블록(java 21.0.5, Boot 3.3.5, 이미지 동일, hikari 10, cpu 8, macOS 26.3.1 aarch64). S4 는 `s4_confirm_timeout_ms`(2000) 를 env 에 기록하고 S5 는 기록하지 않는다(S5 기본값도 2000). elapsed/settle 은 n=1 반복 묶음의 정보값이다.
+`evidence/s5/consistency/20261025-114307-049a56e-dirty` 는 커밋 전(dirty) 같은 코드의 run 이고 표에는 쓰지 않는다.
+
+* B/C/D/E (load, bottleneck, recovery, fairness): `verify.sh bundle` 은 NO_TESTS(태그된 테스트가 저장소에 없다). `verify.sh load`/`recovery` 는 s4 전용 분기(settle, AOF 기본값, queue depth, 발행 실패 지표)가 s5 를 모르므로 실행하지 않았다: INCOMPLETE.
