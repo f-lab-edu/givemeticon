@@ -840,3 +840,40 @@ Test A v3+settle, 10회, 1000 threads, 재고 100, 같은 env 블록(java 21.0.5
 * 3회 제한은 한 번의 전달 안에서만 센다. 재전달되면 초기화된다. 전달을 넘어선 누적 상한은 구현하지 않는다.
 * FAILED 기록은 requestId를 읽을 수 있을 때만 가능하다. JSON이 깨진 메시지는 DLQ에만 남는다.
 * DLQ 재처리 도구, 다중 Consumer, 다중 노드는 범위 밖이다.
+
+### 12. 결과 (측정 뒤; 예측은 `8979a57`, 첫 S6 측정보다 앞선 커밋)
+
+코드: `S6CouponIssueService`, `S6RabbitConfiguration`, `S6RequestProcessor`, `S6RequestConsumer`, `S6ConsumerSupervisor`, `S6ErrorClassifier`, `S6DataSourceConfiguration`, `S6CouponRequestController`, `S6RequestMapper`(+XML), `V3__s6_coupon_request.sql`. 공유 변경(추가만): `IssueResult.Accepted`, `CouponIssueService.issue(eventId, memberId, requestId)` 기본 메서드, 컨트롤러 202 매핑과 선택 필드 `requestId`(없으면 기존 2인자 호출 그대로). 하네스: `docker-compose.load.s6.yml`(override; 기본 compose 는 그대로), `recovery_s6.js`, `recovery_s6_postprocess.py`(+테스트), `verify.sh` 의 `run_recovery_s6`.
+
+| 예측 | 결과 | 판정 |
+|---|---|---|
+| P-A: 10회 모두 issued 100, 예외 0, dup 0, DLQ 0 | `evidence/s6/consistency/20261026-120830-2cffc0b`: 10회 모두 issued 100, 초과 0, dup 0, DLQ 0, remaining 일치. **1회차만 예외 311, elapsed 600,682 ms**(2~10회차 예외 0, elapsed 267~441 ms) | **FAIL** (불변식은 10/10 유지, 건강 조건 1/10 위반). 아래 "알려진 문제 1" |
+| P-B1, P-B2: 접수 처리량 ±25%, 소비 250~450행/초, 큐 누적·503 | B(`verify.sh load --stage s6`)는 실행하지 않았다. 소비 속도만 D/F run 의 `db-samples.jsonl` 10초 기울기 최대값에서 유도: 330~442행/초 | B: **INCOMPLETE**. P-B2 는 범위 안이지만 B 측정이 아니므로 판정하지 않는다 |
+| P-D1: db-down 45 s 중 전부 202, 유실 0, DLQ 0, 비우기 60~120 s | `ab3f82c` run: 31,002 → 202 31,002, 5xx 0, 타임아웃 0, blackout 0, 유실 0, DLQ 0, 재고 일치, 소비자 일시중단 1회(55.2 s), 시도 실패 0, 큐 최대 29,643, 비우기 104.7 s. 앞선 두 run(`e6968e1`, `fbae2e5`)도 PASS(비우기 74.6 / 81.7 s) | **확인** |
+| P-D2: consumer-redeliver(FAIL_EVERY 50) 재전달 ≈ N/50, 중복 0, 이중 차감 0 | `ab3f82c`: 31,002 → 202 31,002, 재전달 620(= 31,002/50), 중복 0, `stock − remaining == ISSUED`, DLQ 0. 앞선 run 619 / 620 | **확인** |
+| P-F: 202 집합 ⊆ DB 집합, 확인 못 받은 신청에 202 0건 | `ab3f82c` 3회: 유실 0 / 0 / 0, 202 11,564 / 11,702 / 11,202, 타임아웃·503 이지만 저장된 건 5,449 / 5,723 / 5,754, 끝의 큐 0·소비자 1. 첫 run(`e6968e1`)도 PASS. **`fbae2e5` run 은 FAIL**(202 11,055 중 7,073건이 정착 시점에 행이 없음) | 확인 4/5, FAIL 1/5. 아래 "알려진 문제 2" |
+| P-E: 재전달이 없으면 적재 순서 = 당첨 순서, DB 중단·재개 시 순서가 바뀐 당첨자 가능 | `evidence/s6/fairness/…-001d124`: 300건·재고 100, baseline 3회와 DB 5 s 차단 3회(일시중단 각 1회) 모두 순서 밖 당첨자 0 | 앞부분 **확인**, DB 중단 부분 **기각**(관측 0). 원인(classic 큐의 requeue 가 원래 위치로 돌아가는지)은 확인하지 않았다. 크래시 주입 변형은 재지 않았다 |
+| P-G: 독 메시지만 DLQ, DB 중단 중 DLQ 0 | 부하 조건의 G 는 실행하지 않았다. 통합 테스트(`S6ConsumerIntegrationTest`, `S6DatabaseOutageTest`)에서 깨진 JSON·필드 누락 → 즉시 DLQ, 항상 실패 → 정확히 3회 후 FAILED + DLQ, DB 차단 중 DLQ 0·시도 실패 0 | 부하 조건: **INCOMPLETE** |
+
+S4 와 비교(같은 시나리오·시각·길이, n 은 S4 1회 대 S6 1~3회; §9 의 바뀐 조건이 모두 함께 바뀌었으므로 차이의 원인을 하나로 단정하지 않는다. 환경도 다르다: S4 는 redis 컨테이너 + AOF, Hikari 대기 30 s; S6 는 redis 없음, Hikari 대기 2 s):
+
+| 측정 | S4 (`6b8b065`) | S6 (`ab3f82c`) |
+|---|---|---|
+| db-down 45 s: 응답 | 200 31,002, 5xx 0, 타임아웃 0 | 202 31,002, 5xx 0, 타임아웃 0 |
+| db-down: 큐 최대 / 비우기 | 25,865 / 28.7 s | 29,643 / 104.7 s (앞선 run 74.6, 81.7 s) |
+| consumer-redeliver: 재전달 / 중복 / 큐 최대 | 620 / 0 / 1,337 | 620 / 0 / 24,221 |
+| 소비 속도(유도) | 약 740~890행/초 | 약 330~440행/초 |
+
+S6 는 모든 요청을 판정하고 기록하므로(당첨자만 쓰던 S4 대비 요청당 문장 4~5개, 재고 행 갱신 포함) 소비가 느리고 큐가 더 쌓인다. 대신 판정이 MySQL 한 곳에 있어 Redis 장애 시나리오가 없다.
+
+**알려진 문제 1 (Test A 1회차 600 s 정지).** 1회차에서 발행 1,000건 가운데 일부의 confirm 이 오지 않다가 정확히 600 s 뒤 채널이 닫히며 nack/타임아웃(예외 311)으로 끝났고, 소비자도 그동안 50건(prefetch)만 처리했다. 600 s 는 amqp-client 의 기본 channel RPC 타임아웃(10분)과 같다. 2~10회차는 정상이다. 차가운 채널 캐시에 가상 스레드 1,000개가 동시에 채널을 여는 상황(S4/S5 는 당첨자 100건만 발행)에서 생기는 교착으로 **추정**하지만 확인하지 못했다(`-Djdk.tracePinnedThreads` 는 이 JDK 에서 JVM 을 죽였다). 운영 경로(Tomcat 플랫폼 스레드)에서 재현되는지는 모른다. 고치려면 Test A 의 호출 스레드를 바꾸거나(동결된 측정 조건 변경: 승인 필요) 발행 쪽 채널 수를 제한해야 한다.
+
+**알려진 문제 2 (broker-down `fbae2e5` FAIL).** 그 run 의 정착 판정은 행 수만 봤고, 브로커 재시작 뒤 관리 API 샘플이 끝까지 비었으며 소비 기울기는 169행/초였다. "소비자가 재개하지 않아 메시지가 큐에 남았다"가 가장 그럴듯하지만, 당시 큐 깊이를 기록하지 않아 **실제 유실과 구별할 수 없다**. 이후 정착 조건에 "메인 큐가 비어 있음"을 더하고 끝의 큐·소비자 수를 기록하게 했고(`216ab87`), 같은 조건 3회는 모두 큐 0·소비자 1로 PASS 였다. 재현 빈도는 1/5 (수정 전 2회 중 1회)이고 원인은 미확인이다.
+
+**그 밖의 관측.** broker-down 에서 15 s 중단에 blackout 은 37~38 s 이고 타임아웃(클라이언트 5 s)이 14,000건 이상이다. 그 가운데 5,400~5,700건은 실제로 큐에 들어가 처리됐다(확인을 못 받은 클라이언트가 같은 requestId 로 재시도하면 한 번만 처리된다). 요청 스레드가 브로커 재연결을 기다리며 묶인 것으로 보이며, 측정하지 않았다. db-down 에서 롤백 실패(`08003`)가 시도 1회로 세어지던 분류 누락은 `216ab87` 에서 고쳤다(이후 시도 실패 0).
+
+**이번 단계에서 하지 않은 것 / 쓰면 안 되는 말**
+
+* B(부하 ramping, n ≥ 5): 실행하지 않았다(`verify.sh load` 는 s6 를 모른다). G(부하 중 독 메시지): 실행하지 않았다. E 의 크래시 주입 변형: 실행하지 않았다.
+* `docker stop` 은 정상 종료다. "브로커·DB 크래시에서 유실 0"이 아니다. 노드는 각 1대이고 Quorum Queue 는 쓰지 않았다(§11).
+* 표본 수: D/F 시나리오별 1~3회, E 6회, A 10회 1묶음. 동결(`stage/s6`, protected-paths)은 하지 않았다: A FAIL, B·G 미실행.

@@ -1,0 +1,98 @@
+{
+  "test": "F",
+  "scenario": "broker-down",
+  "stage": "s6",
+  "stock": 10000000,
+  "fault": {
+    "at_s": 20,
+    "duration_s": 15,
+    "observed": {
+      "stopped_at": 1793019601.038,
+      "stop_returned_at": 1793019602.674,
+      "started_at": 1793019618.031,
+      "healthy_at": 1793019627.523
+    }
+  },
+  "totals": {
+    "accepted": 11702,
+    "unconfirmed": 622,
+    "http_5xx": 0,
+    "timeout": 14033,
+    "other": 0
+  },
+  "sent": 26357,
+  "rows": 17425,
+  "rows_by_status": {
+    "ISSUED": 17425
+  },
+  "lost": 0,
+  "lost_sample": [],
+  "recorded_despite_unconfirmed": 5723,
+  "unexplained_rows": 0,
+  "issued": 17425,
+  "over_issue": 0,
+  "issue_rows": 17425,
+  "remaining": 9982575,
+  "dup_members": 0,
+  "dlq_depth": 0,
+  "queue_final": 0,
+  "consumers_final": 1,
+  "blackout_s": 37,
+  "error_codes": {
+    "1050": 14033
+  },
+  "settle_s": 42.0,
+  "drain_s": 36.9,
+  "queue_depth_max": 13263,
+  "dlq_depth_max": 0,
+  "metrics": {
+    "coupon_s6_confirm_latency": 17425.0,
+    "coupon_s6_confirm_latency.max": 63.972,
+    "coupon_s6_confirm_latency.total_time": 649496.07,
+    "coupon_s6_processed": 17428.0,
+    "coupon_s6_processed{duplicate=false}": 17425.0,
+    "coupon_s6_processed{duplicate=true}": 3.0,
+    "coupon_s6_processed{status=ISSUED}": 17428.0,
+    "coupon_s6_publish_failures": 8933.0,
+    "coupon_s6_publish_failures{reason=exception}": 8928.0,
+    "coupon_s6_publish_failures{reason=nack}": 5.0,
+    "coupon_s6_redeliveries": 50.0
+  },
+  "must": {
+    "lost_zero": true,
+    "unexplained_rows_zero": true,
+    "over_issue_zero": true,
+    "dup_members_zero": true,
+    "issue_rows_match": true,
+    "dlq_zero": true,
+    "stock_consistent": true,
+    "queue_drained": true
+  },
+  "validity": {
+    "k6_completed": true,
+    "settled": true,
+    "fault_observed": true,
+    "valid": true
+  },
+  "pass": true,
+  "env": {
+    "app_cpus": "2",
+    "hikari_connection_timeout_ms": "2000",
+    "hikari_pool_size": "10",
+    "innodb_buffer_pool_size": "134217728",
+    "innodb_flush_log_at_trx_commit": "1",
+    "innodb_redo_log_capacity": "104857600",
+    "jvm_heap": "1g",
+    "k6_mode": "host",
+    "k6_version": "v2.2.0",
+    "mysql_cpus": "2",
+    "queue_type": "classic",
+    "rabbitmq_cpus": "1",
+    "rabbitmq_image": "rabbitmq:3-management-alpine",
+    "s6_confirm_timeout_ms": "2000",
+    "s6_consumer_fail_every": "0",
+    "s6_queue_max_length": "200000",
+    "stage_has_redis": "false",
+    "tomcat_max_threads": "200"
+  }
+}
