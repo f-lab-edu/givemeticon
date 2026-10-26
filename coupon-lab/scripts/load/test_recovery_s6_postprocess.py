@@ -144,6 +144,7 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
         self.assertTrue(report["pass"], report["must"])
         retry = report["client_retry"]
         self.assertEqual((retry["retried"], retry["retry_accepted"], retry["already_stored"], retry["redecided"]), (2, 2, 1, 0))
+        self.assertEqual(report["recorded_despite_unconfirmed"], 1)  # b, stored before the retry; c was written by the retry
         # the retry of b decided it again (status changed): a re-decision, the MUST fails
         changed = [("a", "1", "ISSUED"), ("b", "2", "SOLD_OUT"), ("c", "3", "ISSUED")]
         bad = self.run_pp(load, changed, scenario="broker-down", retry=[("accepted", "b"), ("accepted", "c")], before=before,

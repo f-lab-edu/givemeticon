@@ -42,6 +42,7 @@ the same requestId and member (retry_s6.js); requests-before.tsv is coupon_reque
   retried / retry_accepted   requests sent again / of those, answered 202.
   already_stored             retried requests that already had a row before the retry (the "uncertain" ones): the retry must find
                              them by their id. no_redecision MUST hold: every row of requests-before.tsv has the same status after.
+                             recorded_despite_unconfirmed is then counted on requests-before.tsv (before the retry wrote the rest).
   lost                       then counts every request accepted in the load OR in the retry without a row.
 Validity (the measurement happened as intended): k6 completed, the run settled, and the fault was observed (stopped_at and
 started_at for the container scenarios; for consumer-redeliver the app's redelivery counter > 0). PASS = valid and every MUST.
@@ -186,7 +187,9 @@ def build(args):
         }
     lost = sorted(accepted_anywhere - row_ids)
     unconfirmed_or_timeout = by_result["unconfirmed"] | by_result["timeout"] | by_result["http_5xx"]
-    recorded_despite = len(unconfirmed_or_timeout & row_ids)
+    # "stored although the client was not told" is a property of the load: with a retry, count it on the rows before the retry
+    stored_by_load = {rid for rid, _, _ in before} if retry is not None else row_ids
+    recorded_despite = len(unconfirmed_or_timeout & stored_by_load)
     unexplained = len(row_ids - sent)
     issued = status_counts.get("ISSUED", 0)
 
