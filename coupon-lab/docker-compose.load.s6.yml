@@ -1,0 +1,13 @@
+# Stage s6 only, layered on docker-compose.load.yml by `scripts/verify.sh recovery --stage s6`; the base file is unchanged for
+# S0..S5. S6 has no Redis: the runner starts mysql, rabbitmq and app only, so the app must not wait for redis, and the app gets
+# the S6 knobs (confirm timeout; the test-D consumer-redeliver hook, 0 = off).
+services:
+  app:
+    depends_on: !override
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      COUPON_S6_CONFIRM_TIMEOUT_MS: ${COUPON_S6_CONFIRM_TIMEOUT_MS:-2000}
+      COUPON_S6_CONSUMER_FAIL_EVERY: ${COUPON_S6_CONSUMER_FAIL_EVERY:-0}

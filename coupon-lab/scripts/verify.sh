@@ -8,7 +8,13 @@
 #                  (tests B and C: k6 against docker compose, see docs/stages.md)
 #   verify.sh reprocess evidence/<stage>/load/<profile>/<dir>        (test B: re-aggregate a saved run into a new -reprocessed dir)
 #   verify.sh reprocess evidence/<stage>/recovery/<scenario>/<dir>   (test D: add the loss axes to a saved recovery.json, new -reprocessed dir)
-#   verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver [--fault-at 20] [--fault-duration 10] [--stock N] [--redis-aof|--no-redis-aof]
+#   verify.sh recovery --stage sN --scenario db-down|redis-restart|consumer-redeliver|broker-down [--fault-at 20] [--fault-duration 10] [--stock N] [--redis-aof|--no-redis-aof]
+#   Stage s6 (RabbitMQ intake, MySQL Consumer decides; no Redis) has its own runner, run_recovery_s6: compose with the
+#                  docker-compose.load.s6.yml override (mysql, rabbitmq and app only), recovery_s6.js (every request carries its own
+#                  requestId) and recovery_s6_postprocess.py (accepted ids vs coupon_request rows). Scenarios db-down,
+#                  consumer-redeliver (COUPON_S6_CONSUMER_FAIL_EVERY=50) and broker-down (test F: docker stop/start rabbitmq);
+#                  redis-restart does not apply. For s6, PASS = valid measurement AND its MUST invariants (no accepted request
+#                  lost, no over-issue, one coupon per member, no dead letter, coupon_issue == ISSUED rows): they are the claims.
 #                  (test D: 500 rps for 60 s while a fault is injected, then the loss accounting; see docs/stages.md. consumer-redeliver is
 #                  s4 only: no container fault, the app runs with COUPON_S4_CONSUMER_FAIL_EVERY=50; other stages are refused with exit 2)
 #   Stage s4 (asynchronous writes): load and recovery settle before the rows are counted (poll until 5 polls in a row are equal,
@@ -159,7 +165,11 @@ case "$mode" in
             db-down) : "${stock:=10000000}" ;;
             redis-restart) : "${stock:=20000}" ;;
             consumer-redeliver)
-                [ "$stage" = s4 ] || { echo "consumer-redeliver requires a consumer (S4+); stage $stage has none" >&2; exit 2; }
+                [ "$stage" = s4 ] || [ "$stage" = s6 ] || { echo "consumer-redeliver requires a consumer (s4, s6); stage $stage has none" >&2; exit 2; }
+                : "${stock:=10000000}"
+                ;;
+            broker-down)
+                [ "$stage" = s6 ] || { echo "broker-down (test F) is an s6 scenario; stage $stage is refused" >&2; exit 2; }
                 : "${stock:=10000000}"
                 ;;
             *) usage ;;
@@ -169,9 +179,11 @@ case "$mode" in
         recovery_warmup=$(python3 -I -c 'import json; print(json.load(open("scripts/load/profiles.json"))["recovery"]["warmup"]["seconds"])')
         # db-down: the fault must be over before the load ends; redis-restart has no duration, only its start must fall inside the load
         fault_end_s=$fault_at
-        [ "$scenario" != db-down ] || fault_end_s=$((fault_at + fault_duration))
+        [ "$scenario" != db-down ] && [ "$scenario" != broker-down ] || fault_end_s=$((fault_at + fault_duration))
         [ "$fault_end_s" -lt "$recovery_seconds" ] || { echo "the fault ends at second $fault_end_s of ${recovery_seconds}; it must end before the load does" >&2; exit 2; }
         require_stage_class "$stage"
+        [ "$stage" != s6 ] || [ "$scenario" != redis-restart ] || { echo "redis-restart does not apply to s6 (no Redis)" >&2; exit 2; }
+        [ "$stage" != s6 ] || [ -z "$redis_aof" ] || { echo "s6 has no Redis; --redis-aof/--no-redis-aof do not apply" >&2; exit 2; }
         default_redis_aof
         tier="recovery-$scenario"
         # evidence/<stage>/recovery/<scenario dir>/: the scenario plus the configuration knob that distinguishes the run
@@ -978,6 +990,328 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/recovery.json")
     esac
 }
 
+# verify.sh recovery --stage s6 (tests D and F): one run. Compose up with the s6 override (mysql, rabbitmq, app; no redis), seed one
+# event, recovery_s6.js from the host while the fault is injected from here (db-down: docker stop/start mysql; broker-down: docker
+# stop/start rabbitmq; consumer-redeliver: no container fault, COUPON_S6_CONSUMER_FAIL_EVERY=50), wait until the event's
+# coupon_request rows stop changing, read every row and the app's S6 counters, postprocess, keep the evidence, compose down -v.
+run_recovery_s6() {
+    set +e
+    local compose=(docker compose -p coupon-lab-load -f docker-compose.load.yml -f docker-compose.load.s6.yml)
+    local compose_up=false run_status="" run_note="" work="build/recovery/s6-$scenario" run_evidence=""
+    local sampler_pid="" dbpoll_pid="" fault_pid="" k6_pid="" queue_pid="" event_id="" fault_target=mysql fail_every=0
+    local passed=0 failed=0 evidence_dirs=() failures=()
+    local start_lead=${RECOVERY_START_LEAD_S:-20}
+    [ "$scenario" != broker-down ] || fault_target=rabbitmq
+    if [ "$scenario" = consumer-redeliver ]; then fault_target=app; fail_every=50; fi
+
+    s6_cleanup() {
+        local pid
+        for pid in "$sampler_pid" "$dbpoll_pid" "$fault_pid" "$k6_pid" "$queue_pid"; do
+            [ -z "$pid" ] || { kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; }
+        done
+        sampler_pid=""; dbpoll_pid=""; fault_pid=""; k6_pid=""; queue_pid=""
+        [ "$compose_up" = true ] || return 0
+        compose_up=false
+        "${compose[@]}" down -v --remove-orphans >>"$log" 2>&1 \
+            || echo "WARN: docker compose down failed; remove the ${LOAD_PREFIX}* containers and volumes by hand" >&2
+    }
+    trap s6_cleanup EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    : >"$log"
+    command -v k6 >/dev/null || { echo "k6 not found; install it on the host first" >&2; exit 2; }
+    if ! command -v docker >/dev/null || ! docker info >/dev/null 2>&1; then
+        echo "docker daemon not reachable" | tee -a "$log"
+        load_finish INFRA_DOWN 3
+    fi
+    local others
+    others=$(docker ps --format '{{.Names}}' | grep -v "^$LOAD_PREFIX" || true)
+    if [ -n "$others" ]; then
+        echo "running containers other than ${LOAD_PREFIX}*:" >&2
+        sed 's/^/  /' <<<"$others" >&2
+        echo "stop other containers first; measurements must run on an idle machine" >&2
+        exit 2
+    fi
+
+    load_mysql() {
+        MYSQL_PWD="$COUPON_LAB_DB_PASSWORD" docker exec -e MYSQL_PWD "${LOAD_PREFIX}mysql" \
+            mysql -h 127.0.0.1 -uroot -N -B coupon_lab -e "$1" 2>>"$log"
+    }
+    load_inspect() { docker inspect -f "$1" "${LOAD_PREFIX}$2" 2>/dev/null; }
+    app_env() { load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n "s/^$1=//p"; }
+    s6_event() {
+        python3 -I -c 'import datetime, sys, time
+t = time.time()
+print("%sZ %s epoch=%.3f %s" % (datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3], sys.argv[1], t, sys.argv[2]))' \
+            "$1" "${2:-}" >>"$work/fault.log"
+    }
+    s6_wait_until() { python3 -I -c 'import sys, time; time.sleep(max(0.0, float(sys.argv[1]) - time.time()))' "$1"; }
+    s6_wait_healthy() {
+        local waited=0
+        while [ "$waited" -lt 180 ]; do
+            [ "$(load_inspect '{{.State.Health.Status}}' "$1")" != healthy ] || return 0
+            sleep 1
+            waited=$((waited + 1))
+        done
+        return 1
+    }
+    s6_inject() {   # <epoch at which the 500 rps phase starts>
+        local rc
+        s6_event fault_scheduled "scenario=$scenario target=${LOAD_PREFIX}$fault_target at=main+${fault_at}s for ${fault_duration}s"
+        s6_wait_until "$(($1 + fault_at))"
+        s6_event stopped_at "about to docker stop ${LOAD_PREFIX}$fault_target"
+        docker stop "${LOAD_PREFIX}$fault_target" >>"$log" 2>&1; rc=$?
+        s6_event stop_returned_at "docker stop ${LOAD_PREFIX}$fault_target rc=$rc"
+        sleep "$fault_duration"
+        docker start "${LOAD_PREFIX}$fault_target" >>"$log" 2>&1; rc=$?
+        s6_event started_at "docker start ${LOAD_PREFIX}$fault_target rc=$rc"
+        if s6_wait_healthy "$fault_target"; then s6_event healthy_at "${LOAD_PREFIX}$fault_target healthy"
+        else s6_event healthy_timeout "${LOAD_PREFIX}$fault_target not healthy after 180s"; fi
+    }
+    # every whole second: {"time", "db_rows": coupon_request rows of the event, null while MySQL is unreachable}
+    s6_sample_db() {
+        local out=$1 now rows
+        while :; do
+            python3 -I -c 'import time; time.sleep(1 - time.time() % 1)'
+            now=$(date +%s)
+            rows=$(MYSQL_PWD="$COUPON_LAB_DB_PASSWORD" docker exec -e MYSQL_PWD "${LOAD_PREFIX}mysql" \
+                mysql -h 127.0.0.1 -uroot -N -B coupon_lab -e "SELECT COUNT(*) FROM coupon_request WHERE event_id = $event_id" 2>/dev/null)
+            [[ "$rows" =~ ^[0-9]+$ ]] || rows=null
+            printf '{"time":%s,"db_rows":%s}\n' "$now" "$rows" >>"$out"
+        done
+    }
+    # every second: depth of the S6 queue and of its DLQ, broker channels (management API; null while unreadable)
+    s6_sample_queue() {
+        exec python3 -I -c '
+import base64, json, sys, time, urllib.request
+out, api, user = sys.argv[1:4]
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+auth = "Basic " + base64.b64encode(user.encode()).decode()
+def get(path):
+    try:
+        return json.load(opener.open(urllib.request.Request(api + path, headers={"Authorization": auth}), timeout=2))
+    except Exception:
+        return {}
+while True:
+    time.sleep(1 - time.time() % 1)
+    queue = get("/queues/%2F/coupon.s6.requests")
+    dlq = get("/queues/%2F/coupon.s6.requests.dlq")
+    totals = get("/overview").get("object_totals") or {}
+    line = {"time": int(time.time()), "queue_depth": queue.get("messages"), "ready": queue.get("messages_ready"),
+            "unacked": queue.get("messages_unacknowledged"), "dlq_depth": dlq.get("messages"), "channels": totals.get("channels")}
+    with open(out, "a") as f:
+        f.write(json.dumps(line, separators=(",", ":")) + "\n")
+' "$1" "$RABBIT_API" "$RABBIT_API_USER"
+    }
+    # every 2 s: docker stats of the three S6 containers (the base sampler also asks for redis, which S6 does not start)
+    s6_sample_stats() {
+        local out=$1 started now
+        while :; do
+            started=$(date +%s)
+            docker stats --no-stream --format json "${LOAD_PREFIX}app" "${LOAD_PREFIX}mysql" "${LOAD_PREFIX}rabbitmq" 2>/dev/null | while IFS= read -r line; do
+                [ -z "$line" ] || printf '{"time":%s,"stat":%s}\n' "$(date +%s)" "$line" >>"$out"
+            done
+            now=$(date +%s)
+            [ $((now - started)) -ge 2 ] || sleep $((2 - now + started))
+        done
+    }
+    # after k6: true once the last 5 samples after <base> are equal and not null; gives up after 600 s
+    s6_wait_settled() {
+        local waited=0 total vals
+        while [ "$waited" -lt 600 ]; do
+            total=$(wc -l <"$work/db-samples.jsonl")
+            if [ "$total" -ge $(($1 + 5)) ]; then
+                vals=$(tail -n 5 "$work/db-samples.jsonl" | sed -n 's/.*"db_rows":\([0-9a-z]*\)}.*/\1/p' | sort -u)
+                ! [[ "$vals" =~ ^[0-9]+$ ]] || return 0
+            fi
+            sleep 1
+            waited=$((waited + 1))
+        done
+        return 1
+    }
+    # the app's S6 counters as one JSON object {"<name>": total, "<name>{<tag>=<value>}": n, ...}; {} when nothing is readable
+    s6_metrics() {
+        python3 -I -c '
+import json, urllib.error, urllib.parse, urllib.request
+base = "http://127.0.0.1:18080/actuator/metrics/"
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+def read(name, query=""):
+    try:
+        return json.load(opener.open(base + name + query, timeout=5))
+    except Exception:
+        return None
+out = {}
+for name in ("coupon_s6_redeliveries", "coupon_s6_consumer_pauses", "coupon_s6_consumer_paused_seconds",
+             "coupon_s6_attempt_failures", "coupon_s6_dlq", "coupon_s6_publish_failures", "coupon_s6_processed",
+             "coupon_s6_confirm_latency"):
+    body = read(name)
+    if body is None:
+        continue
+    for m in body["measurements"]:
+        key = name if m["statistic"] in ("COUNT",) else name + "." + m["statistic"].lower()
+        out[key] = m["value"]
+    for tag in body.get("availableTags", []):
+        if tag["tag"] not in ("reason", "status", "duplicate"):
+            continue
+        for value in tag["values"]:
+            sub = read(name, "?tag=" + urllib.parse.quote(tag["tag"] + ":" + value))
+            if sub:
+                out["%s{%s=%s}" % (name, tag["tag"], value)] = next(
+                    (m["value"] for m in sub["measurements"] if m["statistic"] == "COUNT"), None)
+print(json.dumps(out, sort_keys=True))'
+    }
+
+    s6_body() {
+        rm -rf "$work"
+        mkdir -p "$work/gc"
+        : >"$work/fault.log"
+        export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=s6 HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE FLUSH_LOG=1 LOAD_GC_DIR="$PWD/$work/gc" \
+            REDIS_APPENDONLY=no COUPON_S4_CONSUMER_FAIL_EVERY=0 COUPON_S6_CONSUMER_FAIL_EVERY=$fail_every
+        COUPON_LAB_DB_PASSWORD=$(python3 -I -c 'import secrets; print(secrets.token_hex(12))')
+        local k6_version
+        k6_version=$(k6 version 2>/dev/null | head -n 1 | awk '{print $2}')
+
+        "${compose[@]}" down -v --remove-orphans >>"$log" 2>&1
+        compose_up=true
+        echo "recovery $scenario on s6: docker compose up mysql rabbitmq app (first image build takes a few minutes)"
+        if ! "${compose[@]}" up -d --build mysql rabbitmq app >>"$log" 2>&1; then
+            run_status=INFRA_DOWN; run_note="docker compose up failed (see $log)"; return
+        fi
+        if ! s6_wait_healthy app; then
+            docker logs --tail 40 "${LOAD_PREFIX}app" >>"$log" 2>&1
+            run_status=INFRA_DOWN; run_note="app not healthy after 180s (see $log)"; return
+        fi
+        if [ -n "$(docker ps -q --filter "name=^${LOAD_PREFIX}redis$")" ]; then
+            run_status=INFRA_DOWN; run_note="a redis container is running; s6 runs without one"; return
+        fi
+        local app_fail_every
+        app_fail_every=$(app_env COUPON_S6_CONSUMER_FAIL_EVERY)
+        if [ "$app_fail_every" != "$fail_every" ]; then
+            run_status=INFRA_DOWN; run_note="app runs COUPON_S6_CONSUMER_FAIL_EVERY=${app_fail_every:-?}, requested $fail_every"; return
+        fi
+
+        event_id=$(load_mysql "INSERT INTO coupon_event (name, total_quantity, remaining_quantity, created_at) VALUES ('recovery-$scenario-s6', $stock, $stock, NOW(6)); SELECT LAST_INSERT_ID();")
+        if ! [[ "$event_id" =~ ^[0-9]+$ ]]; then
+            run_status=INFRA_DOWN; run_note="seeding the event failed (got '$event_id'; see $log)"; return
+        fi
+
+        local env_args=() var_name var_value nano
+        while IFS=$'\t' read -r var_name var_value; do
+            [ -z "$var_name" ] || env_args+=(--env "$var_name=$var_value")
+        done < <(load_mysql "SHOW VARIABLES WHERE Variable_name IN ('innodb_flush_log_at_trx_commit','innodb_buffer_pool_size','innodb_redo_log_capacity')")
+        nano=$(load_inspect '{{.HostConfig.NanoCpus}}' app); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; env_args+=(--env "app_cpus=$((nano / 1000000000))")
+        nano=$(load_inspect '{{.HostConfig.NanoCpus}}' mysql); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; env_args+=(--env "mysql_cpus=$((nano / 1000000000))")
+        nano=$(load_inspect '{{.HostConfig.NanoCpus}}' rabbitmq); [[ "$nano" =~ ^[0-9]+$ ]] || nano=0; env_args+=(--env "rabbitmq_cpus=$((nano / 1000000000))")
+        env_args+=(--env "rabbitmq_image=$(load_inspect '{{.Config.Image}}' rabbitmq)" --env "queue_type=classic" --env "stage_has_redis=false"
+            --env "jvm_heap=$(load_inspect '{{json .Config.Entrypoint}}' app | grep -o -- '-Xmx[0-9]*[kKmMgG]' | head -n 1 | sed 's/^-Xmx//')"
+            --env "hikari_pool_size=$(app_env SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE)" --env "hikari_connection_timeout_ms=2000"
+            --env "s6_confirm_timeout_ms=$(app_env COUPON_S6_CONFIRM_TIMEOUT_MS)" --env "s6_consumer_fail_every=$app_fail_every"
+            --env "s6_queue_max_length=200000" --env "tomcat_max_threads=200" --env "k6_version=$k6_version" --env "k6_mode=host")
+
+        : >"$work/stats.jsonl"
+        s6_sample_stats "$work/stats.jsonl" &
+        sampler_pid=$!
+        : >"$work/db-samples.jsonl"
+        s6_sample_db "$work/db-samples.jsonl" &
+        dbpoll_pid=$!
+        : >"$work/queue.jsonl"
+        s6_sample_queue "$work/queue.jsonl" &
+        queue_pid=$!
+        local start_at_s main_start
+        start_at_s=$(($(date +%s) + start_lead))
+        main_start=$((start_at_s + recovery_warmup))
+        echo "recovery $scenario on s6: event $event_id, stock $stock, $([ "$scenario" = consumer-redeliver ] && echo "no container fault, COUPON_S6_CONSUMER_FAIL_EVERY=$fail_every" || echo "$fault_target down at main+${fault_at}s for ${fault_duration}s"); k6 starts at epoch $start_at_s"
+        s6_event k6_started "test starts at epoch $start_at_s, main phase at epoch $main_start"
+        k6 run --out json="$work/raw.json.gz" --summary-export "$work/summary.json" \
+            -e BASE_URL=http://127.0.0.1:18080 -e EVENT_ID="$event_id" -e START_AT_MS=$((start_at_s * 1000)) \
+            scripts/load/recovery_s6.js >>"$log" 2>&1 &
+        k6_pid=$!
+        if [ "$scenario" != consumer-redeliver ]; then
+            s6_inject "$main_start" &
+            fault_pid=$!
+        fi
+        wait "$k6_pid"
+        local k6_rc=$?
+        k6_pid=""
+        s6_event k6_ended_at "k6 exit $k6_rc"
+        [ -z "$fault_pid" ] || wait "$fault_pid"
+        fault_pid=""
+
+        local base settle_started settle_s settled=true
+        base=$(wc -l <"$work/db-samples.jsonl")
+        settle_started=$(date +%s)
+        s6_wait_settled "$base" || { settled=false; echo "recovery $scenario on s6: coupon_request rows still changing 600 s after the load ended"; }
+        settle_s=$(($(date +%s) - settle_started))
+        kill "$dbpoll_pid" 2>/dev/null; wait "$dbpoll_pid" 2>/dev/null; dbpoll_pid=""
+        kill "$queue_pid" 2>/dev/null; wait "$queue_pid" 2>/dev/null; queue_pid=""
+        kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""
+
+        local issue_rows dlq_depth metrics
+        issue_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_issue WHERE event_id = $event_id")
+        if ! [[ "$issue_rows" =~ ^[0-9]+$ ]] || ! load_mysql "SELECT request_id, member_id, status FROM coupon_request WHERE event_id = $event_id" >"$work/requests.tsv"; then
+            run_status=INFRA_DOWN; run_note="reading the final rows failed (see $log)"; return
+        fi
+        dlq_depth=$(docker exec "${LOAD_PREFIX}rabbitmq" rabbitmqctl list_queues -q name messages 2>>"$log" | awk '$1 == "coupon.s6.requests.dlq" { print $2 }')
+        if ! [[ "$dlq_depth" =~ ^[0-9]+$ ]]; then
+            run_status=INFRA_DOWN; run_note="reading the DLQ depth failed (got '$dlq_depth'; see $log)"; return
+        fi
+        metrics=$(s6_metrics)
+        [ -n "$metrics" ] || metrics='{}'
+        if docker logs "${LOAD_PREFIX}app" >"$work/app.log" 2>&1; then
+            grep -v '^[[:space:]]' "$work/app.log" | grep -E ' (ERROR|WARN) ' | cut -c1-400 | head -n 4000 >"$work/app-errors.log"
+        fi
+        if docker logs "${LOAD_PREFIX}rabbitmq" >"$work/rabbitmq-full.log" 2>&1; then
+            grep -iE 'error|warn|closing|flow|alarm' "$work/rabbitmq-full.log" | cut -c1-400 | head -n 2000 >"$work/rabbitmq.log"
+        fi
+
+        python3 -I scripts/load/recovery_s6_postprocess.py --raw "$work/raw.json.gz" --scenario "$scenario" --stock "$stock" \
+            --fault-log "$work/fault.log" --db-samples "$work/db-samples.jsonl" --requests "$work/requests.tsv" \
+            --issue-rows "$issue_rows" --dlq-depth "$dlq_depth" --k6-exit "$k6_rc" --out "$work/recovery.json" \
+            --queue-samples "$work/queue.jsonl" --metrics "$metrics" --settle-s "$settle_s" --settled "$settled" \
+            --fault-at "$fault_at" --fault-duration "$fault_duration" "${env_args[@]}" >>"$log" 2>&1
+        if [ $? -ne 0 ]; then
+            run_status=BUILD_ERROR; run_note="recovery_s6_postprocess failed (see $log)"; return
+        fi
+        local summary
+        summary=$(python3 -I -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+t = d["totals"]
+print("sent=%s accepted=%s unconfirmed=%s timeouts=%s http_5xx=%s rows=%s lost=%s recorded_despite_unconfirmed=%s issued=%s over_issue=%s dup_members=%s dlq=%s blackout_s=%s drain_s=%s settle_s=%s queue_depth_max=%s redeliveries=%s pauses=%s valid=%s failed_musts=%s" % (
+    d["sent"], t["accepted"], t["unconfirmed"], t["timeout"], t["http_5xx"], d["rows"], d["lost"], d["recorded_despite_unconfirmed"],
+    d["issued"], d["over_issue"], d["dup_members"], d["dlq_depth"], d["blackout_s"], d["drain_s"], d["settle_s"], d["queue_depth_max"],
+    d["metrics"].get("coupon_s6_redeliveries"), d["metrics"].get("coupon_s6_consumer_pauses"),
+    str(d["validity"]["valid"]).lower(), ",".join(k for k, v in d["must"].items() if not v) or "none"))
+print("PASS" if d["pass"] else "FAIL")' "$work/recovery.json")
+        echo "recovery $scenario on s6: $(head -n 1 <<<"$summary")"
+        run_status=$(tail -n 1 <<<"$summary")
+        [ "$run_status" = PASS ] || run_note="invalid or a MUST failed: $(head -n 1 <<<"$summary")"
+    }
+
+    s6_body
+    s6_cleanup
+    if [ -f "$work/recovery.json" ]; then
+        run_evidence="evidence/s6/recovery/$scenario/$stamp-$sha"
+        [ "$dirty" = false ] || run_evidence="$run_evidence-dirty"
+        mkdir -p "$run_evidence"
+        cp "$work/recovery.json" "$work/fault.log" "$work/queue.jsonl" "$work/db-samples.jsonl" "$run_evidence/"
+        [ ! -f "$work/summary.json" ] || cp "$work/summary.json" "$run_evidence/"
+        [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
+        [ ! -f "$work/app-errors.log" ] || cp "$work/app-errors.log" "$run_evidence/"
+        [ ! -f "$work/rabbitmq.log" ] || cp "$work/rabbitmq.log" "$run_evidence/"
+        evidence_dirs+=("$run_evidence")
+        echo "recovery $scenario on s6: evidence in $run_evidence"
+    fi
+    [ -z "$run_note" ] || { echo "recovery $scenario on s6: $run_status - $run_note"; failures+=("$run_note"); }
+    case "$run_status" in
+        PASS) passed=1; load_finish PASS 0 ;;
+        FAIL) failed=1; load_finish FAIL 1 ;;
+        INFRA_DOWN) load_finish INFRA_DOWN 3 ;;
+        *) load_finish BUILD_ERROR 5 ;;
+    esac
+}
+
 # verify.sh reprocess evidence/<stage>/recovery/<scenario>/<dir>: the loss axes (seats_lost, client_unknown,
 # recorded_despite_unknown) added to a saved recovery.json. The source stays untouched; the result goes to a new
 # <ts>-<sha>[-dirty]-reprocessed directory next to it, together with copies of the other files of the run.
@@ -1064,7 +1398,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$dest/load.json")
 
 case "$mode" in
     load) run_load ;;
-    recovery) run_recovery ;;
+    recovery) if [ "$stage" = s6 ]; then run_recovery_s6; else run_recovery; fi ;;
     reprocess) if [ "$reprocess_kind" = recovery ]; then run_reprocess_recovery; else run_reprocess; fi ;;
 esac
 
