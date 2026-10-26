@@ -1,0 +1,7 @@
+2026-10-26T14:48:13.132Z k6_started epoch=1793026093.132 test starts at epoch 1793026113, main phase at epoch 1793026123
+2026-10-26T14:48:13.152Z fault_scheduled epoch=1793026093.152 scenario=db-down target=coupon-lab-load-mysql at=main+5s for 45s
+2026-10-26T14:48:48.037Z stopped_at epoch=1793026128.038 about to docker stop coupon-lab-load-mysql
+2026-10-26T14:48:51.182Z stop_returned_at epoch=1793026131.183 docker stop coupon-lab-load-mysql rc=0
+2026-10-26T14:49:36.406Z started_at epoch=1793026176.406 docker start coupon-lab-load-mysql rc=0
+2026-10-26T14:49:39.581Z healthy_at epoch=1793026179.582 coupon-lab-load-mysql healthy
+2026-10-26T14:49:43.300Z k6_ended_at epoch=1793026183.300 k6 exit 0
