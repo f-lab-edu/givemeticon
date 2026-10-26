@@ -28,6 +28,8 @@ class S6ErrorClassifierTest {
         // seen in the S6 db-down run: the rollback after the server went away fails with SQLState 08003
         assertThat(S6ErrorClassifier.isDatabaseDown(new TransactionSystemException("JDBC rollback failed",
                 new SQLException("No operations allowed after connection closed.", "08003")))).isTrue();
+        // seen in the S6 poison-db-down run: the rollback after a poison message's own failure hit the cut
+        assertThat(S6ErrorClassifier.isDatabaseDown(new TransactionSystemException("JDBC rollback failed"))).isTrue();
     }
 
     @Test

@@ -10,6 +10,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.messaging.handler.annotation.Header;
@@ -110,7 +111,8 @@ public class S6RequestConsumer {
                 last = e;
             }
             meterRegistry.counter("coupon_s6_attempt_failures").increment();
-            log.warn("attempt {}/{} failed: requestId={}: {}", attempt, MAX_ATTEMPTS, message.requestId(), last.toString());
+            log.warn("attempt {}/{} failed: requestId={}: {} (root cause: {})", attempt, MAX_ATTEMPTS, message.requestId(),
+                    last.toString(), NestedExceptionUtils.getMostSpecificCause(last).toString());
             if (attempt < MAX_ATTEMPTS) {
                 sleep(attemptDelayMs * attempt);
             }
