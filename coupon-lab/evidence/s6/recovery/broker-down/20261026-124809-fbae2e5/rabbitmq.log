@@ -1,0 +1,26 @@
+2026-10-26 12:48:17.446077+00:00 [info] <0.254.0> Running boot step rabbit_alarm defined by app rabbit[0m
+[38;5;214m2026-10-26 12:48:18.011202+00:00 [warning] <0.254.0> Classic peer discovery backend: list of nodes does not contain the local node [][0m
+[38;5;214m2026-10-26 12:48:18.195641+00:00 [warning] <0.647.0> Message store "628WB79CIFDYO9LJI6DKMI09L/msg_store_persistent": rebuilding indices from scratch[0m
+[38;5;214m2026-10-26 12:48:18.426882+00:00 [warning] <0.717.0> Deprecated features: `management_metrics_collection`: Feature `management_metrics_collection` is deprecated.[0m
+[38;5;214m2026-10-26 12:48:18.426882+00:00 [warning] <0.717.0> By default, this feature can still be used for now.[0m
+[38;5;214m2026-10-26 12:48:18.426882+00:00 [warning] <0.717.0> Its use will not be permitted by default in a future minor RabbitMQ version and the feature will be removed from a future major RabbitMQ version; actual versions to be determined.[0m
+[38;5;214m2026-10-26 12:48:18.426882+00:00 [warning] <0.717.0> To continue using this feature when it is not permitted by default, set the following parameter in your configuration:[0m
+[38;5;214m2026-10-26 12:48:18.426882+00:00 [warning] <0.717.0>     "deprecated_features.permit.management_metrics_collection = true"[0m
+[38;5;214m2026-10-26 12:48:18.426882+00:00 [warning] <0.717.0> To test RabbitMQ as if the feature was removed, set this in your configuration:[0m
+[38;5;214m2026-10-26 12:48:18.426882+00:00 [warning] <0.717.0>     "deprecated_features.permit.management_metrics_collection = false"[0m
+[38;5;214m2026-10-26 12:49:20.092211+00:00 [warning] <0.710.0> HTTP listener registry could not find context rabbitmq_prometheus_tls[0m
+[38;5;214m2026-10-26 12:49:20.102200+00:00 [warning] <0.710.0> HTTP listener registry could not find context rabbitmq_management_tls[0m
+[38;5;160m2026-10-26 12:49:20.124498+00:00 [error] <0.855.0> Error on AMQP connection <0.855.0> (172.19.0.4:39358 -> 172.19.0.2:5672 - rabbitConnectionFactory#3aca2579:0, vhost: '/', user: 'coupon', state: running), channel 0:[0m
+[38;5;160m2026-10-26 12:49:20.124498+00:00 [error] <0.855.0>  operation none caused a connection exception connection_forced: "broker forced connection closure with reason 'shutdown'"[0m
+[38;5;214m2026-10-26 12:49:20.126092+00:00 [warning] <0.1299.0> Channel is stopping with 1 pending publisher confirms[0m
+[38;5;214m2026-10-26 12:49:20.126796+00:00 [warning] <0.1304.0> Channel is stopping with 1 pending publisher confirms[0m
+[38;5;214m2026-10-26 12:49:20.127746+00:00 [warning] <0.1294.0> Channel is stopping with 1 pending publisher confirms[0m
+2026-10-26 12:49:20.136222+00:00 [info] <0.1671.0> Closing all connections in vhost '/' on node 'rabbit@e5c493c518b3' because the vhost is stopping[0m
+2026-10-26 12:49:48.877368+00:00 [info] <0.254.0> Running boot step rabbit_alarm defined by app rabbit[0m
+[38;5;214m2026-10-26 12:49:53.832415+00:00 [warning] <0.614.0> Deprecated features: `management_metrics_collection`: Feature `management_metrics_collection` is deprecated.[0m
+[38;5;214m2026-10-26 12:49:53.832415+00:00 [warning] <0.614.0> By default, this feature can still be used for now.[0m
+[38;5;214m2026-10-26 12:49:53.832415+00:00 [warning] <0.614.0> Its use will not be permitted by default in a future minor RabbitMQ version and the feature will be removed from a future major RabbitMQ version; actual versions to be determined.[0m
+[38;5;214m2026-10-26 12:49:53.832415+00:00 [warning] <0.614.0> To continue using this feature when it is not permitted by default, set the following parameter in your configuration:[0m
+[38;5;214m2026-10-26 12:49:53.832415+00:00 [warning] <0.614.0>     "deprecated_features.permit.management_metrics_collection = true"[0m
+[38;5;214m2026-10-26 12:49:53.832415+00:00 [warning] <0.614.0> To test RabbitMQ as if the feature was removed, set this in your configuration:[0m
+[38;5;214m2026-10-26 12:49:53.832415+00:00 [warning] <0.614.0>     "deprecated_features.permit.management_metrics_collection = false"[0m

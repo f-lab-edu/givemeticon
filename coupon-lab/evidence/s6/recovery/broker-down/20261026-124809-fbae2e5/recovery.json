@@ -1,0 +1,114 @@
+{
+  "test": "F",
+  "scenario": "broker-down",
+  "stage": "s6",
+  "stock": 10000000,
+  "fault": {
+    "at_s": 20,
+    "duration_s": 15,
+    "observed": {
+      "stopped_at": 1793018960.04,
+      "stop_returned_at": 1793018961.981,
+      "started_at": 1793018977.306,
+      "healthy_at": 1793018985.846
+    }
+  },
+  "totals": {
+    "accepted": 11055,
+    "unconfirmed": 656,
+    "http_5xx": 0,
+    "timeout": 14656,
+    "other": 0
+  },
+  "sent": 26367,
+  "rows": 3982,
+  "rows_by_status": {
+    "ISSUED": 3982
+  },
+  "lost": 7073,
+  "lost_sample": [
+    "00087b31-cb06-463a-b5f8-df2f39d779ad",
+    "0008aef7-9836-4fa4-a5eb-d5b548c8b6a8",
+    "000aa050-a009-475b-aabb-d15bf7ae7563",
+    "000c77d0-1ef7-43c8-8edc-873681db4f13",
+    "00154855-9852-48ce-add8-b315a2b4d3af",
+    "00278d14-96e5-4968-b1f6-1b5a9cd1278a",
+    "0034b704-f24b-4c94-acf3-7debf068197c",
+    "003ec897-cbc2-4ee7-9050-ded30a84d4c8",
+    "00577fae-5417-4e4c-8846-03f0e88d57ed",
+    "005e71c5-c8ea-454f-aa34-e3777bffdce0",
+    "00681a65-f060-4563-a8e1-57d2616ff09f",
+    "007054b1-5de7-4085-b09a-c5d7ab9ed7a5",
+    "00872e92-de60-4ad7-b65f-c3537275cd3d",
+    "0087b76a-8b23-4d0d-b09e-f63b736f8e60",
+    "00896abd-c6f8-4a21-8c76-143f1b2b4205",
+    "00960955-16a4-466c-b8b3-10bbc2bc2a02",
+    "00994b96-a455-4cc0-8fd6-84d34f2b4a66",
+    "009b8e83-1cf9-4e6c-9e88-899d7f0521ee",
+    "009ccc4a-8a32-4ac1-bd24-d7c0aa610796",
+    "00a1d853-b9d5-4f9a-b400-2f5428f4aa7a"
+  ],
+  "recorded_despite_unconfirmed": 0,
+  "unexplained_rows": 0,
+  "issued": 3982,
+  "over_issue": 0,
+  "issue_rows": 3982,
+  "remaining": 9996018,
+  "dup_members": 0,
+  "dlq_depth": 0,
+  "blackout_s": 39,
+  "error_codes": {
+    "1050": 14656
+  },
+  "settle_s": 5.0,
+  "drain_s": 0.0,
+  "queue_depth_max": 5521,
+  "dlq_depth_max": 0,
+  "metrics": {
+    "coupon_s6_confirm_latency": 3982.0,
+    "coupon_s6_confirm_latency.max": 14.156,
+    "coupon_s6_confirm_latency.total_time": 23925.401,
+    "coupon_s6_processed": 3982.0,
+    "coupon_s6_processed{duplicate=false}": 3982.0,
+    "coupon_s6_processed{status=ISSUED}": 3982.0,
+    "coupon_s6_publish_failures": 15302.0,
+    "coupon_s6_publish_failures{reason=exception}": 15294.0,
+    "coupon_s6_publish_failures{reason=nack}": 8.0
+  },
+  "must": {
+    "lost_zero": false,
+    "unexplained_rows_zero": true,
+    "over_issue_zero": true,
+    "dup_members_zero": true,
+    "issue_rows_match": true,
+    "dlq_zero": true,
+    "stock_consistent": true
+  },
+  "validity": {
+    "k6_completed": true,
+    "settled": true,
+    "fault_observed": true,
+    "valid": true
+  },
+  "pass": false,
+  "env": {
+    "app_cpus": "2",
+    "hikari_connection_timeout_ms": "2000",
+    "hikari_pool_size": "10",
+    "innodb_buffer_pool_size": "134217728",
+    "innodb_flush_log_at_trx_commit": "1",
+    "innodb_redo_log_capacity": "104857600",
+    "jvm_heap": "1g",
+    "k6_mode": "host",
+    "k6_version": "v2.2.0",
+    "mysql_cpus": "2",
+    "queue_type": "classic",
+    "rabbitmq_cpus": "1",
+    "rabbitmq_image": "rabbitmq:3-management-alpine",
+    "s6_confirm_timeout_ms": "2000",
+    "s6_consumer_fail_every": "0",
+    "s6_queue_max_length": "200000",
+    "stage_has_redis": "false",
+    "tomcat_max_threads": "200"
+  }
+}
