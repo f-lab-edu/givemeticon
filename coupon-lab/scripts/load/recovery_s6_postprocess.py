@@ -6,6 +6,7 @@ usage: python3 -I recovery_s6_postprocess.py --raw raw.json.gz --scenario db-dow
            --k6-exit N --out recovery.json [--queue-samples queue.jsonl] [--metrics '{"name": value, ...}']
            [--settle-s S] [--settled true|false] [--fault-at S] [--fault-duration S] [--env key=value ...]
            [--poison-injected '{"broken": N, "incomplete": N, "always_failing": N}']
+           [--retry-raw retry-raw.json.gz --requests-before requests-before.tsv]
 
 Inputs written by the runner:
   raw.json.gz      k6 JSON output of recovery_s6.js: recovery_results points tagged phase, sec, result (accepted | unconfirmed |
@@ -36,6 +37,12 @@ Definitions:
                              resume), and lost is then read together with queue_final.
   blackout_s                 the longest run of consecutive load seconds (0..59) in which no request started in that second got a 202.
   drain_s                    seconds from the later of (fault end, load end) until db_rows reached the value it finally kept.
+Client retry (broker-down --client-retry): after the load settled, every request whose client saw no 202 was sent once more with
+the same requestId and member (retry_s6.js); requests-before.tsv is coupon_request before that, requests.tsv after it settled again.
+  retried / retry_accepted   requests sent again / of those, answered 202.
+  already_stored             retried requests that already had a row before the retry (the "uncertain" ones): the retry must find
+                             them by their id. no_redecision MUST hold: every row of requests-before.tsv has the same status after.
+  lost                       then counts every request accepted in the load OR in the retry without a row.
 Validity (the measurement happened as intended): k6 completed, the run settled, and the fault was observed (stopped_at and
 started_at for the container scenarios; for consumer-redeliver the app's redelivery counter > 0). PASS = valid and every MUST.
 """
@@ -119,6 +126,19 @@ def drain_seconds(samples, since):
     return max(0.0, round(reached - since, 1)) if reached is not None else None
 
 
+def retry_points(path):
+    """retry_results points as (result, rid)."""
+    opener = gzip.open if path.endswith(".gz") else open
+    with opener(path, "rt") as f:
+        for line in f:
+            if '"retry_results"' not in line:
+                continue
+            point = json.loads(line)
+            if point.get("type") == "Point" and point.get("metric") == "retry_results":
+                tags = point["data"].get("tags", {})
+                yield tags.get("result", "other"), tags.get("rid")
+
+
 def build(args):
     points = list(read_points(args.raw))
     by_result = {r: set() for r in RESULTS}
@@ -140,7 +160,31 @@ def build(args):
     row_ids = {rid for rid, _, _ in rows}
     status_counts = Counter(status for _, _, status in rows)
     issued_members = Counter(member for _, member, status in rows if status == "ISSUED")
-    lost = sorted(by_result["accepted"] - row_ids)
+    retry = None
+    accepted_anywhere = set(by_result["accepted"])
+    if args.retry_raw:
+        retried = {}
+        for result, rid in retry_points(args.retry_raw):
+            if rid:
+                retried[rid] = result
+        before = read_requests(args.requests_before)
+        before_status = dict((rid, status) for rid, _, status in before)
+        after_status = dict((rid, status) for rid, _, status in rows)
+        retry_accepted = {rid for rid, result in retried.items() if result == "accepted"}
+        accepted_anywhere |= retry_accepted
+        redecided = sorted(rid for rid, status in before_status.items() if after_status.get(rid) != status)
+        retry = {
+            "retried": len(retried),
+            "retry_accepted": len(retry_accepted),
+            "retry_not_accepted": len(retried) - len(retry_accepted),
+            "already_stored": len(set(retried) & set(before_status)),
+            "already_stored_and_accepted_again": len(retry_accepted & set(before_status)),
+            "rows_before": len(before),
+            "rows_after": len(rows),
+            "redecided": len(redecided),
+            "redecided_sample": redecided[:20],
+        }
+    lost = sorted(accepted_anywhere - row_ids)
     unconfirmed_or_timeout = by_result["unconfirmed"] | by_result["timeout"] | by_result["http_5xx"]
     recorded_despite = len(unconfirmed_or_timeout & row_ids)
     unexplained = len(row_ids - sent)
@@ -174,6 +218,8 @@ def build(args):
         "stock_consistent": args.stock - args.remaining == issued,
         "queue_drained": args.queue_final == 0,
     }
+    if retry is not None:
+        must["no_redecision"] = retry["redecided"] == 0
     if poison is not None:
         del must["dlq_zero"]
         must["dlq_equals_poison"] = args.dlq_depth == sum(poison.values())
@@ -214,6 +260,7 @@ def build(args):
         "dup_members": sum(1 for n in issued_members.values() if n > 1),
         "dlq_depth": args.dlq_depth,
         "poison_injected": poison,
+        "client_retry": retry,
         "queue_final": args.queue_final,
         "consumers_final": args.consumers_final,
         "blackout_s": longest_run(range(0, 60), lambda s: accepted_per_sec.get(s, 0) == 0),
@@ -253,6 +300,8 @@ def main(argv=None):
     parser.add_argument("--fault-at", type=int)
     parser.add_argument("--fault-duration", type=int)
     parser.add_argument("--poison-injected")
+    parser.add_argument("--retry-raw")
+    parser.add_argument("--requests-before")
     parser.add_argument("--env", action="append", default=[], type=lambda kv: tuple(kv.split("=", 1)))
     args = parser.parse_args(argv)
     args.settled = args.settled == "true"

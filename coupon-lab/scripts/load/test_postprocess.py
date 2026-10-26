@@ -536,6 +536,29 @@ class PostprocessTest(unittest.TestCase):
             self.assertFalse(postprocess.build_report(raw, LAYOUT, "ramping", "s6", accepted - 1, {},
                                                       publish_failures={})["validity"]["valid"])  # a 202 without a row
 
+    def test_s6_confirm_latency_is_summarised_overall_and_per_measure_window(self):
+        lines = [line.replace('"result": "issued"', '"result": "accepted"') for line in synthetic()]
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            first = postprocess.parse_time(stamp(0))  # the anchor: the first request starts at t=0
+            start, end = window_of("ramping", 1)
+            tsv = os.path.join(tmp, "confirm.tsv")
+            with open(tsv, "w") as f:
+                for i in range(1, 101):  # 100 requests in the second window, 10..1000 ms, container clock 2 s ahead
+                    f.write("%d\t%d\n" % ((first + start + 0.01 * i + 2) * 1000, 10 * i))
+                f.write("%d\t%d\n" % ((first + 1 + 2) * 1000, 99999))  # warmup: overall only
+            report = postprocess.build_report(raw, LAYOUT, "ramping", "s6", 0, {}, publish_failures={},
+                                              confirm_latency_path=tsv, clock_offset_s=2)
+            latency = report["confirm_latency_ms"]
+            self.assertEqual(latency["overall"]["n"], 101)
+            self.assertEqual(latency["overall"]["max"], 99999)
+            second = latency["by_stage"][1]
+            self.assertEqual((second["target_rps"], second["n"], second["max"]), (500, 100, 1000))
+            self.assertAlmostEqual(second["p50"], 505.0)
+            self.assertEqual(latency["by_stage"][0]["n"], 0)
+            self.assertNotIn("confirm_latency_ms", postprocess.build_report(raw, LAYOUT, "ramping", "s6", 0, {}))
+
     def test_s4_allows_rows_of_publishes_whose_confirm_came_after_the_wait(self):
         lines = synthetic()
         http = issued_count(lines)

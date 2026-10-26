@@ -15,7 +15,9 @@
 #                  consumer-redeliver (COUPON_S6_CONSUMER_FAIL_EVERY=50), broker-down (test F: docker stop/start rabbitmq), and
 #                  poison / poison-db-down (test G: during the 500 rps phase 5 poison messages a second are published straight to
 #                  the S6 exchange through the management API, round robin broken JSON / a field missing / a request id longer
-#                  than CHAR(36); poison-db-down also stops mysql as db-down does);
+#                  than CHAR(36); poison-db-down also stops mysql as db-down does); broker-down --client-retry: after the
+#                  load settled, every request without a 202 is sent once more with the same requestId and member (retry_s6.js),
+#                  then the run settles again and the rows before and after are compared (evidence .../broker-down-retry/);
 #                  redis-restart does not apply. For s6, PASS = valid measurement AND its MUST invariants (no accepted request
 #                  lost, no over-issue, one coupon per member, no dead letter, coupon_issue == ISSUED rows, stock - remaining ==
 #                  ISSUED rows): they are the claims.
@@ -153,9 +155,11 @@ case "$mode" in
         fault_at=20
         fault_duration=10
         stock=""
+        client_retry=false
         while [ $# -gt 0 ]; do
             if [ "$1" = --redis-aof ]; then redis_aof=yes; shift; continue; fi
             if [ "$1" = --no-redis-aof ]; then redis_aof=no; shift; continue; fi
+            if [ "$1" = --client-retry ]; then client_retry=true; shift; continue; fi
             [ $# -ge 2 ] || usage
             case "$1" in
                 --stage) stage=$2 ;;
@@ -196,8 +200,11 @@ case "$mode" in
         require_stage_class "$stage"
         [ "$stage" != s6 ] || [ "$scenario" != redis-restart ] || { echo "redis-restart does not apply to s6 (no Redis)" >&2; exit 2; }
         [ "$stage" != s6 ] || [ -z "$redis_aof" ] || { echo "s6 has no Redis; --redis-aof/--no-redis-aof do not apply" >&2; exit 2; }
+        [ "$client_retry" = false ] || { [ "$stage" = s6 ] && [ "$scenario" = broker-down ]; } \
+            || { echo "--client-retry applies to --stage s6 --scenario broker-down only" >&2; exit 2; }
         default_redis_aof
         tier="recovery-$scenario"
+        [ "$client_retry" = false ] || tier="recovery-$scenario-retry"
         # evidence/<stage>/recovery/<scenario dir>/: the scenario plus the configuration knob that distinguishes the run
         scenario_dir=$scenario
         [ "$redis_aof" = no ] || scenario_dir="$scenario-aof"
@@ -617,6 +624,10 @@ run_load() {
             s6_env=(--env "s6_confirm_timeout_ms=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^COUPON_S6_CONFIRM_TIMEOUT_MS=//p')"
                 --env "queue_type=classic" --env "stage_has_redis=false" --env "s6_queue_max_length=200000" --env "s6_dlq_final=${s6_dlq:-?}"
                 --env "s6_issued_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_request WHERE event_id IN ($event_ids) AND status = 'ISSUED'")")
+            # decision latency of every accepted request: accepted_at (just before the publish) to processed_at (the decision)
+            if load_mysql "SELECT ROUND(UNIX_TIMESTAMP(accepted_at) * 1000), TIMESTAMPDIFF(MICROSECOND, accepted_at, processed_at) / 1000 FROM coupon_request WHERE event_id IN ($event_ids)" >"$work/confirm.tsv"; then
+                settle_arg+=(--confirm-latency "$work/confirm.tsv")
+            fi
         fi
         load_keep_logs "$work"
         local issued_rows nano cpus_app cpus_mysql cpus_redis redis_image heap hikari cpus_rabbitmq rabbitmq_image rows_table=coupon_issue
@@ -689,6 +700,7 @@ print("PASS" if d["validity"]["valid"] else "FAIL")' "$work/load.json")
             [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
             [ ! -f "$work/innodb.jsonl" ] || cp "$work/innodb.jsonl" "$run_evidence/"
             [ ! -f "$work/queue.jsonl" ] || cp "$work/queue.jsonl" "$run_evidence/"
+            [ ! -f "$work/confirm.tsv" ] || gzip -c "$work/confirm.tsv" >"$run_evidence/confirm.tsv.gz"
             [ ! -f "$work/app-errors.log" ] || cp "$work/app-errors.log" "$run_evidence/"
             [ ! -f "$work/rabbitmq.log" ] || cp "$work/rabbitmq.log" "$run_evidence/"
             [ ! -f "$work/gc/gc.log" ] || cp "$work/gc/gc.log" "$run_evidence/"
@@ -1347,6 +1359,36 @@ print(json.dumps(out, sort_keys=True))'
         settle_started=$(date +%s)
         s6_wait_settled "$base" || { settled=false; echo "recovery $scenario on s6: coupon_request rows still changing 600 s after the load ended"; }
         settle_s=$(($(date +%s) - settle_started))
+        local retry_arg=()
+        if [ "$client_retry" = true ] && [ "$settled" = true ]; then
+            if ! load_mysql "SELECT request_id, member_id, status FROM coupon_request WHERE event_id = $event_id" >"$work/requests-before.tsv"; then
+                run_status=INFRA_DOWN; run_note="reading the rows before the retry failed (see $log)"; return
+            fi
+            python3 -I -c '
+import gzip, json, sys
+final = {}
+with gzip.open(sys.argv[1], "rt") as f:
+    for line in f:
+        if "\"recovery_results\"" not in line:
+            continue
+        p = json.loads(line)
+        if p.get("type") == "Point" and p.get("metric") == "recovery_results":
+            t = p["data"].get("tags", {})
+            if t.get("rid") and t.get("result") != "accepted":
+                final[t["rid"]] = t.get("member")
+json.dump([{"rid": r, "member": m} for r, m in sorted(final.items())], open(sys.argv[2], "w"))
+print(len(final))' "$work/raw.json.gz" "$work/retry.json" >"$work/retry-count.txt" 2>>"$log"
+            s6_event retry_started "client retry of $(cat "$work/retry-count.txt") requests with the same requestId"
+            k6 run --out json="$work/retry-raw.json.gz" -e BASE_URL=http://127.0.0.1:18080 -e EVENT_ID="$event_id" \
+                -e RETRY_FILE="$PWD/$work/retry.json" scripts/load/retry_s6.js >>"$log" 2>&1
+            local retry_rc=$?
+            s6_event retry_ended "k6 retry exit $retry_rc"
+            [ "$retry_rc" -eq 0 ] || { run_status=BUILD_ERROR; run_note="k6 retry exited $retry_rc (see $log)"; return; }
+            base=$(wc -l <"$work/db-samples.jsonl")
+            s6_wait_settled "$base" || { settled=false; echo "recovery $scenario on s6: rows still changing 600 s after the retry"; }
+            settle_s=$(($(date +%s) - settle_started))
+            retry_arg=(--retry-raw "$work/retry-raw.json.gz" --requests-before "$work/requests-before.tsv")
+        fi
         kill "$dbpoll_pid" 2>/dev/null; wait "$dbpoll_pid" 2>/dev/null; dbpoll_pid=""
         kill "$queue_pid" 2>/dev/null; wait "$queue_pid" 2>/dev/null; queue_pid=""
         kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""
@@ -1388,7 +1430,7 @@ print(json.dumps(out, sort_keys=True))'
             --queue-final "$queue_final" --consumers-final "${consumers_final:-0}" --k6-exit "$k6_rc" --out "$work/recovery.json" \
             --queue-samples "$work/queue.jsonl" --metrics "$metrics" --settle-s "$settle_s" --settled "$settled" \
             --fault-at "$fault_at" --fault-duration "$fault_duration" "${env_args[@]}" \
-            ${poison_arg[@]+"${poison_arg[@]}"} >>"$log" 2>&1
+            ${poison_arg[@]+"${poison_arg[@]}"} ${retry_arg[@]+"${retry_arg[@]}"} >>"$log" 2>&1
         if [ $? -ne 0 ]; then
             run_status=BUILD_ERROR; run_note="recovery_s6_postprocess failed (see $log)"; return
         fi
@@ -1401,7 +1443,8 @@ print("sent=%s accepted=%s unconfirmed=%s timeouts=%s http_5xx=%s rows=%s lost=%
     d["sent"], t["accepted"], t["unconfirmed"], t["timeout"], t["http_5xx"], d["rows"], d["lost"], d["recorded_despite_unconfirmed"],
     d["issued"], d["over_issue"], d["dup_members"], d["dlq_depth"], d["blackout_s"], d["drain_s"], d["settle_s"], d["queue_depth_max"],
     d["metrics"].get("coupon_s6_redeliveries"), d["metrics"].get("coupon_s6_consumer_pauses"),
-    str(d["validity"]["valid"]).lower(), ",".join(k for k, v in d["must"].items() if not v) or "none"))
+    str(d["validity"]["valid"]).lower(), ",".join(k for k, v in d["must"].items() if not v) or "none")
+    + ("" if not d.get("client_retry") else " retried=%(retried)s retry_accepted=%(retry_accepted)s already_stored=%(already_stored)s redecided=%(redecided)s" % d["client_retry"]))
 print("PASS" if d["pass"] else "FAIL")' "$work/recovery.json")
         echo "recovery $scenario on s6: $(head -n 1 <<<"$summary")"
         run_status=$(tail -n 1 <<<"$summary")
@@ -1412,11 +1455,15 @@ print("PASS" if d["pass"] else "FAIL")' "$work/recovery.json")
     s6_cleanup
     if [ -f "$work/recovery.json" ]; then
         run_evidence="evidence/s6/recovery/$scenario/$stamp-$sha"
+        [ "$client_retry" = false ] || run_evidence="evidence/s6/recovery/$scenario-retry/$stamp-$sha"
         [ "$dirty" = false ] || run_evidence="$run_evidence-dirty"
         mkdir -p "$run_evidence"
         cp "$work/recovery.json" "$work/fault.log" "$work/queue.jsonl" "$work/db-samples.jsonl" "$run_evidence/"
         [ ! -f "$work/queues-final.txt" ] || cp "$work/queues-final.txt" "$run_evidence/"
         [ ! -f "$work/poison.json" ] || cp "$work/poison.json" "$run_evidence/"
+        [ ! -f "$work/requests-before.tsv" ] || gzip -c "$work/requests-before.tsv" >"$run_evidence/requests-before.tsv.gz"
+        [ ! -f "$work/requests.tsv" ] || [ "$client_retry" = false ] || gzip -c "$work/requests.tsv" >"$run_evidence/requests.tsv.gz"
+        [ ! -f "$work/retry-raw.json.gz" ] || cp "$work/retry-raw.json.gz" "$run_evidence/"
         [ ! -f "$work/summary.json" ] || cp "$work/summary.json" "$run_evidence/"
         [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
         [ ! -f "$work/app-errors.log" ] || cp "$work/app-errors.log" "$run_evidence/"

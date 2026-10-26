@@ -28,7 +28,7 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
         return os.path.join(self.dir, name)
 
     def run_pp(self, requests, rows, scenario="db-down", stock=1000, issue_rows=None, dlq=0, faults=True, metrics=None,
-               k6_exit=0, settled="true", remaining=None, queue_final=0, poison=None):
+               k6_exit=0, settled="true", remaining=None, queue_final=0, poison=None, retry=None, before=None):
         """requests: [(sec, result, rid)]; rows: [(rid, member, status)]."""
         with gzip.open(self.path("raw.json.gz"), "wt") as f:
             for sec, result, rid in requests:
@@ -60,6 +60,15 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
             argv += ["--metrics", json.dumps(metrics)]
         if poison is not None:
             argv += ["--poison-injected", json.dumps(poison)]
+        if retry is not None:
+            with gzip.open(self.path("retry.json.gz"), "wt") as f:
+                for result, rid in retry:
+                    f.write(json.dumps({"type": "Point", "metric": "retry_results",
+                                        "data": {"time": iso(MAIN + 90), "value": 1, "tags": {"result": result, "rid": rid}}}) + "\n")
+            with open(self.path("before.tsv"), "w") as f:
+                for rid, member, status in before:
+                    f.write("%s\t%s\t%s\n" % (rid, member, status))
+            argv += ["--retry-raw", self.path("retry.json.gz"), "--requests-before", self.path("before.tsv")]
         pp.main(argv)
         with open(self.path("out.json")) as f:
             return json.load(f)
@@ -125,6 +134,24 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
                                      poison={"broken": 0})["validity"]["fault_observed"])
         self.assertFalse(self.run_pp([(0, "accepted", "a")], rows, scenario="poison-db-down", faults=False, dlq=6,
                                      metrics=reasons, poison=poison)["validity"]["fault_observed"])
+
+    def test_a_client_retry_with_the_same_id_is_found_and_decides_nothing_again(self):
+        # a: accepted. b: timed out but stored (uncertain). c: timed out and not stored. Both b and c are retried and accepted.
+        load = [(0, "accepted", "a"), (1, "timeout", "b"), (2, "timeout", "c")]
+        before = [("a", "1", "ISSUED"), ("b", "2", "ISSUED")]
+        after = before + [("c", "3", "ISSUED")]
+        report = self.run_pp(load, after, scenario="broker-down", retry=[("accepted", "b"), ("accepted", "c")], before=before)
+        self.assertTrue(report["pass"], report["must"])
+        retry = report["client_retry"]
+        self.assertEqual((retry["retried"], retry["retry_accepted"], retry["already_stored"], retry["redecided"]), (2, 2, 1, 0))
+        # the retry of b decided it again (status changed): a re-decision, the MUST fails
+        changed = [("a", "1", "ISSUED"), ("b", "2", "SOLD_OUT"), ("c", "3", "ISSUED")]
+        bad = self.run_pp(load, changed, scenario="broker-down", retry=[("accepted", "b"), ("accepted", "c")], before=before,
+                          issue_rows=2, remaining=998)
+        self.assertFalse(bad["must"]["no_redecision"])
+        # a retry answered 202 whose row is missing is lost like any accepted request
+        missing = self.run_pp(load, before, scenario="broker-down", retry=[("accepted", "b"), ("accepted", "c")], before=before)
+        self.assertEqual(missing["lost"], 1)
 
     def test_blackout_is_the_longest_run_of_load_seconds_without_a_202(self):
         requests = [(s, "accepted", "r%d" % s) for s in range(60) if not 10 <= s < 25]

@@ -4,7 +4,8 @@
 //   k6 run -e BASE_URL=... -e EVENT_ID=7 -e START_AT_MS=<epoch ms> --out json=... --summary-export ... recovery_s6.js
 // Outcomes (recovery_results, tags result and rid): accepted (202), unconfirmed (503: nack, return, confirm timeout or broker
 // unreachable; retryable), http_5xx (any other 5xx), timeout (status 0: timeout or network error; also tagged error_code),
-// other. recovery_s6_postprocess.py compares the rid sets with the coupon_request rows.
+// other. recovery_s6_postprocess.py compares the rid sets with the coupon_request rows. Every point also carries the member id
+// (tag member), so a later client retry (retry_s6.js) can send the same request again.
 import http from 'k6/http';
 import exec from 'k6/execution';
 import { sleep } from 'k6';
@@ -87,5 +88,5 @@ export default function () {
     result = 'timeout';
   }
   const failure = res.status === 0 ? { error_code: String(res.error_code) } : {};
-  results.add(1, Object.assign({}, tags, { result, rid }, failure));
+  results.add(1, Object.assign({}, tags, { result, rid, member: String(memberId) }, failure));
 }
