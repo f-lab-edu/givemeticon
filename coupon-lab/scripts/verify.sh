@@ -1117,14 +1117,23 @@ while True:
             [ $((now - started)) -ge 2 ] || sleep $((2 - now + started))
         done
     }
-    # after k6: true once the last 5 samples after <base> are equal and not null; gives up after 600 s
+    # "<messages> <consumers>" of coupon.s6.requests as rabbitmqctl reports them; empty when the broker cannot be asked
+    s6_main_queue() {
+        docker exec "${LOAD_PREFIX}rabbitmq" rabbitmqctl list_queues -q name messages consumers 2>/dev/null \
+            | awk '$1 == "coupon.s6.requests" { print $2, $3 }'
+    }
+    # after k6: true once the last 5 samples after <base> are equal and not null AND the S6 queue is empty (rows that stopped
+    # moving because the Consumer is gone are not a settle); gives up after 600 s
     s6_wait_settled() {
-        local waited=0 total vals
+        local waited=0 total vals queue
         while [ "$waited" -lt 600 ]; do
             total=$(wc -l <"$work/db-samples.jsonl")
             if [ "$total" -ge $(($1 + 5)) ]; then
                 vals=$(tail -n 5 "$work/db-samples.jsonl" | sed -n 's/.*"db_rows":\([0-9a-z]*\)}.*/\1/p' | sort -u)
-                ! [[ "$vals" =~ ^[0-9]+$ ]] || return 0
+                if [[ "$vals" =~ ^[0-9]+$ ]]; then
+                    queue=$(s6_main_queue)
+                    [ "${queue%% *}" != 0 ] || return 0
+                fi
             fi
             sleep 1
             waited=$((waited + 1))
@@ -1260,6 +1269,13 @@ print(json.dumps(out, sort_keys=True))'
         fi
         metrics=$(s6_metrics)
         [ -n "$metrics" ] || metrics='{}'
+        local queue_final consumers_final
+        read -r queue_final consumers_final <<<"$(s6_main_queue)"
+        docker exec "${LOAD_PREFIX}rabbitmq" rabbitmqctl list_queues -q name messages messages_ready messages_unacknowledged consumers \
+            >"$work/queues-final.txt" 2>>"$log"
+        if ! [[ "$queue_final" =~ ^[0-9]+$ ]]; then
+            run_status=INFRA_DOWN; run_note="reading the final S6 queue depth failed (got '$queue_final'; see $log)"; return
+        fi
         if docker logs "${LOAD_PREFIX}app" >"$work/app.log" 2>&1; then
             grep -v '^[[:space:]]' "$work/app.log" | grep -E ' (ERROR|WARN) ' | cut -c1-400 | head -n 4000 >"$work/app-errors.log"
         fi
@@ -1269,7 +1285,8 @@ print(json.dumps(out, sort_keys=True))'
 
         python3 -I scripts/load/recovery_s6_postprocess.py --raw "$work/raw.json.gz" --scenario "$scenario" --stock "$stock" \
             --fault-log "$work/fault.log" --db-samples "$work/db-samples.jsonl" --requests "$work/requests.tsv" \
-            --issue-rows "$issue_rows" --dlq-depth "$dlq_depth" --remaining "$remaining" --k6-exit "$k6_rc" --out "$work/recovery.json" \
+            --issue-rows "$issue_rows" --dlq-depth "$dlq_depth" --remaining "$remaining" \
+            --queue-final "$queue_final" --consumers-final "${consumers_final:-0}" --k6-exit "$k6_rc" --out "$work/recovery.json" \
             --queue-samples "$work/queue.jsonl" --metrics "$metrics" --settle-s "$settle_s" --settled "$settled" \
             --fault-at "$fault_at" --fault-duration "$fault_duration" "${env_args[@]}" >>"$log" 2>&1
         if [ $? -ne 0 ]; then
@@ -1298,6 +1315,7 @@ print("PASS" if d["pass"] else "FAIL")' "$work/recovery.json")
         [ "$dirty" = false ] || run_evidence="$run_evidence-dirty"
         mkdir -p "$run_evidence"
         cp "$work/recovery.json" "$work/fault.log" "$work/queue.jsonl" "$work/db-samples.jsonl" "$run_evidence/"
+        [ ! -f "$work/queues-final.txt" ] || cp "$work/queues-final.txt" "$run_evidence/"
         [ ! -f "$work/summary.json" ] || cp "$work/summary.json" "$run_evidence/"
         [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
         [ ! -f "$work/app-errors.log" ] || cp "$work/app-errors.log" "$run_evidence/"

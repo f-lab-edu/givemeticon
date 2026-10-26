@@ -2,6 +2,7 @@ package com.jinddung2.couponlab.coupon.service;
 
 import java.net.ConnectException;
 import java.net.SocketException;
+import java.sql.SQLException;
 import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLRecoverableException;
 import java.sql.SQLTransientConnectionException;
@@ -12,6 +13,8 @@ import org.springframework.transaction.CannotCreateTransactionException;
 /**
  * S6: tells a database that cannot be reached (the Consumer pauses, nothing is counted as a failed attempt, nothing goes to
  * the DLQ) from everything else. Decided by the cause chain, so wrappers (Spring's, MyBatis', the listener's) do not matter.
+ * An SQLException whose SQLState is in class 08 (connection exception, e.g. 08003 "connection closed" from a rollback after the
+ * server went away) counts as well.
  * Deadlocks and lock-wait timeouts are not here: they are transient transaction errors and retried like any other failure.
  */
 public final class S6ErrorClassifier {
@@ -24,11 +27,15 @@ public final class S6ErrorClassifier {
             if (cause instanceof CannotGetJdbcConnectionException || cause instanceof CannotCreateTransactionException
                     || cause instanceof SQLTransientConnectionException || cause instanceof SQLNonTransientConnectionException
                     || cause instanceof SQLRecoverableException || cause instanceof ConnectException
-                    || cause instanceof SocketException || isCommunicationsFailure(cause)) {
+                    || cause instanceof SocketException || isCommunicationsFailure(cause) || isConnectionSqlState(cause)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean isConnectionSqlState(Throwable cause) {
+        return cause instanceof SQLException sql && sql.getSQLState() != null && sql.getSQLState().startsWith("08");
     }
 
     private static boolean isCommunicationsFailure(Throwable cause) {

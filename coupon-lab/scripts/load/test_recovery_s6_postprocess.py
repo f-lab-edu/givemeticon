@@ -28,7 +28,7 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
         return os.path.join(self.dir, name)
 
     def run_pp(self, requests, rows, scenario="db-down", stock=1000, issue_rows=None, dlq=0, faults=True, metrics=None,
-               k6_exit=0, settled="true", remaining=None):
+               k6_exit=0, settled="true", remaining=None, queue_final=0):
         """requests: [(sec, result, rid)]; rows: [(rid, member, status)]."""
         with gzip.open(self.path("raw.json.gz"), "wt") as f:
             for sec, result, rid in requests:
@@ -53,6 +53,7 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
                 "--issue-rows", str(issue_rows if issue_rows is not None else sum(1 for r in rows if r[2] == "ISSUED")),
                 "--dlq-depth", str(dlq),
                 "--remaining", str(remaining if remaining is not None else stock - sum(1 for r in rows if r[2] == "ISSUED")),
+                "--queue-final", str(queue_final), "--consumers-final", "1",
                 "--k6-exit", str(k6_exit), "--out", self.path("out.json"), "--settled", settled,
                 "--env", "queue_type=classic"]
         if metrics is not None:
@@ -97,6 +98,12 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
         report = self.run_pp([(0, "accepted", "a"), (0, "accepted", "b")], rows, stock=10, remaining=8)
         self.assertFalse(report["must"]["stock_consistent"])
         self.assertFalse(report["pass"])
+
+    def test_requests_still_in_the_queue_at_the_end_fail_queue_drained(self):
+        report = self.run_pp([(0, "accepted", "a"), (0, "accepted", "b")], [("a", "1", "ISSUED")], queue_final=1)
+        self.assertFalse(report["must"]["queue_drained"])
+        self.assertEqual(1, report["lost"])
+        self.assertEqual(1, report["queue_final"])
 
     def test_blackout_is_the_longest_run_of_load_seconds_without_a_202(self):
         requests = [(s, "accepted", "r%d" % s) for s in range(60) if not 10 <= s < 25]

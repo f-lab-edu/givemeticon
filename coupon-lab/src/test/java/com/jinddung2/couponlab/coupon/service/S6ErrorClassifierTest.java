@@ -3,6 +3,7 @@ package com.jinddung2.couponlab.coupon.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.ConnectException;
+import java.sql.SQLException;
 import java.sql.SQLTransientConnectionException;
 
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.TransactionSystemException;
 
 /** S6: only connection failures pause the Consumer; transaction and data errors are attempts. */
 class S6ErrorClassifierTest {
@@ -23,6 +25,9 @@ class S6ErrorClassifierTest {
         assertThat(S6ErrorClassifier.isDatabaseDown(new ListenerExecutionFailedException("listener",
                 new RuntimeException(new SQLTransientConnectionException("pool timeout"))))).isTrue();
         assertThat(S6ErrorClassifier.isDatabaseDown(new RuntimeException(new ConnectException("refused")))).isTrue();
+        // seen in the S6 db-down run: the rollback after the server went away fails with SQLState 08003
+        assertThat(S6ErrorClassifier.isDatabaseDown(new TransactionSystemException("JDBC rollback failed",
+                new SQLException("No operations allowed after connection closed.", "08003")))).isTrue();
     }
 
     @Test
@@ -31,5 +36,6 @@ class S6ErrorClassifierTest {
         assertThat(S6ErrorClassifier.isDatabaseDown(new DuplicateKeyException("uq"))).isFalse();
         assertThat(S6ErrorClassifier.isDatabaseDown(new DataIntegrityViolationException("too long"))).isFalse();
         assertThat(S6ErrorClassifier.isDatabaseDown(new IllegalStateException("bug"))).isFalse();
+        assertThat(S6ErrorClassifier.isDatabaseDown(new SQLException("Deadlock found", "40001"))).isFalse();
     }
 }

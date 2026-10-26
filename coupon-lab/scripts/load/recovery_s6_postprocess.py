@@ -26,6 +26,9 @@ Definitions:
                              and none taken without a winner row. MUST hold.
   dup_members                members with more than one ISSUED row. MUST be 0.
   dlq_depth                  messages in coupon.s6.requests.dlq after the settle. MUST be 0 (no poison message is sent).
+  queue_final / consumers_final   messages and consumers of coupon.s6.requests at the end. queue_drained (queue_final == 0) MUST hold:
+                             accepted requests still waiting in the queue are not lost but not decided either (the Consumer did not
+                             resume), and lost is then read together with queue_final.
   blackout_s                 the longest run of consecutive load seconds (0..59) in which no request started in that second got a 202.
   drain_s                    seconds from the later of (fault end, load end) until db_rows reached the value it finally kept.
 Validity (the measurement happened as intended): k6 completed, the run settled, and the fault was observed (stopped_at and
@@ -159,6 +162,7 @@ def build(args):
         "issue_rows_match": args.issue_rows == issued,
         "dlq_zero": args.dlq_depth == 0,
         "stock_consistent": args.stock - args.remaining == issued,
+        "queue_drained": args.queue_final == 0,
     }
     validity = {
         "k6_completed": args.k6_exit == 0,
@@ -192,6 +196,8 @@ def build(args):
         "remaining": args.remaining,
         "dup_members": sum(1 for n in issued_members.values() if n > 1),
         "dlq_depth": args.dlq_depth,
+        "queue_final": args.queue_final,
+        "consumers_final": args.consumers_final,
         "blackout_s": longest_run(range(0, 60), lambda s: accepted_per_sec.get(s, 0) == 0),
         "error_codes": dict(sorted(error_codes.items())),
         "settle_s": args.settle_s,
@@ -217,6 +223,8 @@ def main(argv=None):
     parser.add_argument("--issue-rows", type=int, required=True)
     parser.add_argument("--dlq-depth", type=int, required=True)
     parser.add_argument("--remaining", type=int, required=True)
+    parser.add_argument("--queue-final", type=int, required=True)
+    parser.add_argument("--consumers-final", type=int, required=True)
     parser.add_argument("--k6-exit", type=int, required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument("--queue-samples")
