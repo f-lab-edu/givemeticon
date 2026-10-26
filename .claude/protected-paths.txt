@@ -8,3 +8,17 @@ coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S4RabbitConfigur
 coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S5CouponIssueService.java
 coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S5CouponIssuedConsumer.java
 coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S5RabbitConfiguration.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S6CouponIssueService.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S6RabbitConfiguration.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S6RequestConsumer.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S6RequestProcessor.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S6ConsumerSupervisor.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S6ErrorClassifier.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S6DataSourceConfiguration.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S6PublishUnconfirmedException.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/service/S6RequestMessage.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/controller/S6CouponRequestController.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/mapper/S6RequestMapper.java
+coupon-lab/src/main/java/com/jinddung2/couponlab/coupon/model/S6RequestRecord.java
+coupon-lab/src/main/resources/mapper/S6RequestMapper.xml
+coupon-lab/src/main/resources/db/migration/V3__s6_coupon_request.sql
