@@ -166,7 +166,7 @@ case "$mode" in
             db-down) : "${stock:=10000000}" ;;
             redis-restart) : "${stock:=20000}" ;;
             consumer-redeliver)
-                [ "$stage" = s4 ] || [ "$stage" = s6 ] || { echo "consumer-redeliver requires a consumer (s4, s6); stage $stage has none" >&2; exit 2; }
+                [ "$stage" = s4 ] || [ "$stage" = s6 ] || { echo "consumer-redeliver requires a consumer (S4+); this runner covers s4 and s6, stage $stage is refused" >&2; exit 2; }
                 : "${stock:=10000000}"
                 ;;
             broker-down)
