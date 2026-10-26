@@ -61,6 +61,36 @@ class S6CouponIssueServiceTest {
     }
 
     @Test
+    void noMoreThanThePermittedPublishesAreInFlightAtOnceAndNobodyIsTurnedAway() throws Exception {
+        int permits = 5;
+        S6CouponIssueService bounded = new S6CouponIssueService(rabbitTemplate, registry, 5000, permits);
+        java.util.concurrent.atomic.AtomicInteger inFlight = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicInteger maxInFlight = new java.util.concurrent.atomic.AtomicInteger();
+        brokerAnswers(cd -> {
+            maxInFlight.accumulateAndGet(inFlight.incrementAndGet(), Math::max);
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            inFlight.decrementAndGet();
+            cd.getFuture().complete(new CorrelationData.Confirm(true, null));
+        });
+        java.util.List<java.util.concurrent.Future<IssueResult>> results = new java.util.ArrayList<>();
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int member = 0; member < 100; member++) {
+                long id = member;
+                results.add(executor.submit(() -> bounded.issue(7L, id)));
+            }
+        }
+
+        assertThat(maxInFlight.get()).isLessThanOrEqualTo(permits).isPositive();
+        for (var result : results) {
+            assertThat(result.get()).isInstanceOf(IssueResult.Accepted.class);
+        }
+    }
+
+    @Test
     void ackedPublishIsAcceptedWithAGeneratedRequestId() {
         brokerAnswers(cd -> cd.getFuture().complete(new CorrelationData.Confirm(true, null)));
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Aggregate one S6 test-D/F run (scripts/verify.sh recovery --stage s6) into recovery.json. Standard library only.
 
-usage: python3 -I recovery_s6_postprocess.py --raw raw.json.gz --scenario db-down|consumer-redeliver|broker-down --stock N
+usage: python3 -I recovery_s6_postprocess.py --raw raw.json.gz --scenario db-down|consumer-redeliver|broker-down|poison|poison-db-down --stock N
            --fault-log fault.log --db-samples db-samples.jsonl --requests requests.tsv --issue-rows N --dlq-depth N --remaining N
            --k6-exit N --out recovery.json [--queue-samples queue.jsonl] [--metrics '{"name": value, ...}']
            [--settle-s S] [--settled true|false] [--fault-at S] [--fault-duration S] [--env key=value ...]
+           [--poison-injected '{"broken": N, "incomplete": N, "always_failing": N}']
 
 Inputs written by the runner:
   raw.json.gz      k6 JSON output of recovery_s6.js: recovery_results points tagged phase, sec, result (accepted | unconfirmed |
@@ -25,7 +26,11 @@ Definitions:
   stock_consistent           stock - coupon_event.remaining_quantity == issued: no seat taken twice (a redelivery decrementing again)
                              and none taken without a winner row. MUST hold.
   dup_members                members with more than one ISSUED row. MUST be 0.
-  dlq_depth                  messages in coupon.s6.requests.dlq after the settle. MUST be 0 (no poison message is sent).
+  dlq_depth                  messages in coupon.s6.requests.dlq after the settle. MUST be 0 (no poison message is sent), except in
+                             the poison scenarios (test G), where it MUST equal the poison messages injected, and the app's
+                             coupon_s6_dlq{reason} MUST match them by kind: conversion = broken JSON, invalid = a field missing,
+                             exhausted = always failing (a request id longer than CHAR(36): every attempt and the FAILED record fail).
+                             A normal message dead-lettered (during the DB cut of poison-db-down, say) breaks both.
   queue_final / consumers_final   messages and consumers of coupon.s6.requests at the end. queue_drained (queue_final == 0) MUST hold:
                              accepted requests still waiting in the queue are not lost but not decided either (the Consumer did not
                              resume), and lost is then read together with queue_final.
@@ -149,8 +154,13 @@ def build(args):
     load_end = events.get("k6_ended_at")
     since = max(t for t in (fault_end, load_end) if t is not None) if (fault_end or load_end) else None
 
+    poison = json.loads(args.poison_injected) if args.poison_injected else None
     if args.scenario == "consumer-redeliver":
         fault_observed = (metrics.get("coupon_s6_redeliveries") or 0) > 0
+    elif args.scenario == "poison":
+        fault_observed = bool(poison) and sum(poison.values()) > 0
+    elif args.scenario == "poison-db-down":
+        fault_observed = bool(poison) and sum(poison.values()) > 0 and "stopped_at" in events and "started_at" in events
     else:
         fault_observed = "stopped_at" in events and "started_at" in events
 
@@ -164,6 +174,13 @@ def build(args):
         "stock_consistent": args.stock - args.remaining == issued,
         "queue_drained": args.queue_final == 0,
     }
+    if poison is not None:
+        del must["dlq_zero"]
+        must["dlq_equals_poison"] = args.dlq_depth == sum(poison.values())
+        must["dlq_reasons_match"] = (
+            (metrics.get("coupon_s6_dlq{reason=conversion}") or 0) == poison.get("broken", 0)
+            and (metrics.get("coupon_s6_dlq{reason=invalid}") or 0) == poison.get("incomplete", 0)
+            and (metrics.get("coupon_s6_dlq{reason=exhausted}") or 0) == poison.get("always_failing", 0))
     validity = {
         "k6_completed": args.k6_exit == 0,
         "settled": args.settled,
@@ -176,7 +193,7 @@ def build(args):
         return max(values) if values else None
 
     return {
-        "test": "F" if args.scenario == "broker-down" else "D",
+        "test": "F" if args.scenario == "broker-down" else "G" if args.scenario.startswith("poison") else "D",
         "scenario": args.scenario,
         "stage": "s6",
         "stock": args.stock,
@@ -196,6 +213,7 @@ def build(args):
         "remaining": args.remaining,
         "dup_members": sum(1 for n in issued_members.values() if n > 1),
         "dlq_depth": args.dlq_depth,
+        "poison_injected": poison,
         "queue_final": args.queue_final,
         "consumers_final": args.consumers_final,
         "blackout_s": longest_run(range(0, 60), lambda s: accepted_per_sec.get(s, 0) == 0),
@@ -215,7 +233,8 @@ def build(args):
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--raw", required=True)
-    parser.add_argument("--scenario", required=True, choices=("db-down", "consumer-redeliver", "broker-down"))
+    parser.add_argument("--scenario", required=True,
+                        choices=("db-down", "consumer-redeliver", "broker-down", "poison", "poison-db-down"))
     parser.add_argument("--stock", type=int, required=True)
     parser.add_argument("--fault-log", required=True)
     parser.add_argument("--db-samples", required=True)
@@ -233,6 +252,7 @@ def main(argv=None):
     parser.add_argument("--settled", choices=("true", "false"), default="true")
     parser.add_argument("--fault-at", type=int)
     parser.add_argument("--fault-duration", type=int)
+    parser.add_argument("--poison-injected")
     parser.add_argument("--env", action="append", default=[], type=lambda kv: tuple(kv.split("=", 1)))
     args = parser.parse_args(argv)
     args.settled = args.settled == "true"

@@ -2,6 +2,7 @@ package com.jinddung2.couponlab.coupon.service;
 
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -10,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.NestedExceptionUtils;
@@ -30,6 +32,11 @@ import io.micrometer.core.instrument.MeterRegistry;
  * with the same request id and the Consumer decides it once.
  * The request id is the client's if it sent one (it must be a UUID), else a new one. The event id is not checked here: an
  * unknown event is recorded as FAILED by the Consumer.
+ * At most publishPermits publishes are in flight at once (the channel cache size, 200): callers beyond that wait for a permit
+ * (a java.util.concurrent Semaphore, no timeout, no new answer). Without the bound, a burst of virtual-thread callers (Test A:
+ * 1,000) opens hundreds of new channels at once; amqp-client 5.21 waits for each channel RPC in Object.wait, which pins the
+ * virtual thread's carrier, so 256 such waits use up every carrier, the threads holding the socket and channel locks cannot run,
+ * the connection's reader thread blocks behind them, and everything stalls until the 10-minute channel RPC timeout.
  */
 @Service
 @ConditionalOnProperty(name = "coupon.strategy", havingValue = "s6")
@@ -40,12 +47,20 @@ public class S6CouponIssueService implements CouponIssueService {
     private final RabbitTemplate rabbitTemplate;
     private final MeterRegistry meterRegistry;
     private final long confirmTimeoutMs;
+    private final Semaphore publishPermits;
 
+    @Autowired
     public S6CouponIssueService(RabbitTemplate rabbitTemplate, MeterRegistry meterRegistry,
-            @Value("${COUPON_S6_CONFIRM_TIMEOUT_MS:2000}") long confirmTimeoutMs) {
+            @Value("${COUPON_S6_CONFIRM_TIMEOUT_MS:2000}") long confirmTimeoutMs,
+            @Value("${spring.rabbitmq.cache.channel.size:200}") int publishPermits) {
         this.rabbitTemplate = rabbitTemplate;
         this.meterRegistry = meterRegistry;
         this.confirmTimeoutMs = confirmTimeoutMs;
+        this.publishPermits = new Semaphore(publishPermits);
+    }
+
+    S6CouponIssueService(RabbitTemplate rabbitTemplate, MeterRegistry meterRegistry, long confirmTimeoutMs) {
+        this(rabbitTemplate, meterRegistry, confirmTimeoutMs, 200);
     }
 
     @Override
@@ -59,6 +74,12 @@ public class S6CouponIssueService implements CouponIssueService {
         S6RequestMessage message = new S6RequestMessage(id, eventId, memberId, System.currentTimeMillis());
         CorrelationData correlation = new CorrelationData(id);
         CorrelationData.Confirm confirm;
+        try {
+            publishPermits.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw unconfirmed("exception", id, rootCause(e), e);
+        }
         try {
             rabbitTemplate.convertAndSend(S6RabbitConfiguration.EXCHANGE, S6RabbitConfiguration.ROUTING_KEY, message, post -> {
                 post.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
@@ -76,6 +97,8 @@ public class S6CouponIssueService implements CouponIssueService {
             throw unconfirmed("exception", id, rootCause(e), e);
         } catch (RuntimeException e) {
             throw unconfirmed("exception", id, rootCause(e), e);
+        } finally {
+            publishPermits.release();
         }
         if (!confirm.isAck()) {
             throw unconfirmed("nack", id, "nack: " + confirm.getReason(), null);

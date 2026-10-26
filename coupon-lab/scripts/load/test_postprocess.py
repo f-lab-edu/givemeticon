@@ -521,6 +521,21 @@ class PostprocessTest(unittest.TestCase):
             with open(out, encoding="utf-8") as f:
                 self.assertEqual(json.load(f)["publish_failures"]["total"], 7)
 
+    def test_s6_counts_accepted_per_stage_and_matches_them_against_request_rows(self):
+        lines = [line.replace('"result": "issued"', '"result": "accepted"') for line in synthetic()]
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            accepted = sum(1 for line in lines if json.loads(line)["data"].get("tags", {}).get("result") == "accepted")
+            report = postprocess.build_report(raw, LAYOUT, "ramping", "s6", accepted, {}, publish_failures={})
+            self.assertEqual([s["accepted"] for s in report["stages"]], [100] * 5)
+            self.assertEqual([s["issued"] for s in report["stages"]], [0] * 5)
+            self.assertEqual([s["errors"] for s in report["stages"]], [0] * 5)  # 202 is not an error
+            self.assertEqual(report["db"]["http_issued"], accepted)
+            self.assertTrue(report["validity"]["valid"])
+            self.assertFalse(postprocess.build_report(raw, LAYOUT, "ramping", "s6", accepted - 1, {},
+                                                      publish_failures={})["validity"]["valid"])  # a 202 without a row
+
     def test_s4_allows_rows_of_publishes_whose_confirm_came_after_the_wait(self):
         lines = synthetic()
         http = issued_count(lines)
@@ -540,6 +555,11 @@ class PostprocessTest(unittest.TestCase):
             self.assertFalse(run("s4", http + 1)["validity"]["valid"])  # counter not read: only equality is valid
             self.assertTrue(run("s4", http)["validity"]["valid"])
             s3 = run("s3", http + 2, two)
+            # s6: the same rule, counted against 202 (accepted) responses; the synthetic run has none, so rows must be 0..2
+            s6 = run("s6", 2, two)
+            self.assertEqual((s6["db"]["http_issued"], s6["db"]["rows_table"]), (0, "coupon_request"))
+            self.assertTrue(s6["validity"]["db_match"])
+            self.assertFalse(run("s6", 3, two)["validity"]["db_match"])
             self.assertNotIn("rows_from_timed_out_publishes", s3["db"])
             self.assertFalse(s3["validity"]["valid"])  # other stages: rows == 200 responses, unchanged
 

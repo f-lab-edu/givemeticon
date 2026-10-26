@@ -28,7 +28,7 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
         return os.path.join(self.dir, name)
 
     def run_pp(self, requests, rows, scenario="db-down", stock=1000, issue_rows=None, dlq=0, faults=True, metrics=None,
-               k6_exit=0, settled="true", remaining=None, queue_final=0):
+               k6_exit=0, settled="true", remaining=None, queue_final=0, poison=None):
         """requests: [(sec, result, rid)]; rows: [(rid, member, status)]."""
         with gzip.open(self.path("raw.json.gz"), "wt") as f:
             for sec, result, rid in requests:
@@ -58,6 +58,8 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
                 "--env", "queue_type=classic"]
         if metrics is not None:
             argv += ["--metrics", json.dumps(metrics)]
+        if poison is not None:
+            argv += ["--poison-injected", json.dumps(poison)]
         pp.main(argv)
         with open(self.path("out.json")) as f:
             return json.load(f)
@@ -104,6 +106,25 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
         self.assertFalse(report["must"]["queue_drained"])
         self.assertEqual(1, report["lost"])
         self.assertEqual(1, report["queue_final"])
+
+    def test_poison_runs_pass_when_exactly_the_poison_is_dead_lettered_by_kind(self):
+        rows = [("a", "1", "ISSUED")]
+        poison = {"broken": 2, "incomplete": 1, "always_failing": 3}
+        reasons = {"coupon_s6_dlq{reason=conversion}": 2, "coupon_s6_dlq{reason=invalid}": 1,
+                   "coupon_s6_dlq{reason=exhausted}": 3}
+        good = self.run_pp([(0, "accepted", "a")], rows, scenario="poison", faults=False, dlq=6, metrics=reasons, poison=poison)
+        self.assertEqual("G", good["test"])
+        self.assertTrue(good["pass"], good["must"])
+        self.assertNotIn("dlq_zero", good["must"])
+        # one normal message dead-lettered too: the depth and the exhausted count no longer match the poison
+        bad = self.run_pp([(0, "accepted", "a")], rows, scenario="poison", faults=False, dlq=7,
+                          metrics=dict(reasons, **{"coupon_s6_dlq{reason=exhausted}": 4}), poison=poison)
+        self.assertFalse(bad["must"]["dlq_equals_poison"])
+        self.assertFalse(bad["must"]["dlq_reasons_match"])
+        self.assertFalse(self.run_pp([(0, "accepted", "a")], rows, scenario="poison", faults=False, dlq=0,
+                                     poison={"broken": 0})["validity"]["fault_observed"])
+        self.assertFalse(self.run_pp([(0, "accepted", "a")], rows, scenario="poison-db-down", faults=False, dlq=6,
+                                     metrics=reasons, poison=poison)["validity"]["fault_observed"])
 
     def test_blackout_is_the_longest_run_of_load_seconds_without_a_202(self):
         requests = [(s, "accepted", "r%d" % s) for s in range(60) if not 10 <= s < 25]

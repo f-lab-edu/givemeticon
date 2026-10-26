@@ -12,7 +12,10 @@
 #   Stage s6 (RabbitMQ intake, MySQL Consumer decides; no Redis) has its own runner, run_recovery_s6: compose with the
 #                  docker-compose.load.s6.yml override (mysql, rabbitmq and app only), recovery_s6.js (every request carries its own
 #                  requestId) and recovery_s6_postprocess.py (accepted ids vs coupon_request rows). Scenarios db-down,
-#                  consumer-redeliver (COUPON_S6_CONSUMER_FAIL_EVERY=50) and broker-down (test F: docker stop/start rabbitmq);
+#                  consumer-redeliver (COUPON_S6_CONSUMER_FAIL_EVERY=50), broker-down (test F: docker stop/start rabbitmq), and
+#                  poison / poison-db-down (test G: during the 500 rps phase 5 poison messages a second are published straight to
+#                  the S6 exchange through the management API, round robin broken JSON / a field missing / a request id longer
+#                  than CHAR(36); poison-db-down also stops mysql as db-down does);
 #                  redis-restart does not apply. For s6, PASS = valid measurement AND its MUST invariants (no accepted request
 #                  lost, no over-issue, one coupon per member, no dead letter, coupon_issue == ISSUED rows, stock - remaining ==
 #                  ISSUED rows): they are the claims.
@@ -28,6 +31,9 @@
 #   VERIFY <tier> <PASS|FAIL|INFRA_DOWN|BUILD_ERROR|TIMEOUT|NO_TESTS> passed=N failed=N skipped=N duration=Ns sha=<short> dirty=<bool> report=<path>
 # Exit codes: 0 PASS, 1 FAIL, 2 usage/config error, 3 INFRA_DOWN, 4 TIMEOUT, 5 BUILD_ERROR, 6 NO_TESTS.
 # For `recovery`: PASS = valid measurement (k6 ran to the end and the fault was injected while it ran); the loss figures are outcomes, never part of PASS/FAIL.
+# Stage s6 load: the docker-compose.load.s6.yml override (mysql, rabbitmq, app; no redis), 202 counted as accepted, the settle waits
+# until the event's coupon_request rows stop changing AND coupon.s6.requests is empty, and the validity rule compares coupon_request
+# rows with the 202 responses (rows may exceed them by at most the publishes that timed out, as for s4).
 # For `load`: PASS = valid run (first stage without dropped iterations >= 1% and DB rows == 200 responses; for s4 DB rows may exceed the
 # 200 responses by at most the publishes that timed out waiting for their confirm, see postprocess.py),
 # FAIL = invalid run, INFRA_DOWN = docker/compose/health/seed problem, BUILD_ERROR = k6 or postprocess failed.
@@ -132,6 +138,7 @@ case "$mode" in
         [ -z "$pool" ] || LOAD_HIKARI_POOL_SIZE=$pool
         [[ "$runs" =~ ^[1-9][0-9]*$ ]] || usage
         require_stage_class "$stage"
+        [ "$stage" != s6 ] || [ -z "$redis_aof" ] || { echo "s6 has no Redis; --redis-aof/--no-redis-aof do not apply" >&2; exit 2; }
         default_redis_aof
         tier="load-$profile"
         # evidence/<stage>/load/<variant>/: the profile plus whatever distinguishes the run (the row count is part of ramping-rows)
@@ -173,6 +180,10 @@ case "$mode" in
                 [ "$stage" = s6 ] || { echo "broker-down (test F) is an s6 scenario; stage $stage is refused" >&2; exit 2; }
                 : "${stock:=10000000}"
                 ;;
+            poison|poison-db-down)
+                [ "$stage" = s6 ] || { echo "$scenario (test G) is an s6 scenario; stage $stage is refused" >&2; exit 2; }
+                : "${stock:=10000000}"
+                ;;
             *) usage ;;
         esac
         [[ "$fault_at" =~ ^[1-9][0-9]*$ ]] && [[ "$fault_duration" =~ ^[1-9][0-9]*$ ]] && [[ "$stock" =~ ^[1-9][0-9]*$ ]] || usage
@@ -180,7 +191,7 @@ case "$mode" in
         recovery_warmup=$(python3 -I -c 'import json; print(json.load(open("scripts/load/profiles.json"))["recovery"]["warmup"]["seconds"])')
         # db-down: the fault must be over before the load ends; redis-restart has no duration, only its start must fall inside the load
         fault_end_s=$fault_at
-        [ "$scenario" != db-down ] && [ "$scenario" != broker-down ] || fault_end_s=$((fault_at + fault_duration))
+        case "$scenario" in db-down|broker-down|poison-db-down) fault_end_s=$((fault_at + fault_duration)) ;; esac
         [ "$fault_end_s" -lt "$recovery_seconds" ] || { echo "the fault ends at second $fault_end_s of ${recovery_seconds}; it must end before the load does" >&2; exit 2; }
         require_stage_class "$stage"
         [ "$stage" != s6 ] || [ "$scenario" != redis-restart ] || { echo "redis-restart does not apply to s6 (no Redis)" >&2; exit 2; }
@@ -286,11 +297,14 @@ load_next_run_order() {
 # Every 2 s one line per container into <outfile>: {"time": <epoch>, "stat": <docker stats object>}. Run in the
 # background during k6 and killed afterwards; postprocess.py turns the app and mysql lines into per-stage CPU figures
 # (redis and rabbitmq lines are kept in stats.jsonl for reading by hand and are not aggregated).
-load_sample_stats() {
-    local out=$1 started now
+load_sample_stats() {   # <outfile> [service ...]: default app mysql redis rabbitmq (s6 has no redis)
+    local out=$1 started now names=() service
+    shift
+    [ $# -gt 0 ] || set -- app mysql redis rabbitmq
+    for service in "$@"; do names+=("${LOAD_PREFIX}$service"); done
     while :; do
         started=$(date +%s)
-        docker stats --no-stream --format json "${LOAD_PREFIX}app" "${LOAD_PREFIX}mysql" "${LOAD_PREFIX}redis" "${LOAD_PREFIX}rabbitmq" 2>/dev/null | while IFS= read -r line; do
+        docker stats --no-stream --format json "${names[@]}" 2>/dev/null | while IFS= read -r line; do
             [ -z "$line" ] || printf '{"time":%s,"stat":%s}\n' "$(date +%s)" "$line" >>"$out"
         done
         now=$(date +%s)
@@ -309,7 +323,7 @@ RABBIT_API_USER=coupon:coupon
 load_sample_queue() {
     exec python3 -I -c '
 import base64, json, sys, time, urllib.request
-out, api, user = sys.argv[1:4]
+out, api, user, name = sys.argv[1:5]
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 auth = "Basic " + base64.b64encode(user.encode()).decode()
 def get(path):
@@ -320,14 +334,14 @@ def get(path):
 while True:
     time.sleep(1 - time.time() % 1)
     now = int(time.time())
-    queue = get("/queues/%2F/coupon.issued")
+    queue = get("/queues/%2F/" + name)
     totals = get("/overview").get("object_totals") or {}
     line = {"time": now, "queue_depth": queue.get("messages"), "ready": queue.get("messages_ready"),
             "unacked": queue.get("messages_unacknowledged"), "channels": totals.get("channels"),
             "connections": totals.get("connections")}
     with open(out, "a") as f:
         f.write(json.dumps(line, separators=(",", ":")) + "\n")
-' "$1" "$RABBIT_API" "$RABBIT_API_USER"
+' "$1" "$RABBIT_API" "$RABBIT_API_USER" "${2:-coupon.issued}"
 }
 
 # Stage s4, after k6: polls `SELECT <arg>` (a row count) every second until 5 polls in a row return the same number, at most
@@ -360,10 +374,10 @@ except Exception:
 
 # The Micrometer counter coupon_s4_publish_failures of the running app per reason tag, as JSON {"<reason>": N, ...}: {} when the
 # counter does not exist (no publish ever failed: actuator answers 404), nothing when it cannot be read.
-load_publish_failures() {
+load_publish_failures() {   # [metric name, default coupon_s4_publish_failures]
     python3 -I -c '
-import json, urllib.error, urllib.parse, urllib.request
-base = "http://127.0.0.1:18080/actuator/metrics/coupon_s4_publish_failures"
+import json, sys, urllib.error, urllib.parse, urllib.request
+base = "http://127.0.0.1:18080/actuator/metrics/" + sys.argv[1]
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 def count(body):
     return int(next(m["value"] for m in body["measurements"] if m["statistic"] == "COUNT"))
@@ -381,7 +395,7 @@ try:
 except SystemExit:
     pass
 except Exception:
-    pass'
+    pass' "${1:-coupon_s4_publish_failures}"
 }
 
 # Before the containers go away: from the app log (every stage) the ERROR and WARN headlines plus every line of a Lettuce logger
@@ -394,7 +408,7 @@ load_keep_logs() {   # <dir>
         grep -v '^[[:space:]]' "$1/app.log" | grep -E ' (ERROR|WARN) |io\.lettuce|i\.l\.[a-z]|ConnectionWatchdog' \
             | cut -c1-400 | head -n 4000 >"$1/app-errors.log"
     fi
-    if [ "$stage" = s4 ] && docker logs "${LOAD_PREFIX}rabbitmq" >"$1/rabbitmq-full.log" 2>&1; then
+    if { [ "$stage" = s4 ] || [ "$stage" = s6 ]; } && docker logs "${LOAD_PREFIX}rabbitmq" >"$1/rabbitmq-full.log" 2>&1; then
         grep -iE 'error|warn|closing|flow|alarm' "$1/rabbitmq-full.log" | cut -c1-400 | head -n 2000 >"$1/rabbitmq.log"
     fi
 }
@@ -406,7 +420,10 @@ load_keep_logs() {   # <dir>
 # inside the compose network against http://app:8080 and writes its output to a bind-mounted directory.
 run_load() {
     set +e
-    local compose=(docker compose -p coupon-lab-load -f docker-compose.load.yml)
+    local compose=(docker compose -p coupon-lab-load -f docker-compose.load.yml) services=() stat_services=()
+    if [ "$stage" = s6 ]; then
+        compose+=(-f docker-compose.load.s6.yml); services=(mysql rabbitmq app); stat_services=(app mysql rabbitmq)
+    fi
     local compose_up=false run_status="" run_note="" work="" run_evidence="" sampler_pid="" innodb_pid="" queue_pid=""
     local passed=0 failed=0 n evidence_dirs=() failures=()
 
@@ -456,7 +473,7 @@ run_load() {
         mkdir -p "$work"
         mkdir -p "$work/gc"
         export COUPON_LAB_DB_PASSWORD COUPON_STRATEGY=$stage HIKARI_POOL_SIZE=$LOAD_HIKARI_POOL_SIZE FLUSH_LOG=$flush_log LOAD_GC_DIR="$PWD/$work/gc" \
-            REDIS_APPENDONLY=$redis_aof COUPON_S4_CONSUMER_FAIL_EVERY=0
+            REDIS_APPENDONLY=$redis_aof COUPON_S4_CONSUMER_FAIL_EVERY=0 COUPON_S6_CONSUMER_FAIL_EVERY=0
         local run_order up_epoch
         run_order=$(load_next_run_order)
         COUPON_LAB_DB_PASSWORD=$(python3 -I -c 'import secrets; print(secrets.token_hex(12))')
@@ -476,7 +493,7 @@ run_load() {
         "${compose[@]}" down -v --remove-orphans >>"$log" 2>&1
         compose_up=true
         echo "run $1/$runs: docker compose up (first image build takes a few minutes)"
-        if ! "${compose[@]}" up -d --build >>"$log" 2>&1; then
+        if ! "${compose[@]}" up -d --build ${services[@]+"${services[@]}"} >>"$log" 2>&1; then
             run_status=INFRA_DOWN; run_note="docker compose up failed (see $log)"; return
         fi
         up_epoch=$(date +%s)
@@ -484,6 +501,7 @@ run_load() {
         while [ "$waited" -lt "$LOAD_HEALTH_TIMEOUT_S" ]; do
             health=$(load_inspect '{{.State.Health.Status}}' app)
             redis_health=$(load_inspect '{{.State.Health.Status}}' redis)
+            [ "$stage" != s6 ] || redis_health=healthy   # s6 runs without redis
             [ "$health" != healthy ] || [ "$redis_health" != healthy ] || break
             sleep 2
             waited=$((waited + 2))
@@ -519,6 +537,7 @@ run_load() {
         fi
         local appendonly
         appendonly=$(docker exec "${LOAD_PREFIX}redis" redis-cli --raw CONFIG GET appendonly 2>>"$log" | tail -n 1)
+        [ "$stage" != s6 ] || appendonly=$redis_aof   # no redis container: nothing to check
         if [ "$appendonly" != "$redis_aof" ]; then
             run_status=INFRA_DOWN; run_note="redis runs appendonly=${appendonly:-?}, requested $redis_aof (see $log)"; return
         fi
@@ -530,14 +549,14 @@ run_load() {
         minutes_up=$(awk -v now="$(date +%s)" -v up="$up_epoch" 'BEGIN { printf "%.1f", (now - up) / 60 }')
         echo "run $1/$runs: k6 ($k6_mode) $profile on $stage, events $event_ids, stock $stock each${max_vus:+, maxVUs $max_vus}"
         : >"$work/stats.jsonl"
-        load_sample_stats "$work/stats.jsonl" &
+        load_sample_stats "$work/stats.jsonl" ${stat_services[@]+"${stat_services[@]}"} &
         sampler_pid=$!
         : >"$work/innodb.jsonl"
         load_sample_innodb "$work/innodb.jsonl" &
         innodb_pid=$!
-        if [ "$stage" = s4 ]; then
+        if [ "$stage" = s4 ] || [ "$stage" = s6 ]; then
             : >"$work/queue.jsonl"
-            load_sample_queue "$work/queue.jsonl" &
+            if [ "$stage" = s6 ]; then load_sample_queue "$work/queue.jsonl" coupon.s6.requests & else load_sample_queue "$work/queue.jsonl" & fi
             queue_pid=$!
         fi
         if [ "$k6_mode" = container ]; then
@@ -575,9 +594,34 @@ run_load() {
             publish_failures=$(load_publish_failures)
             [ -z "$publish_failures" ] || settle_arg+=(--publish-failures "$publish_failures")
         fi
+        # S6 decides asynchronously and writes one coupon_request row per accepted request: settled = rows unchanged for 5 polls
+        # AND coupon.s6.requests empty (rows that stopped because the Consumer is gone are not a settle)
+        local s6_env=() s6_dlq=""
+        if [ "$stage" = s6 ]; then
+            local settle_started s6_queue
+            settle_started=$(date +%s)
+            settle_s=""
+            while [ $(($(date +%s) - settle_started)) -lt 600 ]; do
+                if load_settle "COUNT(*) FROM coupon_request WHERE event_id IN ($event_ids)" >/dev/null; then
+                    s6_queue=$(docker exec "${LOAD_PREFIX}rabbitmq" rabbitmqctl list_queues -q name messages 2>>"$log" | awk '$1 == "coupon.s6.requests" { print $2 }')
+                    if [ "$s6_queue" = 0 ]; then settle_s=$(($(date +%s) - settle_started)); break; fi
+                fi
+            done
+            if [ -n "$settle_s" ]; then settle_arg=(--settle-s "$settle_s" --settled true)
+            else echo "run $1/$runs: coupon_request rows or coupon.s6.requests still changing 600 s after k6 ended"; settle_arg=(--settle-s 600 --settled false); fi
+            kill "$queue_pid" 2>/dev/null; wait "$queue_pid" 2>/dev/null; queue_pid=""
+            local publish_failures
+            publish_failures=$(load_publish_failures coupon_s6_publish_failures)
+            [ -z "$publish_failures" ] || settle_arg+=(--publish-failures "$publish_failures")
+            s6_dlq=$(docker exec "${LOAD_PREFIX}rabbitmq" rabbitmqctl list_queues -q name messages 2>>"$log" | awk '$1 == "coupon.s6.requests.dlq" { print $2 }')
+            s6_env=(--env "s6_confirm_timeout_ms=$(load_inspect '{{range .Config.Env}}{{println .}}{{end}}' app | sed -n 's/^COUPON_S6_CONFIRM_TIMEOUT_MS=//p')"
+                --env "queue_type=classic" --env "stage_has_redis=false" --env "s6_queue_max_length=200000" --env "s6_dlq_final=${s6_dlq:-?}"
+                --env "s6_issued_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_request WHERE event_id IN ($event_ids) AND status = 'ISSUED'")")
+        fi
         load_keep_logs "$work"
-        local issued_rows nano cpus_app cpus_mysql cpus_redis redis_image heap hikari cpus_rabbitmq rabbitmq_image
-        issued_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_issue WHERE event_id IN ($event_ids)")
+        local issued_rows nano cpus_app cpus_mysql cpus_redis redis_image heap hikari cpus_rabbitmq rabbitmq_image rows_table=coupon_issue
+        [ "$stage" != s6 ] || rows_table=coupon_request   # s6: one row per accepted request, compared with the 202 responses
+        issued_rows=$(load_mysql "SELECT COUNT(*) FROM $rows_table WHERE event_id IN ($event_ids)")
         if ! [[ "$issued_rows" =~ ^[0-9]+$ ]]; then
             run_status=INFRA_DOWN; run_note="counting coupon_issue rows failed (see $log)"; return
         fi
@@ -611,7 +655,7 @@ run_load() {
             --env "app_cpus=$cpus_app" --env "mysql_cpus=$cpus_mysql" --env "redis_image=$redis_image" --env "redis_cpus=$cpus_redis" --env "jvm_heap=$heap" \
             --env "redis_appendonly=$appendonly" --env "rabbitmq_image=$rabbitmq_image" --env "rabbitmq_cpus=$cpus_rabbitmq" \
             --env "hikari_pool_size=$hikari" --env "k6_version=$k6_version" --env "k6_mode=$k6_mode" ${k6_env[@]+"${k6_env[@]}"} ${mysql_env[@]+"${mysql_env[@]}"} \
-            ${s4_env[@]+"${s4_env[@]}"} \
+            ${s4_env[@]+"${s4_env[@]}"} ${s6_env[@]+"${s6_env[@]}"} \
             >>"$log" 2>&1
         if [ $? -ne 0 ]; then
             run_status=BUILD_ERROR; run_note="postprocess failed (see $log)"; return
@@ -1002,15 +1046,17 @@ run_recovery_s6() {
     local sampler_pid="" dbpoll_pid="" fault_pid="" k6_pid="" queue_pid="" event_id="" fault_target=mysql fail_every=0
     local passed=0 failed=0 evidence_dirs=() failures=()
     local start_lead=${RECOVERY_START_LEAD_S:-20}
+    local poison_pid=""
     [ "$scenario" != broker-down ] || fault_target=rabbitmq
-    if [ "$scenario" = consumer-redeliver ]; then fault_target=app; fail_every=50; fi
+    if [ "$scenario" = consumer-redeliver ] || [ "$scenario" = poison ]; then fault_target=app; fi
+    [ "$scenario" != consumer-redeliver ] || fail_every=50
 
     s6_cleanup() {
         local pid
-        for pid in "$sampler_pid" "$dbpoll_pid" "$fault_pid" "$k6_pid" "$queue_pid"; do
+        for pid in "$sampler_pid" "$dbpoll_pid" "$fault_pid" "$k6_pid" "$queue_pid" "$poison_pid"; do
             [ -z "$pid" ] || { kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; }
         done
-        sampler_pid=""; dbpoll_pid=""; fault_pid=""; k6_pid=""; queue_pid=""
+        sampler_pid=""; dbpoll_pid=""; fault_pid=""; k6_pid=""; queue_pid=""; poison_pid=""
         [ "$compose_up" = true ] || return 0
         compose_up=false
         "${compose[@]}" down -v --remove-orphans >>"$log" 2>&1 \
@@ -1104,6 +1150,43 @@ while True:
     with open(out, "a") as f:
         f.write(json.dumps(line, separators=(",", ":")) + "\n")
 ' "$1" "$RABBIT_API" "$RABBIT_API_USER"
+    }
+    # test G: from <main start> for the load's seconds, 5 messages a second straight to the S6 exchange (management API),
+    # round robin broken JSON / eventId missing / a 40-character request id; writes {"broken", "incomplete", "always_failing"}
+    # counting only the publishes the broker routed to the queue
+    s6_inject_poison() {   # <main start epoch> <seconds> <out json> <event id>
+        exec python3 -I -c '
+import base64, json, sys, time, urllib.request
+start, seconds, out, event, api, user = float(sys.argv[1]), int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), sys.argv[5], sys.argv[6]
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+auth = "Basic " + base64.b64encode(user.encode()).decode()
+kinds = ["broken", "incomplete", "always_failing"]
+bodies = {
+    "broken": lambda n: "{this is not json %d" % n,
+    "incomplete": lambda n: json.dumps({"requestId": "00000000-0000-4000-8000-%012d" % n, "memberId": 900000000 + n,
+                                        "acceptedAt": int(time.time() * 1000)}),
+    "always_failing": lambda n: json.dumps({"requestId": "poison-%034d" % n, "eventId": event, "memberId": 900000000 + n,
+                                            "acceptedAt": int(time.time() * 1000)}),
+}
+counts = dict((k, 0) for k in kinds)
+time.sleep(max(0.0, start - time.time()))
+n = 0
+while time.time() < start + seconds:
+    kind = kinds[n % 3]
+    payload = {"properties": {"content_type": "application/json", "delivery_mode": 2}, "routing_key": "coupon.s6.requests",
+               "payload": bodies[kind](n), "payload_encoding": "string"}
+    request = urllib.request.Request(api + "/exchanges/%2F/coupon.s6.direct/publish", data=json.dumps(payload).encode(),
+                                     headers={"Authorization": auth, "Content-Type": "application/json"}, method="POST")
+    try:
+        if json.load(opener.open(request, timeout=2)).get("routed"):
+            counts[kind] += 1
+    except Exception:
+        pass
+    n += 1
+    time.sleep(max(0.0, start + n * 0.2 - time.time()))
+with open(out, "w") as f:
+    json.dump(counts, f)
+' "$1" "$2" "$3" "$4" "$RABBIT_API" "$RABBIT_API_USER"
     }
     # every 2 s: docker stats of the three S6 containers (the base sampler also asks for redis, which S6 does not start)
     s6_sample_stats() {
@@ -1231,22 +1314,33 @@ print(json.dumps(out, sort_keys=True))'
         local start_at_s main_start
         start_at_s=$(($(date +%s) + start_lead))
         main_start=$((start_at_s + recovery_warmup))
-        echo "recovery $scenario on s6: event $event_id, stock $stock, $([ "$scenario" = consumer-redeliver ] && echo "no container fault, COUPON_S6_CONSUMER_FAIL_EVERY=$fail_every" || echo "$fault_target down at main+${fault_at}s for ${fault_duration}s"); k6 starts at epoch $start_at_s"
+        local what="${LOAD_PREFIX}$fault_target down at main+${fault_at}s for ${fault_duration}s"
+        [ "$scenario" != consumer-redeliver ] || what="no container fault, COUPON_S6_CONSUMER_FAIL_EVERY=$fail_every"
+        [ "$scenario" != poison ] || what="no container fault, 5 poison messages/s during the load"
+        [ "$scenario" != poison-db-down ] || what="5 poison messages/s during the load, mysql down at main+${fault_at}s for ${fault_duration}s"
+        echo "recovery $scenario on s6: event $event_id, stock $stock, $what; k6 starts at epoch $start_at_s"
         s6_event k6_started "test starts at epoch $start_at_s, main phase at epoch $main_start"
         k6 run --out json="$work/raw.json.gz" --summary-export "$work/summary.json" \
             -e BASE_URL=http://127.0.0.1:18080 -e EVENT_ID="$event_id" -e START_AT_MS=$((start_at_s * 1000)) \
             scripts/load/recovery_s6.js >>"$log" 2>&1 &
         k6_pid=$!
-        if [ "$scenario" != consumer-redeliver ]; then
-            s6_inject "$main_start" &
-            fault_pid=$!
-        fi
+        case "$scenario" in
+            db-down|broker-down|poison-db-down) s6_inject "$main_start" & fault_pid=$! ;;
+        esac
+        case "$scenario" in
+            poison|poison-db-down)
+                s6_inject_poison "$main_start" "$recovery_seconds" "$work/poison.json" "$event_id" &
+                poison_pid=$!
+                ;;
+        esac
         wait "$k6_pid"
         local k6_rc=$?
         k6_pid=""
         s6_event k6_ended_at "k6 exit $k6_rc"
         [ -z "$fault_pid" ] || wait "$fault_pid"
         fault_pid=""
+        [ -z "$poison_pid" ] || wait "$poison_pid"
+        poison_pid=""
 
         local base settle_started settle_s settled=true
         base=$(wc -l <"$work/db-samples.jsonl")
@@ -1283,12 +1377,18 @@ print(json.dumps(out, sort_keys=True))'
             grep -iE 'error|warn|closing|flow|alarm' "$work/rabbitmq-full.log" | cut -c1-400 | head -n 2000 >"$work/rabbitmq.log"
         fi
 
+        local poison_arg=()
+        if [ "$scenario" = poison ] || [ "$scenario" = poison-db-down ]; then
+            [ -f "$work/poison.json" ] || { run_status=BUILD_ERROR; run_note="the poison injector wrote no poison.json (see $log)"; return; }
+            poison_arg=(--poison-injected "$(cat "$work/poison.json")")
+        fi
         python3 -I scripts/load/recovery_s6_postprocess.py --raw "$work/raw.json.gz" --scenario "$scenario" --stock "$stock" \
             --fault-log "$work/fault.log" --db-samples "$work/db-samples.jsonl" --requests "$work/requests.tsv" \
             --issue-rows "$issue_rows" --dlq-depth "$dlq_depth" --remaining "$remaining" \
             --queue-final "$queue_final" --consumers-final "${consumers_final:-0}" --k6-exit "$k6_rc" --out "$work/recovery.json" \
             --queue-samples "$work/queue.jsonl" --metrics "$metrics" --settle-s "$settle_s" --settled "$settled" \
-            --fault-at "$fault_at" --fault-duration "$fault_duration" "${env_args[@]}" >>"$log" 2>&1
+            --fault-at "$fault_at" --fault-duration "$fault_duration" "${env_args[@]}" \
+            ${poison_arg[@]+"${poison_arg[@]}"} >>"$log" 2>&1
         if [ $? -ne 0 ]; then
             run_status=BUILD_ERROR; run_note="recovery_s6_postprocess failed (see $log)"; return
         fi
@@ -1316,6 +1416,7 @@ print("PASS" if d["pass"] else "FAIL")' "$work/recovery.json")
         mkdir -p "$run_evidence"
         cp "$work/recovery.json" "$work/fault.log" "$work/queue.jsonl" "$work/db-samples.jsonl" "$run_evidence/"
         [ ! -f "$work/queues-final.txt" ] || cp "$work/queues-final.txt" "$run_evidence/"
+        [ ! -f "$work/poison.json" ] || cp "$work/poison.json" "$run_evidence/"
         [ ! -f "$work/summary.json" ] || cp "$work/summary.json" "$run_evidence/"
         [ ! -f "$work/stats.jsonl" ] || cp "$work/stats.jsonl" "$run_evidence/"
         [ ! -f "$work/app-errors.log" ] || cp "$work/app-errors.log" "$run_evidence/"

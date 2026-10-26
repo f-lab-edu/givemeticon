@@ -6,7 +6,8 @@
 // One ramping-arrival-rate scenario: a warmup, then for every step a short ramp to its rate followed by a hold.
 // Each request is tagged by the point on that timeline where it starts:
 //   phase=warmup | transition | measure, target_rps=<rate of the step>
-// Only phase=measure is aggregated. 200 (issued) and 409 (sold out) are both successful responses.
+// Only phase=measure is aggregated. 200 (issued) and 409 (sold out) are both successful responses, and so is 202 (accepted:
+// stage s6 only answers 202, the decision comes later; the earlier stages never send it).
 import http from 'k6/http';
 import exec from 'k6/execution';
 import { Counter } from 'k6/metrics';
@@ -69,7 +70,7 @@ export const options = {
   discardResponseBodies: true,
 };
 
-http.setResponseCallback(http.expectedStatuses(200, 409));
+http.setResponseCallback(http.expectedStatuses(200, 202, 409));
 
 const results = new Counter('coupon_results');
 const issueUrl = (eventId) => `${BASE_URL}/coupon-events/${eventId}/issue`;
@@ -84,6 +85,6 @@ export default function () {
   const eventId = pickEventId(EVENT_IDS, exec.scenario.iterationInTest);
   const res = http.post(issueUrl(eventId), JSON.stringify({ memberId }), { headers: HEADERS, tags });
 
-  const result = res.status === 200 ? 'issued' : res.status === 409 ? 'sold_out' : 'error';
+  const result = res.status === 200 ? 'issued' : res.status === 202 ? 'accepted' : res.status === 409 ? 'sold_out' : 'error';
   results.add(1, Object.assign({}, tags, { result }));
 }
