@@ -2,7 +2,7 @@
 """Aggregate one S6 test-D/F run (scripts/verify.sh recovery --stage s6) into recovery.json. Standard library only.
 
 usage: python3 -I recovery_s6_postprocess.py --raw raw.json.gz --scenario db-down|consumer-redeliver|broker-down --stock N
-           --fault-log fault.log --db-samples db-samples.jsonl --requests requests.tsv --issue-rows N --dlq-depth N
+           --fault-log fault.log --db-samples db-samples.jsonl --requests requests.tsv --issue-rows N --dlq-depth N --remaining N
            --k6-exit N --out recovery.json [--queue-samples queue.jsonl] [--metrics '{"name": value, ...}']
            [--settle-s S] [--settled true|false] [--fault-at S] [--fault-duration S] [--env key=value ...]
 
@@ -22,6 +22,8 @@ Definitions:
                              client was not told so): uncertain, not lost; the client retries with the same id.
   unexplained_rows           rows whose request id was never sent by this run. MUST be 0.
   issued / over_issue        ISSUED rows; over_issue = max(0, issued - stock). MUST be 0. issue_rows_match: coupon_issue rows == issued.
+  stock_consistent           stock - coupon_event.remaining_quantity == issued: no seat taken twice (a redelivery decrementing again)
+                             and none taken without a winner row. MUST hold.
   dup_members                members with more than one ISSUED row. MUST be 0.
   dlq_depth                  messages in coupon.s6.requests.dlq after the settle. MUST be 0 (no poison message is sent).
   blackout_s                 the longest run of consecutive load seconds (0..59) in which no request started in that second got a 202.
@@ -156,6 +158,7 @@ def build(args):
         "dup_members_zero": sum(1 for n in issued_members.values() if n > 1) == 0,
         "issue_rows_match": args.issue_rows == issued,
         "dlq_zero": args.dlq_depth == 0,
+        "stock_consistent": args.stock - args.remaining == issued,
     }
     validity = {
         "k6_completed": args.k6_exit == 0,
@@ -186,6 +189,7 @@ def build(args):
         "issued": issued,
         "over_issue": max(0, issued - args.stock),
         "issue_rows": args.issue_rows,
+        "remaining": args.remaining,
         "dup_members": sum(1 for n in issued_members.values() if n > 1),
         "dlq_depth": args.dlq_depth,
         "blackout_s": longest_run(range(0, 60), lambda s: accepted_per_sec.get(s, 0) == 0),
@@ -212,6 +216,7 @@ def main(argv=None):
     parser.add_argument("--requests", required=True)
     parser.add_argument("--issue-rows", type=int, required=True)
     parser.add_argument("--dlq-depth", type=int, required=True)
+    parser.add_argument("--remaining", type=int, required=True)
     parser.add_argument("--k6-exit", type=int, required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument("--queue-samples")

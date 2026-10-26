@@ -14,7 +14,8 @@
 #                  requestId) and recovery_s6_postprocess.py (accepted ids vs coupon_request rows). Scenarios db-down,
 #                  consumer-redeliver (COUPON_S6_CONSUMER_FAIL_EVERY=50) and broker-down (test F: docker stop/start rabbitmq);
 #                  redis-restart does not apply. For s6, PASS = valid measurement AND its MUST invariants (no accepted request
-#                  lost, no over-issue, one coupon per member, no dead letter, coupon_issue == ISSUED rows): they are the claims.
+#                  lost, no over-issue, one coupon per member, no dead letter, coupon_issue == ISSUED rows, stock - remaining ==
+#                  ISSUED rows): they are the claims.
 #                  (test D: 500 rps for 60 s while a fault is injected, then the loss accounting; see docs/stages.md. consumer-redeliver is
 #                  s4 only: no container fault, the app runs with COUPON_S4_CONSUMER_FAIL_EVERY=50; other stages are refused with exit 2)
 #   Stage s4 (asynchronous writes): load and recovery settle before the rows are counted (poll until 5 polls in a row are equal,
@@ -1247,9 +1248,10 @@ print(json.dumps(out, sort_keys=True))'
         kill "$queue_pid" 2>/dev/null; wait "$queue_pid" 2>/dev/null; queue_pid=""
         kill "$sampler_pid" 2>/dev/null; wait "$sampler_pid" 2>/dev/null; sampler_pid=""
 
-        local issue_rows dlq_depth metrics
+        local issue_rows dlq_depth metrics remaining
         issue_rows=$(load_mysql "SELECT COUNT(*) FROM coupon_issue WHERE event_id = $event_id")
-        if ! [[ "$issue_rows" =~ ^[0-9]+$ ]] || ! load_mysql "SELECT request_id, member_id, status FROM coupon_request WHERE event_id = $event_id" >"$work/requests.tsv"; then
+        remaining=$(load_mysql "SELECT remaining_quantity FROM coupon_event WHERE id = $event_id")
+        if ! [[ "$issue_rows" =~ ^[0-9]+$ ]] || ! [[ "$remaining" =~ ^[0-9]+$ ]] || ! load_mysql "SELECT request_id, member_id, status FROM coupon_request WHERE event_id = $event_id" >"$work/requests.tsv"; then
             run_status=INFRA_DOWN; run_note="reading the final rows failed (see $log)"; return
         fi
         dlq_depth=$(docker exec "${LOAD_PREFIX}rabbitmq" rabbitmqctl list_queues -q name messages 2>>"$log" | awk '$1 == "coupon.s6.requests.dlq" { print $2 }')
@@ -1267,7 +1269,7 @@ print(json.dumps(out, sort_keys=True))'
 
         python3 -I scripts/load/recovery_s6_postprocess.py --raw "$work/raw.json.gz" --scenario "$scenario" --stock "$stock" \
             --fault-log "$work/fault.log" --db-samples "$work/db-samples.jsonl" --requests "$work/requests.tsv" \
-            --issue-rows "$issue_rows" --dlq-depth "$dlq_depth" --k6-exit "$k6_rc" --out "$work/recovery.json" \
+            --issue-rows "$issue_rows" --dlq-depth "$dlq_depth" --remaining "$remaining" --k6-exit "$k6_rc" --out "$work/recovery.json" \
             --queue-samples "$work/queue.jsonl" --metrics "$metrics" --settle-s "$settle_s" --settled "$settled" \
             --fault-at "$fault_at" --fault-duration "$fault_duration" "${env_args[@]}" >>"$log" 2>&1
         if [ $? -ne 0 ]; then

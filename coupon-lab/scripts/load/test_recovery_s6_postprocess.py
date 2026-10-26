@@ -28,7 +28,7 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
         return os.path.join(self.dir, name)
 
     def run_pp(self, requests, rows, scenario="db-down", stock=1000, issue_rows=None, dlq=0, faults=True, metrics=None,
-               k6_exit=0, settled="true"):
+               k6_exit=0, settled="true", remaining=None):
         """requests: [(sec, result, rid)]; rows: [(rid, member, status)]."""
         with gzip.open(self.path("raw.json.gz"), "wt") as f:
             for sec, result, rid in requests:
@@ -51,7 +51,9 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
                 "--fault-log", self.path("fault.log"), "--db-samples", self.path("db.jsonl"),
                 "--requests", self.path("requests.tsv"),
                 "--issue-rows", str(issue_rows if issue_rows is not None else sum(1 for r in rows if r[2] == "ISSUED")),
-                "--dlq-depth", str(dlq), "--k6-exit", str(k6_exit), "--out", self.path("out.json"), "--settled", settled,
+                "--dlq-depth", str(dlq),
+                "--remaining", str(remaining if remaining is not None else stock - sum(1 for r in rows if r[2] == "ISSUED")),
+                "--k6-exit", str(k6_exit), "--out", self.path("out.json"), "--settled", settled,
                 "--env", "queue_type=classic"]
         if metrics is not None:
             argv += ["--metrics", json.dumps(metrics)]
@@ -88,6 +90,13 @@ class S6RecoveryPostprocessTest(unittest.TestCase):
                          ["must"]["unexplained_rows_zero"])
         self.assertFalse(self.run_pp(base, [("a", "1", "ISSUED"), ("b", "2", "SOLD_OUT")], dlq=1)["must"]["dlq_zero"])
         self.assertFalse(self.run_pp(base, [("a", "1", "ISSUED"), ("b", "2", "SOLD_OUT")], issue_rows=2)["must"]["issue_rows_match"])
+
+    def test_a_seat_taken_twice_or_without_a_winner_breaks_stock_consistency(self):
+        rows = [("a", "1", "ISSUED"), ("b", "2", "SOLD_OUT")]
+        self.assertTrue(self.run_pp([(0, "accepted", "a"), (0, "accepted", "b")], rows, stock=10)["must"]["stock_consistent"])
+        report = self.run_pp([(0, "accepted", "a"), (0, "accepted", "b")], rows, stock=10, remaining=8)
+        self.assertFalse(report["must"]["stock_consistent"])
+        self.assertFalse(report["pass"])
 
     def test_blackout_is_the_longest_run_of_load_seconds_without_a_202(self):
         requests = [(s, "accepted", "r%d" % s) for s in range(60) if not 10 <= s < 25]
