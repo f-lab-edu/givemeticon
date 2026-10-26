@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-26T13:47:33" hostname="heojinhyeog-ui-MacBookAir.local" time="60.434">
+  <properties/>
+  <testcase name="issuedNeverExceedsStockUnderConcurrency()" classname="com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest" time="60.434"/>
+  <system-out><![CDATA[22:47:17.671 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest]: ConcurrentIssueConsistencyTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+22:47:17.724 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.jinddung2.couponlab.CouponLabApplication for test class com.jinddung2.couponlab.consistency.ConcurrentIssueConsistencyTest
+22:47:17.786 [Test worker] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+22:47:17.788 [Test worker] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+22:47:17.794 [Test worker] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.21.4
+22:47:17.895 [Test worker] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+22:47:18.023 [Test worker] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+22:47:18.024 [Test worker] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+22:47:18.037 [Test worker] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 29.7.2
+  API Version: 1.55
+  Operating System: Docker Desktop
+  Total Memory: 3916 MB
+  Labels: 
+    com.docker.desktop.address=unix:///Users/jinhyuck/Library/Containers/com.docker.docker/Data/docker-cli.sock
+22:47:18.057 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Creating container for image: testcontainers/ryuk:0.12.0
+22:47:18.199 [Test worker] INFO org.testcontainers.utility.RegistryAuthLocator -- Credential helper/store (docker-credential-desktop) does not have credentials for https://index.docker.io/v1/
+22:47:18.270 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Container testcontainers/ryuk:0.12.0 is starting: c978f9bec6d5e484f386b13e14e246a6ae5b1e85880bd472d72b617a86bc229b
+22:47:18.465 [Test worker] INFO tc.testcontainers/ryuk:0.12.0 -- Container testcontainers/ryuk:0.12.0 started in PT0.407321S
+22:47:18.470 [Test worker] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
+22:47:18.470 [Test worker] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+22:47:18.470 [Test worker] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+22:47:18.473 [Test worker] INFO tc.mysql:8.0 -- Creating container for image: mysql:8.0
+22:47:18.525 [Test worker] INFO tc.mysql:8.0 -- Container mysql:8.0 is starting: 5aeb4301a7393926aab4c3f4b190b9f1f3da772911c958546eb6ea1c872cefee
+22:47:18.678 [Test worker] INFO tc.mysql:8.0 -- Waiting for database connection to become available at jdbc:mysql://localhost:57070/test using query 'SELECT 1'
+22:47:26.173 [Test worker] INFO tc.mysql:8.0 -- Container mysql:8.0 started in PT7.700776S
+22:47:26.174 [Test worker] INFO tc.mysql:8.0 -- Container is started (JDBC URL: jdbc:mysql://localhost:57070/test)
+22:47:26.174 [Test worker] INFO tc.redis:7-alpine -- Creating container for image: redis:7-alpine
+22:47:26.202 [Test worker] INFO tc.redis:7-alpine -- Container redis:7-alpine is starting: ada8e492a5e52eb2e4f5d19c71ea7cc5adbba00c8a2b77163f0e590c4fd7bd27
+22:47:26.396 [Test worker] INFO tc.redis:7-alpine -- Container redis:7-alpine started in PT0.22185S
+22:47:26.396 [Test worker] INFO tc.rabbitmq:3-alpine -- Creating container for image: rabbitmq:3-alpine
+22:47:26.415 [Test worker] INFO tc.rabbitmq:3-alpine -- Container rabbitmq:3-alpine is starting: d202e189232ba997ee15015cd385690925f90e8ecb10c6ad041f1a7a5a72c612
+22:47:31.274 [Test worker] INFO tc.rabbitmq:3-alpine -- Container rabbitmq:3-alpine started in PT4.877929S
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.5)
+
+2026-10-26T22:47:31.459+09:00  INFO 36980 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : Starting ConcurrentIssueConsistencyTest using Java 21.0.5 with PID 36980 (started by jinhyuck in /Users/jinhyuck/Desktop/projects/givemeticon/coupon-lab)
+2026-10-26T22:47:31.459+09:00  INFO 36980 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : No active profile set, falling back to 1 default profile: "default"
+2026-10-26T22:47:31.945+09:00  INFO 36980 --- [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-10-26T22:47:31.946+09:00  INFO 36980 --- [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-10-26T22:47:31.961+09:00  INFO 36980 --- [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 6 ms. Found 0 Redis repository interfaces.
+2026-10-26T22:47:32.421+09:00  INFO 36980 --- [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-26T22:47:32.518+09:00  INFO 36980 --- [    Test worker] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@325e03b
+2026-10-26T22:47:32.518+09:00  INFO 36980 --- [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-26T22:47:32.545+09:00  INFO 36980 --- [    Test worker] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:57070/test (MySQL 8.0)
+2026-10-26T22:47:32.594+09:00  INFO 36980 --- [    Test worker] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table `test`.`flyway_schema_history` does not exist yet
+2026-10-26T22:47:32.596+09:00  INFO 36980 --- [    Test worker] o.f.core.internal.command.DbValidate     : Successfully validated 3 migrations (execution time 00:00.014s)
+2026-10-26T22:47:32.612+09:00  INFO 36980 --- [    Test worker] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table `test`.`flyway_schema_history` ...
+2026-10-26T22:47:32.664+09:00  INFO 36980 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Current version of schema `test`: << Empty Schema >>
+2026-10-26T22:47:32.671+09:00  INFO 36980 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Migrating schema `test` to version "1 - init"
+2026-10-26T22:47:32.720+09:00  INFO 36980 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Migrating schema `test` to version "2 - coupon issue message id"
+2026-10-26T22:47:32.758+09:00  INFO 36980 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Migrating schema `test` to version "3 - s6 coupon request"
+2026-10-26T22:47:32.790+09:00  INFO 36980 --- [    Test worker] o.f.core.internal.command.DbMigrate      : Successfully applied 3 migrations to schema `test`, now at version v3 (execution time 00:00.063s)
+2026-10-26T22:47:33.502+09:00  INFO 36980 --- [    Test worker] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+2026-10-26T22:47:33.543+09:00  INFO 36980 --- [    Test worker] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:57140]
+2026-10-26T22:47:33.569+09:00  INFO 36980 --- [    Test worker] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#1aaf73b7:0/SimpleConnection@33acec5e [delegate=amqp://guest@127.0.0.1:57140/, localPort=57151]
+2026-10-26T22:47:33.633+09:00  INFO 36980 --- [    Test worker] c.j.c.c.ConcurrentIssueConsistencyTest   : Started ConcurrentIssueConsistencyTest in 2.321 seconds (process running for 16.494)
+]]></system-out>
+  <system-err><![CDATA[WARNING: A Java agent has been loaded dynamically (/Users/jinhyuck/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.14.19/154da3a65b4f4a909d3e5bdec55d1b2b4cbb6ce1/byte-buddy-agent-1.14.19.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>
