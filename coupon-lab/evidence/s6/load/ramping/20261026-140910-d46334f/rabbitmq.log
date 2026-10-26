@@ -1,0 +1,11 @@
+2026-10-26 14:02:27.941194+00:00 [info] <0.254.0> Running boot step rabbit_alarm defined by app rabbit[0m
+[38;5;214m2026-10-26 14:02:28.352070+00:00 [warning] <0.254.0> Classic peer discovery backend: list of nodes does not contain the local node [][0m
+[38;5;214m2026-10-26 14:02:28.512846+00:00 [warning] <0.647.0> Message store "628WB79CIFDYO9LJI6DKMI09L/msg_store_persistent": rebuilding indices from scratch[0m
+[38;5;214m2026-10-26 14:02:28.670570+00:00 [warning] <0.717.0> Deprecated features: `management_metrics_collection`: Feature `management_metrics_collection` is deprecated.[0m
+[38;5;214m2026-10-26 14:02:28.670570+00:00 [warning] <0.717.0> By default, this feature can still be used for now.[0m
+[38;5;214m2026-10-26 14:02:28.670570+00:00 [warning] <0.717.0> Its use will not be permitted by default in a future minor RabbitMQ version and the feature will be removed from a future major RabbitMQ version; actual versions to be determined.[0m
+[38;5;214m2026-10-26 14:02:28.670570+00:00 [warning] <0.717.0> To continue using this feature when it is not permitted by default, set the following parameter in your configuration:[0m
+[38;5;214m2026-10-26 14:02:28.670570+00:00 [warning] <0.717.0>     "deprecated_features.permit.management_metrics_collection = true"[0m
+[38;5;214m2026-10-26 14:02:28.670570+00:00 [warning] <0.717.0> To test RabbitMQ as if the feature was removed, set this in your configuration:[0m
+[38;5;214m2026-10-26 14:02:28.670570+00:00 [warning] <0.717.0>     "deprecated_features.permit.management_metrics_collection = false"[0m
+[38;5;87m2026-10-26 14:05:25.195537+00:00 [notice] <0.86.0>     alarm_handler: {set,{system_memory_high_watermark,[]}}[0m
