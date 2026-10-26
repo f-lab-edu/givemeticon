@@ -749,3 +749,94 @@ Test A v3+settle, 10회, 1000 threads, 재고 100, 같은 env 블록(java 21.0.5
 `evidence/s5/consistency/20261025-114307-049a56e-dirty` 는 커밋 전(dirty) 같은 코드의 run 이고 표에는 쓰지 않는다.
 
 * B/C/D/E (load, bottleneck, recovery, fairness): `verify.sh bundle` 은 NO_TESTS(태그된 테스트가 저장소에 없다). `verify.sh load`/`recovery` 는 s4 전용 분기(settle, AOF 기본값, queue depth, 발행 실패 지표)가 s5 를 모르므로 실행하지 않았다: INCOMPLETE.
+
+
+## S6 - RabbitMQ 접수, MySQL Consumer 판정
+
+* 구조: App → RabbitMQ(S6 전용 classic durable 큐) → Consumer 1개(중복·재고·당첨 판정) → MySQL(단일 원장). Redis를 쓰지 않는다. S4/S5 코드·evidence·`coupon.issued` 큐는 건드리지 않는다.
+
+### 1. 요구사항과 우선순위
+
+* 절대 조건: 초과 발급 0, 1인 1매 위반 0, 202를 받은 신청의 유실 0.
+* 가용성: DB 장애 중에도 브로커 수용 한도 안에서 접수를 계속한다.
+* 포기하는 것: 즉시 당첨 응답(202만 준다), 결과 확정 속도(Consumer 처리 속도에 묶인다).
+
+### 2. 공정성(선착순)의 정의
+
+* 선착순 = 브로커에 적재된 순서대로 Consumer가 처리하고 커밋한 순서. HTTP 도착 순서는 약속하지 않는다(여러 요청 스레드가 동시에 발행한다).
+* 재전달이 일어나면 처리 순서가 적재 순서와 달라질 수 있다. 테스트 E로 잰다.
+
+### 3. 메시지 계약
+
+* 필드: `requestId`(UUID), `eventId`, `memberId`, `acceptedAt`(발행 직전 epoch ms; 확정 지연 측정용). persistent(deliveryMode 2), JSON, messageId = requestId.
+* `requestId`: 클라이언트가 보내면 그 값, 없으면 서버가 만든다. 같은 requestId로 다시 보내도 안전하다(Consumer가 UNIQUE(request_id)로 걸러 기존 결과를 유지한다).
+* 요청 경로는 DB를 읽지 않는다. 존재하지 않는 eventId도 접수되고, Consumer가 `FAILED`(reason `UNKNOWN_EVENT`)로 기록하고 ACK한다.
+
+### 4. 응답 계약
+
+| 상황 | 응답 |
+|---|---|
+| 발행 확인(ack)을 받고 return이 없음 | 202 `{status: ACCEPTED, requestId}` |
+| nack, return(unroutable), 큐 상한 초과(reject-publish) | 503 `{requestId, retryable: true}` |
+| 확인 타임아웃(2 s) | 503 `{requestId, retryable: true}`. 저장됐을 수 있으므로 같은 requestId로 재시도하게 한다 |
+| 결과 조회 `GET /coupon-requests/{requestId}` | 200 `{status}`: PENDING(DB에 없음) / ISSUED(+seq) / SOLD_OUT / ALREADY_ISSUED / FAILED |
+| DB 장애 중 결과 조회 | 503. 별도 접수 증빙 저장소는 만들지 않는다 |
+
+### 5. 상태 전이
+
+`(DB에 없음 = PENDING)` → `ISSUED` | `SOLD_OUT` | `ALREADY_ISSUED` | `FAILED`. 최종 상태는 바뀌지 않는다.
+
+### 6. 오류 분류
+
+| 오류 | 처리 |
+|---|---|
+| DB 연결 장애 (커넥션 획득 실패, 트랜잭션 시작 실패, 접근 불가) | 재시도 횟수에 넣지 않는다. 메시지는 ACK하지 않고 container를 비동기로 멈춘 뒤 DB 복구가 확인되면 재개 |
+| 일시적 트랜잭션 오류 (데드락, 락 대기 초과) | 같은 전달 안에서 재시도(위 "그 밖" 횟수에 센다) |
+| 중복 요청 (같은 requestId가 이미 처리됨) | 오류가 아니다. 기존 결과를 두고 ACK |
+| 메시지 변환 실패·필수 필드 누락 | 재시도 없이 reject(requeue=false) → DLX → DLQ |
+| 그 밖의 반복 실패 | 같은 전달 안에서 최대 3회 시도 후 FAILED 기록 + reject(requeue=false) → DLQ |
+
+### 7. 설계 결정
+
+* ACK: AUTO. 판정 트랜잭션은 리스너 밖 서비스 메서드(`@Transactional`)에서 끝나므로, 리스너가 정상 반환할 때(=커밋 뒤)에만 ACK가 나간다.
+* 재시도는 Spring Retry 인터셉터 대신 리스너 안의 3회 루프로 쓴다. 인터셉터는 재시도 불가 예외에도 복구 콜백(DLQ 이동)을 부르므로, "DB 연결 장애는 DLQ로 가지 않는다"를 보장하려면 분류를 먼저 해야 하기 때문이다.
+* 판정은 한 트랜잭션: request_id 확인 → 이미 ISSUED인 회원이면 ALREADY_ISSUED(재고 소모 없음) → `UPDATE ... SET remaining_quantity = remaining_quantity - 1 WHERE id = ? AND remaining_quantity > 0` → 영향 행 1이면 ISSUED(seq = total − 차감 뒤 remaining)와 `coupon_issue` INSERT(`message_id` = requestId), 0이면 SOLD_OUT. 제약은 새 테이블 `coupon_request`에 둔다: UNIQUE(request_id), UNIQUE(event_id, issued_member_id)(생성 컬럼; status가 ISSUED일 때만 member_id). 기존 `coupon_issue`의 제약 없음은 유지한다.
+* 큐: exchange `coupon.s6.direct`, 큐 `coupon.s6.requests`(classic durable, `x-max-length`=200,000, `x-overflow`=reject-publish, DLX `coupon.s6.dlx`), DLQ `coupon.s6.requests.dlq`. 200,000은 S4 ramping에서 관측한 큐 최대치(213,760)와 같은 자릿수다. 기본 overflow(drop-head)는 확인을 받은 신청을 조용히 버리므로 쓰지 않는다.
+* Consumer: 전용 container factory, concurrency 1, prefetch 50(S4와 같음; `spring.rabbitmq.listener.*`는 바꾸지 않는다). DB 연결 장애 감지 시 메시지를 ACK하지 않고 container를 별도 스레드에서 멈추며, 1초 간격 `SELECT 1`이 연속 3회 성공하면 재시작한다. 장애 감지가 늦지 않도록 S6가 켜져 있을 때만 Hikari connectionTimeout을 2 s로 낮춘다(기본 30 s).
+
+### 8. 측정 조건 동결
+
+* 테스트 A: `ConcurrentIssueConsistencyTest`, 1,000 threads, 재고 100, 10회, `v3+settle`. 판정: 정착 뒤 `issued == 100`, `exceptions == 0`, `dup_members == 0`, DLQ 0.
+* 테스트 B: S4와 같은 ramping 프로필, n ≥ 5. 테스트 D: S4와 같은 `db-down`(중단 시각·길이 동일), `consumer-redeliver`(`COUPON_S6_CONSUMER_FAIL_EVERY=50`). 테스트 F: `broker-down`(새 시나리오). 테스트 E, G: T07.
+* 환경 블록에 `queue_type: classic`, `stage_has_redis: false`를 기록한다.
+
+### 9. S4 → S6에서 바뀌는 조건 (비교 시 반드시 함께 적는다)
+
+| 항목 | S4 | S6 |
+|---|---|---|
+| 당첨 판정 위치 | Redis Lua INCR (요청 경로) | MySQL Consumer (요청 경로 밖) |
+| Redis | 사용 (AOF everysec) | 사용하지 않음 |
+| 응답 | 200 ISSUED (즉시 결과) | 202 Accepted + request_id (결과는 조회) |
+| DB 쓰기 | 당첨자만 | 모든 요청의 결과 + 당첨자 |
+| 제약 | UNIQUE 없음, message_id 존재 확인 | UNIQUE(request_id), 당첨자 1인 1매 UNIQUE |
+| Consumer 오류 처리 | 실패 시 1초 쉬고 무한 재전달 | DB 장애는 중단·재개, 그 밖은 유한 재시도 후 DLQ |
+| 큐 | `coupon.issued` (classic durable, 상한 없음) | S6 전용 큐 (classic durable, max-length + reject-publish, DLX) |
+
+### 10. 예측 (측정 전에 커밋; 측정 뒤 확인/기각 판정)
+
+* P-A: 테스트 A 10회 모두 정착 뒤 issued 100, 예외 0, dup_members 0, DLQ 0.
+* P-B1: 접수 처리량은 S4와 비슷하다(요청 경로가 발행 확인뿐). ramping sustained 중앙값이 S4(1,600 rps)의 ±25% 안.
+* P-B2: Consumer 처리 속도는 약 250~450행/초다. 메시지당 트랜잭션 하나에 문장 4~5개(존재 확인, 중복 회원 확인, 재고 UPDATE, remaining 조회, INSERT 1~2)와 재고 행 하나에 대한 쓰기가 직렬로 들어가므로 S4의 740~890보다 느리다. 그래서 몰리는 구간에서 큐가 쌓이고, 큐가 200,000에 닿으면 503(reject-publish)이 나온다. 확정 지연 p95는 분 단위다.
+* P-D1 (db-down 45 s): 중단 중 응답이 전부 202(5xx 0), 복구 뒤 202를 받은 신청의 유실 0, DLQ 0. 쌓인 큐를 비우는 시간(settle)은 60~120 s(부하 종료 시점 백로그 약 2.5만 건 ÷ 350행/초).
+* P-D2 (consumer-redeliver, FAIL_EVERY 50): 재전달 건수는 요청 수/50 근처, 중복 0, 재고 이중 차감 0.
+* P-F (broker-down): 202를 받은 requestId 집합 ⊆ 정착 뒤 DB의 requestId 집합. 확인 못 받은 신청에 202 0건. 타임아웃 503 중 일부는 실제로 저장돼 있다(유실이 아니라 불확실로 센다).
+* P-E: 재전달이 없으면 적재 순서 = 당첨 순서(단일 발행자). DB 중단·재개나 크래시 주입으로 재전달이 생기면 순서가 바뀐 당첨자가 생길 수 있고, 중단 1회당 최대 prefetch(50) 자릿수다.
+* P-G: 독 메시지만 DLQ로 간다. DB 중단과 겹쳐도 정상 메시지의 DLQ 이동은 0이다.
+
+### 11. 이번 단계에서 하지 않는 것과 알려진 한계
+
+* Quorum Queue 미적용. "브로커 노드가 1대라 quorum의 복제 이점이 없고, 얻는 것은 브로커 차원의 재시도 상한뿐이다. 재시도 상한은 앱에서 세고, 상한을 넘은 메시지는 DLX를 거쳐 DLQ로 보낸다. S4와 같은 큐 종류를 유지해 비교 변수를 줄인다. 다중 노드 이중화 단계에서 다시 검토한다."
+* classic 큐의 dead-lettering은 at-most-once다. DLQ로 옮기는 중의 장애까지 무유실이라고 주장하지 않는다.
+* 3회 제한은 한 번의 전달 안에서만 센다. 재전달되면 초기화된다. 전달을 넘어선 누적 상한은 구현하지 않는다.
+* FAILED 기록은 requestId를 읽을 수 있을 때만 가능하다. JSON이 깨진 메시지는 DLQ에만 남는다.
+* DLQ 재처리 도구, 다중 Consumer, 다중 노드는 범위 밖이다.
