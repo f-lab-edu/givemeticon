@@ -11,4 +11,8 @@ public sealed interface IssueResult {
     /** S5+: the member already holds a coupon of this event (one per member per event). */
     record AlreadyIssued() implements IssueResult {
     }
+
+    /** S6+: the request is durably queued (publisher-confirmed); the result is read later by request id. */
+    record Accepted(String requestId) implements IssueResult {
+    }
 }

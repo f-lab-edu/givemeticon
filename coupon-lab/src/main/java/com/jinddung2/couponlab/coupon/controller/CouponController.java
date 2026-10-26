@@ -21,20 +21,30 @@ public class CouponController {
     }
 
     @PostMapping("/coupon-events/{eventId}/issue")
-    public ResponseEntity<IssueResponse> issue(@PathVariable long eventId, @RequestBody IssueRequest request) {
-        return switch (couponIssueService.issue(eventId, request.memberId())) {
+    public ResponseEntity<?> issue(@PathVariable long eventId, @RequestBody IssueRequest request) {
+        // The two-argument call stays the path of every stage that has no request id.
+        IssueResult result = request.requestId() == null
+                ? couponIssueService.issue(eventId, request.memberId())
+                : couponIssueService.issue(eventId, request.memberId(), request.requestId());
+        return switch (result) {
             case IssueResult.Issued issued -> ResponseEntity.ok(new IssueResponse("ISSUED", issued.seq()));
             case IssueResult.SoldOut soldOut ->
                     ResponseEntity.status(HttpStatus.CONFLICT).body(new IssueResponse("SOLD_OUT", null));
             case IssueResult.AlreadyIssued alreadyIssued ->
                     ResponseEntity.status(HttpStatus.CONFLICT).body(new IssueResponse("ALREADY_ISSUED", null));
+            case IssueResult.Accepted accepted ->
+                    ResponseEntity.accepted().body(new AcceptedResponse("ACCEPTED", accepted.requestId()));
         };
     }
 
-    public record IssueRequest(long memberId) {
+    /** requestId is optional and only S6 reads it. */
+    public record IssueRequest(long memberId, String requestId) {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record IssueResponse(String result, Integer seq) {
+    }
+
+    public record AcceptedResponse(String status, String requestId) {
     }
 }
