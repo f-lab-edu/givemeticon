@@ -1,11 +1,11 @@
 # coupon-lab
 
 ## Purpose
-Evolve a first-come coupon service through stages S0..S4. Every stage is measured with the same
+Evolve a first-come coupon service through stages S0..S6. Every stage is measured with the same
 test bundle: consistency, load, bottleneck, recovery, fairness.
 
 ## Stage selection
-* The active stage is chosen by `coupon.strategy` (s0..s4).
+* The active stage is chosen by `coupon.strategy` (s0..s6; there is no s2).
 * Finished stages are frozen (listed in `.claude/protected-paths.txt` at the repo root).
   Add a new strategy; never edit an old one.
 

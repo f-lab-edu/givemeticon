@@ -521,6 +521,44 @@ class PostprocessTest(unittest.TestCase):
             with open(out, encoding="utf-8") as f:
                 self.assertEqual(json.load(f)["publish_failures"]["total"], 7)
 
+    def test_s6_counts_accepted_per_stage_and_matches_them_against_request_rows(self):
+        lines = [line.replace('"result": "issued"', '"result": "accepted"') for line in synthetic()]
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            accepted = sum(1 for line in lines if json.loads(line)["data"].get("tags", {}).get("result") == "accepted")
+            report = postprocess.build_report(raw, LAYOUT, "ramping", "s6", accepted, {}, publish_failures={})
+            self.assertEqual([s["accepted"] for s in report["stages"]], [100] * 5)
+            self.assertEqual([s["issued"] for s in report["stages"]], [0] * 5)
+            self.assertEqual([s["errors"] for s in report["stages"]], [0] * 5)  # 202 is not an error
+            self.assertEqual(report["db"]["http_issued"], accepted)
+            self.assertTrue(report["validity"]["valid"])
+            self.assertFalse(postprocess.build_report(raw, LAYOUT, "ramping", "s6", accepted - 1, {},
+                                                      publish_failures={})["validity"]["valid"])  # a 202 without a row
+
+    def test_s6_confirm_latency_is_summarised_overall_and_per_measure_window(self):
+        lines = [line.replace('"result": "issued"', '"result": "accepted"') for line in synthetic()]
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = os.path.join(tmp, "raw.json.gz")
+            write_raw(raw, lines)
+            first = postprocess.parse_time(stamp(0))  # the anchor: the first request starts at t=0
+            start, end = window_of("ramping", 1)
+            tsv = os.path.join(tmp, "confirm.tsv")
+            with open(tsv, "w") as f:
+                for i in range(1, 101):  # 100 requests in the second window, 10..1000 ms, container clock 2 s ahead
+                    f.write("%d\t%d\n" % ((first + start + 0.01 * i + 2) * 1000, 10 * i))
+                f.write("%d\t%d\n" % ((first + 1 + 2) * 1000, 99999))  # warmup: overall only
+            report = postprocess.build_report(raw, LAYOUT, "ramping", "s6", 0, {}, publish_failures={},
+                                              confirm_latency_path=tsv, clock_offset_s=2)
+            latency = report["confirm_latency_ms"]
+            self.assertEqual(latency["overall"]["n"], 101)
+            self.assertEqual(latency["overall"]["max"], 99999)
+            second = latency["by_stage"][1]
+            self.assertEqual((second["target_rps"], second["n"], second["max"]), (500, 100, 1000))
+            self.assertAlmostEqual(second["p50"], 505.0)
+            self.assertEqual(latency["by_stage"][0]["n"], 0)
+            self.assertNotIn("confirm_latency_ms", postprocess.build_report(raw, LAYOUT, "ramping", "s6", 0, {}))
+
     def test_s4_allows_rows_of_publishes_whose_confirm_came_after_the_wait(self):
         lines = synthetic()
         http = issued_count(lines)
@@ -540,6 +578,11 @@ class PostprocessTest(unittest.TestCase):
             self.assertFalse(run("s4", http + 1)["validity"]["valid"])  # counter not read: only equality is valid
             self.assertTrue(run("s4", http)["validity"]["valid"])
             s3 = run("s3", http + 2, two)
+            # s6: the same rule, counted against 202 (accepted) responses; the synthetic run has none, so rows must be 0..2
+            s6 = run("s6", 2, two)
+            self.assertEqual((s6["db"]["http_issued"], s6["db"]["rows_table"]), (0, "coupon_request"))
+            self.assertTrue(s6["validity"]["db_match"])
+            self.assertFalse(run("s6", 3, two)["validity"]["db_match"])
             self.assertNotIn("rows_from_timed_out_publishes", s3["db"])
             self.assertFalse(s3["validity"]["valid"])  # other stages: rows == 200 responses, unchanged
 

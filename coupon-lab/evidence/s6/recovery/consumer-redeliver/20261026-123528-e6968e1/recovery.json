@@ -1,0 +1,88 @@
+{
+  "test": "D",
+  "scenario": "consumer-redeliver",
+  "stage": "s6",
+  "stock": 10000000,
+  "fault": {
+    "at_s": 20,
+    "duration_s": 10,
+    "observed": {
+      "stopped_at": null,
+      "stop_returned_at": null,
+      "started_at": null,
+      "healthy_at": null
+    }
+  },
+  "totals": {
+    "accepted": 30977,
+    "unconfirmed": 0,
+    "http_5xx": 0,
+    "timeout": 0,
+    "other": 0
+  },
+  "sent": 30977,
+  "rows": 30977,
+  "rows_by_status": {
+    "ISSUED": 30977
+  },
+  "lost": 0,
+  "lost_sample": [],
+  "recorded_despite_unconfirmed": 0,
+  "unexplained_rows": 0,
+  "issued": 30977,
+  "over_issue": 0,
+  "issue_rows": 30977,
+  "dup_members": 0,
+  "dlq_depth": 0,
+  "blackout_s": 0,
+  "error_codes": {},
+  "settle_s": 55.0,
+  "drain_s": 50.7,
+  "queue_depth_max": 18563,
+  "dlq_depth_max": 0,
+  "metrics": {
+    "coupon_s6_confirm_latency": 30977.0,
+    "coupon_s6_confirm_latency.max": 50.666,
+    "coupon_s6_confirm_latency.total_time": 1070911.804,
+    "coupon_s6_processed": 31596.0,
+    "coupon_s6_processed{duplicate=false}": 30977.0,
+    "coupon_s6_processed{duplicate=true}": 619.0,
+    "coupon_s6_processed{status=ISSUED}": 31596.0,
+    "coupon_s6_redeliveries": 619.0
+  },
+  "must": {
+    "lost_zero": true,
+    "unexplained_rows_zero": true,
+    "over_issue_zero": true,
+    "dup_members_zero": true,
+    "issue_rows_match": true,
+    "dlq_zero": true
+  },
+  "validity": {
+    "k6_completed": true,
+    "settled": true,
+    "fault_observed": true,
+    "valid": true
+  },
+  "pass": true,
+  "env": {
+    "app_cpus": "2",
+    "hikari_connection_timeout_ms": "2000",
+    "hikari_pool_size": "10",
+    "innodb_buffer_pool_size": "134217728",
+    "innodb_flush_log_at_trx_commit": "1",
+    "innodb_redo_log_capacity": "104857600",
+    "jvm_heap": "1g",
+    "k6_mode": "host",
+    "k6_version": "v2.2.0",
+    "mysql_cpus": "2",
+    "queue_type": "classic",
+    "rabbitmq_cpus": "1",
+    "rabbitmq_image": "rabbitmq:3-management-alpine",
+    "s6_confirm_timeout_ms": "2000",
+    "s6_consumer_fail_every": "50",
+    "s6_queue_max_length": "200000",
+    "stage_has_redis": "false",
+    "tomcat_max_threads": "200"
+  }
+}

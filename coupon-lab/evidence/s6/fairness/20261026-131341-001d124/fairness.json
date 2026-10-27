@@ -1,0 +1,82 @@
+{
+  "test" : "E",
+  "stage" : "s6",
+  "procedure" : "e-order-v1",
+  "repetitions" : 3,
+  "requests" : 300,
+  "stock" : 100,
+  "db_cut_after" : 30,
+  "db_cut_seconds" : 5,
+  "runs" : [ {
+    "variant" : "baseline",
+    "run" : 1,
+    "decided" : 300,
+    "winners" : 100,
+    "out_of_order" : 0,
+    "max_displacement" : 0,
+    "dup_members" : 0,
+    "pauses" : 0.0,
+    "dlq_depth" : 0
+  }, {
+    "variant" : "baseline",
+    "run" : 2,
+    "decided" : 300,
+    "winners" : 100,
+    "out_of_order" : 0,
+    "max_displacement" : 0,
+    "dup_members" : 0,
+    "pauses" : 0.0,
+    "dlq_depth" : 0
+  }, {
+    "variant" : "baseline",
+    "run" : 3,
+    "decided" : 300,
+    "winners" : 100,
+    "out_of_order" : 0,
+    "max_displacement" : 0,
+    "dup_members" : 0,
+    "pauses" : 0.0,
+    "dlq_depth" : 0
+  }, {
+    "variant" : "db-interrupt",
+    "run" : 1,
+    "decided" : 300,
+    "winners" : 100,
+    "out_of_order" : 0,
+    "max_displacement" : 0,
+    "dup_members" : 0,
+    "pauses" : 1.0,
+    "dlq_depth" : 0
+  }, {
+    "variant" : "db-interrupt",
+    "run" : 2,
+    "decided" : 300,
+    "winners" : 100,
+    "out_of_order" : 0,
+    "max_displacement" : 0,
+    "dup_members" : 0,
+    "pauses" : 1.0,
+    "dlq_depth" : 0
+  }, {
+    "variant" : "db-interrupt",
+    "run" : 3,
+    "decided" : 300,
+    "winners" : 100,
+    "out_of_order" : 0,
+    "max_displacement" : 0,
+    "dup_members" : 0,
+    "pauses" : 1.0,
+    "dlq_depth" : 0
+  } ],
+  "env" : {
+    "java" : "21.0.5",
+    "spring_boot" : "3.3.5",
+    "mysql_image" : "mysql:8.0",
+    "rabbitmq_image" : "rabbitmq:3-alpine",
+    "queue_type" : "classic",
+    "stage_has_redis" : false,
+    "prefetch" : 50,
+    "cpu" : 8,
+    "os" : "Mac OS X 26.3.1 aarch64"
+  }
+}

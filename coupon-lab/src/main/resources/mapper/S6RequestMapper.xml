@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jinddung2.couponlab.coupon.mapper.S6RequestMapper">
+
+    <resultMap id="s6RequestMap" type="com.jinddung2.couponlab.coupon.model.S6RequestRecord">
+        <constructor>
+            <arg column="request_id" javaType="java.lang.String"/>
+            <arg column="event_id" javaType="_long"/>
+            <arg column="member_id" javaType="_long"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="seq" javaType="java.lang.Integer"/>
+            <arg column="reason" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByRequestId" resultMap="s6RequestMap">
+        SELECT request_id, event_id, member_id, status, seq, reason FROM coupon_request WHERE request_id = #{requestId}
+    </select>
+
+    <select id="existsIssuedForMember" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM coupon_request WHERE event_id = #{eventId} AND issued_member_id = #{memberId})
+    </select>
+
+    <update id="decrementStock">
+        UPDATE coupon_event SET remaining_quantity = remaining_quantity - 1
+        WHERE id = #{eventId} AND remaining_quantity &gt; 0
+    </update>
+
+    <resultMap id="s6StockMap" type="com.jinddung2.couponlab.coupon.model.CouponStock">
+        <constructor>
+            <idArg column="id" javaType="_long"/>
+            <arg column="total_quantity" javaType="_int"/>
+            <arg column="remaining_quantity" javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectStock" resultMap="s6StockMap">
+        SELECT id, total_quantity, remaining_quantity FROM coupon_event WHERE id = #{eventId}
+    </select>
+
+    <insert id="insertRequest">
+        INSERT INTO coupon_request (request_id, event_id, member_id, status, seq, reason, accepted_at, processed_at)
+        VALUES (#{requestId}, #{eventId}, #{memberId}, #{status}, #{seq}, #{reason}, #{acceptedAt}, NOW(6))
+    </insert>
+</mapper>

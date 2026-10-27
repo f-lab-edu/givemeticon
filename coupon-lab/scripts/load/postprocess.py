@@ -18,6 +18,14 @@ counter was not read). --redis-counter (S3/S4) is recorded as db.redis_counter a
 stop changing before counting them) are recorded as settle_s and settled; the validity rule is unchanged.
 --publish-failures (S4 only) is the app's coupon_s4_publish_failures counter per reason tag; it is recorded as
 publish_failures {"total", "by_reason"}, null when not given (other stages, or the counter could not be read).
+Stage s6 answers 202 (result accepted) and decides later; every accepted request becomes one coupon_request row. For s6
+--db-issued-rows is that coupon_request row count, db.http_issued counts the 202 responses (db.rows_table and
+db.http_result say so), and the s4 rule applies with the s6 counter (coupon_s6_publish_failures): rows - 202 in 0..timeouts.
+--settle-s / --settled and --publish-failures are recorded for s6 as for s4. Stages get an accepted count next to issued.
+--confirm-latency (s6) is a TSV "<accepted_at epoch ms><TAB><processed_at - accepted_at ms>" of every coupon_request row, read
+after the settle: how long an accepted request waited for its decision. It becomes confirm_latency_ms {"overall": {n, p50, p95,
+p99, max}, "by_stage": [{target_rps, n, p50, p95, p99, max}]}; a request counts in the measure window its accepted_at falls in
+(container clock minus run.container_clock_offset_s). An outcome, never part of validity.
 
 Every stage also gets a kind:
   saturated  achieved_rps < 0.95 * target_rps, or p50 > 100 ms (the system cannot keep up; requests queue)
@@ -265,7 +273,7 @@ def classify(stage):
 
 def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, filtered_path=None,
                  stats_path=None, summary_path=None, gc_path=None, run_info=None, innodb_path=None, rows=1, redis_counter=None,
-                 publish_failures=None):
+                 publish_failures=None, confirm_latency_path=None, clock_offset_s=None):
     profile = layout["profiles"][profile_name]
     rates = [step["rps"] for step in profile["steps"]]
     if len(set(rates)) != len(rates):
@@ -278,14 +286,16 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         raise ValueError("no http_req_duration points in " + raw_path)
 
     stages = []
+    windows = []
     cursor = layout["warmup"]["seconds"]
     for step in profile["steps"]:
         rps = step["rps"]
         window_start = anchor + cursor + layout["transition_seconds"]
         window_end = anchor + cursor + step["seconds"]
         cursor += step["seconds"]
+        windows.append((rps, window_start, window_end))
 
-        by_result = dict((r, counts.get((rps, "measure", r), 0)) for r in ("issued", "sold_out", "error"))
+        by_result = dict((r, counts.get((rps, "measure", r), 0)) for r in ("issued", "accepted", "sold_out", "error"))
         requests = sum(by_result.values())
         values = sorted(latencies.get(rps, []))
         dropped_here = int(sum(v for t, v in dropped if window_start <= t < window_end))
@@ -311,6 +321,7 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
             "p95_margin_ms": None if p95 is None else round(P95_LIMIT_MS - p95, 2),
             "p99_ms": _round(percentile(values, 99)),
             "issued": by_result["issued"],
+            "accepted": by_result["accepted"],
             "sold_out": by_result["sold_out"],
             "errors": by_result["error"],
             "error_rate": round(by_result["error"] / requests, 6) if requests else None,
@@ -349,18 +360,21 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
                "mysql_cpu_pct_max": s["mysql_cpu_pct_max"], "app_cpu_pct_max": s["app_cpu_pct_max"]}
               for s in stages if s["kind"] == "stall"]
 
-    http_issued = sum(n for (_, _, result), n in counts.items() if result == "issued")
+    http_result = "accepted" if stage_id == "s6" else "issued"
+    http_issued = sum(n for (_, _, result), n in counts.items() if result == http_result)
     match = db_issued_rows == http_issued
     db = {"issued_rows": db_issued_rows, "http_issued": http_issued, "match": match}
+    if stage_id == "s6":
+        db.update(rows_table="coupon_request", http_result="accepted")
     db_valid = match
-    if stage_id == "s4":  # see the module docstring: rows of publishes whose confirm came after the 2 s wait are allowed
+    if stage_id in ("s4", "s6"):  # see the module docstring: rows of publishes whose confirm came after the 2 s wait are allowed
         db["rows_from_timed_out_publishes"] = db_issued_rows - http_issued
         timed_out = (publish_failures or {}).get("timeout", 0)
         db_valid = 0 <= db["rows_from_timed_out_publishes"] <= timed_out
     if redis_counter is not None:  # S3/S4: the decision counter, summed over the seeded events (informational)
         db["redis_counter"] = redis_counter
 
-    return {
+    report = {
         "test": "B",
         "profile": profile_name,
         "stage": stage_id,
@@ -390,6 +404,29 @@ def build_report(raw_path, layout, profile_name, stage_id, db_issued_rows, env, 
         },
         "env": env,
     }
+    if confirm_latency_path:
+        report["confirm_latency_ms"] = confirm_latency_of(confirm_latency_path, windows, clock_offset_s or 0)
+    return report
+
+
+def latency_summary(values):
+    values = sorted(values)
+    return {"n": len(values), "p50": _round(percentile(values, 50)), "p95": _round(percentile(values, 95)),
+            "p99": _round(percentile(values, 99)), "max": _round(values[-1]) if values else None}
+
+
+def confirm_latency_of(path, windows, clock_offset_s):
+    """Decision latency of every accepted request (see the module docstring), overall and per measure window."""
+    rows = []
+    with open_text(path, "r") as f:
+        for line in f:
+            fields = line.split("\t")
+            if len(fields) >= 2 and fields[0].strip():
+                rows.append((float(fields[0]) / 1000.0 - clock_offset_s, float(fields[1])))
+    by_stage = []
+    for rps, start, end in windows:
+        by_stage.append(dict(target_rps=rps, **latency_summary([ms for when, ms in rows if start <= when < end])))
+    return {"overall": latency_summary([ms for _, ms in rows]), "by_stage": by_stage}
 
 
 def publish_failures_of(by_reason):
@@ -436,6 +473,7 @@ def main(argv=None):
     parser.add_argument("--settle-s", type=int)
     parser.add_argument("--settled", choices=("true", "false"))
     parser.add_argument("--publish-failures", type=json.loads, metavar="JSON")
+    parser.add_argument("--confirm-latency", metavar="TSV")
     parser.add_argument("--out", required=True)
     parser.add_argument("--filtered-raw")
     parser.add_argument("--profiles", default=DEFAULT_PROFILES)
@@ -505,7 +543,8 @@ def main(argv=None):
                 run_info[key] = value
     report = build_report(args.raw, layout, args.profile, args.stage, args.db_issued_rows,
                           _env(env_pairs), args.filtered_raw, args.stats, args.summary, args.gc_log, run_info,
-                          args.innodb, args.rows, args.redis_counter, args.publish_failures)
+                          args.innodb, args.rows, args.redis_counter, args.publish_failures,
+                          args.confirm_latency, (run_info or {}).get("container_clock_offset_s"))
     if args.settle_s is not None:
         report["settle_s"] = args.settle_s
         report["settled"] = args.settled == "true"

@@ -44,6 +44,7 @@ import com.jinddung2.couponlab.coupon.mapper.CouponMapper;
 import com.jinddung2.couponlab.coupon.model.CouponEvent;
 import com.jinddung2.couponlab.coupon.service.CouponIssueService;
 import com.jinddung2.couponlab.coupon.service.S4RabbitConfiguration;
+import com.jinddung2.couponlab.coupon.service.S6RabbitConfiguration;
 import com.zaxxer.hikari.HikariDataSource;
 
 import io.micrometer.core.instrument.Counter;
@@ -68,6 +69,10 @@ import io.micrometer.core.instrument.MeterRegistry;
  * not asserted) and redeliveries (delta of the coupon_s4_redeliveries counter). The procedure changed, so S0, S1 and S3
  * are re-recorded once with it; v3 and v3+settle evidence are not compared.
  * s5 (asynchronous like s4) records redis_counter and queue_depth as s4 does; it has no redelivery counter.
+ * s6 (asynchronous, no Redis) decides in MySQL and maintains coupon_event.remaining_quantity, so "remaining" is "db" again.
+ * Its settle polls the event's coupon_request rows (every request, winners and losers, is one row), not coupon_issue; it
+ * records requests_decided, queue_depth and dlq_depth of its own queues, and asserts one more invariant: dlq_depth == 0.
+ * The env block adds queue_type classic and stage_has_redis false.
  * Expected to FAIL on S0, whose read-then-decrement has no protection; the numbers are the evidence.
  */
 @Tag("consistency")
@@ -163,7 +168,9 @@ class ConcurrentIssueConsistencyTest {
                         + " runs; max over_issue=" + maxOf("over_issue") + ", max dup_members=" + maxOf("dup_members")),
                 () -> assertEquals(0, runsUnhealthy(), () -> "issued != " + EXPECTED_ISSUED + " or exceptions > 0 in "
                         + runsUnhealthy() + " of " + REPETITIONS + " runs; issued per run=" + valuesOf("issued")
-                        + ", exceptions per run=" + valuesOf("exceptions")));
+                        + ", exceptions per run=" + valuesOf("exceptions")),
+                () -> assertEquals(0, RUNS.stream().filter(run -> run.containsKey("dlq_depth")
+                        && !Long.valueOf(0).equals(run.get("dlq_depth"))).count(), () -> "dead letters: " + valuesOf("dlq_depth")));
     }
 
     private Map<String, Object> runOnce(int run) throws InterruptedException {
@@ -203,6 +210,7 @@ class ConcurrentIssueConsistencyTest {
         long settleMs = settle(eventId);
 
         int issued = countIssued(eventId);
+        Integer requestsDecided = "s6".equals(stage) ? countRequests(eventId) : null;
         int dupMembers = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM (SELECT member_id FROM coupon_issue WHERE event_id = ? "
                         + "GROUP BY member_id HAVING COUNT(*) > 1) d", Integer.class, eventId);
@@ -227,7 +235,12 @@ class ConcurrentIssueConsistencyTest {
             result.put("redis_counter", redisCounter);
         }
         if ("s4".equals(stage) || "s5".equals(stage)) {
-            result.put("queue_depth", queueDepth());
+            result.put("queue_depth", queueDepth(S4RabbitConfiguration.QUEUE));
+        }
+        if ("s6".equals(stage)) {
+            result.put("requests_decided", requestsDecided);
+            result.put("queue_depth", queueDepth(S6RabbitConfiguration.QUEUE));
+            result.put("dlq_depth", queueDepth(S6RabbitConfiguration.DEAD_LETTER_QUEUE));
         }
         if ("s4".equals(stage)) {
             result.put("redeliveries", (long) (redeliveries() - redeliveriesBefore));
@@ -245,15 +258,24 @@ class ConcurrentIssueConsistencyTest {
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM coupon_issue WHERE event_id = ?", Integer.class, eventId);
     }
 
+    private int countRequests(long eventId) {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM coupon_request WHERE event_id = ?", Integer.class, eventId);
+    }
+
+    /** What the settle watches: coupon_request rows for s6 (every request is a row), coupon_issue rows otherwise. */
+    private int countSettled(long eventId) {
+        return "s6".equals(stage) ? countRequests(eventId) : countIssued(eventId);
+    }
+
     /** Polls the event's rows until they stay unchanged for SETTLE_STABLE (at most SETTLE_MAX); returns the time spent. */
     private long settle(long eventId) throws InterruptedException {
         long started = System.nanoTime();
-        int last = countIssued(eventId);
+        int last = countSettled(eventId);
         long unchangedSince = System.nanoTime();
         while (System.nanoTime() - unchangedSince < SETTLE_STABLE.toNanos()
                 && System.nanoTime() - started < SETTLE_MAX.toNanos()) {
             Thread.sleep(SETTLE_POLL.toMillis());
-            int now = countIssued(eventId);
+            int now = countSettled(eventId);
             if (now != last) {
                 last = now;
                 unchangedSince = System.nanoTime();
@@ -262,8 +284,8 @@ class ConcurrentIssueConsistencyTest {
         return Duration.ofNanos(System.nanoTime() - started).toMillis();
     }
 
-    /** Messages (ready + unacked) of coupon.issued as rabbitmqctl reports them; null when the queue is not listed. */
-    private static Long queueDepth() throws InterruptedException {
+    /** Messages (ready + unacked) of a queue as rabbitmqctl reports them; null when the queue is not listed. */
+    private static Long queueDepth(String queue) throws InterruptedException {
         ExecResult listing;
         try {
             listing = RABBITMQ.execInContainer("rabbitmqctl", "list_queues", "-q", "name", "messages");
@@ -272,7 +294,7 @@ class ConcurrentIssueConsistencyTest {
         }
         for (String line : listing.getStdout().split("\\R")) {
             String[] fields = line.trim().split("\\s+");
-            if (fields.length == 2 && fields[0].equals(S4RabbitConfiguration.QUEUE)) {
+            if (fields.length == 2 && fields[0].equals(queue)) {
                 return Long.parseLong(fields[1]);
             }
         }
@@ -325,6 +347,10 @@ class ConcurrentIssueConsistencyTest {
         if (s4ConfirmTimeoutMs != null) {
             env.put("s4_confirm_timeout_ms", Long.parseLong(s4ConfirmTimeoutMs));
             env.put("s4_consumer_fail_every", Integer.parseInt(s4ConsumerFailEvery));
+        }
+        if ("s6".equals(stage)) {
+            env.put("queue_type", "classic");
+            env.put("stage_has_redis", false);
         }
         env.put("cpu", Runtime.getRuntime().availableProcessors());
         env.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version")

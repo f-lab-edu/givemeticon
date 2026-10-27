@@ -1,0 +1,105 @@
+{
+  "test": "G",
+  "scenario": "poison-db-down",
+  "stage": "s6",
+  "stock": 10000000,
+  "fault": {
+    "at_s": 20,
+    "duration_s": 15,
+    "observed": {
+      "stopped_at": 1793024898.051,
+      "stop_returned_at": 1793024901.424,
+      "started_at": 1793024916.713,
+      "healthy_at": 1793024919.941
+    }
+  },
+  "totals": {
+    "accepted": 31001,
+    "unconfirmed": 0,
+    "http_5xx": 0,
+    "timeout": 0,
+    "other": 0
+  },
+  "sent": 31001,
+  "rows": 31001,
+  "rows_by_status": {
+    "ISSUED": 31001
+  },
+  "lost": 0,
+  "lost_sample": [],
+  "recorded_despite_unconfirmed": 0,
+  "unexplained_rows": 0,
+  "issued": 31001,
+  "over_issue": 0,
+  "issue_rows": 31001,
+  "remaining": 9968999,
+  "dup_members": 0,
+  "dlq_depth": 300,
+  "poison_injected": {
+    "broken": 100,
+    "incomplete": 100,
+    "always_failing": 100
+  },
+  "queue_final": 0,
+  "consumers_final": 1,
+  "blackout_s": 0,
+  "error_codes": {},
+  "settle_s": 133.0,
+  "drain_s": 127.7,
+  "queue_depth_max": 26971,
+  "dlq_depth_max": 300,
+  "metrics": {
+    "coupon_s6_attempt_failures": 302.0,
+    "coupon_s6_confirm_latency": 31001.0,
+    "coupon_s6_confirm_latency.max": 127.315,
+    "coupon_s6_confirm_latency.total_time": 2519575.666,
+    "coupon_s6_consumer_paused_seconds": 25.815525137,
+    "coupon_s6_consumer_pauses": 1.0,
+    "coupon_s6_dlq": 300.0,
+    "coupon_s6_dlq{reason=conversion}": 100.0,
+    "coupon_s6_dlq{reason=exhausted}": 100.0,
+    "coupon_s6_dlq{reason=invalid}": 100.0,
+    "coupon_s6_processed": 31001.0,
+    "coupon_s6_processed{duplicate=false}": 31001.0,
+    "coupon_s6_processed{status=ISSUED}": 31001.0,
+    "coupon_s6_redeliveries": 50.0
+  },
+  "must": {
+    "lost_zero": true,
+    "unexplained_rows_zero": true,
+    "over_issue_zero": true,
+    "dup_members_zero": true,
+    "issue_rows_match": true,
+    "stock_consistent": true,
+    "queue_drained": true,
+    "dlq_equals_poison": true,
+    "dlq_reasons_match": true
+  },
+  "validity": {
+    "k6_completed": true,
+    "settled": true,
+    "fault_observed": true,
+    "valid": true
+  },
+  "pass": true,
+  "env": {
+    "app_cpus": "2",
+    "hikari_connection_timeout_ms": "2000",
+    "hikari_pool_size": "10",
+    "innodb_buffer_pool_size": "134217728",
+    "innodb_flush_log_at_trx_commit": "1",
+    "innodb_redo_log_capacity": "104857600",
+    "jvm_heap": "1g",
+    "k6_mode": "host",
+    "k6_version": "v2.2.0",
+    "mysql_cpus": "2",
+    "queue_type": "classic",
+    "rabbitmq_cpus": "1",
+    "rabbitmq_image": "rabbitmq:3-management-alpine",
+    "s6_confirm_timeout_ms": "2000",
+    "s6_consumer_fail_every": "0",
+    "s6_queue_max_length": "200000",
+    "stage_has_redis": "false",
+    "tomcat_max_threads": "200"
+  }
+}

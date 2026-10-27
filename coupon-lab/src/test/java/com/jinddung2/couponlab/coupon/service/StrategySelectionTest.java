@@ -27,7 +27,7 @@ class StrategySelectionTest {
             .withBean(RabbitTemplate.class, () -> mock(RabbitTemplate.class))
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
             .withUserConfiguration(S0CouponIssueService.class, S1CouponIssueService.class, S3CouponIssueService.class,
-                    S4CouponIssueService.class, S5CouponIssueService.class);
+                    S4CouponIssueService.class, S5CouponIssueService.class, S6CouponIssueService.class);
 
     @Test
     void s0SelectsOnlyS0() {
@@ -66,6 +66,14 @@ class StrategySelectionTest {
         contextRunner.withPropertyValues("coupon.strategy=s5").run(context -> {
             assertThat(context.getBeansOfType(CouponIssueService.class)).hasSize(1);
             assertThat(context.getBean(CouponIssueService.class)).isInstanceOf(S5CouponIssueService.class);
+        });
+    }
+
+    @Test
+    void s6SelectsOnlyS6() {
+        contextRunner.withPropertyValues("coupon.strategy=s6").run(context -> {
+            assertThat(context.getBeansOfType(CouponIssueService.class)).hasSize(1);
+            assertThat(context.getBean(CouponIssueService.class)).isInstanceOf(S6CouponIssueService.class);
         });
     }
 

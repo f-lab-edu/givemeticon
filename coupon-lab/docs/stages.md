@@ -749,3 +749,236 @@ Test A v3+settle, 10회, 1000 threads, 재고 100, 같은 env 블록(java 21.0.5
 `evidence/s5/consistency/20261025-114307-049a56e-dirty` 는 커밋 전(dirty) 같은 코드의 run 이고 표에는 쓰지 않는다.
 
 * B/C/D/E (load, bottleneck, recovery, fairness): `verify.sh bundle` 은 NO_TESTS(태그된 테스트가 저장소에 없다). `verify.sh load`/`recovery` 는 s4 전용 분기(settle, AOF 기본값, queue depth, 발행 실패 지표)가 s5 를 모르므로 실행하지 않았다: INCOMPLETE.
+
+
+## S6 - RabbitMQ 접수, MySQL Consumer 판정 (frozen)
+
+* 구조: App → RabbitMQ(S6 전용 classic durable 큐) → Consumer 1개(중복·재고·당첨 판정) → MySQL(단일 원장). Redis를 쓰지 않는다. S4/S5 코드·evidence·`coupon.issued` 큐는 건드리지 않는다.
+
+### 1. 요구사항과 우선순위
+
+* 절대 조건: 초과 발급 0, 1인 1매 위반 0, 202를 받은 신청의 유실 0.
+* 가용성: DB 장애 중에도 브로커 수용 한도 안에서 접수를 계속한다.
+* 포기하는 것: 즉시 당첨 응답(202만 준다), 결과 확정 속도(Consumer 처리 속도에 묶인다).
+
+### 2. 공정성(선착순)의 정의
+
+* 선착순 = 브로커에 적재된 순서대로 Consumer가 처리하고 커밋한 순서. HTTP 도착 순서는 약속하지 않는다(여러 요청 스레드가 동시에 발행한다).
+* 재전달이 일어나면 처리 순서가 적재 순서와 달라질 수 있다. 테스트 E로 잰다.
+
+### 3. 메시지 계약
+
+* 필드: `requestId`(UUID), `eventId`, `memberId`, `acceptedAt`(발행 직전 epoch ms; 확정 지연 측정용). persistent(deliveryMode 2), JSON, messageId = requestId.
+* `requestId`: 클라이언트가 보내면 그 값, 없으면 서버가 만든다. 같은 requestId로 다시 보내도 안전하다(Consumer가 UNIQUE(request_id)로 걸러 기존 결과를 유지한다).
+* 요청 경로는 DB를 읽지 않는다. 존재하지 않는 eventId도 접수되고, Consumer가 `FAILED`(reason `UNKNOWN_EVENT`)로 기록하고 ACK한다.
+
+### 4. 응답 계약
+
+| 상황 | 응답 |
+|---|---|
+| 발행 확인(ack)을 받고 return이 없음 | 202 `{status: ACCEPTED, requestId}` |
+| nack, return(unroutable), 큐 상한 초과(reject-publish) | 503 `{requestId, retryable: true}` |
+| 확인 타임아웃(2 s) | 503 `{requestId, retryable: true}`. 저장됐을 수 있으므로 같은 requestId로 재시도하게 한다 |
+| 결과 조회 `GET /coupon-requests/{requestId}` | 200 `{status}`: PENDING(DB에 없음) / ISSUED(+seq) / SOLD_OUT / ALREADY_ISSUED / FAILED |
+| DB 장애 중 결과 조회 | 503. 별도 접수 증빙 저장소는 만들지 않는다 |
+
+### 5. 상태 전이
+
+`(DB에 없음 = PENDING)` → `ISSUED` | `SOLD_OUT` | `ALREADY_ISSUED` | `FAILED`. 최종 상태는 바뀌지 않는다.
+
+### 6. 오류 분류
+
+| 오류 | 처리 |
+|---|---|
+| DB 연결 장애 (커넥션 획득 실패, 트랜잭션 시작 실패, 접근 불가) | 재시도 횟수에 넣지 않는다. 메시지는 ACK하지 않고 container를 비동기로 멈춘 뒤 DB 복구가 확인되면 재개 |
+| 일시적 트랜잭션 오류 (데드락, 락 대기 초과) | 같은 전달 안에서 재시도(위 "그 밖" 횟수에 센다) |
+| 중복 요청 (같은 requestId가 이미 처리됨) | 오류가 아니다. 기존 결과를 두고 ACK |
+| 메시지 변환 실패·필수 필드 누락 | 재시도 없이 reject(requeue=false) → DLX → DLQ |
+| 그 밖의 반복 실패 | 같은 전달 안에서 최대 3회 시도 후 FAILED 기록 + reject(requeue=false) → DLQ |
+
+### 7. 설계 결정
+
+* ACK: AUTO. 판정 트랜잭션은 리스너 밖 서비스 메서드(`@Transactional`)에서 끝나므로, 리스너가 정상 반환할 때(=커밋 뒤)에만 ACK가 나간다.
+* 재시도는 Spring Retry 인터셉터 대신 리스너 안의 3회 루프로 쓴다. 인터셉터는 재시도 불가 예외에도 복구 콜백(DLQ 이동)을 부르므로, "DB 연결 장애는 DLQ로 가지 않는다"를 보장하려면 분류를 먼저 해야 하기 때문이다.
+* 판정은 한 트랜잭션: request_id 확인 → 이미 ISSUED인 회원이면 ALREADY_ISSUED(재고 소모 없음) → `UPDATE ... SET remaining_quantity = remaining_quantity - 1 WHERE id = ? AND remaining_quantity > 0` → 영향 행 1이면 ISSUED(seq = total − 차감 뒤 remaining)와 `coupon_issue` INSERT(`message_id` = requestId), 0이면 SOLD_OUT. 제약은 새 테이블 `coupon_request`에 둔다: UNIQUE(request_id), UNIQUE(event_id, issued_member_id)(생성 컬럼; status가 ISSUED일 때만 member_id). 기존 `coupon_issue`의 제약 없음은 유지한다.
+* 큐: exchange `coupon.s6.direct`, 큐 `coupon.s6.requests`(classic durable, `x-max-length`=200,000, `x-overflow`=reject-publish, DLX `coupon.s6.dlx`), DLQ `coupon.s6.requests.dlq`. 200,000은 S4 ramping에서 관측한 큐 최대치(213,760)와 같은 자릿수다. 기본 overflow(drop-head)는 확인을 받은 신청을 조용히 버리므로 쓰지 않는다.
+* Consumer: 전용 container factory, concurrency 1, prefetch 50(S4와 같음; `spring.rabbitmq.listener.*`는 바꾸지 않는다). DB 연결 장애 감지 시 메시지를 ACK하지 않고 container를 별도 스레드에서 멈추며, 1초 간격 `SELECT 1`이 연속 3회 성공하면 재시작한다. 장애 감지가 늦지 않도록 S6가 켜져 있을 때만 Hikari connectionTimeout을 2 s로 낮춘다(기본 30 s).
+
+### 8. 측정 조건 동결
+
+* 테스트 A: `ConcurrentIssueConsistencyTest`, 1,000 threads, 재고 100, 10회, `v3+settle`. 판정: 정착 뒤 `issued == 100`, `exceptions == 0`, `dup_members == 0`, DLQ 0.
+* 테스트 B: S4와 같은 ramping 프로필, n ≥ 5. 테스트 D: S4와 같은 `db-down`(중단 시각·길이 동일), `consumer-redeliver`(`COUPON_S6_CONSUMER_FAIL_EVERY=50`). 테스트 F: `broker-down`(새 시나리오). 테스트 E, G: T07.
+* 환경 블록에 `queue_type: classic`, `stage_has_redis: false`를 기록한다.
+
+### 9. S4 → S6에서 바뀌는 조건 (비교 시 반드시 함께 적는다)
+
+| 항목 | S4 | S6 |
+|---|---|---|
+| 당첨 판정 위치 | Redis Lua INCR (요청 경로) | MySQL Consumer (요청 경로 밖) |
+| Redis | 사용 (AOF everysec) | 사용하지 않음 |
+| 응답 | 200 ISSUED (즉시 결과) | 202 Accepted + request_id (결과는 조회) |
+| DB 쓰기 | 당첨자만 | 모든 요청의 결과 + 당첨자 |
+| 제약 | UNIQUE 없음, message_id 존재 확인 | UNIQUE(request_id), 당첨자 1인 1매 UNIQUE |
+| Consumer 오류 처리 | 실패 시 1초 쉬고 무한 재전달 | DB 장애는 중단·재개, 그 밖은 유한 재시도 후 DLQ |
+| 큐 | `coupon.issued` (classic durable, 상한 없음) | S6 전용 큐 (classic durable, max-length + reject-publish, DLX) |
+
+### 10. 예측 (측정 전에 커밋; 측정 뒤 확인/기각 판정)
+
+* P-A: 테스트 A 10회 모두 정착 뒤 issued 100, 예외 0, dup_members 0, DLQ 0.
+* P-B1: 접수 처리량은 S4와 비슷하다(요청 경로가 발행 확인뿐). ramping sustained 중앙값이 S4(1,600 rps)의 ±25% 안.
+* P-B2: Consumer 처리 속도는 약 250~450행/초다. 메시지당 트랜잭션 하나에 문장 4~5개(존재 확인, 중복 회원 확인, 재고 UPDATE, remaining 조회, INSERT 1~2)와 재고 행 하나에 대한 쓰기가 직렬로 들어가므로 S4의 740~890보다 느리다. 그래서 몰리는 구간에서 큐가 쌓이고, 큐가 200,000에 닿으면 503(reject-publish)이 나온다. 확정 지연 p95는 분 단위다.
+* P-D1 (db-down 45 s): 중단 중 응답이 전부 202(5xx 0), 복구 뒤 202를 받은 신청의 유실 0, DLQ 0. 쌓인 큐를 비우는 시간(settle)은 60~120 s(부하 종료 시점 백로그 약 2.5만 건 ÷ 350행/초).
+* P-D2 (consumer-redeliver, FAIL_EVERY 50): 재전달 건수는 요청 수/50 근처, 중복 0, 재고 이중 차감 0.
+* P-F (broker-down): 202를 받은 requestId 집합 ⊆ 정착 뒤 DB의 requestId 집합. 확인 못 받은 신청에 202 0건. 타임아웃 503 중 일부는 실제로 저장돼 있다(유실이 아니라 불확실로 센다).
+* P-E: 재전달이 없으면 적재 순서 = 당첨 순서(단일 발행자). DB 중단·재개나 크래시 주입으로 재전달이 생기면 순서가 바뀐 당첨자가 생길 수 있고, 중단 1회당 최대 prefetch(50) 자릿수다.
+* P-G: 독 메시지만 DLQ로 간다. DB 중단과 겹쳐도 정상 메시지의 DLQ 이동은 0이다.
+
+### 11. 이번 단계에서 하지 않는 것과 알려진 한계
+
+* Quorum Queue 미적용. "브로커 노드가 1대라 quorum의 복제 이점이 없고, 얻는 것은 브로커 차원의 재시도 상한뿐이다. 재시도 상한은 앱에서 세고, 상한을 넘은 메시지는 DLX를 거쳐 DLQ로 보낸다. S4와 같은 큐 종류를 유지해 비교 변수를 줄인다. 다중 노드 이중화 단계에서 다시 검토한다."
+* classic 큐의 dead-lettering은 at-most-once다. DLQ로 옮기는 중의 장애까지 무유실이라고 주장하지 않는다.
+* 3회 제한은 한 번의 전달 안에서만 센다. 재전달되면 초기화된다. 전달을 넘어선 누적 상한은 구현하지 않는다.
+* FAILED 기록은 requestId를 읽을 수 있을 때만 가능하다. JSON이 깨진 메시지는 DLQ에만 남는다.
+* DLQ 재처리 도구, 다중 Consumer, 다중 노드는 범위 밖이다.
+
+### 12. 결과 (측정 뒤; 예측은 `8979a57`, 첫 S6 측정보다 앞선 커밋)
+
+코드: `S6CouponIssueService`, `S6RabbitConfiguration`, `S6RequestProcessor`, `S6RequestConsumer`, `S6ConsumerSupervisor`, `S6ErrorClassifier`, `S6DataSourceConfiguration`, `S6CouponRequestController`, `S6RequestMapper`(+XML), `V3__s6_coupon_request.sql`. 공유 변경(추가만): `IssueResult.Accepted`, `CouponIssueService.issue(eventId, memberId, requestId)` 기본 메서드, 컨트롤러 202 매핑과 선택 필드 `requestId`(없으면 기존 2인자 호출 그대로). 하네스: `docker-compose.load.s6.yml`(override; 기본 compose 는 그대로), `recovery_s6.js`, `recovery_s6_postprocess.py`(+테스트), `verify.sh` 의 `run_recovery_s6`.
+
+| 예측 | 결과 | 판정 |
+|---|---|---|
+| P-A: 10회 모두 issued 100, 예외 0, dup 0, DLQ 0 | `evidence/s6/consistency/20261026-120830-2cffc0b`: 10회 모두 issued 100, 초과 0, dup 0, DLQ 0, remaining 일치. **1회차만 예외 311, elapsed 600,682 ms**(2~10회차 예외 0, elapsed 267~441 ms) | **FAIL** (불변식은 10/10 유지, 건강 조건 1/10 위반). 아래 "알려진 문제 1" |
+| P-B1, P-B2: 접수 처리량 ±25%, 소비 250~450행/초, 큐 누적·503 | B(`verify.sh load --stage s6`)는 실행하지 않았다. 소비 속도만 D/F run 의 `db-samples.jsonl` 10초 기울기 최대값에서 유도: 330~442행/초 | B: **INCOMPLETE**. P-B2 는 범위 안이지만 B 측정이 아니므로 판정하지 않는다 |
+| P-D1: db-down 45 s 중 전부 202, 유실 0, DLQ 0, 비우기 60~120 s | `ab3f82c` run: 31,002 → 202 31,002, 5xx 0, 타임아웃 0, blackout 0, 유실 0, DLQ 0, 재고 일치, 소비자 일시중단 1회(55.2 s), 시도 실패 0, 큐 최대 29,643, 비우기 104.7 s. 앞선 두 run(`e6968e1`, `fbae2e5`)도 PASS(비우기 74.6 / 81.7 s). `e6968e1` run 들은 `stock_consistent` 가, `e6968e1`·`fbae2e5` run 들은 `queue_drained` 가 생기기 전의 판정이다 | **확인** |
+| P-D2: consumer-redeliver(FAIL_EVERY 50) 재전달 ≈ N/50, 중복 0, 이중 차감 0 | `ab3f82c`: 31,002 → 202 31,002, 재전달 620(= 31,002/50), 중복 0, `stock − remaining == ISSUED`, DLQ 0. 앞선 run 619 / 620 | **확인** |
+| P-F: 202 집합 ⊆ DB 집합, 확인 못 받은 신청에 202 0건 | `ab3f82c` 3회: 유실 0 / 0 / 0, 202 11,564 / 11,702 / 11,202, 타임아웃·503 이지만 저장된 건 5,449 / 5,723 / 5,754, 끝의 큐 0·소비자 1. 첫 run(`e6968e1`)도 PASS. **`fbae2e5` run 은 FAIL**(202 11,055 중 7,073건이 정착 시점에 행이 없음) | 확인 4/5, FAIL 1/5. 아래 "알려진 문제 2" |
+| P-E: 재전달이 없으면 적재 순서 = 당첨 순서, DB 중단·재개 시 순서가 바뀐 당첨자 가능 | `evidence/s6/fairness/20261026-131341-001d124`: 300건·재고 100, baseline 3회와 DB 5 s 차단 3회(일시중단 각 1회) 모두 순서 밖 당첨자 0 | 앞부분 **확인**, DB 중단 부분 **기각**(관측 0). 원인(classic 큐의 requeue 가 원래 위치로 돌아가는지)은 확인하지 않았다. 크래시 주입 변형은 재지 않았다 |
+| P-G: 독 메시지만 DLQ, DB 중단 중 DLQ 0 | 부하 조건의 G 는 실행하지 않았다. 통합 테스트(`S6ConsumerIntegrationTest`, `S6DatabaseOutageTest`)에서 깨진 JSON·필드 누락 → 즉시 DLQ, 항상 실패 → 정확히 3회 후 FAILED + DLQ, DB 차단 중 DLQ 0·시도 실패 0 | 부하 조건: **INCOMPLETE** |
+
+S4 와 비교(같은 시나리오·시각·길이, n 은 S4 1회 대 S6 1~3회; §9 의 바뀐 조건이 모두 함께 바뀌었으므로 차이의 원인을 하나로 단정하지 않는다. 환경도 다르다: S4 는 redis 컨테이너 + AOF, Hikari 대기 30 s; S6 는 redis 없음, Hikari 대기 2 s):
+
+| 측정 | S4 (`6b8b065`) | S6 (`ab3f82c`) |
+|---|---|---|
+| db-down 45 s: 응답 | 200 31,002, 5xx 0, 타임아웃 0 | 202 31,002, 5xx 0, 타임아웃 0 |
+| db-down: 큐 최대 / 비우기 | 25,865 / 28.7 s | 29,643 / 104.7 s (앞선 run 74.6, 81.7 s) |
+| consumer-redeliver: 재전달 / 중복 / 큐 최대 | 620 / 0 / 1,337 | 620 / 0 / 24,221 |
+| 소비 속도(유도) | 약 740~890행/초 | 약 330~440행/초 |
+
+S6 는 모든 요청을 판정하고 기록하므로(당첨자만 쓰던 S4 대비 요청당 문장 4~5개, 재고 행 갱신 포함) 소비가 느리고 큐가 더 쌓인다. 대신 판정이 MySQL 한 곳에 있어 Redis 장애 시나리오가 없다.
+
+**알려진 문제 1 (Test A 1회차 600 s 정지).** 1회차에서 발행 1,000건 가운데 일부의 confirm 이 오지 않다가 정확히 600 s 뒤 채널이 닫히며 nack/타임아웃(예외 311)으로 끝났고, 소비자도 그동안 50건(prefetch)만 처리했다. 600 s 는 amqp-client 의 기본 channel RPC 타임아웃(10분)과 같다. 2~10회차는 정상이다. 차가운 채널 캐시에 가상 스레드 1,000개가 동시에 채널을 여는 상황(S4/S5 는 당첨자 100건만 발행)에서 생기는 교착으로 **추정**하지만 확인하지 못했다(`-Djdk.tracePinnedThreads` 는 이 JDK 에서 JVM 을 죽였다). 운영 경로(Tomcat 플랫폼 스레드)에서 재현되는지는 모른다. 고치려면 Test A 의 호출 스레드를 바꾸거나(동결된 측정 조건 변경: 승인 필요) 발행 쪽 채널 수를 제한해야 한다.
+
+**알려진 문제 2 (broker-down `fbae2e5` FAIL).** 그 run 의 정착 판정은 행 수만 봤고, 브로커 재시작 뒤 관리 API 샘플이 끝까지 비었으며 소비 기울기는 169행/초였다. "소비자가 재개하지 않아 메시지가 큐에 남았다"가 가장 그럴듯하지만, 당시 큐 깊이를 기록하지 않아 **실제 유실과 구별할 수 없다**. 이후 정착 조건에 "메인 큐가 비어 있음"을 더하고 끝의 큐·소비자 수를 기록하게 했고(`216ab87`), 같은 조건 3회는 모두 큐 0·소비자 1로 PASS 였다. 재현 빈도는 1/5 (수정 전 2회 중 1회)이고 원인은 미확인이다.
+
+**그 밖의 관측.** broker-down 에서 15 s 중단에 blackout 은 37~38 s 이고 타임아웃(클라이언트 5 s)이 14,000건 이상이다. 그 가운데 5,400~5,700건은 실제로 큐에 들어가 처리됐다(확인을 못 받은 클라이언트가 같은 requestId 로 재시도하면 한 번만 처리된다). 요청 스레드가 브로커 재연결을 기다리며 묶인 것으로 보이며, 측정하지 않았다. db-down 에서 롤백 실패(`08003`)가 시도 1회로 세어지던 분류 누락은 `216ab87` 에서 고쳤다(이후 시도 실패 0).
+
+**이번 단계에서 하지 않은 것 / 쓰면 안 되는 말**
+
+* B(부하 ramping, n ≥ 5): 실행하지 않았다(`verify.sh load` 는 s6 를 모른다). G(부하 중 독 메시지): 실행하지 않았다. E 의 크래시 주입 변형: 실행하지 않았다.
+* `docker stop` 은 정상 종료다. "브로커·DB 크래시에서 유실 0"이 아니다. 노드는 각 1대이고 Quorum Queue 는 쓰지 않았다(§11).
+* 표본 수: D/F 시나리오별 1~3회, E 6회, A 10회 1묶음. 동결(`stage/s6`, protected-paths)은 하지 않았다: A FAIL, B·G 미실행.
+
+### 13. 후속 결과와 동결 판정 (§12 의 FAIL·INCOMPLETE 를 이어서 판정; §12 의 기록은 그대로 둔다)
+
+최종 코드 `b5ac635`(태그 `stage/s6`). §12 이후 코드 변경은 두 가지다: 동시 발행 상한(`0c879e6`), 커밋·롤백 실패를 DB 장애로 분류(`b5ac635`).
+
+**알려진 문제 1 (Test A 600 s 정지): 원인 확인, 수정, 재측정 PASS.**
+
+* 재현: 수정 전 코드로 verify.sh 밖 진단 실행(evidence 없음)에서 5회차가 600,516 ms·예외 50 으로 다시 멈췄다. 정지 시작 13:33:14.7, 재개 13:43:15.5(약 601 s).
+* 정지 중 스레드 덤프(가상 스레드 포함): 가상 스레드 **256개**가 amqp-client 5.21 의 `BlockingCell.get`(`Object.wait`)에서 채널 RPC 응답을 기다린다. JDK 21 에서 `Object.wait` 는 캐리어를 고정하고, 256 은 가상 스레드 스케줄러의 기본 최대 캐리어 수다. 소켓 쓰기 락을 기다리는 가상 스레드 378개는 캐리어가 없어 돌지 못하고, 연결의 읽기 스레드(`AMQP Connection`, 플랫폼 스레드)는 `ChannelN.markRpcFinished` 에서 채널 락을 기다린다. 응답을 넘겨줄 스레드가 막혀 있으니 channel RPC 타임아웃(10분)이 터질 때까지 모두 멈춘다.
+* 조건: 발행자 1,000명(가상 스레드)이 채널 캐시(200)를 넘어 새 채널을 한꺼번에 여는 순간. S4/S5 의 Test A 는 당첨자 100명만 발행해서 이 문턱에 닿지 않았다. 운영 경로(Tomcat 플랫폼 스레드 200)에서는 생기지 않는다.
+* 수정(`0c879e6`, 측정 조건은 그대로): `S6CouponIssueService` 가 동시에 진행 중인 발행을 채널 캐시 크기(200)로 제한한다(`Semaphore`, 시간 제한 없음, 새 응답 없음). 고정될 수 있는 가상 스레드가 200개를 넘지 않으므로 캐리어가 남는다. 이 상한은 가상 스레드 스케줄러의 최대 캐리어(기본 256)보다 작아야 성립한다.
+* 재측정: `evidence/s6/consistency/20261026-134416-0c879e6`, `…-134539-0c879e6`, `…-134716-0c879e6`, 최종 `…-b5ac635`. 4 × 10회 모두 issued 100, 초과 0, dup 0, DLQ 0, 예외 0, elapsed 최대 292 ms. 수정 전 관측 빈도는 20회차 중 2회였고, 수정 뒤 40회차 중 0회다.
+* P-A 판정: **확인** (최종 코드).
+
+**B 부하 (`ramping`, n = 5, `d46334f`; 최종 코드와는 예외 경로 분류만 다르다)**
+
+| 측정 | 결과 (5회) |
+|---|---|
+| sustained (프로필 최대 800 rps) | 800 / 800 / 800 / 800 / 800, stall 0, dropped 0 |
+| 800 rps 단계 p50 / p95 (ms) | 3.5 / 5.3 / 6.8 / 15.2 / 4.0, 121 / 91 / 63 / 203 / 45 (중앙값 5.3 / 91) |
+| 202 응답 == `coupon_request` 행 | 89,540 / 89,645 / 89,636 / 89,603 / 89,638, 모두 일치. 발행 실패 0, DLQ 0 |
+| 큐 최대 / 정착 | 39,161~62,530 / 96~200 s |
+| 소비 속도 (큐 최대치에서 0 까지의 기울기) | 419 / 384 / 338 / 321 / 424 행/초 |
+| 요청당 DB 쓰기 행 | 2 (`coupon_request` + 당첨 시 `coupon_issue`; 재고 1천만이라 모든 요청이 당첨) |
+
+* P-B1(S4 1,600 rps 의 ±25%): **판정 불가**. S4 의 1,600 은 `ramping-rows1` 프로필 값이고 S6 는 `ramping` 만 쟀다. S6 는 이 프로필 끝(800)에서도 천장에 닿지 않았다. S4 의 `ramping` evidence(`1d455d2`)는 S4 마감 전 초기 코드라 비교하지 않는다.
+* P-B2(소비 250~450행/초, 큐 누적): **확인**. 321~424행/초이고, 400 rps 단계부터 큐가 쌓인다. 큐 상한(200,000)에는 닿지 않아서 reject-publish 503 은 이 프로필에서 생기지 않았다(통합 테스트에서만 확인). 확정 지연(p50·p95)은 B 에서 기록하지 않았다.
+
+**G 독 메시지 (`b5ac635`, 부하 500 rps 60 s 중 초당 5건, 종류별 100건)**
+
+| 시나리오 | 결과 |
+|---|---|
+| poison | 정상 31,002 → 202 31,002, 유실 0. DLQ 300 = 주입 300, 사유별 conversion 100 / invalid 100 / exhausted 100. 시도 실패 300 (= exhausted 100 × 3) |
+| poison-db-down (MySQL 20 s 째부터 15 s 중단) | 정상 31,002 → 유실 0, DLQ 300 = 주입 300(사유별 일치), 일시중단 1회. 시도 실패 301: 독 메시지 1건이 1회 실패한 뒤 DB 차단에 걸려 재전달되며 횟수가 초기화되었다(§11 의 한계 그대로). 정상 메시지의 시도 실패·DLQ 0 |
+
+* P-G 판정: **확인**. 앞선 run(`fae3bf5`)은 PASS 였지만 롤백 실패를 시도로 센 분류 누락 2건이 있었고 `b5ac635` 에서 고쳤다.
+* 뒤 메시지가 막힌 시간(유도): exhausted 1건은 시도 사이 대기 0.2 + 0.4 s 를 쓰므로 100건이면 소비자가 약 60 s 를 대기에 쓴다. 비우기 시간이 같은 부하의 db-down 보다 길어지는 이유다(직접 재지 않았다).
+
+**E 공정성 (`evidence/s6/fairness/20261026-150441-5bb215d`)**
+
+* baseline 3회, db-interrupt 3회(일시중단 각 1회, 재전달 50), crash-every-10 3회(재전달 30): 모두 순서 밖 당첨자 0.
+* P-E 의 앞부분(재전달 없으면 적재 순서 = 당첨 순서)은 **확인**, 뒷부분(재전달이 순서를 바꾼 당첨자를 만든다)은 **기각**(관측 0).
+* 한계: 이 지표는 "당첨자 집합 = 적재 순서 앞쪽 재고 수만큼"인지만 본다. 재고 경계를 넘지 않는 순서 바뀜(재전달된 메시지가 뒤 메시지보다 늦게 처리되는 것)은 세지 않는다.
+
+**D·F 최종 코드 재기록 (`b5ac635`)**
+
+* db-down 31,001 → 202 전부, 유실 0, DLQ 0, 시도 실패 0, 비우기 57.7 s.
+* consumer-redeliver 재전달 620, 중복 0, 재고 일치.
+* broker-down: 유실 0이고, 202 18,878 / 타임아웃 8,143 / 503 593, 불확실 저장 1,093, blackout 22 s, 끝의 큐 0·소비자 1.
+* broker-down 의 타임아웃·blackout 은 `ab3f82c` run 들(타임아웃 14,000건 이상, blackout 37~38 s)보다 작다. 발행 상한이 생긴 것과 시기가 겹치지만 원인은 확인하지 않았다(n = 1).
+
+**동결 판정**
+
+* 최종 코드에서 A·B·D·E·F·G 가 모두 PASS 다. §12 의 FAIL 두 건은 기록으로 남는다. A 의 FAIL 은 원인을 확인하고 고쳤다. broker-down `fbae2e5` 의 FAIL 은 원인 미확인이다. 그 뒤 같은 조건 4회(큐 비움까지 확인)는 PASS 였다.
+* 동결 대상(`.claude/protected-paths.txt`): `S6*` 서비스·설정·소비자·감독자·분류기·예외·메시지, `S6CouponRequestController`, `S6RequestMapper`(+XML), `S6RequestRecord`, `V3__s6_coupon_request.sql`.
+* 남은 한계: §11 과 위의 것 그대로다. `docker stop` 은 정상 종료이고, 노드는 각 1대다. Quorum Queue 는 쓰지 않았다. 확정 지연 분포는 재지 않았다. broker-down FAIL 1건의 원인은 미확인이다.
+
+
+### 14. 포트폴리오 보강 실험 (§13 이후; S6 코드는 동결 그대로, 바뀐 것은 하네스뿐)
+
+하네스 변경: B 에 확정 지연 기록(`1005253`: `coupon_request` 의 `processed_at − accepted_at` 을 `confirm.tsv.gz` 로 남기고 `load.json` 의 `confirm_latency_ms` 에 전체·단계별 p50/p95/p99/max), broker-down 의 `--client-retry`(`1005253`, 집계 수정 `5649656`).
+
+**② 확정 지연 (S6 B `ramping` ×3, `da30cf0`)**
+
+| 측정 | 결과 (3회) |
+|---|---|
+| sustained / 202 == 행 | 800 / 800 / 800, 모두 일치 (89,645 / 89,390 / 89,637). 2회차에 650 rps 단계 stall 1회 |
+| 요청 경로 p95 @800 rps | 18.6 / 92.1 / 18.5 ms |
+| 확정 지연 p50 (100·200·300 rps 단계) | 약 2 ms (2.1~6.3) |
+| 확정 지연 p50 (400 / 500 / 650 / 800 rps 단계) | 3~1,503 ms / 2.2~10.4 s / 24~37 s / 42~53 s |
+| 확정 지연 전체 p50 / p95 / 최대 | 5.7~14.8 s / 45~57 s / 47~59 s |
+| 큐 최대 / 정착 | 26,029~31,583 / 53~64 s |
+
+* 해석: 도착률이 소비 속도(약 330~440행/초, §13)를 넘는 400 rps 단계부터 큐가 쌓이고, 확정 지연은 큐 길이만큼 늘어난다. 800 rps 에서 결과를 알기까지 약 1분이다. 이것이 S6 가 "즉시 당첨 응답"을 포기한 대가의 크기다.
+
+**③ S4 와 같은 조건 비교 (`ramping`, n = 3 대 3, 같은 Mac; S4 는 설계대로 AOF, `da30cf0` 에서 동결된 S4 코드)**
+
+| 측정 | S4 (`evidence/s4/load/ramping-aof/*-da30cf0`) | S6 (`evidence/s6/load/ramping/*-da30cf0`) |
+|---|---|---|
+| sustained | 800 / 800 / 800 | 800 / 800 / 800 |
+| 요청 경로 p95 @800 rps | 35.0 / 120.9 / 46.3 ms | 18.6 / 92.1 / 18.5 ms |
+| 사용자가 당첨 결과를 아는 시점 | 응답 그 자체 (위 p95) | 확정 지연 p50 @800 rps 42~53 s |
+| 큐 최대 / 정착 | 18,735~19,705 / 30~31 s | 26,029~31,583 / 53~64 s |
+| MySQL CPU @800 (2 cpu 중) | 32~36 % | §13 run 들 49~59 % |
+| 요청당 DB 쓰기 행 | 당첨 1 | 요청 1 + 당첨 1 |
+
+* P-B1 판정: 이 프로필에서는 두 단계 모두 끝(800 rps)까지 위반이 없어 천장 비교는 할 수 없다. 요청 경로 지연은 같은 범위다(차이를 단정하지 않는다). 판정·Redis 유무·DB 쓰기량·오류 처리가 함께 바뀌었으므로(§9) 큐 적체 차이를 하나의 원인으로 돌리지 않는다.
+
+**④ 같은 requestId 재시도 (broker-down `--client-retry` ×3, `5649656`)**
+
+| run | 부하 중 202 못 받음 → 재시도 | 재시도 202 | 그중 이미 저장돼 있던 요청 | 재판정 | 보낸 요청 = 최종 행 |
+|---|---|---|---|---|---|
+| `…215533` | 9,708 | 9,708 | 637 | 0 | 27,308 = 27,308 |
+| `…215828` | 9,125 | 9,125 | 2,141 | 0 | 27,475 = 27,475 |
+| `…220124` | 8,915 | 8,915 | 154 | 0 | 27,584 = 27,584 |
+
+* 판정: **확인**. 확인을 못 받은 요청은 같은 id 로 다시 보내면 모두 접수되고, 이미 저장돼 있던 요청은 다시 판정되지 않는다(상태 불변). 요청 1건이 행 1개다.
+* `…215050-1005253` 은 "불확실 저장" 수를 재시도 뒤 행으로 세던 하네스로 돌았다. 다른 판정은 같지만 그 수(10,992)는 쓰지 않는다.
+
+**⑤ broker-down 재현 시도**
+
+* 전체 16회(`e6968e1` 1, `fbae2e5` 1, `ab3f82c` 3, `b5ac635` 1, `5649656` 6, `da30cf0` 4): PASS 15, FAIL 1(`fbae2e5`).
+* 정착 판정을 고친 `216ab87` 이후 14회는 모두 PASS 다(유실 0, 끝의 큐 0·소비자 1). `fbae2e5` FAIL 의 원인은 여전히 미확인이고, 그 조건으로는 재현되지 않았다.
+* `…221604-5649656` 은 실행 중 노트북이 잠들어 k6 가 18분 걸렸다. 정확성 판정은 유효하지만 blackout·비우기 시간은 쓰지 않는다. 그 뒤 첫 시도들은 깬 직후 Docker Desktop DNS 실패로 compose 가 뜨지 않아 측정 없이 INFRA_DOWN 이었다(evidence 없음).
+* 시간 수치(잠든 run 제외 15회): blackout 19~39 s, 확인 못 받은 요청 중 실제로 저장된 요청 0~5,754건.

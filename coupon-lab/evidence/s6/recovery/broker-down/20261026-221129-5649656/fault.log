@@ -1,0 +1,7 @@
+2026-10-26T22:11:48.354Z k6_started epoch=1793052708.355 test starts at epoch 1793052728, main phase at epoch 1793052738
+2026-10-26T22:11:48.376Z fault_scheduled epoch=1793052708.377 scenario=broker-down target=coupon-lab-load-rabbitmq at=main+20s for 15s
+2026-10-26T22:12:38.026Z stopped_at epoch=1793052758.027 about to docker stop coupon-lab-load-rabbitmq
+2026-10-26T22:12:39.416Z stop_returned_at epoch=1793052759.416 docker stop coupon-lab-load-rabbitmq rc=0
+2026-10-26T22:12:54.599Z started_at epoch=1793052774.599 docker start coupon-lab-load-rabbitmq rc=0
+2026-10-26T22:13:01.913Z healthy_at epoch=1793052781.913 coupon-lab-load-rabbitmq healthy
+2026-10-26T22:13:18.307Z k6_ended_at epoch=1793052798.308 k6 exit 0

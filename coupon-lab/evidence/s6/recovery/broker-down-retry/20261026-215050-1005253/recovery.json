@@ -1,0 +1,111 @@
+{
+  "test": "F",
+  "scenario": "broker-down",
+  "stage": "s6",
+  "stock": 10000000,
+  "fault": {
+    "at_s": 20,
+    "duration_s": 15,
+    "observed": {
+      "stopped_at": 1793051571.036,
+      "stop_returned_at": 1793051572.558,
+      "started_at": 1793051587.785,
+      "healthy_at": 1793051595.172
+    }
+  },
+  "totals": {
+    "accepted": 16037,
+    "unconfirmed": 978,
+    "http_5xx": 0,
+    "timeout": 10014,
+    "other": 0
+  },
+  "sent": 27029,
+  "rows": 27029,
+  "rows_by_status": {
+    "ISSUED": 27029
+  },
+  "lost": 0,
+  "lost_sample": [],
+  "recorded_despite_unconfirmed": 10992,
+  "unexplained_rows": 0,
+  "issued": 27029,
+  "over_issue": 0,
+  "issue_rows": 27029,
+  "remaining": 9972971,
+  "dup_members": 0,
+  "dlq_depth": 0,
+  "poison_injected": null,
+  "client_retry": {
+    "retried": 10992,
+    "retry_accepted": 10992,
+    "retry_not_accepted": 0,
+    "already_stored": 433,
+    "already_stored_and_accepted_again": 433,
+    "rows_before": 16470,
+    "rows_after": 27029,
+    "redecided": 0,
+    "redecided_sample": []
+  },
+  "queue_final": 0,
+  "consumers_final": 1,
+  "blackout_s": 27,
+  "error_codes": {
+    "1050": 10014
+  },
+  "settle_s": 57.0,
+  "drain_s": 51.7,
+  "queue_depth_max": 10381,
+  "dlq_depth_max": 0,
+  "metrics": {
+    "coupon_s6_confirm_latency": 27029.0,
+    "coupon_s6_confirm_latency.max": 49.676,
+    "coupon_s6_confirm_latency.total_time": 500370.65,
+    "coupon_s6_processed": 27465.0,
+    "coupon_s6_processed{duplicate=false}": 27029.0,
+    "coupon_s6_processed{duplicate=true}": 436.0,
+    "coupon_s6_processed{status=ISSUED}": 27465.0,
+    "coupon_s6_publish_failures": 10560.0,
+    "coupon_s6_publish_failures{reason=exception}": 10556.0,
+    "coupon_s6_publish_failures{reason=nack}": 4.0,
+    "coupon_s6_redeliveries": 50.0
+  },
+  "must": {
+    "lost_zero": true,
+    "unexplained_rows_zero": true,
+    "over_issue_zero": true,
+    "dup_members_zero": true,
+    "issue_rows_match": true,
+    "dlq_zero": true,
+    "stock_consistent": true,
+    "queue_drained": true,
+    "no_redecision": true
+  },
+  "validity": {
+    "k6_completed": true,
+    "settled": true,
+    "fault_observed": true,
+    "valid": true
+  },
+  "pass": true,
+  "env": {
+    "app_cpus": "2",
+    "hikari_connection_timeout_ms": "2000",
+    "hikari_pool_size": "10",
+    "innodb_buffer_pool_size": "134217728",
+    "innodb_flush_log_at_trx_commit": "1",
+    "innodb_redo_log_capacity": "104857600",
+    "jvm_heap": "1g",
+    "k6_mode": "host",
+    "k6_version": "v2.2.0",
+    "mysql_cpus": "2",
+    "queue_type": "classic",
+    "rabbitmq_cpus": "1",
+    "rabbitmq_image": "rabbitmq:3-management-alpine",
+    "s6_confirm_timeout_ms": "2000",
+    "s6_consumer_fail_every": "0",
+    "s6_queue_max_length": "200000",
+    "stage_has_redis": "false",
+    "tomcat_max_threads": "200"
+  }
+}
