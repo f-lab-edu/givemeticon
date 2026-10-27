@@ -97,7 +97,8 @@ class S6ConsumerSupervisorTest {
         probeScript.addAll(java.util.List.of(true, false, true, true));
         databaseUpNow.set(true);
         long deadline = System.currentTimeMillis() + 2000;
-        while (starts.get() == 0 && System.currentTimeMillis() < deadline) {
+        // the supervisor starts the container first and clears the pause after it: wait for both, not just the start
+        while ((starts.get() == 0 || supervisor.isPaused()) && System.currentTimeMillis() < deadline) {
             Thread.sleep(10);
         }
 
