@@ -1,0 +1,24 @@
+2026-10-27 00:09:28.572437+00:00 [info] <0.254.0> Running boot step rabbit_alarm defined by app rabbit[0m
+[38;5;214m2026-10-27 00:09:29.118624+00:00 [warning] <0.254.0> Classic peer discovery backend: list of nodes does not contain the local node [][0m
+[38;5;214m2026-10-27 00:09:29.336568+00:00 [warning] <0.647.0> Message store "628WB79CIFDYO9LJI6DKMI09L/msg_store_persistent": rebuilding indices from scratch[0m
+[38;5;214m2026-10-27 00:09:29.502488+00:00 [warning] <0.717.0> Deprecated features: `management_metrics_collection`: Feature `management_metrics_collection` is deprecated.[0m
+[38;5;214m2026-10-27 00:09:29.502488+00:00 [warning] <0.717.0> By default, this feature can still be used for now.[0m
+[38;5;214m2026-10-27 00:09:29.502488+00:00 [warning] <0.717.0> Its use will not be permitted by default in a future minor RabbitMQ version and the feature will be removed from a future major RabbitMQ version; actual versions to be determined.[0m
+[38;5;214m2026-10-27 00:09:29.502488+00:00 [warning] <0.717.0> To continue using this feature when it is not permitted by default, set the following parameter in your configuration:[0m
+[38;5;214m2026-10-27 00:09:29.502488+00:00 [warning] <0.717.0>     "deprecated_features.permit.management_metrics_collection = true"[0m
+[38;5;214m2026-10-27 00:09:29.502488+00:00 [warning] <0.717.0> To test RabbitMQ as if the feature was removed, set this in your configuration:[0m
+[38;5;214m2026-10-27 00:09:29.502488+00:00 [warning] <0.717.0>     "deprecated_features.permit.management_metrics_collection = false"[0m
+[38;5;214m2026-10-27 00:10:31.095252+00:00 [warning] <0.710.0> HTTP listener registry could not find context rabbitmq_prometheus_tls[0m
+[38;5;214m2026-10-27 00:10:31.105694+00:00 [warning] <0.710.0> HTTP listener registry could not find context rabbitmq_management_tls[0m
+[38;5;160m2026-10-27 00:10:31.119463+00:00 [error] <0.855.0> Error on AMQP connection <0.855.0> (172.19.0.4:42112 -> 172.19.0.3:5672 - rabbitConnectionFactory#33356666:0, vhost: '/', user: 'coupon', state: running), channel 0:[0m
+[38;5;160m2026-10-27 00:10:31.119463+00:00 [error] <0.855.0>  operation none caused a connection exception connection_forced: "broker forced connection closure with reason 'shutdown'"[0m
+[38;5;214m2026-10-27 00:10:31.123611+00:00 [warning] <0.1669.0> Channel is stopping with 1 pending publisher confirms[0m
+2026-10-27 00:10:31.142525+00:00 [info] <0.2413.0> Closing all connections in vhost '/' on node 'rabbit@46a12d01b485' because the vhost is stopping[0m
+2026-10-27 00:10:52.976282+00:00 [info] <0.254.0> Running boot step rabbit_alarm defined by app rabbit[0m
+[38;5;214m2026-10-27 00:10:54.718137+00:00 [warning] <0.612.0> Deprecated features: `management_metrics_collection`: Feature `management_metrics_collection` is deprecated.[0m
+[38;5;214m2026-10-27 00:10:54.718137+00:00 [warning] <0.612.0> By default, this feature can still be used for now.[0m
+[38;5;214m2026-10-27 00:10:54.718137+00:00 [warning] <0.612.0> Its use will not be permitted by default in a future minor RabbitMQ version and the feature will be removed from a future major RabbitMQ version; actual versions to be determined.[0m
+[38;5;214m2026-10-27 00:10:54.718137+00:00 [warning] <0.612.0> To continue using this feature when it is not permitted by default, set the following parameter in your configuration:[0m
+[38;5;214m2026-10-27 00:10:54.718137+00:00 [warning] <0.612.0>     "deprecated_features.permit.management_metrics_collection = true"[0m
+[38;5;214m2026-10-27 00:10:54.718137+00:00 [warning] <0.612.0> To test RabbitMQ as if the feature was removed, set this in your configuration:[0m
+[38;5;214m2026-10-27 00:10:54.718137+00:00 [warning] <0.612.0>     "deprecated_features.permit.management_metrics_collection = false"[0m
